@@ -1,0 +1,238 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import QuoteBand from '../components/QuoteBand.astro';
+import { showDev } from '../data/site';
+
+/**
+ * Answers marked `pending: true` are policy questions we cannot answer until
+ * supplier terms, freight arrangements and warranties are confirmed. They are
+ * shown honestly rather than filled with plausible-sounding guesses.
+ */
+const groups = [
+  {
+    title: 'Choosing',
+    items: [
+      {
+        q: 'What is the difference between a barrel and a cube sauna?',
+        a: 'Geometry, mostly. A barrel has curved walls, which removes cold corners and reduces the air volume that has to be heated — barrels are known for coming up to temperature quickly. A cube is a flat-roofed rectangular volume, which allows much larger glazing and a more architectural presence. A barrel feels enclosed; a cube feels open to the view.',
+      },
+      {
+        q: 'Indoor or outdoor?',
+        a: 'Outdoor saunas give you more space, a proper cooling area, and a stronger sense of occasion. Indoor saunas get used far more often, because there is no weather between you and the room. If frequency matters more than ceremony, build inside.',
+      },
+      {
+        q: 'What size should I choose?',
+        a: 'Work from how many people will realistically use it at once, then add a little. Bench length decides whether anyone can lie down, which is the single biggest comfort difference. Room volume also determines heater sizing, so size and heater are one decision, not two.',
+      },
+      {
+        q: 'Electric or wood-burning?',
+        a: 'Electric heaters run on a timer, need no tending, and suit indoor rooms and anywhere a flue is impractical. Wood-burning stoves take longer to bring up, need fuel and a flue, and are chosen by people who want the fire to be part of the ritual. Both need to be sized to the room.',
+      },
+    ],
+  },
+  {
+    title: 'Site and installation',
+    items: [
+      {
+        q: 'What does an outdoor sauna need underneath it?',
+        a: 'A level, stable, well-drained base. Depending on the model and your ground conditions that may be a concrete pad, a gravel base, piers or an existing deck rated for the load. We will tell you what a given model requires before you order, but the base itself is arranged locally.',
+      },
+      {
+        q: 'What electrical work is involved?',
+        a: 'Electric heaters generally require a dedicated circuit sized to the heater, installed by a licensed electrician and inspected where your jurisdiction requires it. This should be planned before ordering, not after delivery. We can tell you the electrical requirement for a given heater so your electrician can quote it.',
+      },
+      {
+        q: 'Do I need a permit?',
+        a: 'It depends entirely on your municipality, the size of the structure, whether it is permanent, and where it sits on the lot. Some jurisdictions treat a small outdoor sauna as an accessory structure needing no permit; others do not. Check with your local building department early — it can affect which model makes sense.',
+      },
+      {
+        q: 'Do you install?',
+        a: '',
+        pending: true,
+        note: 'Installation and assembly arrangements vary by model and region. We will publish exactly what is included as soon as it is confirmed. Ask us directly in the meantime.',
+      },
+    ],
+  },
+  {
+    title: 'Ordering and delivery',
+    items: [
+      {
+        q: 'How much does a sauna cost?',
+        a: '',
+        pending: true,
+        note: 'Pricing is not yet published. Cost depends on model, size, heater and delivery location, so we quote in writing rather than listing a figure that will not apply to your situation.',
+      },
+      {
+        q: 'How is it delivered, and how long does it take?',
+        a: '',
+        pending: true,
+        note: 'Freight arrangements and lead times are being finalised with our suppliers and will be published here. Delivery cost depends heavily on your ZIP code, which is why the quote form asks for it.',
+      },
+      {
+        q: 'What warranty is included?',
+        a: '',
+        pending: true,
+        note: 'Warranty terms are set by each manufacturer. We will publish the specific coverage for every model rather than summarising it inaccurately.',
+      },
+      {
+        q: 'Can I see one before buying?',
+        a: '',
+        pending: true,
+        note: 'Showroom and demonstration arrangements have not been finalised. Get in touch and we will tell you what is currently possible in your area.',
+      },
+    ],
+  },
+  {
+    title: 'Living with it',
+    items: [
+      {
+        q: 'How long does a sauna take to heat up?',
+        a: 'This varies with room volume, heater output, insulation and how much glazing there is. A small, well-insulated room reaches temperature considerably faster than a large one with a full glass wall. We will give you the figure for the model you are considering rather than a general number.',
+      },
+      {
+        q: 'How much maintenance is there?',
+        a: 'Less than people expect. Ventilate after use so the timber dries, wipe the benches, and keep the floor clean. Heater stones are periodically restacked and eventually replaced as they break down. Outdoor cabins need their exterior finish maintained on whatever schedule the manufacturer specifies.',
+      },
+      {
+        q: 'Can I use it in winter?',
+        a: 'Yes — winter is arguably when a sauna is best. What matters is that the walk to and from it is manageable in the dark and the cold, which is worth thinking about when you decide where to put it.',
+      },
+    ],
+  },
+];
+
+/**
+ * In production, questions we cannot answer yet are removed entirely rather
+ * than published as "not yet available". A customer sees a complete FAQ; you
+ * still see the gaps while developing.
+ */
+const visibleGroups = groups
+  .map((g) => ({ ...g, items: g.items.filter((i) => showDev || !i.pending) }))
+  .filter((g) => g.items.length > 0);
+
+const answered = groups.flatMap((g) =>
+  g.items.filter((i) => !i.pending).map((i) => ({
+    '@type': 'Question',
+    name: i.q,
+    acceptedAnswer: { '@type': 'Answer', text: i.a },
+  }))
+);
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: answered,
+};
+---
+
+<BaseLayout
+  title="FAQ"
+  description="Common questions about choosing, siting, installing and living with a home sauna."
+>
+  <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} slot="head" />
+
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">FAQ</span>
+      <h1 class="display measure--tight">Questions worth asking first</h1>
+      <p class="lead measure">
+        The questions worth settling before you buy — how the formats differ,
+        what your site needs, and what the room asks of you once it is in.
+        Anything not covered here, ask us directly.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell faq">
+      {visibleGroups.map((g) => (
+        <div class="faq__group">
+          <h2 class="faq__gh">{g.title}</h2>
+          <div class="faq__items">
+            {g.items.map((item) => (
+              <details class="qa">
+                <summary>
+                  <span class="qa__q">{item.q}</span>
+                  <span class="qa__icon" aria-hidden="true"></span>
+                </summary>
+                <div class="qa__a">
+                  {item.pending ? (
+                    <p class="qa__pending"><strong>Not yet published.</strong> {item.note}</p>
+                  ) : (
+                    <p>{item.a}</p>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <QuoteBand
+    heading="Still have a question?"
+    body="Ask it directly. We would rather answer a specific question about your space than have you work it out from a general page."
+  />
+</BaseLayout>
+
+<style>
+  .page-head .lead { margin-top: 1.75rem; }
+
+  .faq__group + .faq__group { margin-top: clamp(3rem, 2rem + 3vw, 5rem); }
+
+  .faq__gh {
+    font-family: var(--font-sans);
+    font-size: var(--t-label);
+    font-weight: 400;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    margin: 0 0 1.5rem;
+  }
+
+  .qa { border-top: 1px solid var(--line); }
+  .qa:last-child { border-bottom: 1px solid var(--line); }
+
+  .qa summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 1.35rem 0;
+    cursor: pointer;
+    list-style: none;
+  }
+  .qa summary::-webkit-details-marker { display: none; }
+
+  .qa__q {
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 1rem + 0.5vw, 1.45rem);
+    line-height: 1.3;
+  }
+
+  .qa__icon {
+    flex: 0 0 auto;
+    position: relative;
+    width: 14px;
+    height: 14px;
+  }
+  .qa__icon::before,
+  .qa__icon::after {
+    content: '';
+    position: absolute;
+    background: var(--bronze);
+    transition: transform 0.4s var(--ease), opacity 0.4s var(--ease);
+  }
+  .qa__icon::before { inset: 6px 0 auto 0; height: 1px; }
+  .qa__icon::after { inset: 0 auto 0 6px; width: 1px; }
+  .qa[open] .qa__icon::after { transform: scaleY(0); opacity: 0; }
+
+  .qa__a { padding-bottom: 1.6rem; max-width: 46em; }
+  .qa__a p { color: var(--muted); margin: 0; }
+  .qa__pending strong { color: var(--ink); font-weight: 500; }
+
+  @media (max-width: 560px) {
+    .qa summary { gap: 1rem; }
+  }
+</style>

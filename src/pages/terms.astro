@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { showDev } from '../data/site';
+---
+
+<BaseLayout title="Terms" noindex={true}>
+  <section class="band">
+    <div class="shell shell--narrow">
+      <span class="eyebrow">Terms</span>
+      <h1 class="display">Terms</h1>
+      {showDev && (<p class="lead">
+        This page is a placeholder. BUXENA's Terms has not yet been published.
+      </p>)}
+      {showDev && (<p class="note">
+        Replace this file with the reviewed text before launch. Because BUXENA
+        sells to customers across the United States, this should be drafted or
+        reviewed by someone familiar with US consumer and privacy law — state
+        requirements vary.
+      </p>)}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .lead { margin-top: 1.75rem; }
+  .note {
+    margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+    font-size: 0.8125rem; color: var(--muted); font-style: italic;
+  }
+</style>

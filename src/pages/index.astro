@@ -1,0 +1,272 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import Figure from '../components/Figure.astro';
+import CollectionCard from '../components/CollectionCard.astro';
+import QuoteBand from '../components/QuoteBand.astro';
+import { categories, showDev } from '../data/site';
+import { getCollection } from 'astro:content';
+
+const saunas = await getCollection('saunas', ({ data }) => !data.draft);
+const countFor = (id: string) => saunas.filter((s) => s.data.category === id).length;
+const featured = categories.filter((c) => countFor(c.id) > 0);
+
+const reasons = [
+  {
+    title: 'Curated European Design',
+    body: 'We select from European makers working in a tradition that treats the sauna as a room, not a novelty. A short range we know completely, rather than a catalogue we do not.',
+  },
+  {
+    title: 'Built Around Your Space',
+    body: 'Room volume, glazing, power supply and access all change what will actually work. We start with your site and specify against it, rather than pointing you at a product page.',
+  },
+  {
+    title: 'Guidance From Selection to Delivery',
+    body: 'The same person handles your enquiry, your quote and your delivery. If a model is wrong for your site, or the work needs an electrician or a permit, you hear it early.',
+  },
+  {
+    title: 'A Better Way to Bring Wellness Home',
+    body: 'Buying a sauna in the United States is harder than it should be. We are trying to make it a considered purchase rather than a leap of faith.',
+  },
+];
+
+const steps = [
+  { n: '01', title: 'Tell us the space', body: 'Send dimensions, photographs and a sense of how you want to use it. A rough sketch is enough to start.' },
+  { n: '02', title: 'We specify options', body: 'You get a written quote with the models that suit the site, heater sizing, and what the installation will ask of you.' },
+  { n: '03', title: 'Prepare the site', body: 'Base, power and access are agreed before anything is ordered, so delivery day holds no surprises.' },
+  { n: '04', title: 'Delivery and handover', body: 'We coordinate the freight and walk you through first heat, care and the rhythm of using it.' },
+];
+---
+
+<BaseLayout title="home" overHero={true}>
+  <Hero />
+
+  <!-- Introduction -->
+  <section class="band" id="intro">
+    <div class="shell intro">
+      <div class="intro__left reveal">
+        <span class="eyebrow">BUXENA</span>
+        <h2 class="h2">
+          A sauna is a room that asks nothing of you.<br />
+          <span class="serif-italic">That is the whole idea.</span>
+        </h2>
+      </div>
+      <div class="intro__right reveal">
+        <p class="lead">
+          BUXENA brings European-designed saunas to homes across the United
+          States — outdoor cabins, indoor rooms, barrels and cubes, selected for
+          build quality rather than breadth of catalogue.
+        </p>
+        <p>
+          We are a small operation, and we prefer it that way. Every enquiry is
+          answered by someone who knows the range, has looked at your dimensions,
+          and will tell you plainly if what you have in mind will not work.
+        </p>
+        <a class="link" href="/our-story/">Our story <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured collections -->
+  <section class="band band--deep">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">The Range</span>
+        <h2 class="h2 measure--tight">Four ways to put heat in a home</h2>
+      </div>
+
+      <div class="grid cols-4 reveal">
+        {featured.map((c) => (
+          <CollectionCard
+            name={c.name}
+            blurb={c.blurb}
+            href={`/collections/${c.id}/`}
+            count={countFor(c.id)}
+            note={`${c.name} — representative collection image, exterior or interior, consistent treatment across all four cards.`}
+          />
+        ))}
+      </div>
+
+      <p class="more-link reveal">
+        <a class="link" href="/saunas/">View every model <span class="arrow" aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Why BUXENA -->
+  <section class="band band--ember">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Why BUXENA</span>
+        <h2 class="h2 measure--tight">Small range. Long conversations.</h2>
+      </div>
+      <div class="grid cols-4 why reveal">
+        {reasons.map((r) => (
+          <div class="why__item">
+            <span class="slats" aria-hidden="true"></span>
+            <h3 class="h3 why__title">{r.title}</h3>
+            <p class="why__body">{r.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- European design, selected for American homes -->
+  <section class="band">
+    <div class="shell split">
+      <div class="split__media reveal">
+        <Figure
+          alt="Timber cladding detail"
+          note="DESIGN — tight detail of timber: end grain, a chamfered edge, or the shadow gap between two boards. Raking natural light, shallow depth of field."
+          ratio="4 / 5"
+          tone="light"
+        />
+      </div>
+      <div class="split__text reveal">
+        <span class="eyebrow">European Design. Selected for American Homes.</span>
+        <h2 class="h2">We do not build them. We choose them, carefully.</h2>
+        <p class="lead">
+          BUXENA is a curator and importer, not a manufacturer. Our work is
+          selection — finding European makers whose saunas are worth putting in
+          an American home, and then standing behind that choice.
+        </p>
+        <p>
+          The sauna is a northern European invention refined over centuries in
+          places where winter is long and warmth is not decorative. That
+          inheritance produces conventions worth insisting on: benches set at the
+          height where heat actually gathers, shadow gaps that let timber move
+          with humidity, fixings kept away from skin, joinery that expects a
+          hundred cycles of hot and cold every year.
+        </p>
+        <p>
+          Those are the details we select for, because they decide whether a
+          sauna is still good in year ten. Bringing them here is the other half
+          of the job: matching a European product to American homes, American
+          electrical supply and American freight.
+        </p>
+        {showDev && (
+          <p class="split__note">
+            DEV NOTE — supplier names, timber species and mill sources to be added
+            once agreements are confirmed. Hidden in production.
+          </p>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Wellness -->
+  <section class="band band--birch">
+    <div class="shell wellness">
+      <div class="sec-head reveal">
+        <span class="eyebrow">The Ritual</span>
+        <h2 class="h2 measure--tight">Heat, cold, rest — and then again</h2>
+        <p class="lead measure">
+          The sauna is not a machine you sit inside. It is a rhythm, and the
+          pauses are as much a part of it as the heat.
+        </p>
+      </div>
+
+      <div class="grid cols-3 reveal">
+        <Figure alt="Steam rising from heater stones" note="RITUAL 01 — löyly: water hitting hot stones, steam rising. Backlit, dark ground." ratio="3 / 4" tone="dark" />
+        <Figure alt="Cooling outdoors after a round" note="RITUAL 02 — cooling: figure on a deck or by water, wrapped, breath visible. Cool blue light, contrast to the warm frames." ratio="3 / 4" tone="mid" />
+        <Figure alt="Resting between rounds" note="RITUAL 03 — rest: quiet interior, towel and bucket, nobody in frame. Stillness." ratio="3 / 4" tone="light" />
+      </div>
+
+      <p class="wellness__foot reveal">
+        <a class="link" href="/wellness/">How to use a sauna well <span class="arrow" aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Process -->
+  <section class="band">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">How It Works</span>
+        <h2 class="h2 measure--tight">Four steps, in order</h2>
+      </div>
+
+      <ol class="steps reveal">
+        {steps.map((s) => (
+          <li class="step">
+            <span class="step__n">{s.n}</span>
+            <div class="step__body">
+              <h3 class="h3">{s.title}</h3>
+              <p>{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <QuoteBand />
+</BaseLayout>
+
+<style>
+  /* --- intro --- */
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    align-items: start;
+  }
+  .intro__left .h2 { line-height: 1.14; }
+
+  /* --- collections --- */
+  .more-link { margin-top: clamp(2.5rem, 1.5rem + 2.5vw, 4rem); }
+
+  /* --- why --- */
+  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.75rem; }
+  .why__title { margin-bottom: 0.85rem; }
+  .why__body { font-size: var(--t-small); color: var(--muted-dark); line-height: 1.75; }
+
+  /* --- craftsmanship split --- */
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    align-items: center;
+  }
+  .split__text .h2 { margin-bottom: 1.75rem; }
+  .split__text .lead { margin-bottom: 1.5rem; }
+  .split__note {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.8125rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* --- wellness --- */
+  .wellness__foot { margin-top: clamp(2.5rem, 1.5rem + 2.5vw, 4rem); }
+
+  /* --- steps --- */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(1.75rem, 0.6rem + 3vw, 3.5rem);
+  }
+  .step { padding-top: 1.75rem; border-top: 1px solid var(--line); }
+  .step__n {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    line-height: 1;
+    color: var(--bronze);
+    margin-bottom: 1.1rem;
+  }
+  .step__body .h3 { margin-bottom: 0.7rem; }
+  .step__body p { font-size: var(--t-small); color: var(--muted); line-height: 1.75; }
+
+  @media (max-width: 900px) {
+    .intro, .split { grid-template-columns: 1fr; }
+    .split__media { order: 2; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .steps { grid-template-columns: 1fr; }
+  }
+</style>

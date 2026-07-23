@@ -1,0 +1,84 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import QuoteForm from '../components/QuoteForm.astro';
+import { publicEmail } from '../data/site';
+
+const expect = [
+  'A written quote covering the models that suit your space',
+  'Heater sizing and the electrical requirement that comes with it',
+  'What the site needs — base, access, clearances',
+  'Delivery cost to your ZIP code',
+];
+---
+
+<BaseLayout
+  title="Request a Quote"
+  description="Tell us about your space and we will send a written quote with the models that fit it."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Request a Quote</span>
+      <h1 class="display measure--tight">Tell us about your space</h1>
+      <p class="lead measure">
+        The more you can tell us about where the sauna is going, the more useful
+        our answer will be. Rough dimensions and a photograph are plenty to start.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell quote">
+      <div class="quote__form">
+        <QuoteForm />
+      </div>
+      <aside class="quote__side">
+        <h2 class="quote__h">What you will get back</h2>
+        <ul class="quote__list">
+          {expect.map((e) => <li>{e}</li>)}
+        </ul>
+        <p class="quote__note">
+          If a model is wrong for your site, we will tell you that too.
+        </p>
+        {publicEmail && (
+          <p class="quote__alt">
+            Prefer email? <a href={`mailto:${publicEmail}`}>{publicEmail}</a>
+          </p>
+        )}
+      </aside>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head .lead { margin-top: 1.75rem; }
+
+  .quote {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.75fr);
+    gap: clamp(2.5rem, 1rem + 5vw, 6rem);
+    align-items: start;
+  }
+
+  .quote__side { border-top: 2px solid var(--ink); padding-top: 1.75rem; }
+
+  .quote__h {
+    font-family: var(--font-sans);
+    font-size: var(--t-label);
+    font-weight: 400;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    margin: 0 0 1.5rem;
+  }
+
+  .quote__list { font-size: var(--t-small); color: var(--muted); }
+  .quote__list li { padding: 0.7rem 0; border-bottom: 1px solid var(--line); line-height: 1.7; }
+
+  .quote__note { margin-top: 1.75rem; font-size: var(--t-small); font-style: italic; color: var(--muted); }
+  .quote__alt { margin-top: 1.5rem; font-size: var(--t-small); }
+  .quote__alt a { color: var(--bronze-ink); }
+
+  @media (max-width: 900px) {
+    .quote { grid-template-columns: 1fr; }
+    .quote__side { order: -1; }
+  }
+</style>
