@@ -1,0 +1,15 @@
+BUXENA - hero preview
+
+Double-click  index.html
+
+Extract this folder first. Opening index.html from inside a Windows zip
+preview window will not load the images.
+
+The hero image is a NEUTRAL STAND-IN, not a photograph and not a landscape
+illustration. It is a dark defocused abstraction whose only job is to let you
+judge the composition, typography and motion.
+
+To drop in real media, in the full source package:
+    photograph  ->  public/images/hero.jpg
+    video       ->  public/media/hero.mp4
+Then rebuild. Video takes priority. No code changes needed.
