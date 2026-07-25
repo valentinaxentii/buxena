@@ -14,13 +14,20 @@
   --basalt: #2a2622;       /* raised surface on dark                       */
   --bronze: #9c7a4a;       /* accent — rules, hovers, large marks          */
   --bronze-soft: #c4a277;  /* accent on dark grounds                       */
-  --bronze-ink: #7e6038;   /* accent for SMALL text on light (contrast)    */
+  --bronze-ink: #6e532f;   /* accent for SMALL text on light (contrast)    */
   --bronze-btn: #8f6e42;   /* solid button ground — 4.69:1 with white      */
   --ink: #241f1a;          /* body text on light                           */
-  --muted: #6b6156;        /* secondary text on light                      */
-  --muted-dark: #a99f92;   /* secondary text on dark                       */
-  --line: #d9d0c2;         /* hairlines on light                           */
+  --muted: #4d4238;        /* secondary text on light — warm charcoal, not pale grey */
+  --muted-dark: #c2b8a9;   /* secondary text on dark                       */
+  --line: #cbbfa9;         /* hairlines on light — a touch more visible    */
   --line-dark: #3a352f;    /* hairlines on dark                            */
+
+  /* named BUXENA brand aliases — sourced from the logo artwork (brand/ folder) */
+  --buxena-brown: var(--ember);     /* deep brown-black of the wordmark & roofline */
+  --buxena-gold: var(--bronze);     /* muted gold of the steam mark & tagline      */
+  --buxena-cream: var(--linen);     /* warm cream/beige page background            */
+  --buxena-charcoal: var(--ink);    /* dark charcoal body text                     */
+  --buxena-border: var(--line);     /* subtle warm border/hairline                 */
 
   /* wood tones — used only by placeholder art, replaced by real photography */
   --wood-1: #c9a67c;
@@ -36,16 +43,16 @@
   --t-h1: clamp(2.4rem, 1.5rem + 3.9vw, 5rem);
   --t-h2: clamp(1.9rem, 1.35rem + 2.4vw, 3.4rem);
   --t-h3: clamp(1.35rem, 1.1rem + 1.1vw, 1.9rem);
-  --t-lead: clamp(1.06rem, 0.98rem + 0.42vw, 1.32rem);
-  --t-body: 1.0625rem;
-  --t-small: 0.875rem;
-  --t-label: 0.6875rem;
+  --t-lead: clamp(1.15rem, 1.05rem + 0.5vw, 1.375rem);
+  --t-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --t-small: 0.9375rem;
+  --t-label: 0.8125rem;
 
   /* --- layout ------------------------------------------------------------ */
   --shell: 78rem;      /* standard content width  */
   --shell-narrow: 46rem;
   --gutter: clamp(1.25rem, 0.6rem + 2.8vw, 3.5rem);
-  --band: clamp(4.5rem, 2.6rem + 8vw, 9.5rem);   /* vertical section rhythm */
+  --band: clamp(2.5rem, 1.45rem + 4.4vw, 5.2rem);   /* vertical section rhythm, ~45% tighter than original */
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
@@ -63,8 +70,8 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--t-body);
-  font-weight: 300;
-  line-height: 1.78;
+  font-weight: 400;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
@@ -74,14 +81,16 @@ img, svg, video { display: block; max-width: 100%; height: auto; }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  font-weight: 300;
-  line-height: 1.07;
+  font-weight: 500;
+  line-height: 1.1;
   letter-spacing: -0.012em;
   margin: 0;
   text-wrap: balance;
 }
 
-p { margin: 0 0 1.15em; text-wrap: pretty; }
+h1 { font-weight: 600; }
+
+p { margin: 0 0 0.9em; text-wrap: pretty; }
 p:last-child { margin-bottom: 0; }
 
 a { color: inherit; }
@@ -146,12 +155,12 @@ button { font: inherit; color: inherit; }
    ========================================================================== */
 .eyebrow {
   font-family: var(--font-sans);
-  font-size: var(--t-label);
-  font-weight: 400;
-  letter-spacing: 0.34em;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--bronze-ink);
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.85rem;
   display: block;
 }
 .band--ember .eyebrow { color: var(--bronze-soft); }
@@ -162,9 +171,9 @@ button { font: inherit; color: inherit; }
 
 .lead {
   font-size: var(--t-lead);
-  line-height: 1.72;
+  line-height: 1.5;
   color: var(--muted);
-  font-weight: 300;
+  font-weight: 400;
 }
 .band--ember .lead { color: var(--muted-dark); }
 
@@ -208,9 +217,9 @@ button { font: inherit; color: inherit; }
   align-items: center;
   gap: 0.7rem;
   font-family: var(--font-sans);
-  font-size: var(--t-label);
-  font-weight: 400;
-  letter-spacing: 0.2em;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   text-decoration: none;
   padding: 1.05rem 2.1rem;
@@ -238,8 +247,9 @@ button { font: inherit; color: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  font-size: var(--t-label);
-  letter-spacing: 0.2em;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   text-decoration: none;
   color: var(--bronze-ink);
@@ -257,8 +267,8 @@ button { font: inherit; color: inherit; }
 /* ==========================================================================
    Section heading block
    ========================================================================== */
-.sec-head { margin-bottom: clamp(2.5rem, 1.4rem + 3vw, 4.5rem); }
-.sec-head .lead { margin-top: 1.6rem; }
+.sec-head { margin-bottom: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); }
+.sec-head .lead { margin-top: 1.2rem; }
 
 /* ==========================================================================
    Scroll reveal — subtle, and fully disabled under reduced-motion
@@ -283,7 +293,7 @@ button { font: inherit; color: inherit; }
 /* ==========================================================================
    Utility
    ========================================================================== */
-.grid { display: grid; gap: clamp(1.25rem, 0.7rem + 2vw, 2.5rem); }
+.grid { display: grid; gap: clamp(0.8rem, 0.45rem + 1.2vw, 1.5rem); }
 .cols-2 { grid-template-columns: repeat(2, 1fr); }
 .cols-3 { grid-template-columns: repeat(3, 1fr); }
 .cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -298,3 +308,85 @@ button { font: inherit; color: inherit; }
 .stack-lg > * + * { margin-top: 2rem; }
 .center { text-align: center; }
 .mx-auto { margin-inline: auto; }
+
+/* Compact "Plan Your Sauna" entry-point CTA — shared across pages */
+.plan-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 165px;
+  height: 40px;
+  margin-top: 0.85rem;
+  padding: 0 1rem;
+  background: var(--bronze-btn);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 0.3s var(--ease);
+}
+.plan-cta:hover { background: var(--bronze-ink); }
+
+/* ==========================================================================
+   Legal / policy pages — shared, compact typography and rhythm.
+   One definition used by Privacy, Terms, Shipping, Returns, Warranty and
+   Accessibility so all six stay visually identical.
+   ========================================================================== */
+.legal { max-width: 56rem; }
+.legal .display { font-size: clamp(1.5rem, 0.95rem + 2.5vw, 3.2rem); }
+.legal .lead { font-size: clamp(0.95rem, 0.87rem + 0.42vw, 1.14rem); margin-top: 0.9rem; }
+.page-head:has(.legal) { padding-bottom: 0; }
+.legal .legal__updated { margin: 0.8rem 0 0; font-size: var(--t-small); color: var(--muted); }
+.legal .legal-contact { margin-top: 1rem; }
+
+.legal__toc {
+  margin-bottom: clamp(0.9rem, 0.53rem + 0.91vw, 1.44rem);
+  padding-bottom: clamp(0.72rem, 0.43rem + 0.72vw, 1.08rem);
+  border-bottom: 1px solid var(--line);
+}
+.legal__toc ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 2rem;
+}
+.legal__toc a {
+  font-size: 0.8125rem;
+  color: var(--bronze-ink);
+  text-decoration: none;
+}
+.legal__toc a:hover { color: var(--ink); text-decoration: underline; }
+
+.legal__body article + article {
+  margin-top: clamp(0.83rem, 0.53rem + 0.53vw, 1.08rem);
+  padding-top: clamp(0.83rem, 0.53rem + 0.53vw, 1.08rem);
+  border-top: 1px solid var(--line);
+}
+.legal__body h2 {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.legal__body p {
+  font-size: clamp(0.77rem, 0.73rem + 0.175vw, 0.85rem);
+  color: var(--ink);
+  line-height: 1.3;
+  margin-bottom: 0.7em;
+}
+.legal__body ul { margin: 0 0 0.7em; padding-left: 1.4rem; list-style: disc; }
+.legal__body li {
+  font-size: clamp(0.77rem, 0.73rem + 0.175vw, 0.85rem);
+  color: var(--ink);
+  line-height: 1.3;
+  padding: 0.1rem 0;
+}
+.legal__body a { color: var(--bronze-ink); }
+.legal__body a:hover { color: var(--ink); }
+
+@media (max-width: 640px) {
+  .legal__toc ol { grid-template-columns: 1fr; }
+}

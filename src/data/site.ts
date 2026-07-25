@@ -18,17 +18,16 @@ export const site = {
   description:
     'BUXENA selects European-designed saunas for American homes — outdoor cabins, indoor rooms, barrel and cube. Chosen, specified and delivered with guidance at every step.',
 
-  /**
-   * UNCONFIRMED. Shown in development only, hidden in production builds,
-   * until this mailbox is known to exist. Set `emailConfirmed` to true to
-   * publish it.
-   */
-  email: 'hello@buxena.com',
-  emailConfirmed: false,
+  email: 'info@buxena.com',
+  emailConfirmed: true,
 
   phone: '',
   city: '',
   instagram: '',
+
+  // Default social-share preview image (1200×630). Individual pages may
+  // override with their own image where one exists (e.g. product pages).
+  ogImage: '/images/og-default.jpg',
 };
 
 /** The email address, or null when it must not be shown to customers. */

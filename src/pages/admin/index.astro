@@ -1,0 +1,105 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import '../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../lib/supabase-admin';
+
+const PIPELINE_STAGES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
+
+let dbReady = true;
+let kpis = {
+  newLeads: 0,
+  newQuoteRequests: 0,
+  openQuotes: 0,
+  awaitingFollowUp: 0,
+  ordersInProgress: 0,
+  unitsInStock: 0,
+  incomingInventory: 0,
+  recentEnquiries: 0,
+};
+let pipelineCounts: Record<string, number> = {};
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [
+    newLeads,
+    newQuoteRequests,
+    openQuotes,
+    awaitingFollowUp,
+    ordersInProgress,
+    inventoryRows,
+    recentEnquiries,
+    leadStatusRows,
+  ] = await Promise.all([
+    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'New Lead'),
+    supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'Draft'),
+    supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', ['Sent', 'Viewed', 'Negotiating']),
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .lte('follow_up_date', today)
+      .not('status', 'in', '("Won","Lost")'),
+    supabase.from('orders').select('id', { count: 'exact', head: true }).not('status', 'in', '("Delivered","Installed")'),
+    supabase.from('inventory').select('in_stock, incoming'),
+    supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
+    supabase.from('leads').select('status'),
+  ]);
+
+  kpis = {
+    newLeads: newLeads.count ?? 0,
+    newQuoteRequests: newQuoteRequests.count ?? 0,
+    openQuotes: openQuotes.count ?? 0,
+    awaitingFollowUp: awaitingFollowUp.count ?? 0,
+    ordersInProgress: ordersInProgress.count ?? 0,
+    unitsInStock: (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.in_stock ?? 0), 0),
+    incomingInventory: (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.incoming ?? 0), 0),
+    recentEnquiries: recentEnquiries.count ?? 0,
+  };
+
+  for (const stage of PIPELINE_STAGES) pipelineCounts[stage] = 0;
+  for (const row of leadStatusRows.data ?? []) {
+    if (row.status in pipelineCounts) pipelineCounts[row.status]++;
+  }
+} catch {
+  dbReady = false;
+}
+---
+
+<AdminLayout title="Dashboard">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 2rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>
+        Set <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code> and
+        <code>SUPABASE_SERVICE_ROLE_KEY</code>, then run <code>supabase/schema.sql</code> in your
+        project's SQL editor. See <code>README-ADMIN.md</code> for exact steps.
+      </p>
+    </div>
+  )}
+
+  <div class="admin-kpis">
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.newLeads}</span><span class="admin-kpi__label">New Leads</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.newQuoteRequests}</span><span class="admin-kpi__label">New Quote Requests</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.openQuotes}</span><span class="admin-kpi__label">Open Quotes</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.awaitingFollowUp}</span><span class="admin-kpi__label">Awaiting Follow-Up</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.ordersInProgress}</span><span class="admin-kpi__label">Orders In Progress</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.unitsInStock}</span><span class="admin-kpi__label">Units In Stock</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.incomingInventory}</span><span class="admin-kpi__label">Incoming Inventory</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.recentEnquiries}</span><span class="admin-kpi__label">New Website Enquiries</span></div>
+  </div>
+
+  <h2 class="admin-section-title">Sales Pipeline</h2>
+  <div class="admin-pipeline">
+    {PIPELINE_STAGES.map((stage) => (
+      <div class="admin-pipeline__stage">
+        <span class="admin-pipeline__count">{pipelineCounts[stage] ?? 0}</span>
+        <span class="admin-pipeline__label">{stage}</span>
+      </div>
+    ))}
+  </div>
+
+  <a class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
+</AdminLayout>

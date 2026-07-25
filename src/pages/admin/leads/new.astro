@@ -1,0 +1,126 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const STATUSES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
+const SOURCES = ['Website', 'Instagram', 'Facebook', 'Google', 'Referral', 'Manual'];
+
+let products: any[] = [];
+let staff: any[] = [];
+let error: string | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  const [productRows, staffRows] = await Promise.all([
+    supabase.from('products').select('id, model_name').order('model_name'),
+    supabase.from('profiles').select('id, full_name'),
+  ]);
+  products = productRows.data ?? [];
+  staff = staffRows.data ?? [];
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const payload = {
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? '') || null,
+      phone: String(form.get('phone') ?? '') || null,
+      state: String(form.get('state') ?? '') || null,
+      source: String(form.get('source') ?? 'Manual'),
+      product_id: String(form.get('product_id') ?? '') || null,
+      location_type: String(form.get('location_type') ?? '') || null,
+      budget: form.get('budget') ? Number(form.get('budget')) : null,
+      heater_preference: String(form.get('heater_preference') ?? '') || null,
+      timeline: String(form.get('timeline') ?? '') || null,
+      notes: String(form.get('notes') ?? '') || null,
+      follow_up_date: String(form.get('follow_up_date') ?? '') || null,
+      assigned_staff: String(form.get('assigned_staff') ?? '') || null,
+      status: String(form.get('status') ?? 'New Lead'),
+    };
+
+    if (!payload.name) {
+      error = 'Name is required.';
+    } else {
+      const { data, error: insertError } = await supabase.from('leads').insert(payload).select('id').single();
+      if (insertError) {
+        error = insertError.message;
+      } else {
+        return Astro.redirect(`/admin/leads/${data.id}`);
+      }
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="New Lead">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form" method="POST">
+    <label class="admin-field"><span>Name *</span><input type="text" name="name" required /></label>
+    <label class="admin-field"><span>Email</span><input type="email" name="email" /></label>
+    <label class="admin-field"><span>Phone</span><input type="tel" name="phone" /></label>
+    <label class="admin-field"><span>State</span><input type="text" name="state" /></label>
+
+    <label class="admin-field">
+      <span>Source</span>
+      <select name="source">{SOURCES.map((s) => <option value={s}>{s}</option>)}</select>
+    </label>
+    <label class="admin-field">
+      <span>Sauna Model of Interest</span>
+      <select name="product_id">
+        <option value="">— none —</option>
+        {products.map((p) => <option value={p.id}>{p.model_name}</option>)}
+      </select>
+    </label>
+
+    <label class="admin-field">
+      <span>Indoor / Outdoor</span>
+      <select name="location_type">
+        <option value="">— unspecified —</option>
+        <option value="indoor">Indoor</option>
+        <option value="outdoor">Outdoor</option>
+      </select>
+    </label>
+    <label class="admin-field"><span>Budget (USD)</span><input type="number" step="0.01" name="budget" /></label>
+
+    <label class="admin-field"><span>Heater Preference</span><input type="text" name="heater_preference" /></label>
+    <label class="admin-field"><span>Timeline</span><input type="text" name="timeline" placeholder="e.g. Within 3 months" /></label>
+
+    <label class="admin-field"><span>Follow-Up Date</span><input type="date" name="follow_up_date" /></label>
+    <label class="admin-field">
+      <span>Assigned Staff</span>
+      <select name="assigned_staff">
+        <option value="">— unassigned —</option>
+        {staff.map((s) => <option value={s.id}>{s.full_name || s.id}</option>)}
+      </select>
+    </label>
+
+    <label class="admin-field">
+      <span>Status</span>
+      <select name="status">{STATUSES.map((s) => <option value={s}>{s}</option>)}</select>
+    </label>
+
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Lead</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/leads">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error {
+    padding: 0.85rem 1rem;
+    font-size: 0.85rem;
+    color: #e6b7a0;
+    background: rgba(230, 130, 90, 0.06);
+    border: 1px solid rgba(230, 130, 90, 0.35);
+    border-radius: 2px;
+  }
+</style>

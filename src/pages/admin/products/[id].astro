@@ -1,0 +1,118 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const { id } = Astro.params;
+let product: any = null;
+let suppliers: any[] = [];
+let error: string | null = null;
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    if (String(form.get('_intent')) === 'delete') {
+      await supabase.from('products').delete().eq('id', id);
+      return Astro.redirect('/admin/products');
+    }
+    const width = form.get('width');
+    const depth = form.get('depth');
+    const height = form.get('height');
+    const payload = {
+      model_name: String(form.get('model_name') ?? ''),
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      category: String(form.get('category') ?? '') || null,
+      cost: form.get('cost') ? Number(form.get('cost')) : null,
+      selling_price: form.get('selling_price') ? Number(form.get('selling_price')) : null,
+      dimensions: width || depth || height ? { width, depth, height, unit: 'in' } : null,
+      capacity: String(form.get('capacity') ?? '') || null,
+      timber_type: String(form.get('timber_type') ?? '') || null,
+      glass_configuration: String(form.get('glass_configuration') ?? '') || null,
+      heater_options: String(form.get('heater_options') ?? '')
+        .split(',').map((s) => s.trim()).filter(Boolean),
+      electrical_requirements: String(form.get('electrical_requirements') ?? '') || null,
+      weight_kg: form.get('weight_kg') ? Number(form.get('weight_kg')) : null,
+      shipping_dimensions: String(form.get('shipping_dimensions') ?? '') || null,
+      stock_quantity: form.get('stock_quantity') ? Number(form.get('stock_quantity')) : 0,
+      brochure_url: String(form.get('brochure_url') ?? '') || null,
+      installation_manual_url: String(form.get('installation_manual_url') ?? '') || null,
+      warranty_document_url: String(form.get('warranty_document_url') ?? '') || null,
+      is_active: form.get('is_active') === 'on',
+    };
+    const { error: updateError } = await supabase.from('products').update(payload).eq('id', id);
+    if (updateError) error = updateError.message;
+  }
+
+  const [productRow, supplierRows] = await Promise.all([
+    supabase.from('products').select('*').eq('id', id).single(),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+  if (productRow.error || !productRow.data) notFound = true;
+  else product = productRow.data;
+  suppliers = supplierRows.data ?? [];
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+const dims = product?.dimensions ?? {};
+---
+
+<AdminLayout title={product ? product.model_name : 'Product'}>
+  {notFound && <p class="admin-empty">Product not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {product && (
+    <>
+      <form class="admin-form" method="POST">
+        <label class="admin-field"><span>Model Name *</span><input type="text" name="model_name" value={product.model_name} required /></label>
+        <label class="admin-field">
+          <span>Supplier</span>
+          <select name="supplier_id"><option value="">— none —</option>{suppliers.map((s) => <option value={s.id} selected={s.id === product.supplier_id}>{s.name}</option>)}</select>
+        </label>
+        <label class="admin-field"><span>Category</span><input type="text" name="category" value={product.category ?? ''} /></label>
+        <label class="admin-field"><span>Active</span>
+          <select name="is_active"><option value="on" selected={product.is_active}>Active</option><option value="" selected={!product.is_active}>Inactive</option></select>
+        </label>
+
+        <label class="admin-field"><span>EXW / Product Cost</span><input type="number" step="0.01" name="cost" value={product.cost ?? ''} /></label>
+        <label class="admin-field"><span>Selling Price</span><input type="number" step="0.01" name="selling_price" value={product.selling_price ?? ''} /></label>
+
+        <label class="admin-field"><span>Width (in)</span><input type="number" step="0.1" name="width" value={dims.width ?? ''} /></label>
+        <label class="admin-field"><span>Depth (in)</span><input type="number" step="0.1" name="depth" value={dims.depth ?? ''} /></label>
+        <label class="admin-field"><span>Height (in)</span><input type="number" step="0.1" name="height" value={dims.height ?? ''} /></label>
+        <label class="admin-field"><span>Capacity</span><input type="text" name="capacity" value={product.capacity ?? ''} /></label>
+
+        <label class="admin-field"><span>Timber Type</span><input type="text" name="timber_type" value={product.timber_type ?? ''} /></label>
+        <label class="admin-field"><span>Glass Configuration</span><input type="text" name="glass_configuration" value={product.glass_configuration ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Heater Options (comma-separated)</span><input type="text" name="heater_options" value={(product.heater_options ?? []).join(', ')} /></label>
+        <label class="admin-field"><span>Electrical Requirements</span><input type="text" name="electrical_requirements" value={product.electrical_requirements ?? ''} /></label>
+        <label class="admin-field"><span>Weight (kg)</span><input type="number" step="0.1" name="weight_kg" value={product.weight_kg ?? ''} /></label>
+        <label class="admin-field"><span>Shipping Dimensions</span><input type="text" name="shipping_dimensions" value={product.shipping_dimensions ?? ''} /></label>
+        <label class="admin-field"><span>Stock Quantity</span><input type="number" name="stock_quantity" value={product.stock_quantity ?? 0} /></label>
+
+        <label class="admin-field"><span>Brochure URL</span><input type="text" name="brochure_url" value={product.brochure_url ?? ''} /></label>
+        <label class="admin-field"><span>Installation Manual URL</span><input type="text" name="installation_manual_url" value={product.installation_manual_url ?? ''} /></label>
+        <label class="admin-field"><span>Warranty Document URL</span><input type="text" name="warranty_document_url" value={product.warranty_document_url ?? ''} /></label>
+
+        <div class="admin-form__actions">
+          <button class="admin-btn" type="submit">Save Changes</button>
+          <a class="admin-btn admin-btn--ghost" href="/admin/products">Back to Products</a>
+        </div>
+      </form>
+
+      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this product? This cannot be undone.');">
+        <input type="hidden" name="_intent" value="delete" />
+        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Product</button>
+      </form>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

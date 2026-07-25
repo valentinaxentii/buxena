@@ -3,7 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Figure from '../../components/Figure.astro';
 import QuoteForm from '../../components/QuoteForm.astro';
 import ProductCard from '../../components/ProductCard.astro';
-import { categoryMap, showDev } from '../../data/site';
+import { categoryMap, showDev, site } from '../../data/site';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -39,9 +39,11 @@ const TBC = 'To be confirmed';
  */
 const verifiedRows = [
   { label: 'Collection', value: cat?.name ?? data.category },
+  ...(data.series ? [{ label: 'Series', value: data.series }] : []),
   ...(data.capacity ? [{ label: 'Capacity', value: data.capacity }] : []),
   ...(data.dimensions ?? []),
   ...(data.specs ?? []),
+  ...(data.delivery ? [{ label: 'Delivery', value: data.delivery }] : []),
 ];
 
 const pendingRows = [
@@ -55,6 +57,7 @@ const blocks = [
   { title: 'Materials', items: data.materials },
   { title: 'Heater options', items: data.heaterOptions },
   { title: 'Features', items: data.features },
+  { title: 'Available options', items: data.options },
 ];
 
 const hasDownloads = (data.downloads ?? []).some((d) => d.file);
@@ -64,9 +67,44 @@ const hasVerifiedDetail =
   verifiedRows.length > 1 || blocks.some((b) => b.items?.length) || hasDownloads;
 
 const showSpecs = showDev || hasVerifiedDetail;
+
+// Structured data — verified fields only. No price/offers/rating: none of
+// that is published, and none should be invented.
+const productImage = data.heroImage.src ? new URL(data.heroImage.src, Astro.site).href : undefined;
+
+const productSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: data.title,
+  description: data.summary,
+  ...(productImage ? { image: [productImage] } : {}),
+  brand: { '@type': 'Brand', name: site.name },
+  ...(data.materials?.length ? { material: data.materials.join(', ') } : {}),
+};
+
+const locationLabel = data.location === 'outdoor' ? 'Outdoor Saunas' : data.location === 'indoor' ? 'Indoor Saunas' : null;
+const breadcrumbItems = [
+  { '@type': 'ListItem', position: 1, name: 'Saunas', item: new URL('/saunas/', Astro.site).href },
+  ...(locationLabel
+    ? [{ '@type': 'ListItem', position: 2, name: locationLabel, item: new URL(`/saunas/${data.location}-saunas/`, Astro.site).href }]
+    : []),
+  {
+    '@type': 'ListItem',
+    position: locationLabel ? 3 : 2,
+    name: data.title,
+    item: new URL(`/saunas/${entry.id}/`, Astro.site).href,
+  },
+];
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: breadcrumbItems,
+};
 ---
 
-<BaseLayout title={data.title} description={data.summary}>
+<BaseLayout title={data.title} description={data.summary} image={data.heroImage.src}>
+  <script type="application/ld+json" set:html={JSON.stringify(productSchema)} slot="head" />
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} slot="head" />
   <article>
     <!-- Header -->
     <section class="band band--tight prod-head">
@@ -74,7 +112,13 @@ const showSpecs = showDev || hasVerifiedDetail;
         <nav class="crumbs" aria-label="Breadcrumb">
           <a href="/saunas/">Saunas</a>
           <span aria-hidden="true">/</span>
-          <a href={`/collections/${data.category}/`}>{cat?.name}</a>
+          {data.location ? (
+            <a href={`/saunas/${data.location}-saunas/`}>
+              {data.location === 'outdoor' ? 'Outdoor Saunas' : 'Indoor Saunas'}
+            </a>
+          ) : (
+            <a href={`/collections/${data.category}/`}>{cat?.name}</a>
+          )}
         </nav>
 
         <div class="prod-head__grid">
@@ -202,6 +246,14 @@ const showSpecs = showDev || hasVerifiedDetail;
                 category={s.data.category}
                 placeholder={s.data.placeholder}
                 image={s.data.heroImage}
+                location={s.data.location}
+                productType={s.data.productType}
+                series={s.data.series}
+                capacity={s.data.capacity}
+                capacityMin={s.data.capacityMin}
+                capacityMax={s.data.capacityMax}
+                materials={s.data.materials}
+                dimensions={s.data.dimensions}
               />
             ))}
           </div>
@@ -218,10 +270,11 @@ const showSpecs = showDev || hasVerifiedDetail;
     display: flex;
     gap: 0.75rem;
     font-size: var(--t-label);
-    letter-spacing: 0.2em;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: clamp(1.75rem, 1rem + 2vw, 3rem);
+    margin-bottom: clamp(1.3rem, 0.75rem + 1.5vw, 2.25rem);
   }
   .crumbs a { text-decoration: none; }
   .crumbs a:hover { color: var(--ink); }
@@ -229,15 +282,15 @@ const showSpecs = showDev || hasVerifiedDetail;
   .prod-head__grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(1.75rem, 0.5rem + 4vw, 5rem);
+    gap: clamp(1.3rem, 0.4rem + 3vw, 3.75rem);
     align-items: end;
   }
   .prod-head__tag {
     font-size: clamp(1.15rem, 0.9rem + 0.9vw, 1.65rem);
     color: var(--bronze-ink);
-    margin-top: 1rem;
+    margin-top: 0.75rem;
   }
-  .prod-head__side .lead { margin-bottom: 2rem; }
+  .prod-head__side .lead { margin-bottom: 1.5rem; }
 
   .notice {
     border: 1px solid var(--line);
@@ -246,22 +299,22 @@ const showSpecs = showDev || hasVerifiedDetail;
     padding: 1.15rem 1.5rem;
     font-size: var(--t-small);
     color: var(--muted);
-    margin-top: 2.5rem;
+    margin-top: 1.9rem;
   }
   .notice strong { color: var(--ink); font-weight: 500; }
 
   .gallery {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.75rem, 0.4rem + 1.2vw, 1.5rem);
-    margin-top: clamp(0.75rem, 0.4rem + 1.2vw, 1.5rem);
+    gap: clamp(0.6rem, 0.3rem + 0.9vw, 1.1rem);
+    margin-top: clamp(0.6rem, 0.3rem + 0.9vw, 1.1rem);
   }
 
   .prod-body--solo { grid-template-columns: minmax(0, 1fr); max-width: 52rem; }
   .prod-body {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    gap: clamp(2.5rem, 1rem + 5vw, 6rem);
+    gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
     align-items: start;
   }
 
@@ -276,8 +329,8 @@ const showSpecs = showDev || hasVerifiedDetail;
   .specs__h {
     font-family: var(--font-sans);
     font-size: var(--t-label);
-    font-weight: 400;
-    letter-spacing: 0.28em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     margin: 0 0 1.5rem;
   }
@@ -296,8 +349,8 @@ const showSpecs = showDev || hasVerifiedDetail;
   .specs__sub {
     font-family: var(--font-sans);
     font-size: var(--t-label);
-    font-weight: 400;
-    letter-spacing: 0.24em;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted);
     margin: 2rem 0 0.9rem;

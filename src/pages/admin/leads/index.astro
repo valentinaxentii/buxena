@@ -1,0 +1,85 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const search = Astro.url.searchParams.get('q') ?? '';
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const sourceFilter = Astro.url.searchParams.get('source') ?? '';
+
+const STATUSES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
+const SOURCES = ['Website', 'Instagram', 'Facebook', 'Google', 'Referral', 'Manual'];
+
+let leads: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from('leads')
+    .select('id, name, email, phone, state, source, status, follow_up_date, created_at')
+    .order('created_at', { ascending: false });
+
+  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  if (statusFilter) query = query.eq('status', statusFilter);
+  if (sourceFilter) query = query.eq('source', sourceFilter);
+
+  const { data } = await query.limit(200);
+  leads = data ?? [];
+} catch {
+  dbReady = false;
+}
+---
+
+<AdminLayout title="Leads">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search name or email…" value={search} />
+      <select class="admin-select" name="status">
+        <option value="">All statuses</option>
+        {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
+      </select>
+      <select class="admin-select" name="source">
+        <option value="">All sources</option>
+        {SOURCES.map((s) => <option value={s} selected={s === sourceFilter}>{s}</option>)}
+      </select>
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/leads/new">+ New Lead</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th><th>Contact</th><th>State</th><th>Source</th><th>Follow-Up</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((lead) => (
+            <tr>
+              <td><a href={`/admin/leads/${lead.id}`}>{lead.name}</a></td>
+              <td>{lead.email || lead.phone || '—'}</td>
+              <td>{lead.state || '—'}</td>
+              <td>{lead.source || '—'}</td>
+              <td>{lead.follow_up_date || '—'}</td>
+              <td><StatusBadge status={lead.status} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && leads.length === 0 && <p class="admin-empty">No leads yet. Website enquiries and the Sauna Advisor will create these automatically once wired up — or add one manually.</p>}
+  </div>
+</AdminLayout>

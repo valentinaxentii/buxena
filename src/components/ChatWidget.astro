@@ -1,0 +1,406 @@
+---
+/**
+ * BUXENA Sauna Advisor — frontend chat widget.
+ *
+ * Frontend only, by design: replies below are static, rule-matched canned
+ * text (no AI, no network calls, no API keys). It never states a spec,
+ * price, warranty or lead time it isn't certain of — it defers to BUXENA
+ * and the Request a Quote flow instead. See the end-of-turn report for
+ * what a real backend integration would need.
+ */
+const quickQuestions = [
+  'Help me choose a sauna',
+  'Indoor or outdoor?',
+  'What size do I need?',
+  'Compare models',
+  'Heater requirements',
+  'Delivery & installation',
+];
+---
+
+<div class="chat" data-chat>
+  <button class="chat-fab" type="button" data-chat-toggle aria-expanded="false" aria-controls="buxena-chat-panel">
+    <img class="chat-fab__icon chat-fab__icon--white" src="/brand/buxena-logo-white.png" alt="" />
+    <img class="chat-fab__icon chat-fab__icon--gold" src="/brand/buxena-logo.png" alt="" />
+    <span class="sr-only">Chat with the BUXENA Sauna Advisor</span>
+  </button>
+
+  <div class="chat-panel" id="buxena-chat-panel" data-chat-panel hidden>
+    <div class="chat-panel__head">
+      <img class="chat-panel__logo" src="/brand/buxena-logo.png" alt="" />
+      <div class="chat-panel__id">
+        <span class="chat-panel__name">BUXENA Sauna Advisor</span>
+        <span class="chat-panel__status"><span class="chat-panel__dot" aria-hidden="true"></span>Online</span>
+      </div>
+      <button class="chat-panel__close" type="button" data-chat-close aria-label="Close chat">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <path d="M3 3l10 10M13 3L3 13"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="chat-panel__body" data-chat-messages aria-live="polite">
+      <div class="chat-msg chat-msg--bot">
+        Welcome to BUXENA. I can help you explore our saunas, compare models,
+        understand heater requirements, and find the right sauna for your
+        space. What can I help you with?
+      </div>
+    </div>
+
+    <div class="chat-panel__quick" data-chat-quick>
+      {quickQuestions.map((q) => (
+        <button class="chat-chip" type="button" data-chat-question={q}>{q}</button>
+      ))}
+    </div>
+
+    <form class="chat-panel__form" data-chat-form>
+      <input
+        class="chat-panel__input"
+        type="text"
+        name="message"
+        placeholder="Ask BUXENA about saunas..."
+        aria-label="Ask BUXENA about saunas"
+        autocomplete="off"
+        data-chat-input
+      />
+      <button class="chat-panel__send" type="submit" aria-label="Send message">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M2.5 10h15M11 3.5l6.5 6.5-6.5 6.5" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <div class="chat-scrim" data-chat-scrim hidden></div>
+</div>
+
+<style>
+  .chat { position: relative; }
+
+  .chat-fab {
+    position: fixed;
+    right: clamp(1rem, 0.6rem + 1.5vw, 1.75rem);
+    bottom: clamp(1rem, 0.6rem + 1.5vw, 1.75rem);
+    z-index: 300;
+    width: 3.75rem;
+    height: 3.75rem;
+    border-radius: 50%;
+    border: none;
+    padding: 0.5rem;
+    background: var(--buxena-brown);
+    box-shadow: 0 0.6rem 1.75rem rgba(20, 18, 16, 0.35);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease),
+      background-color 0.6s var(--ease);
+  }
+  .chat-fab:hover { transform: translateY(-2px); box-shadow: 0 0.9rem 2.25rem rgba(20, 18, 16, 0.42); }
+
+  /* swapped in by script below when the button sits over a dark/black
+     section, so the circle keeps contrast against whatever is behind it */
+  .chat-fab--on-dark { background: var(--buxena-cream); }
+  .chat-fab__icon { width: 100%; height: 100%; object-fit: contain; }
+
+  /* black circle (default, over light sections) shows the white mark;
+     cream circle (over dark sections) keeps the existing gold mark */
+  .chat-fab__icon--gold { display: none; }
+  .chat-fab--on-dark .chat-fab__icon--white { display: none; }
+  .chat-fab--on-dark .chat-fab__icon--gold { display: block; }
+
+  .chat-panel {
+    position: fixed;
+    right: clamp(1rem, 0.6rem + 1.5vw, 1.75rem);
+    bottom: clamp(5.25rem, 4.6rem + 1.5vw, 6rem);
+    z-index: 300;
+    width: min(400px, calc(100vw - 2rem));
+    max-height: min(34rem, calc(100vh - 8rem));
+    display: flex;
+    flex-direction: column;
+    background: var(--buxena-cream);
+    border: 1px solid var(--buxena-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1.5rem 3.5rem rgba(20, 18, 16, 0.28);
+  }
+  .chat-panel[hidden] { display: none; }
+
+  .chat-panel__head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.15rem;
+    background: var(--buxena-brown);
+    color: var(--linen);
+  }
+  .chat-panel__logo { width: 2.25rem; height: 2.25rem; object-fit: contain; flex: 0 0 auto; }
+  .chat-panel__id { display: grid; gap: 0.15rem; flex: 1 1 auto; min-width: 0; }
+  .chat-panel__name { font-family: var(--font-display); font-size: 1.05rem; line-height: 1.1; }
+  .chat-panel__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bronze-soft);
+  }
+  .chat-panel__dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #7fae76;
+    box-shadow: 0 0 0 2px rgba(127, 174, 118, 0.25);
+  }
+  .chat-panel__close {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.85;
+    cursor: pointer;
+    padding: 0.4rem;
+  }
+  .chat-panel__close:hover { opacity: 1; }
+
+  .chat-panel__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: var(--buxena-cream);
+  }
+
+  .chat-msg {
+    max-width: 88%;
+    padding: 0.75rem 0.95rem;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    border-radius: 10px;
+  }
+  .chat-msg--bot {
+    align-self: flex-start;
+    background: var(--linen-deep);
+    color: var(--buxena-charcoal);
+    border: 1px solid var(--buxena-border);
+  }
+  .chat-msg--user {
+    align-self: flex-end;
+    background: var(--buxena-brown);
+    color: var(--linen);
+  }
+  .chat-msg__cta {
+    display: inline-flex;
+    margin-top: 0.75rem;
+  }
+
+  .chat-panel__quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 1.15rem 1rem;
+    border-top: 1px solid var(--buxena-border);
+    padding-top: 0.9rem;
+  }
+  .chat-chip {
+    background: none;
+    border: 1px solid var(--buxena-border);
+    color: var(--bronze-ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background-color 0.3s var(--ease);
+  }
+  .chat-chip:hover { border-color: var(--buxena-brown); color: var(--ink); background: var(--linen-deep); }
+
+  .chat-panel__form {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1.15rem;
+    border-top: 1px solid var(--buxena-border);
+    background: var(--buxena-cream);
+  }
+  .chat-panel__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    color: var(--ink);
+    background: var(--linen);
+    border: 1px solid var(--buxena-border);
+    border-radius: 999px;
+    padding: 0.65rem 1.1rem;
+  }
+  .chat-panel__input:focus { outline: none; border-color: var(--buxena-brown); }
+  .chat-panel__send {
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    border: none;
+    background: var(--buxena-brown);
+    color: var(--linen);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s var(--ease);
+  }
+  .chat-panel__send:hover { background: var(--bronze-ink); }
+
+  .chat-scrim[hidden] { display: none; }
+
+  @media (max-width: 480px) {
+    .chat-panel {
+      right: 0.75rem;
+      left: 0.75rem;
+      bottom: 5.5rem;
+      width: auto;
+      max-height: min(30rem, calc(100vh - 7rem));
+    }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-chat]');
+  if (root) {
+    const toggle = root.querySelector<HTMLButtonElement>('[data-chat-toggle]');
+    const closeBtn = root.querySelector<HTMLButtonElement>('[data-chat-close]');
+    const panel = root.querySelector<HTMLElement>('[data-chat-panel]');
+    const scrim = root.querySelector<HTMLElement>('[data-chat-scrim]');
+    const messages = root.querySelector<HTMLElement>('[data-chat-messages]');
+    const form = root.querySelector<HTMLFormElement>('[data-chat-form]');
+    const input = root.querySelector<HTMLInputElement>('[data-chat-input]');
+    const quickButtons = root.querySelectorAll<HTMLButtonElement>('[data-chat-question]');
+
+    // Auto-contrast: flip the fab's circle from black to white whenever it
+    // sits over a dark/black section (hero, ember bands, footer), based on
+    // its actual on-screen position, so it stays legible while scrolling.
+    if (toggle) {
+      const darkSections = Array.from(document.querySelectorAll<HTMLElement>('.hero, .band--ember, .ftr'));
+      let ticking = false;
+
+      const updateFabContrast = () => {
+        const rect = toggle.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const overDark = darkSections.some((el) => {
+          const r = el.getBoundingClientRect();
+          return centerX >= r.left && centerX <= r.right && centerY >= r.top && centerY <= r.bottom;
+        });
+        toggle.classList.toggle('chat-fab--on-dark', overDark);
+      };
+
+      const requestUpdate = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          updateFabContrast();
+          ticking = false;
+        });
+      };
+
+      window.addEventListener('scroll', requestUpdate, { passive: true });
+      window.addEventListener('resize', requestUpdate);
+      updateFabContrast();
+      // re-check once the entrance/reveal animations have settled
+      window.setTimeout(updateFabContrast, 1200);
+    }
+
+    const QUOTE_CTA = `<a class="btn btn--bronze chat-msg__cta" href="/quote/">Request a Quote</a>`;
+    const NEEDS_QUOTE =
+      `Would you like BUXENA to prepare a recommendation for your space?${QUOTE_CTA}`;
+
+    const RESPONSES: Record<string, string> = {
+      'help me choose a sauna':
+        `The two biggest questions are where it's going (indoor or outdoor) and how many people it needs to seat comfortably. Take a look at our <a href="/saunas/outdoor-saunas/">Outdoor Saunas</a> or <a href="/saunas/indoor-saunas/">Indoor Saunas</a>, or let BUXENA make a recommendation.${QUOTE_CTA}`,
+      'indoor or outdoor?':
+        `Outdoor barrel saunas give you more space and a stronger sense of occasion. Indoor rooms tend to get used more often, since there's no weather between you and the sauna. If you're not sure which suits your property, BUXENA can help you decide.${QUOTE_CTA}`,
+      'what size do i need?':
+        `Work from how many people will realistically use it at once — bench length is what decides whether anyone can lie down. Every model page lists exact dimensions and capacity, or BUXENA can size it against your space directly.${QUOTE_CTA}`,
+      'compare models':
+        `Every model's dimensions, capacity and material are listed on its own page, and you can filter the whole range by location, type, series, capacity or material on the <a href="/saunas/">Saunas</a> page. I can't yet compare two specific models side by side here. ${NEEDS_QUOTE}`,
+      'heater requirements':
+        `Heater compatibility and electrical requirements vary by model, and any electrical connection has to be done by a licensed electrician to local code. I don't have verified heater specs for every model in this chat yet. ${NEEDS_QUOTE}`,
+      'delivery & installation':
+        `Delivery is by freight and priced by destination ZIP code, model and site access. BUXENA is the retailer and importer, not an installation contractor, so installation is arranged locally unless we've specifically agreed otherwise in writing. For anything specific to your address, BUXENA can confirm the details.${QUOTE_CTA}`,
+    };
+
+    const FALLBACK =
+      `I can share general information about BUXENA's saunas, but I can't yet look up live specifics in this chat. ${NEEDS_QUOTE}`;
+
+    const setOpen = (open: boolean) => {
+      if (!panel || !toggle) return;
+      panel.hidden = !open;
+      if (scrim) scrim.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) input?.focus();
+    };
+
+    toggle?.addEventListener('click', () => setOpen(panel?.hidden !== false));
+    closeBtn?.addEventListener('click', () => setOpen(false));
+    scrim?.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel && !panel.hidden) setOpen(false);
+    });
+
+    const appendMessage = (role: 'user' | 'bot', html: string) => {
+      if (!messages) return;
+      const el = document.createElement('div');
+      el.className = `chat-msg chat-msg--${role}`;
+      if (role === 'user') {
+        el.textContent = html;
+      } else {
+        el.innerHTML = html;
+      }
+      messages.appendChild(el);
+      messages.scrollTop = messages.scrollHeight;
+    };
+
+    // Best-effort lead capture: mirrors the conversation to the admin
+    // enquiries table in the background. Never awaited, never blocks the
+    // UI, and any failure (including "Supabase not configured") is silently
+    // swallowed — the canned-response chat experience is 100% unaffected
+    // either way.
+    const transcript: { role: 'user' | 'bot'; text: string }[] = [];
+    const recordEnquiry = (latestUserMessage: string) => {
+      transcript.push({ role: 'user', text: latestUserMessage });
+      fetch('/api/enquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: latestUserMessage,
+          chatTranscript: transcript,
+          source: 'Sauna Advisor',
+        }),
+      }).catch(() => {});
+    };
+
+    const respondTo = (question: string) => {
+      const key = question.trim().toLowerCase();
+      const reply = RESPONSES[key] ?? FALLBACK;
+      window.setTimeout(() => appendMessage('bot', reply), 450);
+    };
+
+    quickButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const q = btn.dataset.chatQuestion ?? '';
+        appendMessage('user', q);
+        recordEnquiry(q);
+        respondTo(q);
+      });
+    });
+
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = input?.value.trim();
+      if (!value) return;
+      appendMessage('user', value);
+      recordEnquiry(value);
+      respondTo(value);
+      if (input) input.value = '';
+    });
+  }
+</script>

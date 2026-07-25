@@ -1,0 +1,68 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
+
+let quotes: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from('quotes')
+    .select('id, quote_number, status, total, quote_date, expiry_date, customers(name)')
+    .order('created_at', { ascending: false });
+  if (statusFilter) query = query.eq('status', statusFilter);
+  const { data } = await query.limit(200);
+  quotes = data ?? [];
+} catch {
+  dbReady = false;
+}
+---
+
+<AdminLayout title="Quotes">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <select class="admin-select" name="status">
+        <option value="">All statuses</option>
+        {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
+      </select>
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Quote #</th><th>Customer</th><th>Total</th><th>Quote Date</th><th>Expires</th><th>Status</th></tr></thead>
+        <tbody>
+          {quotes.map((q) => (
+            <tr>
+              <td><a href={`/admin/quotes/${q.id}`}>{q.quote_number || q.id}</a></td>
+              <td>{q.customers?.name || '—'}</td>
+              <td>${q.total ?? 0}</td>
+              <td>{q.quote_date || '—'}</td>
+              <td>{q.expiry_date || '—'}</td>
+              <td><StatusBadge status={q.status} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && quotes.length === 0 && <p class="admin-empty">No quotes yet.</p>}
+  </div>
+</AdminLayout>

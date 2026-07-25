@@ -1,30 +1,415 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { showDev } from '../data/site';
+
+/**
+ * WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
+ * Have this reviewed by a US-licensed attorney familiar with consumer,
+ * e-commerce and freight-delivery law before relying on it commercially.
+ *
+ * Numbers deliberately left unset below (flagged BUXENA DECISION NEEDED)
+ * are business policy calls, not legal ones — fill them in once decided,
+ * they are not typos:
+ *   - Deposit percentage/amount and balance-due timing (Section 6)
+ *   - Cancellation fee, if any (Section 16)
+ *   - Return eligibility window and any restocking fee (Section 17)
+ *   - Governing-law state — currently written generically because
+ *     `site.city`/state of registration is not yet set in src/data/site.ts
+ *     (Section 26)
+ */
+
+const sections = [
+  { id: 'terms', title: 'Terms & Conditions' },
+  { id: 'about', title: 'About BUXENA' },
+  { id: 'product-info', title: 'Product Information' },
+  { id: 'quotes', title: 'Quotes and Orders' },
+  { id: 'pricing', title: 'Pricing and Payment' },
+  { id: 'deposits', title: 'Deposits and Order Confirmation' },
+  { id: 'availability', title: 'Product Availability and Lead Times' },
+  { id: 'shipping', title: 'Shipping and Delivery' },
+  { id: 'site-prep', title: 'Customer Responsibilities and Site Preparation' },
+  { id: 'access', title: 'Access for Delivery' },
+  { id: 'installation', title: 'Installation' },
+  { id: 'electrical', title: 'Electrical Requirements' },
+  { id: 'permits', title: 'Local Permits, Codes and Approvals' },
+  { id: 'inspection', title: 'Inspection Upon Delivery' },
+  { id: 'damaged', title: 'Damaged or Missing Items' },
+  { id: 'cancellations', title: 'Cancellations and Order Changes' },
+  { id: 'returns', title: 'Returns and Refunds' },
+  { id: 'custom', title: 'Custom and Special-Order Products' },
+  { id: 'warranty', title: 'Manufacturer Warranties' },
+  { id: 'variation', title: 'Product Variations' },
+  { id: 'maintenance', title: 'Outdoor Product Maintenance' },
+  { id: 'liability', title: 'Limitation of Liability' },
+  { id: 'errors', title: 'Website Information and Errors' },
+  { id: 'ip', title: 'Intellectual Property' },
+  { id: 'privacy', title: 'Privacy' },
+  { id: 'law', title: 'Governing Law' },
+  { id: 'changes', title: 'Changes to These Terms' },
+  { id: 'contact', title: 'Contact Information' },
+];
 ---
 
-<BaseLayout title="Terms" noindex={true}>
+<BaseLayout
+  title="Terms & Conditions"
+  description="The terms and conditions governing quotes, orders, delivery and returns for saunas sold through BUXENA."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Terms &amp; Conditions</span>
+      <h1 class="display measure--tight">Terms &amp; Conditions</h1>
+      <p class="legal__updated">Last updated: July 2026</p>
+      <p class="lead measure">
+        These Terms &amp; Conditions govern quotes, orders, delivery and
+        returns for products purchased through BUXENA. By requesting a quote
+        or placing an order with us, you agree to the terms below.
+      </p>
+    </div>
+  </section>
+
   <section class="band">
-    <div class="shell shell--narrow">
-      <span class="eyebrow">Terms</span>
-      <h1 class="display">Terms</h1>
-      {showDev && (<p class="lead">
-        This page is a placeholder. BUXENA's Terms has not yet been published.
-      </p>)}
-      {showDev && (<p class="note">
-        Replace this file with the reviewed text before launch. Because BUXENA
-        sells to customers across the United States, this should be drafted or
-        reviewed by someone familiar with US consumer and privacy law — state
-        requirements vary.
-      </p>)}
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="terms">
+          <h2>1. Terms &amp; Conditions</h2>
+          <p>
+            These Terms &amp; Conditions ("Terms") apply to every quote,
+            order and purchase made through buxena.com or in direct
+            correspondence with BUXENA ("BUXENA," "we," "us"). They sit
+            alongside our <a href="/privacy/">Privacy Policy</a>, which
+            explains how we handle your information. Please read both before
+            placing an order.
+          </p>
+        </article>
+
+        <article id="about">
+          <h2>2. About BUXENA</h2>
+          <p>
+            BUXENA is a United States–based retailer and importer of premium
+            indoor and outdoor saunas. We select, specify and sell saunas
+            manufactured by third-party European manufacturers. Unless a
+            specific product listing states otherwise, BUXENA is the
+            retailer and importer of the products we sell — we do not
+            manufacture them.
+          </p>
+        </article>
+
+        <article id="product-info">
+          <h2>3. Product Information</h2>
+          <p>
+            Descriptions, dimensions, materials and specifications on this
+            website are provided to the best of our knowledge, based on
+            information supplied by the manufacturer. Manufacturers
+            periodically update their designs and specifications, and actual
+            products may differ slightly from what is shown here. Please
+            confirm any specification that is critical to your decision with
+            us before ordering.
+          </p>
+        </article>
+
+        <article id="quotes">
+          <h2>4. Quotes and Orders</h2>
+          <p>
+            A quote provided through our Request a Quote form or in
+            correspondence is an estimate based on the information you give
+            us — it is not an order and does not reserve inventory or
+            production capacity. An order is only confirmed once we have
+            issued a written order confirmation and any applicable deposit
+            terms (see Section 6) have been met.
+          </p>
+        </article>
+
+        <article id="pricing">
+          <h2>5. Pricing and Payment</h2>
+          <p>
+            Prices are quoted in US dollars unless stated otherwise and are
+            subject to change at any time before an order is confirmed in
+            writing. Once we have confirmed your order in writing, the
+            confirmed price will not change except by agreement between us —
+            for example, if you request a different model, configuration or
+            delivery destination after confirmation. Accepted payment
+            methods and payment terms will be set out in your quote or order
+            confirmation.
+          </p>
+        </article>
+
+        <article id="deposits">
+          <h2>6. Deposits and Order Confirmation</h2>
+          <p>
+            Certain orders — particularly custom, special-order or
+            made-to-order products — may require a deposit before production
+            or shipment begins, with the balance due before or at delivery.
+            Where a deposit applies, the amount and the schedule for the
+            remaining balance will be set out clearly in your quote or
+            written order confirmation before you are asked to pay anything.
+          </p>
+        </article>
+
+        <article id="availability">
+          <h2>7. Product Availability and Lead Times</h2>
+          <p>
+            Because our products are imported from European manufacturers,
+            availability and lead times vary by model, season and supplier
+            production schedules. Any lead time given in a quote or order
+            confirmation is our good-faith estimate based on current
+            information from the manufacturer, not a guaranteed ship date.
+            If we become aware of a material delay, we will let you know as
+            soon as reasonably possible.
+          </p>
+        </article>
+
+        <article id="shipping">
+          <h2>8. Shipping and Delivery</h2>
+          <p>
+            Most BUXENA products are large and ship via freight carrier.
+            Delivery pricing depends on the destination ZIP code, the sauna
+            model, and site access conditions, and will be confirmed in your
+            quote or order confirmation. If your order has not shipped by
+            the estimated date given at the time of order, we will notify
+            you of a revised timeline. If the delay is significant, you may
+            choose to accept the new date or cancel your order for a full
+            refund of any amount paid, consistent with applicable US
+            consumer protection requirements for ordered merchandise.
+          </p>
+        </article>
+
+        <article id="site-prep">
+          <h2>9. Customer Responsibilities and Site Preparation</h2>
+          <p>
+            You are responsible for providing accurate delivery and site
+            information, including address, access conditions and any known
+            obstacles. Unless BUXENA specifically agrees otherwise in
+            writing, you are also responsible for ensuring adequate site
+            access and a suitable, properly prepared foundation or base for
+            the model you have ordered, completed before delivery. We will
+            tell you what a given model requires before you order.
+          </p>
+        </article>
+
+        <article id="access">
+          <h2>10. Access for Delivery</h2>
+          <p>
+            You must ensure a clear, safe path for the delivery vehicle and
+            any unloading equipment the carrier requires. If access is
+            restricted — a narrow gate, steps, soft ground, overhead lines —
+            please tell us before you order, since it may affect delivery
+            cost or method. Additional charges may apply where access
+            requires special equipment or a second attempt.
+          </p>
+        </article>
+
+        <article id="installation">
+          <h2>11. Installation</h2>
+          <p>
+            BUXENA is a retailer and importer, not an installation
+            contractor. Installation and assembly arrangements vary by
+            model and are addressed at the time of your quote. Unless we
+            have specifically agreed in writing to arrange or provide
+            installation for your order, installation is your
+            responsibility, to be carried out by a qualified local
+            contractor.
+          </p>
+        </article>
+
+        <article id="electrical">
+          <h2>12. Electrical Requirements</h2>
+          <p>
+            Electric sauna heaters require a dedicated electrical circuit
+            sized to the heater. All electrical connections must be
+            performed by an appropriately qualified, licensed electrician in
+            compliance with applicable local electrical codes and
+            inspection requirements. We can provide the electrical
+            specifications for a given heater to help your electrician
+            quote and plan the work, but BUXENA is not responsible for
+            electrical installation.
+          </p>
+        </article>
+
+        <article id="permits">
+          <h2>13. Local Permits, Codes and Approvals</h2>
+          <p>
+            You are solely responsible for determining and obtaining any
+            permits, zoning approvals, homeowners' association approvals or
+            other local authorizations required to install and use your
+            sauna. Requirements vary significantly by municipality and
+            property. We recommend checking with your local building
+            department before ordering, as it can affect which model makes
+            sense for your site.
+          </p>
+        </article>
+
+        <article id="inspection">
+          <h2>14. Inspection Upon Delivery</h2>
+          <p>
+            Please inspect your shipment at the time of delivery, before
+            signing the carrier's delivery paperwork where possible. Note
+            any visible damage or shortage directly on the delivery
+            documents, and contact us promptly afterward — see Section 15.
+          </p>
+        </article>
+
+        <article id="damaged">
+          <h2>15. Damaged or Missing Items</h2>
+          <p>
+            If your order arrives damaged or incomplete, contact us at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a> as soon as
+            possible with a description and photographs. We will work with
+            you, the carrier and the manufacturer to arrange an appropriate
+            resolution — repair, replacement parts, or another remedy suited
+            to the situation.
+          </p>
+        </article>
+
+        <article id="cancellations">
+          <h2>16. Cancellations and Order Changes</h2>
+          <p>
+            To cancel or change an order, email us at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a> as soon as
+            possible. Because many models are imported or produced to order,
+            cancellation terms — including whether any fee applies once
+            production or shipment has begun — will be set out in writing in
+            your order confirmation.
+          </p>
+        </article>
+
+        <article id="returns">
+          <h2>17. Returns and Refunds</h2>
+          <p>
+            Given the size and nature of these products, returns are
+            handled case by case. Any return eligibility window and
+            associated terms will be set out in writing at the time of your
+            order. Refunds relating to cancelled or undelivered orders are
+            handled as described in Section 8 (Shipping and Delivery) and in
+            accordance with applicable law.
+          </p>
+        </article>
+
+        <article id="custom">
+          <h2>18. Custom and Special-Order Products</h2>
+          <p>
+            Products ordered in a specific configuration, finish, or
+            otherwise made to order may not be eligible for cancellation or
+            return once production has begun. We will tell you clearly at
+            the time of order whether your configuration falls into this
+            category.
+          </p>
+        </article>
+
+        <article id="warranty">
+          <h2>19. Manufacturer Warranties</h2>
+          <p>
+            Products sold by BUXENA are covered by the applicable
+            manufacturer's warranty. Warranty length and coverage vary by
+            product and manufacturer and will be provided with your order
+            or on request before you order. BUXENA will help facilitate
+            warranty claims with the manufacturer on your behalf.
+          </p>
+        </article>
+
+        <article id="variation">
+          <h2>20. Product Variations</h2>
+          <p>
+            Our products are built from natural wood, which varies in
+            grain, tone and knots from piece to piece — these are natural
+            characteristics of the material, not defects. Actual products
+            may also differ slightly from website photography due to
+            natural material variation, photographic lighting, your screen,
+            and manufacturer product updates over time.
+          </p>
+        </article>
+
+        <article id="maintenance">
+          <h2>21. Outdoor Product Maintenance</h2>
+          <p>
+            Outdoor saunas need some ongoing exterior maintenance to keep
+            their finish and weather resistance intact, on whatever schedule
+            the manufacturer specifies for that model. Skipping recommended
+            maintenance may affect manufacturer warranty coverage.
+          </p>
+        </article>
+
+        <article id="liability">
+          <h2>22. Limitation of Liability</h2>
+          <p>
+            To the maximum extent permitted by law, BUXENA's liability for
+            any claim relating to a product or order is limited to the
+            amount you paid for that product. BUXENA is not liable for
+            indirect, incidental or consequential damages arising from your
+            purchase or use of a product. Nothing in these Terms limits any
+            liability, or any consumer right, that cannot lawfully be
+            limited or excluded.
+          </p>
+        </article>
+
+        <article id="errors">
+          <h2>23. Website Information and Errors</h2>
+          <p>
+            We take reasonable care to keep this website accurate, but
+            typographical, pricing or technical errors can occur. If we
+            discover an error affecting your order — including a pricing
+            error — we will contact you before proceeding, and you may
+            cancel for a full refund of any amount already paid.
+          </p>
+        </article>
+
+        <article id="ip">
+          <h2>24. Intellectual Property</h2>
+          <p>
+            The text, images, logo and design of this website are owned by
+            BUXENA or used with permission, and may not be copied or reused
+            without our prior written consent.
+          </p>
+        </article>
+
+        <article id="privacy">
+          <h2>25. Privacy</h2>
+          <p>
+            Our <a href="/privacy/">Privacy Policy</a> explains what
+            personal information we collect through this website and our
+            forms, and how we use and share it. It forms part of these
+            Terms.
+          </p>
+        </article>
+
+        <article id="law">
+          <h2>26. Governing Law</h2>
+          <p>
+            These Terms are governed by the laws of the United States and
+            the state in which BUXENA is registered to do business, without
+            regard to conflict-of-laws principles.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>27. Changes to These Terms</h2>
+          <p>
+            We may update these Terms from time to time. Updates take effect
+            as soon as they are posted, and we will update the "Last
+            updated" date above whenever we make a material change.
+            Continuing to order from BUXENA after a change means you accept
+            the updated Terms.
+          </p>
+        </article>
+
+        <article id="contact">
+          <h2>28. Contact Information</h2>
+          <p class="legal__contact-q">Questions about these Terms?</p>
+          <a class="legal__contact-email" href="mailto:info@buxena.com">info@buxena.com</a>
+        </article>
+      </div>
     </div>
   </section>
 </BaseLayout>
 
 <style>
-  .lead { margin-top: 1.75rem; }
-  .note {
-    margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
-    font-size: 0.8125rem; color: var(--muted); font-style: italic;
-  }
+  .legal__contact-q { font-weight: 600; margin-bottom: 0.4rem; }
+  .legal__contact-email { font-size: 1.1rem; font-family: var(--font-display); color: var(--bronze-ink); text-decoration: none; }
+  .legal__contact-email:hover { color: var(--ink); }
 </style>

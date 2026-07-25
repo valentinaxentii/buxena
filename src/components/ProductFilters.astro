@@ -1,0 +1,238 @@
+---
+/**
+ * Reusable multi-facet filter bar for sauna catalog pages.
+ * Each facet is single-select (click a chip, or "All" to clear that facet).
+ * Filtering itself happens client-side against data-* attributes rendered
+ * on ProductCard — see the script below.
+ */
+interface FacetOption {
+  value: string;
+  label: string;
+}
+interface Facet {
+  key: 'location' | 'type' | 'series' | 'capacity' | 'material';
+  label: string;
+  options: FacetOption[];
+}
+interface Props {
+  facets: Facet[];
+}
+const { facets } = Astro.props;
+---
+
+<div class="pfilters" data-filters>
+  <button class="pfilters__trigger" type="button" data-filter-open>
+    Filter
+    <span class="pfilters__count" data-filter-count hidden></span>
+  </button>
+
+  <div class="pfilters__panel" data-filter-panel>
+    <div class="pfilters__head">
+      <span class="pfilters__title">Filter saunas</span>
+      <button class="pfilters__close" type="button" data-filter-close aria-label="Close filters">
+        <span aria-hidden="true">Close</span>
+      </button>
+    </div>
+
+    <div class="pfilters__groups">
+      {facets.map((facet) => (
+        <div class="pfilters__group" data-facet-group={facet.key}>
+          <span class="pfilters__label">{facet.label}</span>
+          <div class="pfilters__chips">
+            <button class="chip is-on" type="button" data-facet={facet.key} data-value="" aria-pressed="true">
+              All
+            </button>
+            {facet.options.map((opt) => (
+              <button class="chip" type="button" data-facet={facet.key} data-value={opt.value} aria-pressed="false">
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <button class="pfilters__apply btn btn--bronze" type="button" data-filter-apply>Show results</button>
+  </div>
+
+  <div class="pfilters__scrim" data-filter-scrim hidden></div>
+</div>
+
+<style>
+  .pfilters { position: relative; margin-bottom: clamp(1.5rem, 0.9rem + 1.5vw, 2.4rem); }
+
+  .pfilters__trigger {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: 1px solid var(--line);
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .pfilters__count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.35rem;
+    background: var(--ember);
+    color: var(--linen);
+    font-size: 0.75rem;
+    font-family: var(--font-display);
+  }
+
+  .pfilters__groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .pfilters__group { display: grid; gap: 0.75rem; }
+
+  .pfilters__label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .pfilters__chips { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+  .chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    background: none;
+    border: 1px solid var(--line);
+    padding: 0.6rem 1.1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background-color 0.35s var(--ease), color 0.35s var(--ease),
+      border-color 0.35s var(--ease);
+  }
+  .chip:hover { border-color: var(--ink); }
+  .chip.is-on { background: var(--ember); color: var(--linen); border-color: var(--ember); }
+
+  .pfilters__apply { display: none; width: 100%; justify-content: center; margin-top: 1.5rem; }
+
+  .pfilters__head, .pfilters__close { display: none; }
+  .pfilters__scrim[hidden] { display: none; }
+
+  @media (max-width: 900px) {
+    .pfilters__trigger { display: inline-flex; }
+
+    .pfilters__panel {
+      position: fixed;
+      inset: 0 0 0 auto;
+      z-index: 200;
+      width: min(24rem, 88vw);
+      background: var(--linen);
+      padding: 1.5rem var(--gutter) 2rem;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.4s var(--ease);
+    }
+    .pfilters.is-open .pfilters__panel { transform: translateX(0); }
+
+    .pfilters__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .pfilters__title { font-family: var(--font-display); font-size: 1.4rem; }
+    .pfilters__close {
+      display: inline-flex;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: var(--t-small);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .pfilters__apply { display: flex; }
+
+    .pfilters__scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 190;
+      background: rgba(27, 25, 23, 0.5);
+    }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-filters]');
+  if (root) {
+    const trigger = root.querySelector<HTMLButtonElement>('[data-filter-open]');
+    const closeBtn = root.querySelector<HTMLButtonElement>('[data-filter-close]');
+    const applyBtn = root.querySelector<HTMLButtonElement>('[data-filter-apply]');
+    const scrim = root.querySelector<HTMLElement>('[data-filter-scrim]');
+    const countEl = root.querySelector<HTMLElement>('[data-filter-count]');
+    const chips = root.querySelectorAll<HTMLButtonElement>('.chip');
+
+    const grid = document.querySelector<HTMLElement>('[data-product-grid]');
+    const cards = grid ? Array.from(grid.querySelectorAll<HTMLElement>('.pcard')) : [];
+    const emptyEl = document.querySelector<HTMLElement>('[data-empty]');
+
+    const active: Record<string, string> = {};
+
+    const setOpen = (open: boolean) => {
+      root.classList.toggle('is-open', open);
+      if (scrim) scrim.hidden = !open;
+      document.body.style.overflow = open ? 'hidden' : '';
+    };
+    trigger?.addEventListener('click', () => setOpen(true));
+    closeBtn?.addEventListener('click', () => setOpen(false));
+    applyBtn?.addEventListener('click', () => setOpen(false));
+    scrim?.addEventListener('click', () => setOpen(false));
+
+    const applyFilters = () => {
+      let shown = 0;
+      cards.forEach((card) => {
+        const match = Object.entries(active).every(([facet, value]) => {
+          if (!value) return true;
+          const tokens = (card.dataset[facet] ?? '').split(' ').filter(Boolean);
+          return tokens.includes(value);
+        });
+        card.hidden = !match;
+        if (match) shown++;
+      });
+      if (emptyEl) emptyEl.hidden = shown > 0;
+
+      const activeCount = Object.values(active).filter(Boolean).length;
+      if (countEl) {
+        countEl.hidden = activeCount === 0;
+        countEl.textContent = String(activeCount);
+      }
+    };
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const facet = chip.dataset.facet!;
+        const value = chip.dataset.value ?? '';
+        active[facet] = value;
+
+        root.querySelectorAll<HTMLButtonElement>(`[data-facet="${facet}"]`).forEach((c) => {
+          const on = c === chip;
+          c.classList.toggle('is-on', on);
+          c.setAttribute('aria-pressed', String(on));
+        });
+
+        applyFilters();
+      });
+    });
+  }
+</script>

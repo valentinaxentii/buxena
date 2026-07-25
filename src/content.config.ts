@@ -48,6 +48,15 @@ const saunas = defineCollection({
     downloads: z
       .array(z.object({ label: z.string(), file: z.string().optional(), note: z.string().optional() }))
       .optional(),
+
+    // --- Catalog facets (sourced from supplier product data) ---
+    location: z.enum(['outdoor', 'indoor']).optional(),
+    productType: z.string().optional(),   // e.g. "Barrel", "Cube"
+    series: z.string().optional(),        // e.g. "EDA", "ITI", "AURA", "ELLA", "ILLI", "ALLA"
+    capacityMin: z.number().optional(),
+    capacityMax: z.number().optional(),
+    options: z.array(z.string()).optional(),   // available options / upgrades
+    delivery: z.string().optional(),           // delivery / installation information
   }),
 });
 

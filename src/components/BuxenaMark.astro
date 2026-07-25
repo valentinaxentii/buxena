@@ -1,0 +1,37 @@
+---
+/**
+ * Renders the word "BUXENA" using the exact lettering from the official
+ * logo artwork (masked, so it takes on whatever color the surrounding
+ * heading already uses) instead of the page's regular typeface. Drop into
+ * any prominent branded heading/eyebrow, e.g. `Why <BuxenaMark />`.
+ *
+ * Not for body copy — this is for display-type brand moments only.
+ */
+---
+
+<span class="buxena-mark-wrap">
+  <span class="buxena-mark" aria-hidden="true"></span>
+  <span class="sr-only">BUXENA</span>
+</span>
+
+<style>
+  .buxena-mark-wrap {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .buxena-mark {
+    display: inline-block;
+    width: calc(1224 / 210 * 1em);
+    height: 1em;
+    background-color: currentColor;
+    -webkit-mask-image: url('/brand/buxena-wordmark-mark.png');
+    mask-image: url('/brand/buxena-wordmark-mark.png');
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+</style>

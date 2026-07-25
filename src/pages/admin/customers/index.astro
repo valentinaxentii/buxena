@@ -1,0 +1,60 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const search = Astro.url.searchParams.get('q') ?? '';
+let customers: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from('customers')
+    .select('id, name, email, phone, city, state, lead_source, created_at')
+    .order('created_at', { ascending: false });
+  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  const { data } = await query.limit(200);
+  customers = data ?? [];
+} catch {
+  dbReady = false;
+}
+---
+
+<AdminLayout title="Customers">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search name or email…" value={search} />
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/customers/new">+ New Customer</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Name</th><th>Contact</th><th>Location</th><th>Lead Source</th></tr></thead>
+        <tbody>
+          {customers.map((c) => (
+            <tr>
+              <td><a href={`/admin/customers/${c.id}`}>{c.name}</a></td>
+              <td>{c.email || c.phone || '—'}</td>
+              <td>{[c.city, c.state].filter(Boolean).join(', ') || '—'}</td>
+              <td>{c.lead_source || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && customers.length === 0 && <p class="admin-empty">No customers yet.</p>}
+  </div>
+</AdminLayout>

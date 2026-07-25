@@ -1,0 +1,112 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalContact from '../components/LegalContact.astro';
+
+// WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
+// Have this reviewed by a US-licensed attorney familiar with accessibility
+// law before relying on it commercially. No specific conformance level
+// (e.g. WCAG AA) is claimed here since that has not been verified/audited.
+const sections = [
+  { id: 'commitment', title: 'Our Commitment' },
+  { id: 'improvements', title: 'Ongoing Improvements' },
+  { id: 'compatibility', title: 'Compatibility' },
+  { id: 'limitations', title: 'Limitations' },
+  { id: 'feedback', title: 'Reporting an Accessibility Issue' },
+  { id: 'changes', title: 'Changes to This Statement' },
+];
+---
+
+<BaseLayout
+  title="Accessibility"
+  description="BUXENA's commitment to an accessible website, and how to report an accessibility issue."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Accessibility</span>
+      <h1 class="display measure--tight">Accessibility Statement</h1>
+      <p class="legal__updated">Last Updated: July 2026</p>
+      <p class="lead measure">
+        BUXENA wants this website to be usable by as many people as
+        possible, including people using assistive technology. This
+        statement explains our approach and how to reach us if something
+        isn't working for you.
+      </p>
+      <LegalContact />
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="commitment">
+          <h2>1. Our Commitment</h2>
+          <p>
+            We aim to design and build buxena.com so that it can be used by
+            visitors with a wide range of abilities, including people using
+            screen readers, keyboard navigation, and other assistive
+            technology.
+          </p>
+        </article>
+
+        <article id="improvements">
+          <h2>2. Ongoing Improvements</h2>
+          <p>
+            Accessibility is an ongoing effort, not a one-time fix. As we
+            add and update pages, we work to keep navigation clear,
+            interactive elements keyboard-operable, and content readable at
+            different text sizes and zoom levels.
+          </p>
+        </article>
+
+        <article id="compatibility">
+          <h2>3. Compatibility</h2>
+          <p>
+            We aim for this site to work well with current, widely used
+            browsers and assistive technologies. If you're using older or
+            less common software and run into a problem, please let us know
+            — see Section 5.
+          </p>
+        </article>
+
+        <article id="limitations">
+          <h2>4. Limitations</h2>
+          <p>
+            Despite our efforts, some parts of the site may not yet meet
+            every accessibility best practice — for example, in
+            third-party embedded content we do not fully control. We treat
+            reports of specific problems as a priority to investigate and
+            fix.
+          </p>
+        </article>
+
+        <article id="feedback">
+          <h2>5. Reporting an Accessibility Issue</h2>
+          <p>
+            If you experience any difficulty using this website, or need
+            information in a different format, please contact us at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a>. Please
+            describe the page and the problem you encountered — it helps us
+            find and fix it faster.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>6. Changes to This Statement</h2>
+          <p>
+            We may update this statement from time to time. We will revise
+            the "Last Updated" date above whenever we make a material
+            change.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

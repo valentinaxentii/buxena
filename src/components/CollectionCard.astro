@@ -7,13 +7,14 @@ interface Props {
   href: string;
   note?: string;
   count?: number;
+  image?: string;
 }
-const { name, blurb, href, note, count } = Astro.props;
+const { name, blurb, href, note, count, image } = Astro.props;
 ---
 
 <a class="ccard" href={href}>
   <div class="ccard__media">
-    <Figure alt={name} note={note ?? `${name} — representative collection image`} ratio="4 / 5" tone="mid" />
+    <Figure src={image} alt={name} note={note ?? `${name} — representative collection image`} ratio="4 / 5" tone="mid" />
     <span class="ccard__slats" aria-hidden="true"></span>
   </div>
   <div class="ccard__body">
@@ -66,7 +67,7 @@ const { name, blurb, href, note, count } = Astro.props;
     .ccard:focus-visible .ccard__slats { opacity: 0; }
   }
 
-  .ccard__body { padding-top: 1.5rem; }
+  .ccard__body { padding-top: 1.15rem; }
 
   .ccard__name {
     font-size: var(--t-h3);
@@ -76,7 +77,7 @@ const { name, blurb, href, note, count } = Astro.props;
   .ccard__blurb {
     font-size: var(--t-small);
     color: var(--muted);
-    line-height: 1.7;
+    line-height: 1.6;
     margin-bottom: 1.1rem;
   }
   .band--ember .ccard__blurb { color: var(--muted-dark); }
@@ -85,8 +86,9 @@ const { name, blurb, href, note, count } = Astro.props;
     display: inline-flex;
     align-items: baseline;
     gap: 0.6rem;
-    font-size: var(--t-label);
-    letter-spacing: 0.2em;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--bronze-ink);
     padding-bottom: 0.3rem;

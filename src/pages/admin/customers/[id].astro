@@ -1,0 +1,130 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const { id } = Astro.params;
+let customer: any = null;
+let quotes: any[] = [];
+let orders: any[] = [];
+let documents: any[] = [];
+let error: string | null = null;
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    if (String(form.get('_intent')) === 'delete') {
+      await supabase.from('customers').delete().eq('id', id);
+      return Astro.redirect('/admin/customers');
+    }
+    const payload = {
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? '') || null,
+      phone: String(form.get('phone') ?? '') || null,
+      address: String(form.get('address') ?? '') || null,
+      city: String(form.get('city') ?? '') || null,
+      state: String(form.get('state') ?? '') || null,
+      zip: String(form.get('zip') ?? '') || null,
+      lead_source: String(form.get('lead_source') ?? '') || null,
+      notes: String(form.get('notes') ?? '') || null,
+    };
+    const { error: updateError } = await supabase.from('customers').update(payload).eq('id', id);
+    if (updateError) error = updateError.message;
+  }
+
+  const [customerRow, quoteRows, orderRows, documentRows] = await Promise.all([
+    supabase.from('customers').select('*').eq('id', id).single(),
+    supabase.from('quotes').select('id, quote_number, status, total, quote_date').eq('customer_id', id),
+    supabase.from('orders').select('id, order_number, status, selling_price').eq('customer_id', id),
+    supabase.from('documents').select('id, category, file_name').eq('customer_id', id),
+  ]);
+
+  if (customerRow.error || !customerRow.data) notFound = true;
+  else customer = customerRow.data;
+  quotes = quoteRows.data ?? [];
+  orders = orderRows.data ?? [];
+  documents = documentRows.data ?? [];
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title={customer ? customer.name : 'Customer'}>
+  {notFound && <p class="admin-empty">Customer not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {customer && (
+    <>
+      <form class="admin-form" method="POST">
+        <label class="admin-field"><span>Name *</span><input type="text" name="name" value={customer.name} required /></label>
+        <label class="admin-field"><span>Email</span><input type="email" name="email" value={customer.email ?? ''} /></label>
+        <label class="admin-field"><span>Phone</span><input type="tel" name="phone" value={customer.phone ?? ''} /></label>
+        <label class="admin-field"><span>Lead Source</span><input type="text" name="lead_source" value={customer.lead_source ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Address</span><input type="text" name="address" value={customer.address ?? ''} /></label>
+        <label class="admin-field"><span>City</span><input type="text" name="city" value={customer.city ?? ''} /></label>
+        <label class="admin-field"><span>State</span><input type="text" name="state" value={customer.state ?? ''} /></label>
+        <label class="admin-field"><span>ZIP</span><input type="text" name="zip" value={customer.zip ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes">{customer.notes ?? ''}</textarea></label>
+        <div class="admin-form__actions">
+          <button class="admin-btn" type="submit">Save Changes</button>
+          <a class="admin-btn admin-btn--ghost" href="/admin/customers">Back to Customers</a>
+        </div>
+      </form>
+
+      <h2 class="admin-section-title" style="margin-top:2.5rem;">Quotes</h2>
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <tbody>
+              {quotes.map((q) => (
+                <tr><td><a href={`/admin/quotes/${q.id}`}>{q.quote_number || q.id}</a></td><td>${q.total ?? 0}</td><td><StatusBadge status={q.status} /></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {quotes.length === 0 && <p class="admin-empty">No quotes yet.</p>}
+      </div>
+
+      <h2 class="admin-section-title" style="margin-top:2rem;">Orders</h2>
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <tbody>
+              {orders.map((o) => (
+                <tr><td>{o.order_number || o.id}</td><td>${o.selling_price ?? 0}</td><td><StatusBadge status={o.status} /></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {orders.length === 0 && <p class="admin-empty">No orders yet.</p>}
+      </div>
+
+      <h2 class="admin-section-title" style="margin-top:2rem;">Documents</h2>
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <tbody>
+              {documents.map((d) => <tr><td>{d.category}</td><td>{d.file_name || '—'}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+        {documents.length === 0 && <p class="admin-empty">No documents yet.</p>}
+      </div>
+
+      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this customer? This cannot be undone.');">
+        <input type="hidden" name="_intent" value="delete" />
+        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Customer</button>
+      </form>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

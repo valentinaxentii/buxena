@@ -1,30 +1,359 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { showDev } from '../data/site';
+import LegalContact from '../components/LegalContact.astro';
+
+// Approved BUXENA Privacy Policy — content supplied by BUXENA, not to be
+// materially altered. Formatting/markup only.
+const sections = [
+  { id: 'collect', title: 'Information We Collect' },
+  { id: 'use', title: 'How We Use Information' },
+  { id: 'payments', title: 'Payments' },
+  { id: 'disclose', title: 'How We Disclose Information' },
+  { id: 'cookies', title: 'Cookies and Similar Technologies' },
+  { id: 'analytics', title: 'Analytics and Advertising' },
+  { id: 'security', title: 'Data Security' },
+  { id: 'retention', title: 'Data Retention' },
+  { id: 'rights', title: 'Your Privacy Rights' },
+  { id: 'gpc', title: 'Opt-Out Preference Signals' },
+  { id: 'email', title: 'Email Communications' },
+  { id: 'children', title: "Children's Privacy" },
+  { id: 'third-party', title: 'Third-Party Websites' },
+  { id: 'us-ops', title: 'United States Operations' },
+  { id: 'changes', title: 'Changes to This Privacy Policy' },
+  { id: 'contact', title: 'Contact Us' },
+];
 ---
 
-<BaseLayout title="Privacy Policy" noindex={true}>
-  <section class="band">
-    <div class="shell shell--narrow">
+<BaseLayout
+  title="Privacy Policy"
+  description="How BUXENA collects, uses, discloses and protects personal information."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
       <span class="eyebrow">Privacy Policy</span>
-      <h1 class="display">Privacy Policy</h1>
-      {showDev && (<p class="lead">
-        This page is a placeholder. BUXENA's Privacy Policy has not yet been published.
-      </p>)}
-      {showDev && (<p class="note">
-        Replace this file with the reviewed text before launch. Because BUXENA
-        sells to customers across the United States, this should be drafted or
-        reviewed by someone familiar with US consumer and privacy law — state
-        requirements vary.
-      </p>)}
+      <h1 class="display measure--tight">Privacy Policy</h1>
+      <p class="legal__updated">Last Updated: July 24, 2026</p>
+      <p class="lead measure">
+        BUXENA LLC ("BUXENA," "we," "us," or "our") respects your privacy.
+        This Privacy Policy explains how we collect, use, disclose, and
+        protect personal information when you visit our website, request
+        information or a quote, communicate with us, purchase products or
+        services from us, or otherwise interact with BUXENA.
+      </p>
+      <LegalContact />
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="collect">
+          <h2>1. Information We Collect</h2>
+          <p>Depending on how you interact with us, we may collect information such as:</p>
+          <ul>
+            <li>Name</li>
+            <li>Email address</li>
+            <li>Telephone number</li>
+            <li>Billing and delivery address</li>
+            <li>ZIP code</li>
+            <li>Information submitted through quote, contact, or inquiry forms</li>
+            <li>Information about the sauna models, accessories, delivery, installation, or other products and services in which you are interested</li>
+            <li>Information necessary to process or administer an order</li>
+            <li>Communications between you and BUXENA</li>
+            <li>Photographs, measurements, drawings, site information, or other materials you voluntarily provide when requesting product, delivery, or installation guidance</li>
+          </ul>
+          <p>
+            Our website may also automatically collect certain technical
+            information, including IP address, browser type, device
+            information, operating system, pages viewed, referring pages,
+            approximate location derived from IP address, and information
+            about how visitors interact with the website.
+          </p>
+        </article>
+
+        <article id="use">
+          <h2>2. How We Use Information</h2>
+          <p>We may use personal information to:</p>
+          <ul>
+            <li>Respond to inquiries and quote requests</li>
+            <li>Recommend appropriate sauna models, heaters, accessories, delivery options, or related products and services</li>
+            <li>Prepare and administer quotations and orders</li>
+            <li>Process and fulfill purchases</li>
+            <li>Coordinate shipping, delivery, and, when purchased or arranged, installation services</li>
+            <li>Communicate regarding orders, deliveries, installation, warranty matters, customer service, and other transactions</li>
+            <li>Maintain business and transaction records</li>
+            <li>Operate, maintain, secure, and improve our website</li>
+            <li>Understand how visitors use our website</li>
+            <li>Detect and prevent fraud, misuse, or security incidents</li>
+            <li>Comply with applicable legal and regulatory obligations</li>
+            <li>Protect BUXENA, our customers, suppliers, service providers, and others</li>
+          </ul>
+        </article>
+
+        <article id="payments">
+          <h2>3. Payments</h2>
+          <p>
+            If online payment functionality is offered, payments may be
+            processed through third-party payment service providers.
+          </p>
+          <p>
+            BUXENA does not intend to store complete payment-card
+            information on its own website when payment processing is
+            handled by a third-party payment provider.
+          </p>
+          <p>
+            Payment providers process information according to their own
+            terms and privacy practices.
+          </p>
+        </article>
+
+        <article id="disclose">
+          <h2>4. How We Disclose Information</h2>
+          <p>We may disclose personal information when reasonably necessary to operate our business, including to:</p>
+          <ul>
+            <li>Manufacturers and suppliers when necessary to prepare or fulfill an order</li>
+            <li>Shipping, freight, logistics, and delivery providers</li>
+            <li>Installation contractors or other service providers when installation or related services are requested</li>
+            <li>Payment processors and financial service providers when applicable</li>
+            <li>Website hosting, technology, security, analytics, communications, and other business service providers</li>
+            <li>Professional advisers, including accountants, insurers, consultants, and legal advisers</li>
+            <li>Government authorities or other parties when required by applicable law, legal process, or a valid governmental request</li>
+          </ul>
+          <p>
+            We may also disclose information when reasonably necessary to
+            protect our rights, property, customers, business, or others.
+          </p>
+          <p>
+            If BUXENA is involved in a merger, acquisition, financing,
+            restructuring, sale of assets, or similar business transaction,
+            information may be transferred as part of that transaction.
+          </p>
+          <p>
+            BUXENA does not disclose personal information to third parties
+            for their own purposes except as described in this Privacy
+            Policy or as otherwise disclosed to you.
+          </p>
+        </article>
+
+        <article id="cookies">
+          <h2>5. Cookies and Similar Technologies</h2>
+          <p>
+            Our website may use cookies and similar technologies necessary
+            for website functionality and may use additional technologies
+            for preferences, analytics, performance, or marketing where
+            implemented.
+          </p>
+          <p>
+            Cookies are small pieces of information stored on or associated
+            with your browser or device.
+          </p>
+          <p>
+            Where required, visitors may be given choices regarding
+            non-essential cookies through the website's cookie-consent
+            tools.
+          </p>
+          <p>
+            You may also control certain cookies through your browser
+            settings. Disabling cookies may affect some website
+            functionality.
+          </p>
+        </article>
+
+        <article id="analytics">
+          <h2>6. Analytics and Advertising</h2>
+          <p>
+            BUXENA may use analytics or advertising technologies to
+            understand website usage, measure performance, improve our
+            services, or market our products.
+          </p>
+          <p>
+            If such technologies are implemented, information about your
+            browser, device, interactions with the website, and similar
+            online activity may be processed by the relevant service
+            providers.
+          </p>
+          <p>
+            Where applicable law provides a right to opt out of certain
+            targeted advertising, sale, or sharing of personal information,
+            BUXENA will provide the required mechanism for exercising that
+            right.
+          </p>
+        </article>
+
+        <article id="security">
+          <h2>7. Data Security</h2>
+          <p>
+            We use reasonable administrative, technical, and organizational
+            measures designed to protect personal information.
+          </p>
+          <p>
+            However, no Internet transmission, electronic storage system,
+            or security measure can guarantee absolute security.
+          </p>
+        </article>
+
+        <article id="retention">
+          <h2>8. Data Retention</h2>
+          <p>
+            We retain personal information for as long as reasonably
+            necessary for the purposes for which it was collected, including
+            to administer inquiries and transactions, provide customer
+            service, maintain appropriate business records, resolve
+            disputes, enforce agreements, and satisfy legal, accounting,
+            tax, warranty, and other legitimate business requirements.
+          </p>
+          <p>
+            Retention periods may vary depending on the type of information
+            and the reason it is maintained.
+          </p>
+        </article>
+
+        <article id="rights">
+          <h2>9. Your Privacy Rights</h2>
+          <p>
+            Depending on where you reside and subject to applicable law, you
+            may have rights concerning your personal information, which may
+            include rights to:
+          </p>
+          <ul>
+            <li>Confirm whether we process your personal information</li>
+            <li>Access certain personal information</li>
+            <li>Correct inaccuracies</li>
+            <li>Request deletion of certain personal information</li>
+            <li>Obtain a copy of certain personal information</li>
+            <li>Opt out of certain processing for targeted advertising, sale of personal information, or qualifying profiling</li>
+            <li>Appeal certain decisions concerning a privacy-rights request</li>
+          </ul>
+          <p>
+            These rights are not absolute and may be subject to exceptions
+            under applicable law.
+          </p>
+          <p>To submit a privacy request, contact:</p>
+          <a class="legal__contact-email" href="mailto:info@buxena.com">info@buxena.com</a>
+          <p>
+            Please include enough information for us to understand and
+            appropriately respond to your request. We may need to verify
+            your identity before completing certain requests.
+          </p>
+          <p>
+            Where applicable law provides a right to appeal our decision
+            regarding a privacy request, you may submit an appeal using the
+            same email address and state that your request is an appeal.
+          </p>
+        </article>
+
+        <article id="gpc">
+          <h2>10. Opt-Out Preference Signals</h2>
+          <p>
+            Where required by applicable law, BUXENA will recognize
+            qualifying browser-based opt-out preference signals for
+            applicable processing, such as Global Privacy Control, in
+            accordance with applicable legal requirements.
+          </p>
+          <p>
+            The availability and effect of these signals may depend on your
+            jurisdiction and the technologies used on our website.
+          </p>
+        </article>
+
+        <article id="email">
+          <h2>11. Email Communications</h2>
+          <p>
+            We may send transactional or service-related communications
+            concerning inquiries, quotations, purchases, deliveries,
+            installation, warranty matters, or customer service.
+          </p>
+          <p>
+            If we send marketing emails, recipients may opt out of marketing
+            communications using the unsubscribe method provided in those
+            communications or by contacting us.
+          </p>
+          <p>
+            Opting out of marketing communications does not prevent us from
+            sending necessary transactional or service-related
+            communications.
+          </p>
+        </article>
+
+        <article id="children">
+          <h2>12. Children's Privacy</h2>
+          <p>
+            Our website and products are intended for adults and are not
+            directed to children under 13.
+          </p>
+          <p>
+            We do not knowingly collect personal information online from
+            children under 13. If we learn that we have collected such
+            information in circumstances requiring deletion, we will take
+            appropriate steps to delete it.
+          </p>
+        </article>
+
+        <article id="third-party">
+          <h2>13. Third-Party Websites</h2>
+          <p>
+            Our website may contain links to manufacturers, suppliers,
+            social-media platforms, or other third-party websites.
+          </p>
+          <p>
+            BUXENA is not responsible for the privacy practices, security,
+            or content of third-party websites. We encourage you to review
+            their privacy policies before providing personal information.
+          </p>
+        </article>
+
+        <article id="us-ops">
+          <h2>14. United States Operations</h2>
+          <p>
+            BUXENA operates from the United States. Information collected
+            through our website or business interactions may be processed
+            and stored in the United States and in other locations where our
+            service providers operate, subject to applicable law.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>15. Changes to This Privacy Policy</h2>
+          <p>
+            We may update this Privacy Policy from time to time to reflect
+            changes in our business, website, technologies, services, or
+            applicable legal requirements.
+          </p>
+          <p>
+            When we update the policy, we will revise the "Last Updated"
+            date displayed at the top of this page.
+          </p>
+        </article>
+
+        <article id="contact">
+          <h2>16. Contact Us</h2>
+          <p>
+            Questions about this Privacy Policy or our privacy practices may
+            be directed to:
+          </p>
+          <LegalContact />
+        </article>
+      </div>
     </div>
   </section>
 </BaseLayout>
 
 <style>
-  .lead { margin-top: 1.75rem; }
-  .note {
-    margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
-    font-size: 0.8125rem; color: var(--muted); font-style: italic;
+  .legal__contact-email {
+    display: inline-block;
+    margin: 0.2rem 0 0.86em;
+    font-size: 1.1rem;
+    font-family: var(--font-display);
+    color: var(--bronze-ink);
+    text-decoration: none;
   }
+  .legal__contact-email:hover { color: var(--ink); }
 </style>

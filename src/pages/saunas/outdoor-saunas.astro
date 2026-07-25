@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import ProductFilters from '../../components/ProductFilters.astro';
+import QuoteBand from '../../components/QuoteBand.astro';
+import { getCollection } from 'astro:content';
+
+const models = (
+  await getCollection('saunas', ({ data }) => !data.draft && data.location === 'outdoor')
+).sort((a, b) => a.data.order - b.data.order);
+
+function uniqueOptions(values: (string | undefined)[]) {
+  return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();
+}
+
+const types = uniqueOptions(models.map((s) => s.data.productType));
+
+const facets = [
+  {
+    key: 'type' as const,
+    label: 'Type',
+    options: types.map((v) => ({ value: v, label: v })),
+  },
+  {
+    key: 'series' as const,
+    label: 'Series',
+    options: uniqueOptions(models.map((s) => s.data.series)).map((v) => ({ value: v, label: v })),
+  },
+  {
+    key: 'capacity' as const,
+    label: 'Capacity',
+    options: ['2–3', '3–4', '4–5', '5–6', '6–8'].map((v) => ({ value: v, label: `${v} people` })),
+  },
+  {
+    key: 'material' as const,
+    label: 'Material',
+    options: uniqueOptions(models.flatMap((s) => s.data.materials ?? [])).map((v) => ({
+      value: v.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      label: v,
+    })),
+  },
+];
+---
+
+<BaseLayout
+  title="Outdoor Saunas"
+  description="BUXENA outdoor saunas — barrel cabins built for the garden, the deck or the tree line, in thermowood or Nordic spruce."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/saunas/">Saunas</a>
+        <span aria-hidden="true">/</span>
+        <span>Outdoor Saunas</span>
+      </nav>
+      <h1 class="display measure--tight">Outdoor Saunas</h1>
+      <p class="lead measure">
+        Free-standing cabins built for the garden, the deck or the tree line —
+        today, that means our barrel range in thermowood or Nordic spruce,
+        from a compact two-person model to a full eight-person cabin.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell">
+      <ProductFilters facets={facets} />
+
+      <div class="grid cols-3" data-product-grid>
+        {models.map((s) => (
+          <ProductCard
+            slug={s.id}
+            title={s.data.title}
+            tagline={s.data.tagline}
+            category={s.data.category}
+            placeholder={s.data.placeholder}
+            image={s.data.heroImage}
+            location={s.data.location}
+            productType={s.data.productType}
+            series={s.data.series}
+            capacity={s.data.capacity}
+            capacityMin={s.data.capacityMin}
+            capacityMax={s.data.capacityMax}
+            materials={s.data.materials}
+            dimensions={s.data.dimensions}
+          />
+        ))}
+      </div>
+
+      <p class="empty" data-empty hidden>Nothing matches those filters yet.</p>
+
+      <p class="more-link">
+        <a class="link" href="/saunas/indoor-saunas/">See indoor saunas instead <span class="arrow" aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </section>
+
+  <QuoteBand />
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
+
+  .crumbs {
+    display: flex;
+    gap: 0.75rem;
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: clamp(1.3rem, 0.75rem + 1.5vw, 2.25rem);
+  }
+  .crumbs a { text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); }
+
+  .empty { color: var(--muted); font-style: italic; padding-block: 2.25rem; }
+  .more-link { margin-top: clamp(1.5rem, 0.9rem + 1.5vw, 2.4rem); }
+</style>

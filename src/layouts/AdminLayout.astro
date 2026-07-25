@@ -1,0 +1,213 @@
+---
+export const prerender = false;
+
+interface Props {
+  title: string;
+  staffEmail?: string | null;
+}
+const { title, staffEmail } = Astro.props;
+
+const path = Astro.url.pathname;
+const isActive = (href: string) => path === href || (href !== '/admin' && path.startsWith(href));
+
+const phase1 = [
+  { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/leads', label: 'Leads' },
+  { href: '/admin/customers', label: 'Customers' },
+  { href: '/admin/quotes', label: 'Quotes' },
+  { href: '/admin/products', label: 'Products' },
+];
+const phase2 = [
+  { href: '/admin/inventory', label: 'Inventory' },
+  { href: '/admin/orders', label: 'Orders' },
+  { href: '/admin/enquiries', label: 'Enquiries' },
+  { href: '/admin/documents', label: 'Documents' },
+  { href: '/admin/analytics', label: 'Analytics' },
+];
+const settingsItem = { href: '/admin/settings', label: 'Settings' };
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · BUXENA Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap"
+    />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="/brand/buxena-logo-champagne.png" alt="BUXENA" width="1536" height="1024" />
+        </div>
+
+        <nav class="nav">
+          <ul>
+            {phase1.map((item) => (
+              <li>
+                <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
+              </li>
+            ))}
+          </ul>
+
+          <p class="nav__group-label">Phase 2</p>
+          <ul>
+            {phase2.map((item) => (
+              <li>
+                <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
+              </li>
+            ))}
+          </ul>
+
+          <ul>
+            <li>
+              <a href={settingsItem.href} aria-current={isActive(settingsItem.href) ? 'page' : undefined}>
+                {settingsItem.label}
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="account">
+          {staffEmail && <p class="account__email">{staffEmail}</p>}
+          <form method="POST" action="/api/logout">
+            <button type="submit">Sign Out</button>
+          </form>
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <h1>{title}</h1>
+        </header>
+        <main class="content">
+          <slot />
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  * { box-sizing: border-box; }
+
+  :root {
+    --admin-bg: #14120f;
+    --admin-panel: #1b1815;
+    --admin-border: rgba(212, 184, 140, 0.14);
+    --admin-cream: #f6f2ea;
+    --admin-muted: rgba(246, 242, 234, 0.6);
+    --admin-gold: #d4b88c;
+  }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--admin-bg);
+    color: var(--admin-cream);
+    font-family: 'Jost', system-ui, sans-serif;
+  }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 15.5rem;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--admin-panel);
+    border-right: 1px solid var(--admin-border);
+    padding: 1.75rem 1.25rem;
+  }
+
+  .brand { padding: 0 0.5rem 1.5rem; }
+  .brand img { width: 100%; max-width: 8rem; height: auto; display: block; }
+
+  .nav { flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.25rem; }
+  .nav ul { list-style: none; margin: 0 0 0.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .nav a {
+    display: block;
+    padding: 0.6rem 0.6rem;
+    border-radius: 2px;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    color: var(--admin-muted);
+    text-decoration: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  .nav a:hover { color: var(--admin-cream); background: rgba(255, 255, 255, 0.03); }
+  .nav a[aria-current='page'] { color: var(--admin-bg); background: var(--admin-gold); }
+
+  .nav__group-label {
+    margin: 0.9rem 0.6rem 0.35rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(246, 242, 234, 0.35);
+  }
+
+  .account {
+    margin-top: auto;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--admin-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .account__email {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--admin-muted);
+    word-break: break-all;
+  }
+  .account form { margin: 0; }
+  .account button {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    background: none;
+    border: 1px solid var(--admin-border);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .account button:hover { color: var(--admin-cream); border-color: var(--admin-gold); }
+
+  .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+  .topbar {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--admin-border);
+  }
+  .topbar h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  .content { flex: 1 1 auto; padding: 2rem; }
+
+  @media (max-width: 860px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 1rem; }
+    .brand { padding: 0; margin-right: 1rem; }
+    .brand img { max-width: 5rem; }
+    .nav { flex-direction: row; flex-wrap: wrap; }
+    .nav ul { flex-direction: row; flex-wrap: wrap; }
+    .nav__group-label { display: none; }
+    .account { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; flex-direction: row; align-items: center; }
+    .account__email { display: none; }
+  }
+</style>

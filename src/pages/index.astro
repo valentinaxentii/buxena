@@ -4,12 +4,18 @@ import Hero from '../components/Hero.astro';
 import Figure from '../components/Figure.astro';
 import CollectionCard from '../components/CollectionCard.astro';
 import QuoteBand from '../components/QuoteBand.astro';
-import { categories, showDev } from '../data/site';
+import BuxenaMark from '../components/BuxenaMark.astro';
+import { categories } from '../data/site';
 import { getCollection } from 'astro:content';
 
 const saunas = await getCollection('saunas', ({ data }) => !data.draft);
 const countFor = (id: string) => saunas.filter((s) => s.data.category === id).length;
 const featured = categories.filter((c) => countFor(c.id) > 0);
+
+const collectionImages: Record<string, string> = {
+  indoor: '/images/collection-indoor.jpg',
+  barrel: '/images/collection-barrel.jpg',
+};
 
 const reasons = [
   {
@@ -45,7 +51,7 @@ const steps = [
   <section class="band" id="intro">
     <div class="shell intro">
       <div class="intro__left reveal">
-        <span class="eyebrow">BUXENA</span>
+        <span class="eyebrow"><BuxenaMark /></span>
         <h2 class="h2">
           A sauna is a room that asks nothing of you.<br />
           <span class="serif-italic">That is the whole idea.</span>
@@ -80,8 +86,9 @@ const steps = [
           <CollectionCard
             name={c.name}
             blurb={c.blurb}
-            href={`/collections/${c.id}/`}
+            href={`/saunas/${c.id}-saunas/`}
             count={countFor(c.id)}
+            image={collectionImages[c.id]}
             note={`${c.name} — representative collection image, exterior or interior, consistent treatment across all four cards.`}
           />
         ))}
@@ -90,6 +97,9 @@ const steps = [
       <p class="more-link reveal">
         <a class="link" href="/saunas/">View every model <span class="arrow" aria-hidden="true">→</span></a>
       </p>
+      <a class="plan-cta reveal" href="/plan-your-sauna/">
+        Plan Your Sauna <span class="arrow" aria-hidden="true">→</span>
+      </a>
     </div>
   </section>
 
@@ -97,13 +107,12 @@ const steps = [
   <section class="band band--ember">
     <div class="shell">
       <div class="sec-head reveal">
-        <span class="eyebrow">Why BUXENA</span>
+        <span class="eyebrow">Why <BuxenaMark /></span>
         <h2 class="h2 measure--tight">Small range. Long conversations.</h2>
       </div>
       <div class="grid cols-4 why reveal">
         {reasons.map((r) => (
           <div class="why__item">
-            <span class="slats" aria-hidden="true"></span>
             <h3 class="h3 why__title">{r.title}</h3>
             <p class="why__body">{r.body}</p>
           </div>
@@ -117,8 +126,8 @@ const steps = [
     <div class="shell split">
       <div class="split__media reveal">
         <Figure
-          alt="Timber cladding detail"
-          note="DESIGN — tight detail of timber: end grain, a chamfered edge, or the shadow gap between two boards. Raking natural light, shallow depth of field."
+          src="/images/craftsmanship-detail.jpg"
+          alt="Close detail of timber bench edge with a shadow gap between boards, showing natural wood grain"
           ratio="4 / 5"
           tone="light"
         />
@@ -145,12 +154,6 @@ const steps = [
           of the job: matching a European product to American homes, American
           electrical supply and American freight.
         </p>
-        {showDev && (
-          <p class="split__note">
-            DEV NOTE — supplier names, timber species and mill sources to be added
-            once agreements are confirmed. Hidden in production.
-          </p>
-        )}
       </div>
     </div>
   </section>
@@ -168,9 +171,18 @@ const steps = [
       </div>
 
       <div class="grid cols-3 reveal">
-        <Figure alt="Steam rising from heater stones" note="RITUAL 01 — löyly: water hitting hot stones, steam rising. Backlit, dark ground." ratio="3 / 4" tone="dark" />
-        <Figure alt="Cooling outdoors after a round" note="RITUAL 02 — cooling: figure on a deck or by water, wrapped, breath visible. Cool blue light, contrast to the warm frames." ratio="3 / 4" tone="mid" />
-        <Figure alt="Resting between rounds" note="RITUAL 03 — rest: quiet interior, towel and bucket, nobody in frame. Stillness." ratio="3 / 4" tone="light" />
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-01-loyly.jpg" alt="Water being poured onto hot sauna stones with steam rising" ratio="3 / 4" tone="dark" />
+          <p class="ritual-shot__caption">Heat</p>
+        </div>
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-02-cooling.jpg" alt="A snow-covered cabin in a winter forest at dusk" ratio="3 / 4" tone="mid" />
+          <p class="ritual-shot__caption">Cool</p>
+        </div>
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-03-rest.jpg" alt="Quiet sauna interior with a bucket and ladle on the bench" ratio="3 / 4" tone="light" />
+          <p class="ritual-shot__caption">Rest</p>
+        </div>
       </div>
 
       <p class="wellness__foot reveal">
@@ -209,16 +221,16 @@ const steps = [
   .intro {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: start;
   }
   .intro__left .h2 { line-height: 1.14; }
 
   /* --- collections --- */
-  .more-link { margin-top: clamp(2.5rem, 1.5rem + 2.5vw, 4rem); }
+  .more-link { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
 
   /* --- why --- */
-  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.75rem; }
+  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.3rem; }
   .why__title { margin-bottom: 0.85rem; }
   .why__body { font-size: var(--t-small); color: var(--muted-dark); line-height: 1.75; }
 
@@ -226,30 +238,34 @@ const steps = [
   .split {
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: center;
   }
-  .split__text .h2 { margin-bottom: 1.75rem; }
-  .split__text .lead { margin-bottom: 1.5rem; }
-  .split__note {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--line);
-    font-size: 0.8125rem;
-    color: var(--muted);
-    font-style: italic;
-  }
+  .split__text .h2 { margin-bottom: 1.3rem; }
+  .split__text .lead { margin-bottom: 1.15rem; }
 
   /* --- wellness --- */
-  .wellness__foot { margin-top: clamp(2.5rem, 1.5rem + 2.5vw, 4rem); }
+  .wellness__foot { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
+
+  .ritual-shot :global(.fig) { overflow: hidden; }
+  .ritual-shot :global(.fig img) { transition: transform 0.8s var(--ease); }
+  .ritual-shot:hover :global(.fig img) { transform: scale(1.03); }
+  .ritual-shot__caption {
+    margin: 0.5rem 0 0;
+    font-family: var(--font-sans);
+    font-size: var(--t-small);
+    font-weight: 500;
+    color: var(--ink);
+    text-align: left;
+  }
 
   /* --- steps --- */
   .steps {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: clamp(1.75rem, 0.6rem + 3vw, 3.5rem);
+    gap: clamp(1.3rem, 0.45rem + 2.25vw, 2.6rem);
   }
-  .step { padding-top: 1.75rem; border-top: 1px solid var(--line); }
+  .step { padding-top: 1.3rem; border-top: 1px solid var(--line); }
   .step__n {
     display: block;
     font-family: var(--font-display);

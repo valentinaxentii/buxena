@@ -28,6 +28,7 @@ const others = categories.filter(
 <BaseLayout
   title={category.name}
   description={`${category.name} from BUXENA — ${category.blurb}`}
+  noindex={true}
 >
   <section class="band band--tight page-head">
     <div class="shell">
@@ -53,6 +54,14 @@ const others = categories.filter(
               category={s.data.category}
               placeholder={s.data.placeholder}
               image={s.data.heroImage}
+              location={s.data.location}
+              productType={s.data.productType}
+              series={s.data.series}
+              capacity={s.data.capacity}
+              capacityMin={s.data.capacityMin}
+              capacityMax={s.data.capacityMax}
+              materials={s.data.materials}
+              dimensions={s.data.dimensions}
             />
           ))}
         </div>
@@ -76,16 +85,17 @@ const others = categories.filter(
 
 <style>
   .page-head { padding-bottom: 0; }
-  .page-head .lead { margin-top: 1.75rem; }
+  .page-head .lead { margin-top: 1.3rem; }
 
   .crumbs {
     display: flex;
     gap: 0.75rem;
     font-size: var(--t-label);
-    letter-spacing: 0.2em;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: clamp(1.75rem, 1rem + 2vw, 3rem);
+    margin-bottom: clamp(1.3rem, 0.75rem + 1.5vw, 2.25rem);
   }
   .crumbs a { text-decoration: none; }
   .crumbs a:hover { color: var(--ink); }
@@ -98,8 +108,8 @@ const others = categories.filter(
   }
 
   .others {
-    margin-top: clamp(3rem, 2rem + 3vw, 5rem);
-    padding-top: 2.5rem;
+    margin-top: clamp(2.25rem, 1.5rem + 2.25vw, 3.75rem);
+    padding-top: 1.9rem;
     border-top: 1px solid var(--line);
   }
   .others__list { display: flex; flex-wrap: wrap; gap: 1.25rem 2.25rem; }

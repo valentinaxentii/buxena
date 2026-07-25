@@ -1,0 +1,32 @@
+---
+title: "EDA Nordic Spruce 3.0m"
+category: "barrel"
+location: "outdoor"
+productType: "Barrel"
+series: "EDA"
+tagline: "A large EDA barrel, in Nordic spruce"
+summary: "A full-length Nordic spruce barrel sauna sized for six to eight people."
+order: 150
+placeholder: false
+capacity: "6–8 people"
+capacityMin: 6
+capacityMax: 8
+materials: ["Nordic spruce"]
+heroImage:
+  src: "/images/saunas/eda-nordic-spruce-3-0m-hero.png"
+  alt: "EDA Nordic Spruce 3.0m barrel sauna exterior, glass door and shingled roof"
+dimensions:
+  - { label: "Length", value: "9.8 ft (300 cm)" }
+  - { label: "Height", value: "7.1 ft (215 cm)" }
+specs:
+  - { label: "Roof", value: "Contact us for details" }
+  - { label: "Door / glass", value: "Contact us for details" }
+  - { label: "Heater compatibility", value: "Contact us for details" }
+delivery: "Contact us for details"
+---
+
+One of the larger barrels in the EDA line, seating six to eight, built in
+Nordic spruce for a paler, more even grain than the thermowood equivalent.
+
+Heater, roof and glazing configuration are confirmed with you before
+ordering, once we know where it is going.

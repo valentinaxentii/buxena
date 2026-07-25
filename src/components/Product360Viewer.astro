@@ -1,0 +1,179 @@
+---
+/**
+ * Reusable 360° product viewer.
+ *
+ * Renders nothing unless given 2+ real photographed frames — there is no
+ * synthetic/AI in-between-frame generation. Drag (desktop) or swipe
+ * (mobile) scrubs through the frame sequence. Frames beyond the first are
+ * lazy-loaded only once the viewer is visible, so an unused viewer costs
+ * nothing on page weight.
+ *
+ * Usage:
+ *   <Product360Viewer
+ *     frames={["/images/360/eda-thermowood-2-5m/eda-thermowood-2-5m-01.jpg", ...]}
+ *     alt="EDA Thermowood 2.5m barrel sauna"
+ *     fallback={data.heroImage}
+ *   />
+ */
+import Figure from './Figure.astro';
+
+interface Props {
+  frames?: string[];
+  alt: string;
+  fallback?: { src?: string; alt: string; note?: string };
+  ratio?: string;
+}
+const { frames = [], alt, fallback, ratio = '4 / 3' } = Astro.props;
+const hasViewer = frames.length >= 2;
+---
+
+{hasViewer ? (
+  <div class="p360" data-p360 data-frames={JSON.stringify(frames)} style={`--p360-ratio:${ratio}`}>
+    <img
+      class="p360__frame"
+      data-p360-frame
+      src={frames[0]}
+      alt={alt}
+      draggable="false"
+      loading="lazy"
+      decoding="async"
+    />
+    <span class="p360__badge" aria-hidden="true">
+      <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M2.5 10a7.5 7.5 0 1 1 3.2 6.15M2.5 10v4.5M2.5 10h4.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      360°
+    </span>
+    <div class="p360__hint" data-p360-hint>
+      <svg viewBox="0 0 24 12" width="26" height="13" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <path d="M8 2 2 6l6 4M16 2l6 4-6 4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      Drag to rotate 360°
+    </div>
+  </div>
+) : (
+  <Figure src={fallback?.src} alt={fallback?.alt ?? alt} note={fallback?.note} ratio={ratio} tone="mid" />
+)}
+
+<style>
+  .p360 {
+    position: relative;
+    aspect-ratio: var(--p360-ratio);
+    overflow: hidden;
+    background: var(--birch);
+    cursor: grab;
+    touch-action: pan-y;
+    user-select: none;
+  }
+  .p360:active { cursor: grabbing; }
+
+  .p360__frame {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  .p360__badge {
+    position: absolute;
+    top: 0.9rem;
+    left: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(27, 25, 23, 0.72);
+    color: var(--linen);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .p360__hint {
+    position: absolute;
+    inset: auto 0 0.9rem 0;
+    margin-inline: auto;
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(27, 25, 23, 0.72);
+    color: var(--linen);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.5rem 0.9rem;
+    transition: opacity 0.4s var(--ease);
+  }
+  .p360__hint[data-hidden] { opacity: 0; pointer-events: none; }
+</style>
+
+<script>
+  const viewers = document.querySelectorAll<HTMLElement>('[data-p360]');
+
+  viewers.forEach((viewer) => {
+    const frames: string[] = JSON.parse(viewer.dataset.frames ?? '[]');
+    const img = viewer.querySelector<HTMLImageElement>('[data-p360-frame]');
+    const hint = viewer.querySelector<HTMLElement>('[data-p360-hint]');
+    if (!img || frames.length < 2) return;
+
+    let currentIndex = 0;
+    let dragging = false;
+    let startX = 0;
+    let startIndex = 0;
+    let interacted = false;
+    let preloaded = false;
+
+    const preload = () => {
+      if (preloaded) return;
+      preloaded = true;
+      frames.forEach((src) => {
+        const pre = new Image();
+        pre.src = src;
+      });
+    };
+
+    // Only pay the preload cost once the viewer is actually visible.
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && preload()),
+      { rootMargin: '200px' }
+    );
+    io.observe(viewer);
+
+    const setFrame = (index: number) => {
+      const wrapped = ((index % frames.length) + frames.length) % frames.length;
+      currentIndex = wrapped;
+      img.src = frames[wrapped];
+    };
+
+    const markInteracted = () => {
+      if (interacted) return;
+      interacted = true;
+      hint?.setAttribute('data-hidden', '');
+    };
+
+    const PX_PER_FRAME = 8;
+
+    const onPointerDown = (e: PointerEvent) => {
+      dragging = true;
+      startX = e.clientX;
+      startIndex = currentIndex;
+      viewer.setPointerCapture(e.pointerId);
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) markInteracted();
+      const delta = Math.round(dx / PX_PER_FRAME);
+      setFrame(startIndex - delta);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      dragging = false;
+      viewer.releasePointerCapture(e.pointerId);
+    };
+
+    viewer.addEventListener('pointerdown', onPointerDown);
+    viewer.addEventListener('pointermove', onPointerMove);
+    viewer.addEventListener('pointerup', onPointerUp);
+    viewer.addEventListener('pointercancel', onPointerUp);
+  });
+</script>

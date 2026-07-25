@@ -1,0 +1,169 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalContact from '../components/LegalContact.astro';
+
+// WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
+// Have this reviewed by a US-licensed attorney before relying on it
+// commercially. Deliberately generic on numbers: BUXENA has not published
+// a fixed return window, cancellation fee, or restocking fee.
+const sections = [
+  { id: 'overview', title: 'Overview' },
+  { id: 'standard', title: 'Standard (In-Stock) Products' },
+  { id: 'special-order', title: 'Special-Order, Custom and Made-to-Order Products' },
+  { id: 'before-shipment', title: 'Cancelling Before Shipment' },
+  { id: 'in-production', title: 'Orders Already in Production or Shipped' },
+  { id: 'condition', title: 'Condition of Returned Goods' },
+  { id: 'return-shipping', title: 'Return Shipping Costs' },
+  { id: 'damaged-incorrect', title: 'Damaged or Incorrect Goods' },
+  { id: 'how-to', title: 'How to Start a Return or Cancellation' },
+  { id: 'changes', title: 'Changes to This Policy' },
+  { id: 'contact', title: 'Contact Us' },
+];
+---
+
+<BaseLayout
+  title="Returns & Cancellations"
+  description="BUXENA's policy on returning or cancelling an order, for standard and special-order products."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Returns &amp; Cancellations</span>
+      <h1 class="display measure--tight">Returns &amp; Cancellations Policy</h1>
+      <p class="legal__updated">Last Updated: July 2026</p>
+      <p class="lead measure">
+        What's possible depends heavily on the type of order — whether it's
+        a standard product, or something special-order or made to order —
+        and how far along it is. This policy explains how that works.
+      </p>
+      <LegalContact />
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="overview">
+          <h2>1. Overview</h2>
+          <p>
+            Because our products are large, often imported to order, and
+            sometimes built to a specific configuration, returns and
+            cancellations are handled case by case rather than under one
+            fixed rule. Always contact us before returning anything — see
+            Section 9.
+          </p>
+        </article>
+
+        <article id="standard">
+          <h2>2. Standard (In-Stock) Products</h2>
+          <p>
+            For products we hold as standard stock, contact us as soon as
+            possible if you'd like to cancel or return your order. We'll
+            confirm what's possible for your specific order, including any
+            timing and condition requirements, in writing.
+          </p>
+        </article>
+
+        <article id="special-order">
+          <h2>3. Special-Order, Custom and Made-to-Order Products</h2>
+          <p>
+            Many of our sauna models are imported or produced specifically
+            for your order. Once production has started, a special-order,
+            custom, or made-to-order product may no longer be eligible for
+            cancellation or return. We will tell you clearly at the time of
+            order whether your configuration falls into this category, and
+            what that means for cancellation.
+          </p>
+        </article>
+
+        <article id="before-shipment">
+          <h2>4. Cancelling Before Shipment</h2>
+          <p>
+            If you need to cancel before your order ships, contact us
+            immediately at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a>. Whether a
+            cancellation fee applies — and how much — depends on how far
+            along the order is (for example, whether production or customs
+            clearance has already started) and will be confirmed with you
+            directly rather than charged at a fixed, pre-set rate.
+          </p>
+        </article>
+
+        <article id="in-production">
+          <h2>5. Orders Already in Production or Shipped</h2>
+          <p>
+            Orders that are already in production, in transit, or delivered
+            are more limited in what can be changed or cancelled. We will
+            always tell you what your options actually are for your
+            specific order rather than apply a blanket rule.
+          </p>
+        </article>
+
+        <article id="condition">
+          <h2>6. Condition of Returned Goods</h2>
+          <p>
+            Where a return is accepted, the product generally needs to be
+            unused, in its original packaging where possible, and in
+            resalable condition, unless the return is due to damage or a
+            defect. We'll confirm the specific condition requirements for
+            your return in writing before you send anything back.
+          </p>
+        </article>
+
+        <article id="return-shipping">
+          <h2>7. Return Shipping Costs</h2>
+          <p>
+            Who pays return freight depends on the reason for the return.
+            Given the size of these products, return shipping can be a
+            meaningful cost — we'll be upfront with you about it before you
+            proceed. If we shipped the wrong item or it arrived damaged or
+            defective, see Section 8.
+          </p>
+        </article>
+
+        <article id="damaged-incorrect">
+          <h2>8. Damaged or Incorrect Goods</h2>
+          <p>
+            If your order arrived damaged, defective, or different from
+            what you ordered, contact us promptly — see our{' '}
+            <a href="/shipping/">Shipping &amp; Delivery Policy</a> for how
+            to report shipping damage. We'll work with you on a repair,
+            replacement, or other resolution appropriate to the situation.
+          </p>
+        </article>
+
+        <article id="how-to">
+          <h2>9. How to Start a Return or Cancellation</h2>
+          <p>
+            Email <a href="mailto:info@buxena.com">info@buxena.com</a> with
+            your order details and what you'd like to do. Please don't ship
+            anything back before we've confirmed the details with you in
+            writing — unauthorized returns may not be accepted.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>10. Changes to This Policy</h2>
+          <p>
+            We may update this policy from time to time. We will revise the
+            "Last Updated" date above whenever we make a material change.
+          </p>
+        </article>
+
+        <article id="contact">
+          <h2>11. Contact Us</h2>
+          <p>Questions about a return or cancellation can be directed to:</p>
+          <LegalContact />
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+

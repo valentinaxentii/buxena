@@ -10,7 +10,22 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
 
 <header class={`hdr ${overHero ? 'hdr--over' : ''}`} data-header>
   <div class="hdr__inner">
-    <a class="wordmark" href="/" aria-label={`${site.name} home`}>{site.name}</a>
+    <a class="wordmark" href="/" aria-label={`${site.name} home`}>
+      <img
+        class="wordmark__logo wordmark__logo--dark"
+        src="/brand/buxena-logo-espresso.png"
+        alt=""
+        width="1536"
+        height="1024"
+      />
+      <img
+        class="wordmark__logo wordmark__logo--light"
+        src="/brand/buxena-logo-champagne.png"
+        alt=""
+        width="1536"
+        height="1024"
+      />
+    </a>
 
     <nav class="hdr__nav" aria-label="Primary">
       <ul>
@@ -75,7 +90,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     max-width: var(--shell);
     margin-inline: auto;
     padding: 0 var(--gutter);
-    height: clamp(4.25rem, 3.4rem + 2.2vw, 5.75rem);
+    height: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -83,14 +98,28 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   }
 
   .wordmark {
-    font-family: var(--font-sans);
-    font-weight: 300;
-    font-size: clamp(1.05rem, 0.9rem + 0.5vw, 1.3rem);
-    letter-spacing: 0.42em;
-    text-indent: 0.42em;
+    display: inline-flex;
+    align-items: center;
     text-decoration: none;
     white-space: nowrap;
   }
+
+  /* new lockup is stacked (steam / wordmark / line / tagline) rather than a
+     flat wide mark, so it is sized by width — height follows the intrinsic
+     1536x1024 ratio automatically. ~145-165px mobile, ~170-190px tablet,
+     ~190-220px desktop. */
+  .wordmark__logo {
+    display: block;
+    width: clamp(9.0625rem, 8.6rem + 4.7vw, 13.75rem);
+    height: auto;
+  }
+
+  /* dark (colored) logo by default — solid header on light backgrounds */
+  .wordmark__logo--light { display: none; }
+
+  /* light logo while transparent over the hero video; swap to dark once stuck/solid */
+  .hdr--over:not(.is-stuck) .wordmark__logo--dark { display: none; }
+  .hdr--over:not(.is-stuck) .wordmark__logo--light { display: block; }
 
   .hdr__nav ul {
     display: flex;
@@ -98,14 +127,15 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   }
 
   .hdr__nav a {
-    font-size: var(--t-label);
-    letter-spacing: 0.19em;
+    font-size: 0.9375rem;
+    font-weight: 300;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     text-decoration: none;
     padding-block: 0.4rem;
     border-bottom: 1px solid transparent;
     transition: border-color 0.35s var(--ease), opacity 0.35s var(--ease);
-    opacity: 0.82;
+    opacity: 0.92;
   }
   .hdr__nav a:hover { opacity: 1; border-bottom-color: currentColor; }
   .hdr__nav a[aria-current='page'] { opacity: 1; border-bottom-color: var(--bronze); }
@@ -134,7 +164,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   /* --- drawer --- */
   .drawer {
     position: fixed;
-    inset: clamp(4.25rem, 3.4rem + 2.2vw, 5.75rem) 0 auto 0;
+    inset: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem) 0 auto 0;
     z-index: 99;
     background: var(--linen);
     border-bottom: 1px solid var(--line);

@@ -1,33 +1,47 @@
 ---
+import fs from 'node:fs';
 import Figure from './Figure.astro';
-import { site } from '../data/site';
+
+// Video takes priority over the still photograph. Drop files in
+// public/media/hero.mp4 and/or public/images/hero.jpg — no further
+// code changes needed.
+const hasVideo = fs.existsSync(new URL('../../public/media/hero.mp4', import.meta.url));
+const hasImage = fs.existsSync(new URL('../../public/images/hero.jpg', import.meta.url));
 ---
 
 <section class="hero">
   <div class="hero__media" aria-hidden="false">
-    <Figure
-      alt="A modern sauna at dusk, warm light spilling from a panoramic window"
-      note="HERO — cinematic wide shot: contemporary cube sauna at blue hour, warm interior light through full-height glazing, natural landscape beyond. Shot horizontally, generous headroom for the wordmark."
-      ratio="16 / 9"
-      tone="dark"
-      priority={true}
-    />
+    {hasVideo ? (
+      <video
+        class="hero__video"
+        src="/media/hero.mp4"
+        poster={hasImage ? '/images/hero.jpg' : undefined}
+        autoplay
+        muted
+        loop
+        playsinline
+      />
+    ) : (
+      <Figure
+        src={hasImage ? '/images/hero.jpg' : undefined}
+        alt="A modern sauna at dusk, warm light spilling from a panoramic window"
+        note="HERO — cinematic wide shot: contemporary cube sauna at blue hour, warm interior light through full-height glazing, natural landscape beyond. Shot horizontally, generous headroom for the wordmark."
+        ratio="16 / 9"
+        tone="dark"
+        priority={true}
+      />
+    )}
     <div class="hero__scrim"></div>
   </div>
 
   <div class="hero__content">
     <div class="shell">
-      <span class="slats hero__slats" aria-hidden="true"></span>
-      <h1 class="hero__mark">
-        <span class="hero__word">{site.name}</span>
-        <span class="hero__tag">{site.tagline}</span>
-      </h1>
+      <h1 class="hero__headline">Your Sauna.<br class="hero__break" /> Your Space.<br class="hero__break" /> Your Ritual.</h1>
       <p class="hero__lede">
-        Saunas for the American home, drawn from a northern European
-        tradition of quiet rooms, warm timber and unhurried heat.
+        European sauna design, selected for the American home.
       </p>
       <div class="hero__actions">
-        <a class="btn btn--bronze" href="/saunas/">Explore the Saunas</a>
+        <a class="btn btn--bronze" href="/saunas/">Explore Saunas</a>
         <a class="btn btn--outline" href="/quote/">Request a Quote</a>
       </div>
     </div>
@@ -51,6 +65,7 @@ import { site } from '../data/site';
 
   .hero__media { position: absolute; inset: 0; }
   .hero__media :global(.fig) { width: 100%; height: 100%; aspect-ratio: auto; }
+  .hero__video { display: block; width: 100%; height: 100%; object-fit: cover; }
 
   .hero__scrim {
     position: absolute;
@@ -69,47 +84,46 @@ import { site } from '../data/site';
     padding-block: clamp(6rem, 4rem + 9vw, 9rem) clamp(4rem, 2.5rem + 5vw, 7rem);
   }
 
-  .hero__slats { color: var(--bronze-soft); opacity: 0.6; margin-bottom: 2.25rem; }
-
-  .hero__mark { display: grid; gap: clamp(0.75rem, 0.4rem + 1vw, 1.5rem); }
-
-  .hero__word {
-    font-family: var(--font-sans);
-    font-weight: 200;
-    font-size: var(--t-hero);
-    line-height: 0.95;
-    letter-spacing: 0.16em;
-    text-indent: 0.16em;
-    color: var(--linen);
-    /* the one orchestrated page-load moment: heat expanding */
-    animation: expand 2.1s var(--ease) both;
+  .hero__content .shell {
+    max-width: none;
+    margin-inline: 0;
+    padding-left: clamp(1.25rem, 7.5vw, 6rem);
+    padding-right: var(--gutter);
   }
 
-  .hero__tag {
-    font-family: var(--font-display);
-    font-style: italic;
-    font-weight: 300;
-    font-size: clamp(1.35rem, 0.95rem + 1.7vw, 2.5rem);
-    line-height: 1.2;
-    color: var(--bronze-soft);
-    animation: rise 1.4s var(--ease) 0.55s both;
+  .hero__headline {
+    max-width: 16ch;
+    font-size: clamp(1.8rem, 1.2rem + 2.72vw, 3.6rem);
+    line-height: 1.02;
+    color: var(--linen);
+    animation: rise 1.4s var(--ease) 0.15s both;
+  }
+
+  /* force one phrase per line once there is room; on narrow screens the
+     headline just wraps naturally, same as before */
+  .hero__break { display: none; }
+  @media (min-width: 701px) {
+    .hero__break { display: block; content: ''; }
   }
 
   .hero__lede {
-    max-width: 30em;
-    margin: clamp(1.5rem, 1rem + 1.6vw, 2.5rem) 0 0;
-    color: rgba(246, 242, 234, 0.82);
-    font-size: var(--t-lead);
-    animation: rise 1.4s var(--ease) 0.75s both;
+    max-width: 28em;
+    margin: clamp(1.1rem, 0.8rem + 1vw, 1.7rem) 0 0;
+    color: rgba(246, 242, 234, 0.9);
+    font-size: clamp(0.98rem, 0.9rem + 0.425vw, 1.17rem);
+    line-height: 1.45;
+    font-weight: 400;
+    animation: rise 1.4s var(--ease) 0.35s both;
   }
 
   .hero__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
-    margin-top: clamp(2rem, 1.4rem + 1.8vw, 3rem);
-    animation: rise 1.4s var(--ease) 0.95s both;
+    gap: 0.75rem;
+    margin-top: clamp(1.7rem, 1.2rem + 1.5vw, 2.5rem);
+    animation: rise 1.4s var(--ease) 0.55s both;
   }
+  .hero__actions .btn { padding: 0.87rem 1.73rem; font-size: 0.78rem; }
   .hero__actions .btn--outline { color: var(--linen); }
 
   .hero__scroll {
@@ -130,10 +144,6 @@ import { site } from '../data/site';
     transform-origin: bottom;
   }
 
-  @keyframes expand {
-    from { opacity: 0; letter-spacing: 0.015em; }
-    to { opacity: 1; letter-spacing: 0.16em; }
-  }
   @keyframes rise {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: none; }
@@ -144,7 +154,7 @@ import { site } from '../data/site';
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero__word, .hero__tag, .hero__lede, .hero__actions, .hero__scroll-line {
+    .hero__headline, .hero__lede, .hero__actions, .hero__scroll-line {
       animation: none;
       opacity: 1;
       transform: none;

@@ -1,0 +1,208 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
+let customers: any[] = [];
+let products: any[] = [];
+let error: string | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const [customerRows, productRows] = await Promise.all([
+    supabase.from('customers').select('id, name').order('name'),
+    supabase.from('products').select('id, model_name, selling_price').order('model_name'),
+  ]);
+  customers = customerRows.data ?? [];
+  products = productRows.data ?? [];
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const descriptions = form.getAll('item_description[]').map(String);
+    const quantities = form.getAll('item_quantity[]').map(Number);
+    const unitPrices = form.getAll('item_unit_price[]').map(Number);
+
+    const items = descriptions
+      .map((description, i) => ({
+        description,
+        quantity: quantities[i] || 0,
+        unit_price: unitPrices[i] || 0,
+        line_total: (quantities[i] || 0) * (unitPrices[i] || 0),
+        sort_order: i,
+      }))
+      .filter((item) => item.description.trim());
+
+    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+    const deliveryCost = Number(form.get('delivery_cost') ?? 0) || 0;
+    const installationCost = Number(form.get('installation_cost') ?? 0) || 0;
+    const discount = Number(form.get('discount') ?? 0) || 0;
+    const taxRate = Number(form.get('tax_rate') ?? 0) || 0;
+    const taxableBase = subtotal + deliveryCost + installationCost - discount;
+    const total = taxableBase + taxableBase * (taxRate / 100);
+
+    const quotePayload = {
+      quote_number: `Q-${Date.now().toString(36).toUpperCase()}`,
+      customer_id: String(form.get('customer_id') ?? '') || null,
+      product_id: String(form.get('product_id') ?? '') || null,
+      heater: String(form.get('heater') ?? '') || null,
+      delivery_cost: deliveryCost,
+      installation_cost: installationCost,
+      discount,
+      tax_rate: taxRate,
+      subtotal,
+      total,
+      quote_date: String(form.get('quote_date') ?? '') || new Date().toISOString().slice(0, 10),
+      expiry_date: String(form.get('expiry_date') ?? '') || null,
+      status: String(form.get('status') ?? 'Draft'),
+    };
+
+    const { data: quote, error: insertError } = await supabase
+      .from('quotes').insert(quotePayload).select('id').single();
+
+    if (insertError) {
+      error = insertError.message;
+    } else {
+      if (items.length) {
+        await supabase.from('quote_items').insert(items.map((item) => ({ ...item, quote_id: quote.id })));
+      }
+      return Astro.redirect(`/admin/quotes/${quote.id}`);
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="New Quote">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form" method="POST" id="quote-form">
+    <label class="admin-field"><span>Customer</span>
+      <select name="customer_id"><option value="">— none —</option>{customers.map((c) => <option value={c.id}>{c.name}</option>)}</select>
+    </label>
+    <label class="admin-field"><span>Sauna Model</span>
+      <select name="product_id" id="product-select">
+        <option value="">— none —</option>
+        {products.map((p) => <option value={p.id} data-price={p.selling_price ?? 0}>{p.model_name}</option>)}
+      </select>
+    </label>
+    <label class="admin-field"><span>Heater</span><input type="text" name="heater" /></label>
+    <label class="admin-field"><span>Status</span>
+      <select name="status">{STATUSES.map((s) => <option value={s}>{s}</option>)}</select>
+    </label>
+    <label class="admin-field"><span>Quote Date</span><input type="date" name="quote_date" /></label>
+    <label class="admin-field"><span>Expiry Date</span><input type="date" name="expiry_date" /></label>
+
+    <div class="admin-form__full">
+      <h2 class="admin-section-title">Line Items</h2>
+      <table class="admin-table" id="items-table">
+        <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr></thead>
+        <tbody id="items-body">
+          <tr class="item-row">
+            <td><input type="text" name="item_description[]" placeholder="Sauna base price" /></td>
+            <td><input type="number" step="0.01" name="item_quantity[]" value="1" class="qty" /></td>
+            <td><input type="number" step="0.01" name="item_unit_price[]" class="price" /></td>
+            <td class="line-total">$0.00</td>
+            <td><button type="button" class="admin-btn admin-btn--ghost remove-row">×</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button type="button" class="admin-btn admin-btn--ghost" id="add-row" style="margin-top:0.75rem;">+ Add Line</button>
+    </div>
+
+    <label class="admin-field"><span>Delivery Cost</span><input type="number" step="0.01" name="delivery_cost" value="0" class="calc-input" /></label>
+    <label class="admin-field"><span>Installation Cost</span><input type="number" step="0.01" name="installation_cost" value="0" class="calc-input" /></label>
+    <label class="admin-field"><span>Discount</span><input type="number" step="0.01" name="discount" value="0" class="calc-input" /></label>
+    <label class="admin-field"><span>Tax Rate (%)</span><input type="number" step="0.01" name="tax_rate" value="0" class="calc-input" /></label>
+
+    <div class="admin-form__full" id="totals">
+      <p>Subtotal: <strong id="subtotal-out">$0.00</strong></p>
+      <p>Total: <strong id="total-out">$0.00</strong></p>
+    </div>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Quote</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/quotes">Cancel</a>
+      <span class="admin-btn admin-btn--ghost" style="opacity:0.5; cursor:not-allowed;" title="Not yet implemented">Generate PDF Quote</span>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  #items-table input { width: 100%; }
+  #totals p { margin: 0.3rem 0; font-size: 0.9rem; color: var(--admin-muted); }
+</style>
+
+<script>
+  const body = document.getElementById('items-body') as HTMLTableSectionElement;
+  const addRowBtn = document.getElementById('add-row');
+  const productSelect = document.getElementById('product-select') as HTMLSelectElement | null;
+
+  function rowTemplate() {
+    const tr = document.createElement('tr');
+    tr.className = 'item-row';
+    tr.innerHTML = `
+      <td><input type="text" name="item_description[]" /></td>
+      <td><input type="number" step="0.01" name="item_quantity[]" value="1" class="qty" /></td>
+      <td><input type="number" step="0.01" name="item_unit_price[]" class="price" /></td>
+      <td class="line-total">$0.00</td>
+      <td><button type="button" class="admin-btn admin-btn--ghost remove-row">×</button></td>
+    `;
+    return tr;
+  }
+
+  function recalc() {
+    let subtotal = 0;
+    body.querySelectorAll('.item-row').forEach((row) => {
+      const qty = parseFloat((row.querySelector('.qty') as HTMLInputElement)?.value || '0');
+      const price = parseFloat((row.querySelector('.price') as HTMLInputElement)?.value || '0');
+      const lineTotal = qty * price;
+      (row.querySelector('.line-total') as HTMLElement).textContent = `$${lineTotal.toFixed(2)}`;
+      subtotal += lineTotal;
+    });
+
+    const delivery = parseFloat((document.querySelector('[name="delivery_cost"]') as HTMLInputElement)?.value || '0');
+    const installation = parseFloat((document.querySelector('[name="installation_cost"]') as HTMLInputElement)?.value || '0');
+    const discount = parseFloat((document.querySelector('[name="discount"]') as HTMLInputElement)?.value || '0');
+    const taxRate = parseFloat((document.querySelector('[name="tax_rate"]') as HTMLInputElement)?.value || '0');
+    const taxableBase = subtotal + delivery + installation - discount;
+    const total = taxableBase + taxableBase * (taxRate / 100);
+
+    document.getElementById('subtotal-out')!.textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('total-out')!.textContent = `$${total.toFixed(2)}`;
+  }
+
+  addRowBtn?.addEventListener('click', () => {
+    const row = rowTemplate();
+    body.appendChild(row);
+    recalc();
+  });
+
+  body.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('remove-row')) {
+      target.closest('.item-row')?.remove();
+      recalc();
+    }
+  });
+
+  document.getElementById('quote-form')?.addEventListener('input', recalc);
+
+  productSelect?.addEventListener('change', () => {
+    const opt = productSelect.selectedOptions[0];
+    const price = opt?.dataset.price;
+    const firstPriceInput = body.querySelector('.price') as HTMLInputElement | null;
+    if (price && firstPriceInput && !firstPriceInput.value) {
+      firstPriceInput.value = price;
+      const firstDescInput = body.querySelector('input[name="item_description[]"]') as HTMLInputElement | null;
+      if (firstDescInput && !firstDescInput.value) firstDescInput.value = opt.textContent || '';
+      recalc();
+    }
+  });
+
+  recalc();
+</script>

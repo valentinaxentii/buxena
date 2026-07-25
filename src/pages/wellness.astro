@@ -39,6 +39,16 @@ const rounds = [
         A sauna rewards patience more than endurance. The rhythm below is the one
         used across northern Europe, and it is worth learning before you buy.
       </p>
+
+      <div class="ritual-photo reveal">
+        <Figure
+          src="/images/wellness-ritual.jpg"
+          alt="Sauna bench and stone heater beside a glass wall, with a lounge area visible beyond"
+          ratio="16 / 9"
+          tone="dark"
+          priority={true}
+        />
+      </div>
     </div>
   </section>
 
@@ -62,8 +72,8 @@ const rounds = [
     <div class="shell split">
       <div class="split__media reveal">
         <Figure
-          alt="Water being poured onto heater stones"
-          note="WELLNESS — löyly moment: water hitting the stones, steam rising. Backlit against a dark interior. This is the signature image of the page."
+          src="/images/wellness-etiquette.jpg"
+          alt="Sauna interior corner with cedar benches, a stone heater and a water bucket with ladle"
           ratio="4 / 5"
           tone="dark"
         />
@@ -111,7 +121,15 @@ const rounds = [
 </BaseLayout>
 
 <style>
-  .page-head .lead { margin-top: 1.75rem; }
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
+
+  .ritual-photo {
+    max-width: 800px;
+    margin-inline: auto;
+    margin-top: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+    margin-bottom: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+  }
 
   .rounds {
     display: grid;
@@ -120,10 +138,10 @@ const rounds = [
   .round {
     display: grid;
     grid-template-columns: minmax(0, 5rem) minmax(0, 1fr);
-    gap: clamp(1.25rem, 0.5rem + 2.5vw, 3.5rem);
-    padding-block: clamp(1.75rem, 1rem + 2vw, 2.75rem);
+    gap: clamp(0.94rem, 0.4rem + 1.9vw, 2.6rem);
+    padding-block: clamp(0.75rem, 0.44rem + 0.87vw, 1.22rem);
     border-top: 1px solid var(--line);
-    align-items: start;
+    align-items: center;
   }
   .round:last-child { border-bottom: 1px solid var(--line); }
 
@@ -133,20 +151,20 @@ const rounds = [
     line-height: 1;
     color: var(--bronze);
   }
-  .round__title { margin-bottom: 0.7rem; }
+  .round__title { margin-bottom: 0.5rem; }
   .round__body { color: var(--muted); max-width: 42em; }
 
   .split {
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: center;
   }
-  .split__text .h2 { margin-bottom: 1.75rem; }
+  .split__text .h2 { margin-bottom: 1.3rem; }
 
   .disclaimer {
     border-top: 2px solid var(--ink);
-    padding-top: 2rem;
+    padding-top: 1.5rem;
   }
   .disclaimer p { font-size: var(--t-small); color: var(--muted); line-height: 1.8; }
 

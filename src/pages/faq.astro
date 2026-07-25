@@ -58,27 +58,19 @@ const groups = [
     items: [
       {
         q: 'How much does a sauna cost?',
-        a: '',
-        pending: true,
-        note: 'Pricing is not yet published. Cost depends on model, size, heater and delivery location, so we quote in writing rather than listing a figure that will not apply to your situation.',
+        a: 'Pricing varies by model, size, materials, heater and selected options. Each product page shows available pricing where applicable. For configurations, delivery and installation, BUXENA will provide a detailed quote before you commit.',
       },
       {
         q: 'How is it delivered, and how long does it take?',
-        a: '',
-        pending: true,
-        note: 'Freight arrangements and lead times are being finalised with our suppliers and will be published here. Delivery cost depends heavily on your ZIP code, which is why the quote form asks for it.',
+        a: 'Delivery depends on the sauna model, destination and site access. Some saunas arrive as pre-cut kits for on-site assembly, while others may have different delivery requirements. We confirm the delivery method and expected timing with you before your order is finalized.',
       },
       {
         q: 'What warranty is included?',
-        a: '',
-        pending: true,
-        note: 'Warranty terms are set by each manufacturer. We will publish the specific coverage for every model rather than summarising it inaccurately.',
+        a: 'Warranty coverage varies by manufacturer and component. Your sauna, heater and accessories may each carry separate manufacturer warranties. BUXENA will provide the applicable warranty information for your selected products before purchase.',
       },
       {
         q: 'Can I see one before buying?',
-        a: '',
-        pending: true,
-        note: 'Showroom and demonstration arrangements have not been finalised. Get in touch and we will tell you what is currently possible in your area.',
+        a: 'Contact us and we will let you know what viewing options are currently available. As our U.S. network grows, opportunities to see selected models and installations may vary by location.',
       },
     ],
   },
@@ -87,15 +79,15 @@ const groups = [
     items: [
       {
         q: 'How long does a sauna take to heat up?',
-        a: 'This varies with room volume, heater output, insulation and how much glazing there is. A small, well-insulated room reaches temperature considerably faster than a large one with a full glass wall. We will give you the figure for the model you are considering rather than a general number.',
+        a: 'It depends on the sauna size, heater, outdoor temperature and desired bathing temperature. We match the heater to the sauna so the complete system performs as intended.',
       },
       {
         q: 'How much maintenance is there?',
-        a: 'Less than people expect. Ventilate after use so the timber dries, wipe the benches, and keep the floor clean. Heater stones are periodically restacked and eventually replaced as they break down. Outdoor cabins need their exterior finish maintained on whatever schedule the manufacturer specifies.',
+        a: 'A well-made sauna is relatively simple to maintain. Regular cleaning, proper ventilation and basic care of the timber, glass and heater are the essentials. Outdoor models may require additional exterior care depending on the material, finish and climate.',
       },
       {
         q: 'Can I use it in winter?',
-        a: 'Yes — winter is arguably when a sauna is best. What matters is that the walk to and from it is manageable in the dark and the cold, which is worth thinking about when you decide where to put it.',
+        a: 'Yes. Outdoor sauna is deeply rooted in northern European winters. The right construction and properly sized heater allow many of our outdoor models to be enjoyed year-round, including in cold weather.',
       },
     ],
   },
@@ -143,7 +135,7 @@ const faqSchema = {
     </div>
   </section>
 
-  <section class="band">
+  <section class="band faq-section">
     <div class="shell faq">
       {visibleGroups.map((g) => (
         <div class="faq__group">
@@ -177,18 +169,21 @@ const faqSchema = {
 </BaseLayout>
 
 <style>
-  .page-head .lead { margin-top: 1.75rem; }
+  .page-head { padding-bottom: clamp(2rem, 1.2rem + 2vw, 3.5rem); }
+  .page-head .lead { margin-top: 1.3rem; }
 
-  .faq__group + .faq__group { margin-top: clamp(3rem, 2rem + 3vw, 5rem); }
+  .faq-section { padding-top: clamp(2rem, 1.2rem + 2vw, 3.5rem); }
+
+  .faq__group + .faq__group { margin-top: clamp(1.75rem, 1.2rem + 1.6vw, 3rem); }
 
   .faq__gh {
     font-family: var(--font-sans);
     font-size: var(--t-label);
-    font-weight: 400;
-    letter-spacing: 0.28em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--bronze-ink);
-    margin: 0 0 1.5rem;
+    margin: 0 0 0.9rem;
   }
 
   .qa { border-top: 1px solid var(--line); }
@@ -199,7 +194,7 @@ const faqSchema = {
     align-items: center;
     justify-content: space-between;
     gap: 2rem;
-    padding: 1.35rem 0;
+    padding: 0.9rem 0;
     cursor: pointer;
     list-style: none;
   }
@@ -228,7 +223,7 @@ const faqSchema = {
   .qa__icon::after { inset: 0 auto 0 6px; width: 1px; }
   .qa[open] .qa__icon::after { transform: scaleY(0); opacity: 0; }
 
-  .qa__a { padding-bottom: 1.6rem; max-width: 46em; }
+  .qa__a { padding-bottom: 1.1rem; max-width: 46em; }
   .qa__a p { color: var(--muted); margin: 0; }
   .qa__pending strong { color: var(--ink); font-weight: 500; }
 

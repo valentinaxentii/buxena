@@ -1,0 +1,97 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+let suppliers: any[] = [];
+let error: string | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase.from('suppliers').select('id, name').order('name');
+  suppliers = data ?? [];
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const width = form.get('width');
+    const depth = form.get('depth');
+    const height = form.get('height');
+    const payload = {
+      model_name: String(form.get('model_name') ?? ''),
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      category: String(form.get('category') ?? '') || null,
+      cost: form.get('cost') ? Number(form.get('cost')) : null,
+      selling_price: form.get('selling_price') ? Number(form.get('selling_price')) : null,
+      dimensions: width || depth || height ? { width, depth, height, unit: 'in' } : null,
+      capacity: String(form.get('capacity') ?? '') || null,
+      timber_type: String(form.get('timber_type') ?? '') || null,
+      glass_configuration: String(form.get('glass_configuration') ?? '') || null,
+      heater_options: String(form.get('heater_options') ?? '')
+        .split(',').map((s) => s.trim()).filter(Boolean),
+      electrical_requirements: String(form.get('electrical_requirements') ?? '') || null,
+      weight_kg: form.get('weight_kg') ? Number(form.get('weight_kg')) : null,
+      shipping_dimensions: String(form.get('shipping_dimensions') ?? '') || null,
+      stock_quantity: form.get('stock_quantity') ? Number(form.get('stock_quantity')) : 0,
+      brochure_url: String(form.get('brochure_url') ?? '') || null,
+      installation_manual_url: String(form.get('installation_manual_url') ?? '') || null,
+      warranty_document_url: String(form.get('warranty_document_url') ?? '') || null,
+      is_active: form.get('is_active') === 'on',
+    };
+    if (!payload.model_name) {
+      error = 'Model name is required.';
+    } else {
+      const { data: inserted, error: insertError } = await supabase.from('products').insert(payload).select('id').single();
+      if (insertError) error = insertError.message;
+      else return Astro.redirect(`/admin/products/${inserted.id}`);
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="New Product">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  <form class="admin-form" method="POST">
+    <label class="admin-field"><span>Model Name *</span><input type="text" name="model_name" required /></label>
+    <label class="admin-field">
+      <span>Supplier</span>
+      <select name="supplier_id"><option value="">— none —</option>{suppliers.map((s) => <option value={s.id}>{s.name}</option>)}</select>
+    </label>
+    <label class="admin-field"><span>Category</span><input type="text" name="category" placeholder="outdoor / indoor / barrel / cube" /></label>
+    <label class="admin-field"><span>Active</span>
+      <select name="is_active"><option value="on">Active</option><option value="">Inactive</option></select>
+    </label>
+
+    <label class="admin-field"><span>EXW / Product Cost</span><input type="number" step="0.01" name="cost" /></label>
+    <label class="admin-field"><span>Selling Price</span><input type="number" step="0.01" name="selling_price" /></label>
+
+    <label class="admin-field"><span>Width (in)</span><input type="number" step="0.1" name="width" /></label>
+    <label class="admin-field"><span>Depth (in)</span><input type="number" step="0.1" name="depth" /></label>
+    <label class="admin-field"><span>Height (in)</span><input type="number" step="0.1" name="height" /></label>
+    <label class="admin-field"><span>Capacity</span><input type="text" name="capacity" placeholder="Seats 4" /></label>
+
+    <label class="admin-field"><span>Timber Type</span><input type="text" name="timber_type" /></label>
+    <label class="admin-field"><span>Glass Configuration</span><input type="text" name="glass_configuration" /></label>
+    <label class="admin-field admin-form__full"><span>Heater Options (comma-separated)</span><input type="text" name="heater_options" /></label>
+    <label class="admin-field"><span>Electrical Requirements</span><input type="text" name="electrical_requirements" /></label>
+    <label class="admin-field"><span>Weight (kg)</span><input type="number" step="0.1" name="weight_kg" /></label>
+    <label class="admin-field"><span>Shipping Dimensions</span><input type="text" name="shipping_dimensions" /></label>
+    <label class="admin-field"><span>Stock Quantity</span><input type="number" name="stock_quantity" value="0" /></label>
+
+    <label class="admin-field"><span>Brochure URL</span><input type="text" name="brochure_url" /></label>
+    <label class="admin-field"><span>Installation Manual URL</span><input type="text" name="installation_manual_url" /></label>
+    <label class="admin-field"><span>Warranty Document URL</span><input type="text" name="warranty_document_url" /></label>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Product</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/products">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

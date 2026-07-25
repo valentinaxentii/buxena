@@ -1,6 +1,7 @@
 ---
 import Figure from './Figure.astro';
 import { categoryMap, showDev } from '../data/site';
+import { capacityBuckets } from '../data/catalog';
 
 interface Props {
   slug: string;
@@ -9,12 +10,39 @@ interface Props {
   category: string;
   placeholder?: boolean;
   image?: { src?: string; alt: string; note?: string };
+  location?: 'outdoor' | 'indoor';
+  productType?: string;
+  series?: string;
+  capacity?: string;
+  capacityMin?: number;
+  capacityMax?: number;
+  materials?: string[];
+  dimensions?: { label: string; value: string }[];
 }
-const { slug, title, tagline, category, placeholder = true, image } = Astro.props;
+const {
+  slug, title, tagline, category, placeholder = true, image,
+  location, productType, series, capacity, capacityMin, capacityMax, materials, dimensions,
+} = Astro.props;
 const cat = categoryMap[category];
+
+const primaryDimension = dimensions?.[0]?.value;
+const specLine = [productType, primaryDimension, capacity, materials?.[0]]
+  .filter(Boolean)
+  .join(' · ');
+
+const buckets = capacityBuckets(capacityMin, capacityMax);
+const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z0-9]+/g, '-')).join(' ');
 ---
 
-<article class="pcard" data-category={category}>
+<article
+  class="pcard"
+  data-category={category}
+  data-location={location ?? ''}
+  data-type={productType ?? ''}
+  data-series={series ?? ''}
+  data-material={materialSlug}
+  data-capacity={buckets.join(' ')}
+>
   <a class="pcard__link" href={`/saunas/${slug}/`}>
     <div class="pcard__media">
       <Figure
@@ -27,12 +55,16 @@ const cat = categoryMap[category];
       {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
     </div>
     <div class="pcard__body">
-      <span class="pcard__cat">{cat?.short ?? category}</span>
+      <span class="pcard__cat">{series ?? cat?.short ?? category}</span>
       <h3 class="pcard__title">{title}</h3>
+      {specLine && <p class="pcard__specs">{specLine}</p>}
       <p class="pcard__tag">{tagline}</p>
-      <span class="pcard__more">View details</span>
     </div>
   </a>
+  <div class="pcard__actions">
+    <a class="pcard__more" href={`/saunas/${slug}/`}>View Sauna</a>
+    <a class="pcard__quote" href="/quote/">Request a Quote</a>
+  </div>
 </article>
 
 <style>
@@ -59,33 +91,63 @@ const cat = categoryMap[category];
     padding: 0.4rem 0.7rem;
   }
 
-  .pcard__body { padding-top: 1.35rem; }
+  .pcard__body { padding-top: 1rem; }
 
   .pcard__cat {
     display: block;
     font-size: var(--t-label);
-    letter-spacing: 0.26em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--bronze-ink);
     margin-bottom: 0.75rem;
   }
 
-  .pcard__title { font-size: var(--t-h3); margin-bottom: 0.5rem; }
+  .pcard__title { font-size: var(--t-h3); margin-bottom: 0.4rem; }
+
+  .pcard__specs {
+    font-size: var(--t-small);
+    font-weight: 600;
+    color: var(--bronze-ink);
+    margin-bottom: 0.6rem;
+  }
 
   .pcard__tag {
     font-size: var(--t-small);
     color: var(--muted);
-    line-height: 1.7;
+    line-height: 1.6;
     margin-bottom: 1rem;
   }
 
+  .pcard__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1.25rem;
+    margin-top: 0.25rem;
+  }
+
   .pcard__more {
-    font-size: var(--t-label);
-    letter-spacing: 0.2em;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
+    text-decoration: none;
+    color: inherit;
     padding-bottom: 0.3rem;
     border-bottom: 1px solid var(--line);
     transition: border-color 0.4s var(--ease);
   }
-  .pcard__link:hover .pcard__more { border-bottom-color: var(--ink); }
+  .pcard:hover .pcard__more { border-bottom-color: var(--ink); }
+
+  .pcard__quote {
+    font-size: var(--t-small);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    color: var(--bronze-ink);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.4s var(--ease), color 0.4s var(--ease);
+  }
+  .pcard__quote:hover { color: var(--ink); border-bottom-color: var(--ink); }
 </style>

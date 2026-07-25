@@ -2,7 +2,6 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Figure from '../components/Figure.astro';
 import QuoteBand from '../components/QuoteBand.astro';
-import { showDev } from '../data/site';
 
 const values = [
   {
@@ -58,17 +57,11 @@ const values = [
           We are deliberately small. That is a constraint on how fast we can grow
           and an advantage in how well we can answer a question.
         </p>
-        {showDev && (
-          <p class="note">
-            DEV NOTE — founding year, team and supplier relationships to be added.
-            Hidden in production.
-          </p>
-        )}
       </div>
       <div class="split__media reveal">
         <Figure
-          alt="Sauna interior, empty and quiet"
-          note="STORY — a quiet, empty sauna interior. No people. Warm light, strong horizontal bench lines. Should feel calm and unstaged."
+          src="/images/our-story-sauna.jpg"
+          alt="Sauna interior, empty and quiet, with heater, rocks and a wooden bucket on the bench"
           ratio="4 / 5"
           tone="mid"
         />
@@ -85,7 +78,6 @@ const values = [
       <div class="grid cols-3 reveal">
         {values.map((v) => (
           <div class="value">
-            <span class="slats" aria-hidden="true"></span>
             <h3 class="h3 value__title">{v.title}</h3>
             <p class="value__body">{v.body}</p>
           </div>
@@ -98,27 +90,19 @@ const values = [
 </BaseLayout>
 
 <style>
-  .page-head .lead { margin-top: 1.75rem; }
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
   .page-head .display { margin-top: 0; }
 
   .split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
-    gap: clamp(2rem, 0.5rem + 5vw, 6rem);
+    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: center;
   }
-  .split__text .h2 { margin-bottom: 1.75rem; }
+  .split__text .h2 { margin-bottom: 1.3rem; }
 
-  .note {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--line);
-    font-size: 0.8125rem;
-    color: var(--muted);
-    font-style: italic;
-  }
-
-  .value .slats { color: var(--bronze-soft); margin-bottom: 1.75rem; }
+  .value .slats { color: var(--bronze-soft); margin-bottom: 1.3rem; }
   .value__title { margin-bottom: 0.85rem; }
   .value__body { font-size: var(--t-small); color: var(--muted-dark); line-height: 1.75; }
 

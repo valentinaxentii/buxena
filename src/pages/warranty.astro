@@ -1,0 +1,140 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalContact from '../components/LegalContact.astro';
+
+// WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
+// Have this reviewed by a US-licensed attorney before relying on it
+// commercially. Deliberately generic on duration/coverage: warranty terms
+// are set by each manufacturer and BUXENA has not published fixed periods.
+const sections = [
+  { id: 'overview', title: 'Overview' },
+  { id: 'manufacturer', title: 'Manufacturer Warranties' },
+  { id: 'coverage', title: 'What Warranties Typically Cover' },
+  { id: 'role', title: "BUXENA's Role in Warranty Claims" },
+  { id: 'proof', title: 'Proof of Purchase and Documentation' },
+  { id: 'requirements', title: 'Installation, Electrical and Maintenance Requirements' },
+  { id: 'changes', title: 'Changes to This Policy' },
+  { id: 'contact', title: 'Contact Us' },
+];
+---
+
+<BaseLayout
+  title="Warranty"
+  description="How manufacturer warranties work on BUXENA sauna products, and how BUXENA helps with claims."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Warranty</span>
+      <h1 class="display measure--tight">Warranty Policy</h1>
+      <p class="legal__updated">Last Updated: July 2026</p>
+      <p class="lead measure">
+        BUXENA is a retailer and importer, not a manufacturer. The products
+        we sell are covered by the warranty of the manufacturer that built
+        them, and terms vary by product. This page explains how that works
+        and how we help if you need to make a claim.
+      </p>
+      <LegalContact />
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="overview">
+          <h2>1. Overview</h2>
+          <p>
+            Every sauna we sell is backed by a warranty from the
+            manufacturer that built it, not by BUXENA. Coverage, duration
+            and exclusions are set by that manufacturer and vary by product
+            — we'll tell you the specific terms that apply to your model
+            with your order, or on request before you order.
+          </p>
+        </article>
+
+        <article id="manufacturer">
+          <h2>2. Manufacturer Warranties</h2>
+          <p>
+            Because our range includes products from more than one
+            manufacturer, warranty length and coverage are not the same
+            across every model. We do not publish a single, universal
+            warranty period for this reason — ask us about the specific
+            model you're considering, and we'll confirm what its
+            manufacturer's warranty covers.
+          </p>
+        </article>
+
+        <article id="coverage">
+          <h2>3. What Warranties Typically Cover</h2>
+          <p>
+            Manufacturer warranties generally cover manufacturing defects
+            in materials and workmanship for a defined period. They
+            typically do not cover normal wear and tear, natural
+            characteristics of wood such as grain and knots, cosmetic
+            changes from weather exposure, or damage caused by improper
+            installation, misuse, unauthorized modification, or failure to
+            follow the manufacturer's care and maintenance instructions.
+            Exact exclusions depend on the manufacturer and product.
+          </p>
+        </article>
+
+        <article id="role">
+          <h2>4. BUXENA's Role in Warranty Claims</h2>
+          <p>
+            If something goes wrong with your sauna, contact us first at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a>. We will
+            help you understand what's covered and coordinate a legitimate
+            claim with the manufacturer on your behalf — we act as your
+            point of contact rather than leaving you to deal with an
+            overseas manufacturer directly.
+          </p>
+        </article>
+
+        <article id="proof">
+          <h2>5. Proof of Purchase and Documentation</h2>
+          <p>
+            To process a warranty claim, we'll typically ask for proof of
+            purchase (such as your order confirmation or invoice) and
+            photographs or other documentation showing the issue. Keeping
+            these on hand after delivery will help any future claim move
+            faster.
+          </p>
+        </article>
+
+        <article id="requirements">
+          <h2>6. Installation, Electrical and Maintenance Requirements</h2>
+          <p>
+            Manufacturer warranties commonly require the sauna to be
+            installed correctly, with any electrical work carried out by an
+            appropriately qualified, licensed electrician to local code, and
+            maintained according to the manufacturer's instructions.
+            Skipping these requirements can affect whether a warranty claim
+            is honored, so it's worth following them even where they feel
+            optional.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>7. Changes to This Policy</h2>
+          <p>
+            We may update this policy from time to time. We will revise the
+            "Last Updated" date above whenever we make a material change.
+          </p>
+        </article>
+
+        <article id="contact">
+          <h2>8. Contact Us</h2>
+          <p>For a warranty question or to start a claim, contact:</p>
+          <LegalContact />
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

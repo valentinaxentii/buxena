@@ -1,0 +1,482 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+import {
+  LOCATION_OPTIONS,
+  CAPACITY_OPTIONS,
+  FORM_OPTIONS,
+  GLASS_OPTIONS,
+  HEAT_OPTIONS,
+  INSTALL_OPTIONS,
+} from '../data/planYourSauna';
+
+const models = await getCollection('saunas', ({ data }) => !data.draft);
+
+// Lean, build-time snapshot of only the fields the client-side wizard needs.
+const catalog = models.map((m) => ({
+  slug: m.id,
+  title: m.data.title,
+  tagline: m.data.tagline,
+  location: m.data.location,
+  productType: m.data.productType,
+  capacity: m.data.capacity,
+  capacityMin: m.data.capacityMin,
+  capacityMax: m.data.capacityMax,
+  materials: m.data.materials,
+  dimensions: m.data.dimensions,
+  heroImage: m.data.heroImage,
+  order: m.data.order,
+}));
+
+const steps = [
+  { n: 1, key: 'location', question: 'Where will your sauna live?', options: LOCATION_OPTIONS },
+  { n: 2, key: 'capacity', question: 'How many people should it comfortably seat?', options: CAPACITY_OPTIONS },
+  { n: 3, key: 'form', question: 'Which form feels most natural for your space?', options: FORM_OPTIONS },
+  { n: 4, key: 'glass', question: 'How open do you want the sauna to feel?', options: GLASS_OPTIONS },
+  { n: 5, key: 'heat', question: 'How would you like to heat it?', options: HEAT_OPTIONS },
+  { n: 6, key: 'install', question: 'How would you like to handle installation?', options: INSTALL_OPTIONS },
+];
+const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
+---
+
+<BaseLayout
+  title="Plan Your Sauna"
+  description="Answer a few questions and BUXENA will shortlist the models that fit your space."
+>
+  <section class="band band--tight page-head">
+    <div class="shell shell--narrow center">
+      <span class="eyebrow">Plan Your Sauna</span>
+      <h1 class="display measure--tight">A short, guided way to the right model</h1>
+      <p class="lead measure">
+        Answer a few questions about your space and preferences. We'll narrow
+        BUXENA's range to two or three models worth a closer look — no
+        pressure, no commitment.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell shell--narrow">
+      <div class="plan" data-plan>
+        <div class="plan__progress">
+          <span data-plan-progress-label>Step 1 of {TOTAL_STEPS}</span>
+          <span class="plan__bar"><span class="plan__bar-fill" data-plan-progress-fill></span></span>
+        </div>
+
+        <form data-plan-form>
+          {steps.map((s) => (
+            <fieldset class="plan__step" data-plan-step={s.n} hidden={s.n !== 1}>
+              <legend class="plan__question">{s.question}</legend>
+              {s.key === 'glass' || s.key === 'heat' ? (
+                <p class="plan__note">
+                  This helps BUXENA understand your preference — final glazing
+                  and heater compatibility is confirmed per model.
+                </p>
+              ) : null}
+              <div class="plan__options" role="group" aria-label={s.question} data-plan-options={s.key}>
+                {s.options.map((o) => (
+                  <button type="button" class="plan__option" data-value={o.value} aria-pressed="false">
+                    <span class="plan__option-check" aria-hidden="true"></span>
+                    <span>{o.label}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+
+          <fieldset class="plan__step" data-plan-step={TOTAL_STEPS} hidden>
+            <legend class="plan__question">Where is the sauna going?</legend>
+            <p class="plan__note">This helps us consider delivery and installation availability.</p>
+            <label class="plan__zip-label" for="plan-zip">ZIP code</label>
+            <input class="plan__zip" type="text" id="plan-zip" inputmode="numeric" autocomplete="postal-code" data-plan-zip />
+          </fieldset>
+
+          <div class="plan__nav">
+            <button type="button" class="btn btn--outline" data-plan-back disabled>Back</button>
+            <button type="button" class="btn btn--bronze" data-plan-next>Continue</button>
+          </div>
+        </form>
+
+        <div class="plan-results" data-plan-results hidden>
+          <div class="plan-results__head">
+            <span class="eyebrow">Your BUXENA Shortlist</span>
+            <h2 class="h2 measure--tight" data-plan-results-title>Models worth a closer look</h2>
+          </div>
+
+          <div class="plan-results__grid" data-plan-results-grid></div>
+
+          <p class="plan-results__empty" data-plan-results-empty hidden>
+            We need a little more information to recommend the right model.
+            <a class="link" href="/quote/">Request a Quote <span class="arrow" aria-hidden="true">→</span></a>
+          </p>
+
+          <div class="plan-results__actions" data-plan-results-actions hidden>
+            <button type="button" class="btn btn--outline" data-plan-save>Save My Shortlist</button>
+            <button type="button" class="btn btn--bronze" data-plan-review-toggle>Ask BUXENA to Review My Selection</button>
+          </div>
+          <p class="plan-results__saved" data-plan-saved hidden>Saved on this device.</p>
+
+          <div class="plan-review" data-plan-review hidden>
+            <h3 class="h3">Ask BUXENA to review your selection</h3>
+            <p class="plan-review__note">
+              We'll look at your answers and shortlist directly — no obligation.
+            </p>
+
+            <form
+              class="qform"
+              name="plan-your-sauna"
+              method="POST"
+              data-netlify="true"
+              netlify-honeypot="bot-field-plan"
+              action="/thank-you/"
+              data-plan-review-form
+            >
+              <input type="hidden" name="form-name" value="plan-your-sauna" />
+              <p class="qform__hp">
+                <label>Leave this field empty <input name="bot-field-plan" tabindex="-1" autocomplete="off" /></label>
+              </p>
+
+              <input type="hidden" name="answers" data-plan-field="answers" />
+              <input type="hidden" name="recommended" data-plan-field="recommended" />
+              <input type="hidden" name="submitted_at" data-plan-field="submitted_at" />
+
+              <div class="qform__grid">
+                <div class="field">
+                  <label for="plan-name">Name <span aria-hidden="true">*</span></label>
+                  <input id="plan-name" name="name" type="text" required autocomplete="name" />
+                </div>
+                <div class="field">
+                  <label for="plan-email">Email <span aria-hidden="true">*</span></label>
+                  <input id="plan-email" name="email" type="email" required autocomplete="email" />
+                </div>
+                <div class="field">
+                  <label for="plan-phone">Phone</label>
+                  <input id="plan-phone" name="phone" type="tel" autocomplete="tel" />
+                </div>
+                <div class="field">
+                  <label for="plan-review-zip">ZIP code</label>
+                  <input id="plan-review-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" data-plan-field="zip" />
+                </div>
+                <div class="field field--full">
+                  <label for="plan-notes">Notes (optional)</label>
+                  <textarea id="plan-notes" name="message" rows="4" placeholder="Anything else worth knowing about your space or timeline."></textarea>
+                </div>
+              </div>
+
+              <div class="qform__foot">
+                <button class="btn btn--bronze" type="submit">Send to BUXENA</button>
+                <p class="qform__note">We use your details to answer this request. Nothing else.</p>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script type="application/json" id="plan-catalog" set:html={JSON.stringify(catalog)} />
+
+<script>
+  import { recommendSaunas, type PlanAnswers, type CatalogModel } from '../data/planYourSauna';
+
+  const root = document.querySelector<HTMLElement>('[data-plan]');
+  if (root) {
+    const catalog: CatalogModel[] = JSON.parse(
+      document.getElementById('plan-catalog')?.textContent ?? '[]'
+    );
+
+    const form = root.querySelector<HTMLFormElement>('[data-plan-form]')!;
+    const stepEls = Array.from(root.querySelectorAll<HTMLElement>('[data-plan-step]'));
+    const totalSteps = stepEls.length;
+    const backBtn = root.querySelector<HTMLButtonElement>('[data-plan-back]')!;
+    const nextBtn = root.querySelector<HTMLButtonElement>('[data-plan-next]')!;
+    const progressLabel = root.querySelector<HTMLElement>('[data-plan-progress-label]')!;
+    const progressFill = root.querySelector<HTMLElement>('[data-plan-progress-fill]')!;
+    const resultsEl = root.querySelector<HTMLElement>('[data-plan-results]')!;
+    const resultsGrid = root.querySelector<HTMLElement>('[data-plan-results-grid]')!;
+    const resultsEmpty = root.querySelector<HTMLElement>('[data-plan-results-empty]')!;
+    const resultsActions = root.querySelector<HTMLElement>('[data-plan-results-actions]')!;
+    const savedNote = root.querySelector<HTMLElement>('[data-plan-saved]')!;
+    const reviewSection = root.querySelector<HTMLElement>('[data-plan-review]')!;
+    const reviewToggle = root.querySelector<HTMLButtonElement>('[data-plan-review-toggle]')!;
+    const reviewForm = root.querySelector<HTMLFormElement>('[data-plan-review-form]')!;
+    const zipInput = root.querySelector<HTMLInputElement>('[data-plan-zip]')!;
+
+    const answers: Record<string, string> = {
+      location: '', capacity: '', form: '', glass: '', heat: '', install: '', zip: '',
+    };
+
+    let current = 1;
+
+    const updateProgress = () => {
+      progressLabel.textContent = `Step ${current} of ${totalSteps}`;
+      progressFill.style.width = `${(current / totalSteps) * 100}%`;
+    };
+
+    const showStep = (n: number) => {
+      stepEls.forEach((el) => {
+        el.hidden = Number(el.dataset.planStep) !== n;
+      });
+      backBtn.disabled = n === 1;
+      nextBtn.textContent = n === totalSteps ? 'See My Shortlist' : 'Continue';
+      updateProgress();
+      const activeStep = stepEls.find((el) => Number(el.dataset.planStep) === n);
+      activeStep?.querySelector<HTMLElement>('.plan__option, input')?.focus();
+    };
+
+    // Single-select option cards, one group per step.
+    root.querySelectorAll<HTMLElement>('[data-plan-options]').forEach((group) => {
+      const key = group.dataset.planOptions!;
+      group.querySelectorAll<HTMLButtonElement>('.plan__option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll<HTMLButtonElement>('.plan__option').forEach((b) => {
+            b.classList.toggle('is-selected', b === btn);
+            b.setAttribute('aria-pressed', String(b === btn));
+          });
+          answers[key] = btn.dataset.value ?? '';
+        });
+      });
+    });
+
+    zipInput.addEventListener('input', () => { answers.zip = zipInput.value; });
+
+    const renderResults = () => {
+      const planAnswers = answers as unknown as PlanAnswers;
+      const recs = recommendSaunas(catalog, planAnswers);
+
+      resultsGrid.innerHTML = '';
+      if (recs.length === 0) {
+        resultsEmpty.hidden = false;
+        resultsActions.hidden = true;
+      } else {
+        resultsEmpty.hidden = true;
+        resultsActions.hidden = false;
+        recs.forEach(({ model, why }) => {
+          const card = document.createElement('article');
+          card.className = 'plan-card';
+          const dims = (model.dimensions ?? []).slice(0, 2).map((d) => `${d.label}: ${d.value}`).join(' · ');
+          const material = model.materials?.[0] ?? '';
+          const needsGlassHeatNote = answers.glass !== 'no-preference' || (answers.heat !== 'unsure' && answers.heat !== '');
+          card.innerHTML = `
+            <a class="plan-card__media" href="/saunas/${model.slug}/">
+              <img src="${model.heroImage?.src ?? ''}" alt="${model.heroImage?.alt ?? model.title}" loading="lazy" decoding="async" />
+            </a>
+            <div class="plan-card__body">
+              <h3 class="plan-card__title">${model.title}</h3>
+              <p class="plan-card__meta">${model.location === 'outdoor' ? 'Outdoor' : 'Indoor'} · ${model.capacity ?? 'Contact us for details'}${dims ? ' · ' + dims : ''}${material ? ' · ' + material : ''}</p>
+              <p class="plan-card__why">${why.length ? 'Recommended because you selected ' + why.join(', ') + '.' : "One of BUXENA's available models."}</p>
+              ${needsGlassHeatNote ? '<p class="plan-card__note">BUXENA will confirm glazing and heater compatibility for your selected model.</p>' : ''}
+              <div class="plan-card__actions">
+                <a class="link" href="/saunas/${model.slug}/">View Sauna <span class="arrow" aria-hidden="true">→</span></a>
+                <a class="btn btn--bronze" href="/quote/">Request a Quote</a>
+              </div>
+            </div>
+          `;
+          resultsGrid.appendChild(card);
+        });
+      }
+
+      form.hidden = true;
+      resultsEl.hidden = false;
+      resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    nextBtn.addEventListener('click', () => {
+      if (current < totalSteps) {
+        current += 1;
+        showStep(current);
+      } else {
+        renderResults();
+      }
+    });
+
+    backBtn.addEventListener('click', () => {
+      if (current > 1) {
+        current -= 1;
+        showStep(current);
+      }
+    });
+
+    reviewToggle.addEventListener('click', () => {
+      reviewSection.hidden = !reviewSection.hidden;
+      if (!reviewSection.hidden) {
+        (document.getElementById('plan-name') as HTMLInputElement | null)?.focus();
+      }
+    });
+
+    reviewForm.addEventListener('submit', () => {
+      const answersField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="answers"]')!;
+      const recommendedField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="recommended"]')!;
+      const submittedField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="submitted_at"]')!;
+      const zipField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="zip"]')!;
+
+      const recs = recommendSaunas(catalog, answers as unknown as PlanAnswers);
+      answersField.value = JSON.stringify(answers);
+      recommendedField.value = recs.map((r) => r.model.title).join(', ');
+      submittedField.value = new Date().toISOString();
+      if (!zipField.value) zipField.value = answers.zip;
+    });
+
+    const saveBtn = root.querySelector<HTMLButtonElement>('[data-plan-save]')!;
+    saveBtn.addEventListener('click', () => {
+      try {
+        const recs = recommendSaunas(catalog, answers as unknown as PlanAnswers);
+        localStorage.setItem(
+          'buxena-plan-your-sauna',
+          JSON.stringify({ answers, recommended: recs.map((r) => r.model.slug), savedAt: new Date().toISOString() })
+        );
+        savedNote.hidden = false;
+      } catch {
+        // localStorage unavailable (private browsing, etc.) — fail silently, non-critical.
+      }
+    });
+
+    showStep(1);
+  }
+</script>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
+
+  .plan { max-width: 44rem; margin-inline: auto; }
+
+  .plan__progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+  .plan__bar { flex: 1 1 auto; height: 2px; background: var(--line); }
+  .plan__bar-fill { display: block; height: 100%; background: var(--bronze); transition: width 0.3s var(--ease); }
+
+  .plan__step { border: none; margin: 0; padding: 0; }
+
+  .plan__question {
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    font-weight: 500;
+    padding: 0;
+    margin-bottom: 1rem;
+  }
+
+  .plan__note { font-size: var(--t-small); color: var(--muted); margin-bottom: 1.25rem; }
+
+  .plan__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .plan__option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    background: var(--linen);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  .plan__option:hover { border-color: var(--ink); }
+  .plan__option-check {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--muted);
+    border-radius: 50%;
+    position: relative;
+  }
+  .plan__option.is-selected {
+    border-color: var(--bronze);
+    background: var(--linen-deep);
+    font-weight: 600;
+  }
+  .plan__option.is-selected .plan__option-check {
+    border-color: var(--bronze);
+    background: var(--bronze);
+  }
+  .plan__option.is-selected .plan__option-check::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--linen);
+  }
+
+  .plan__zip-label {
+    display: block;
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  .plan__zip {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.7rem 0;
+    width: 100%;
+    max-width: 16rem;
+  }
+  .plan__zip:focus { outline: none; border-color: var(--bronze); }
+
+  .plan__nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: clamp(1.75rem, 1.2rem + 1.5vw, 2.5rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+  .plan__nav .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .plan-results { margin-top: 1rem; }
+  .plan-results__head { margin-bottom: 1.5rem; }
+  .plan-results__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1.25rem;
+  }
+  .plan-results__empty { color: var(--muted); font-style: italic; }
+  .plan-results__actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.75rem; }
+  .plan-results__saved { margin-top: 0.75rem; font-size: var(--t-small); color: var(--muted); }
+
+  .plan-review {
+    margin-top: 2.25rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .plan-review__note { color: var(--muted); font-size: var(--t-small); margin-bottom: 1.5rem; }
+
+  @media (max-width: 640px) {
+    .plan__options { grid-template-columns: 1fr; }
+  }
+</style>
+
+<style is:global>
+  .plan-card {
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+  }
+  .plan-card__media { display: block; aspect-ratio: 4 / 3; overflow: hidden; background: var(--birch); }
+  .plan-card__media img { width: 100%; height: 100%; object-fit: cover; }
+  .plan-card__body { padding: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .plan-card__title { font-family: var(--font-display); font-size: var(--t-h3); font-weight: 500; margin: 0; }
+  .plan-card__meta { font-size: var(--t-small); color: var(--bronze-ink); font-weight: 600; margin: 0; }
+  .plan-card__why { font-size: var(--t-small); color: var(--muted); margin: 0; }
+  .plan-card__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin: 0; }
+  .plan-card__actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; flex-wrap: wrap; }
+</style>

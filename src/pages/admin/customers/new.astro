@@ -1,0 +1,59 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const form = await Astro.request.formData();
+    const payload = {
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? '') || null,
+      phone: String(form.get('phone') ?? '') || null,
+      address: String(form.get('address') ?? '') || null,
+      city: String(form.get('city') ?? '') || null,
+      state: String(form.get('state') ?? '') || null,
+      zip: String(form.get('zip') ?? '') || null,
+      lead_source: String(form.get('lead_source') ?? '') || null,
+      notes: String(form.get('notes') ?? '') || null,
+    };
+    if (!payload.name) {
+      error = 'Name is required.';
+    } else {
+      const { data, error: insertError } = await supabase.from('customers').insert(payload).select('id').single();
+      if (insertError) error = insertError.message;
+      else return Astro.redirect(`/admin/customers/${data.id}`);
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+  }
+}
+---
+
+<AdminLayout title="New Customer">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  <form class="admin-form" method="POST">
+    <label class="admin-field"><span>Name *</span><input type="text" name="name" required /></label>
+    <label class="admin-field"><span>Email</span><input type="email" name="email" /></label>
+    <label class="admin-field"><span>Phone</span><input type="tel" name="phone" /></label>
+    <label class="admin-field"><span>Lead Source</span><input type="text" name="lead_source" /></label>
+    <label class="admin-field admin-form__full"><span>Address</span><input type="text" name="address" /></label>
+    <label class="admin-field"><span>City</span><input type="text" name="city" /></label>
+    <label class="admin-field"><span>State</span><input type="text" name="state" /></label>
+    <label class="admin-field"><span>ZIP</span><input type="text" name="zip" /></label>
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Customer</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/customers">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

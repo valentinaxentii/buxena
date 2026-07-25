@@ -50,12 +50,13 @@ const expect = [
 </BaseLayout>
 
 <style>
-  .page-head .lead { margin-top: 1.75rem; }
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
 
   .quote {
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.75fr);
-    gap: clamp(2.5rem, 1rem + 5vw, 6rem);
+    gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
     align-items: start;
   }
 
@@ -64,8 +65,8 @@ const expect = [
   .quote__h {
     font-family: var(--font-sans);
     font-size: var(--t-label);
-    font-weight: 400;
-    letter-spacing: 0.28em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     margin: 0 0 1.5rem;
   }

@@ -1,0 +1,57 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+let enquiries: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase
+    .from('enquiries')
+    .select('id, name, email, phone, message, sauna_interest, source, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  enquiries = data ?? [];
+} catch {
+  dbReady = false;
+}
+---
+
+<AdminLayout title="Enquiries">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <p style="color:var(--admin-muted); font-size:0.85rem; margin-top:-0.5rem; margin-bottom:1.5rem;">
+    The Sauna Advisor chat widget now records every conversation here automatically. Converting
+    an enquiry into a Lead is still manual for now (copy the details into
+    <a href="/admin/leads/new" style="color:var(--admin-gold);">+ New Lead</a>).
+  </p>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>When</th><th>Contact</th><th>Message</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>
+          {enquiries.map((e) => (
+            <tr>
+              <td>{new Date(e.created_at).toLocaleString()}</td>
+              <td>{e.name || e.email || e.phone || '—'}</td>
+              <td style="max-width: 28rem; white-space: normal;">{e.message || '(chat transcript only)'}</td>
+              <td>{e.source}</td>
+              <td><span class="admin-badge admin-badge--neutral">{e.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && enquiries.length === 0 && <p class="admin-empty">No enquiries yet — they'll appear here as visitors use the Sauna Advisor.</p>}
+  </div>
+</AdminLayout>

@@ -1,0 +1,193 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalContact from '../components/LegalContact.astro';
+
+// WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
+// Have this reviewed by a US-licensed attorney before relying on it
+// commercially. Deliberately generic on price/timeline: BUXENA has not
+// published fixed delivery charges or guaranteed lead times.
+const sections = [
+  { id: 'overview', title: 'Overview' },
+  { id: 'quotations', title: 'Delivery Quotations and Charges' },
+  { id: 'lead-times', title: 'Estimated Lead Times' },
+  { id: 'freight', title: 'Freight and Curbside Delivery' },
+  { id: 'access', title: 'Customer Availability and Site Access' },
+  { id: 'unloading', title: 'Unloading Responsibilities' },
+  { id: 'inspection', title: 'Inspection Upon Delivery' },
+  { id: 'damaged', title: 'Damaged or Missing Items' },
+  { id: 'redelivery', title: 'Failed Delivery and Redelivery' },
+  { id: 'installation', title: 'Installation Is a Separate Service' },
+  { id: 'changes', title: 'Changes to This Policy' },
+  { id: 'contact', title: 'Contact Us' },
+];
+---
+
+<BaseLayout
+  title="Shipping & Delivery"
+  description="How BUXENA quotes, arranges and delivers sauna orders across the United States."
+>
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Shipping &amp; Delivery</span>
+      <h1 class="display measure--tight">Shipping &amp; Delivery Policy</h1>
+      <p class="legal__updated">Last Updated: July 2026</p>
+      <p class="lead measure">
+        This policy explains how BUXENA quotes, arranges and delivers orders.
+        Because saunas are large, and every property is different, delivery
+        is quoted and scheduled individually rather than at a fixed rate.
+      </p>
+      <LegalContact />
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell legal">
+      <nav class="legal__toc" aria-label="Table of contents">
+        <ol>
+          {sections.map((s, i) => (
+            <li><a href={`#${s.id}`}>{i + 1}. {s.title}</a></li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="legal__body">
+        <article id="overview">
+          <h2>1. Overview</h2>
+          <p>
+            Most BUXENA products are large and ship by freight rather than
+            standard parcel carrier. This policy covers how delivery is
+            quoted, what to expect on delivery day, and what to do if
+            something arrives damaged or incomplete. It should be read
+            alongside our <a href="/terms/">Terms &amp; Conditions</a>.
+          </p>
+        </article>
+
+        <article id="quotations">
+          <h2>2. Delivery Quotations and Charges</h2>
+          <p>
+            Delivery charges depend on the product, your destination, order
+            size, and site access conditions — including things like
+            distance from the curb, stairs, gates, or narrow access. We do
+            not publish a fixed delivery price for this reason. Your written
+            quote or order confirmation will set out the delivery charge
+            that applies to your specific order before you are asked to pay
+            it.
+          </p>
+        </article>
+
+        <article id="lead-times">
+          <h2>3. Estimated Lead Times</h2>
+          <p>
+            Any lead time we give you — at quote stage or after your order
+            is placed — is our best current estimate based on information
+            from the manufacturer or freight carrier. Lead times can change
+            due to production schedules, customs, weather, or carrier
+            capacity, and should not be treated as guaranteed unless we
+            confirm a specific date with you in writing. If a delay becomes
+            significant, we will let you know and discuss your options.
+          </p>
+        </article>
+
+        <article id="freight">
+          <h2>4. Freight and Curbside Delivery</h2>
+          <p>
+            Many orders are delivered freight or curbside, meaning the
+            carrier delivers to the nearest accessible point at your
+            address rather than into your yard, basement, or a specific
+            room. Whether a more involved delivery service is available,
+            and at what cost, depends on the product, the carrier, and your
+            location — ask us before ordering if you need more than
+            curbside delivery.
+          </p>
+        </article>
+
+        <article id="access">
+          <h2>5. Customer Availability and Site Access</h2>
+          <p>
+            You are responsible for providing accurate delivery and site
+            information, and for being available (or arranging someone to
+            be available) to receive the delivery at the scheduled time.
+            Please tell us in advance about anything that could affect
+            access — steps, slopes, narrow gates, low branches, or shared
+            driveways — since it can affect the delivery method or cost.
+          </p>
+        </article>
+
+        <article id="unloading">
+          <h2>6. Unloading Responsibilities</h2>
+          <p>
+            Unless we have expressly agreed otherwise in writing, unloading
+            the shipment from the delivery vehicle and moving it to its
+            final position is the customer's responsibility once the
+            product has been placed at the delivery point. Some carriers
+            offer liftgate or additional-labor services at extra cost —
+            ask us if you think you will need one.
+          </p>
+        </article>
+
+        <article id="inspection">
+          <h2>7. Inspection Upon Delivery</h2>
+          <p>
+            Please inspect your shipment as soon as reasonably possible,
+            ideally at the time of delivery and before signing the
+            carrier's paperwork. Note any visible damage or shortage
+            directly on the delivery documents where you can, take
+            photographs, and let us know promptly — see Section 8.
+          </p>
+        </article>
+
+        <article id="damaged">
+          <h2>8. Damaged or Missing Items</h2>
+          <p>
+            If your order arrives with visible damage, or something is
+            missing, contact us at{' '}
+            <a href="mailto:info@buxena.com">info@buxena.com</a> as soon as
+            reasonably possible with a description and photographs. Concealed
+            damage that only becomes apparent once you unpack or open the
+            crate should also be reported promptly, since carrier claims
+            windows are time-limited. We will work with you, the carrier and
+            the manufacturer toward an appropriate resolution.
+          </p>
+        </article>
+
+        <article id="redelivery">
+          <h2>9. Failed Delivery and Redelivery</h2>
+          <p>
+            If a delivery attempt fails because nobody was available, the
+            address or access information provided was inaccurate, or the
+            site was not ready to receive the shipment, additional freight
+            or redelivery costs may apply. We will let you know before any
+            such cost is charged.
+          </p>
+        </article>
+
+        <article id="installation">
+          <h2>10. Installation Is a Separate Service</h2>
+          <p>
+            Delivery and installation are separate. Installation is not
+            automatically included with every purchase, and is only part of
+            your order if we have expressly agreed to it in writing and it
+            is reflected in your quote. See our{' '}
+            <a href="/terms/">Terms &amp; Conditions</a> for more on
+            installation, electrical work, and site preparation.
+          </p>
+        </article>
+
+        <article id="changes">
+          <h2>11. Changes to This Policy</h2>
+          <p>
+            We may update this policy from time to time. We will revise the
+            "Last Updated" date above whenever we make a material change.
+          </p>
+        </article>
+
+        <article id="contact">
+          <h2>12. Contact Us</h2>
+          <p>For a delivery quotation or a question about a scheduled delivery, contact:</p>
+          <LegalContact />
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+

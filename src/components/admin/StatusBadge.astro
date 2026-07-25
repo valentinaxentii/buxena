@@ -1,0 +1,20 @@
+---
+interface Props {
+  status: string;
+}
+const { status } = Astro.props;
+
+const GREEN = ['Won', 'Accepted', 'Delivered', 'Installed'];
+const RED = ['Lost', 'Declined', 'Expired'];
+const GOLD = ['Negotiating', 'Quote Sent', 'Qualified'];
+
+const tone = GREEN.includes(status)
+  ? 'green'
+  : RED.includes(status)
+    ? 'red'
+    : GOLD.includes(status)
+      ? 'gold'
+      : 'neutral';
+---
+
+<span class={`admin-badge admin-badge--${tone}`}>{status}</span>
