@@ -1,0 +1,69 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const form = await Astro.request.formData();
+    const payload = {
+      name: String(form.get('name') ?? ''),
+      contact_name: String(form.get('contact_name') ?? '') || null,
+      email: String(form.get('email') ?? '') || null,
+      phone: String(form.get('phone') ?? '') || null,
+      whatsapp: String(form.get('whatsapp') ?? '') || null,
+      country: String(form.get('country') ?? '') || null,
+      factory_address: String(form.get('factory_address') ?? '') || null,
+      website: String(form.get('website') ?? '') || null,
+      currency: String(form.get('currency') ?? '') || null,
+      payment_terms: String(form.get('payment_terms') ?? '') || null,
+      incoterm: String(form.get('incoterm') ?? '') || null,
+      typical_lead_time_days: form.get('typical_lead_time_days') ? Number(form.get('typical_lead_time_days')) : null,
+      warranty_terms: String(form.get('warranty_terms') ?? '') || null,
+      notes: String(form.get('notes') ?? '') || null,
+    };
+    if (!payload.name) {
+      error = 'Name is required.';
+    } else {
+      const { data, error: insertError } = await supabase.from('suppliers').insert(payload).select('id').single();
+      if (insertError) error = insertError.message;
+      else return Astro.redirect(`/admin/suppliers/${data.id}`);
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+  }
+}
+---
+
+<AdminLayout title="New Supplier">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  <form class="admin-form" method="POST">
+    <label class="admin-field"><span>Name *</span><input type="text" name="name" required /></label>
+    <label class="admin-field"><span>Contact Name</span><input type="text" name="contact_name" /></label>
+    <label class="admin-field"><span>Email</span><input type="email" name="email" /></label>
+    <label class="admin-field"><span>Phone</span><input type="tel" name="phone" /></label>
+    <label class="admin-field"><span>WhatsApp</span><input type="text" name="whatsapp" /></label>
+    <label class="admin-field"><span>Country</span><input type="text" name="country" /></label>
+    <label class="admin-field admin-form__full"><span>Factory / Business Address</span><input type="text" name="factory_address" /></label>
+    <label class="admin-field"><span>Website</span><input type="text" name="website" /></label>
+    <label class="admin-field"><span>Currency</span><input type="text" name="currency" maxlength="3" placeholder="USD" /></label>
+    <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" /></label>
+    <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" placeholder="EXW / FOB / CIF / DDP" /></label>
+    <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" /></label>
+    <label class="admin-field admin-form__full"><span>Warranty Terms</span><input type="text" name="warranty_terms" /></label>
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Supplier</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/suppliers">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

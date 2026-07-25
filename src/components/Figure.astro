@@ -18,6 +18,17 @@ interface Props {
   tone?: 'light' | 'mid' | 'dark';
   priority?: boolean;  // hero images only — skips lazy loading
   class?: string;
+  // 'cover' (default, unchanged everywhere existing) crops to fill `ratio`.
+  // 'contain' never crops — the image sits at its natural proportions inside
+  // a capped-height box on a cream ground. Used by the product hero, where
+  // the whole sauna must stay visible rather than being cropped to a shape.
+  fit?: 'cover' | 'contain';
+  maxHeight?: string;   // only meaningful with fit="contain" + fixedRatio=false, e.g. "520px"
+  // With fit="contain": false (default, used by the product hero) lets height
+  // float naturally up to maxHeight. true keeps the `ratio` box itself fixed
+  // — used in grids (ProductCard) so every card is the same height regardless
+  // of each photo's own proportions, while still never cropping the image.
+  fixedRatio?: boolean;
 }
 
 const {
@@ -28,6 +39,9 @@ const {
   tone = 'mid',
   priority = false,
   class: className = '',
+  fit = 'cover',
+  maxHeight = '520px',
+  fixedRatio = false,
 } = Astro.props;
 
 /**
@@ -40,7 +54,10 @@ const {
 const labelled = showDev;
 ---
 
-<figure class={`fig fig--${tone} ${className}`} style={`--fig-ratio:${ratio}`}>
+<figure
+  class={`fig fig--${tone} ${fit === 'contain' ? 'fig--contain' : ''} ${fit === 'contain' && fixedRatio ? 'fig--contain-fixed' : ''} ${className}`}
+  style={`--fig-ratio:${ratio}; --fig-max-h:${maxHeight}`}
+>
   {
     src ? (
       <img
@@ -78,6 +95,32 @@ const labelled = showDev;
     height: 100%;
     object-fit: cover;
   }
+
+  /* Never crop — the full product stays visible, capped height, natural
+     proportions, resting on a cream ground rather than filling a shape. */
+  .fig--contain {
+    aspect-ratio: auto;
+    background: var(--linen);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(1rem, 3%, 2rem);
+  }
+  .fig--contain img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: var(--fig-max-h);
+    object-fit: contain;
+  }
+  @media (max-width: 900px) {
+    .fig--contain:not(.fig--contain-fixed) img { max-height: none; width: 100%; }
+  }
+
+  /* Grid variant — the box itself keeps `ratio` (so every card in a row is
+     the same height), the image still only ever contains within it. */
+  .fig--contain-fixed { aspect-ratio: var(--fig-ratio); }
+  .fig--contain-fixed img { max-height: 100%; }
 
   .fig__ph {
     position: absolute;

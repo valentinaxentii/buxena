@@ -6,71 +6,208 @@ import '../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 
 const PIPELINE_STAGES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
+const OPEN_QUOTE_STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating'];
+const LOW_STOCK_THRESHOLD = 2;
+const ETA_SOON_DAYS = 14;
+const EXPIRY_SOON_DAYS = 7;
 
 let dbReady = true;
-let kpis = {
-  newLeads: 0,
-  newQuoteRequests: 0,
-  openQuotes: 0,
-  awaitingFollowUp: 0,
-  ordersInProgress: 0,
-  unitsInStock: 0,
-  incomingInventory: 0,
-  recentEnquiries: 0,
-};
-let pipelineCounts: Record<string, number> = {};
+
+let pipeline: { stage: string; count: number; value: number }[] = [];
+let totalLeadsCount = 0;
+let activeLeadsCount = 0;
+let followUpCount = 0;
+
+let openQuotesCount = 0;
+let openQuoteValue = 0;
+
+let ordersInProgressCount = 0;
+let ordersInProgressValue = 0;
+
+let unitsInStock = 0;
+let incomingInventory = 0;
+
+let needsAttention: { label: string; detail: string; href: string }[] = [];
+let recentActivity: { label: string; detail: string; href: string; when: string }[] = [];
+let topProducts: { name: string; count: number }[] = [];
+
+function daysFromNow(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${Math.max(mins, 0)}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
 
 try {
   const supabase = createSupabaseAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
   const [
-    newLeads,
-    newQuoteRequests,
-    openQuotes,
-    awaitingFollowUp,
-    ordersInProgress,
+    leadRows,
+    followUpRows,
+    openQuoteRows,
+    expiringQuoteRows,
+    orderRows,
     inventoryRows,
+    lowStockRows,
+    etaSoonRows,
+    newEnquiryRows,
+    recentLeads,
+    recentQuotes,
+    recentOrders,
+    recentCustomers,
     recentEnquiries,
-    leadStatusRows,
+    orderProductRows,
   ] = await Promise.all([
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'New Lead'),
-    supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'Draft'),
-    supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', ['Sent', 'Viewed', 'Negotiating']),
+    supabase.from('leads').select('status, budget'),
     supabase
       .from('leads')
-      .select('id', { count: 'exact', head: true })
+      .select('id, name, follow_up_date')
       .lte('follow_up_date', today)
-      .not('status', 'in', '("Won","Lost")'),
-    supabase.from('orders').select('id', { count: 'exact', head: true }).not('status', 'in', '("Delivered","Installed")'),
+      .not('status', 'in', '("Won","Lost")')
+      .order('follow_up_date', { ascending: true })
+      .limit(4),
+    supabase.from('quotes').select('total').in('status', OPEN_QUOTE_STATUSES),
+    supabase
+      .from('quotes')
+      .select('id, quote_number, expiry_date, customers(name)')
+      .in('status', OPEN_QUOTE_STATUSES)
+      .gte('expiry_date', today)
+      .lte('expiry_date', daysFromNow(EXPIRY_SOON_DAYS))
+      .order('expiry_date', { ascending: true })
+      .limit(4),
+    supabase.from('orders').select('selling_price, status').not('status', 'in', '("Delivered","Installed")'),
     supabase.from('inventory').select('in_stock, incoming'),
-    supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
-    supabase.from('leads').select('status'),
+    supabase
+      .from('inventory')
+      .select('id, available, products(model_name)')
+      .lte('available', LOW_STOCK_THRESHOLD)
+      .order('available', { ascending: true })
+      .limit(4),
+    supabase
+      .from('inventory')
+      .select('id, eta, products(model_name)')
+      .gte('eta', today)
+      .lte('eta', daysFromNow(ETA_SOON_DAYS))
+      .order('eta', { ascending: true })
+      .limit(4),
+    supabase.from('enquiries').select('id, name, source, created_at').eq('status', 'New').order('created_at', { ascending: false }).limit(4),
+    supabase.from('leads').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
+    supabase.from('quotes').select('id, quote_number, created_at').order('created_at', { ascending: false }).limit(6),
+    supabase.from('orders').select('id, order_number, created_at').order('created_at', { ascending: false }).limit(6),
+    supabase.from('customers').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
+    supabase.from('enquiries').select('id, name, source, created_at').order('created_at', { ascending: false }).limit(6),
+    supabase.from('orders').select('product_id, products(model_name)').not('product_id', 'is', null),
   ]);
 
-  kpis = {
-    newLeads: newLeads.count ?? 0,
-    newQuoteRequests: newQuoteRequests.count ?? 0,
-    openQuotes: openQuotes.count ?? 0,
-    awaitingFollowUp: awaitingFollowUp.count ?? 0,
-    ordersInProgress: ordersInProgress.count ?? 0,
-    unitsInStock: (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.in_stock ?? 0), 0),
-    incomingInventory: (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.incoming ?? 0), 0),
-    recentEnquiries: recentEnquiries.count ?? 0,
-  };
+  const leads = leadRows.data ?? [];
+  totalLeadsCount = leads.length;
+  activeLeadsCount = leads.filter((l) => l.status !== 'Won' && l.status !== 'Lost').length;
+  pipeline = PIPELINE_STAGES.map((stage) => {
+    const stageLeads = leads.filter((l) => l.status === stage);
+    return {
+      stage,
+      count: stageLeads.length,
+      value: stageLeads.reduce((sum, l) => sum + Number(l.budget ?? 0), 0),
+    };
+  });
+  followUpCount = followUpRows.count ?? followUpRows.data?.length ?? 0;
 
-  for (const stage of PIPELINE_STAGES) pipelineCounts[stage] = 0;
-  for (const row of leadStatusRows.data ?? []) {
-    if (row.status in pipelineCounts) pipelineCounts[row.status]++;
+  openQuotesCount = (openQuoteRows.data ?? []).length;
+  openQuoteValue = (openQuoteRows.data ?? []).reduce((sum, q) => sum + Number(q.total ?? 0), 0);
+
+  const inProgressOrders = orderRows.data ?? [];
+  ordersInProgressCount = inProgressOrders.length;
+  ordersInProgressValue = inProgressOrders.reduce((sum, o) => sum + Number(o.selling_price ?? 0), 0);
+
+  unitsInStock = (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.in_stock ?? 0), 0);
+  incomingInventory = (inventoryRows.data ?? []).reduce((sum, r) => sum + (r.incoming ?? 0), 0);
+
+  needsAttention = [
+    ...(followUpRows.data ?? []).map((l: any) => ({
+      label: `Follow-up overdue — ${l.name}`,
+      detail: l.follow_up_date ? `Due ${l.follow_up_date}` : '',
+      href: `/admin/leads/${l.id}`,
+    })),
+    ...(expiringQuoteRows.data ?? []).map((q: any) => ({
+      label: `Quote expiring soon — ${q.quote_number || 'Quote'}`,
+      detail: `${q.customers?.name ?? 'Unknown customer'} · expires ${q.expiry_date}`,
+      href: `/admin/quotes/${q.id}`,
+    })),
+    ...(lowStockRows.data ?? []).map((i: any) => ({
+      label: `Low stock — ${i.products?.model_name ?? 'Unknown model'}`,
+      detail: `${i.available ?? 0} available`,
+      href: `/admin/inventory/${i.id}`,
+    })),
+    ...(etaSoonRows.data ?? []).map((i: any) => ({
+      label: `Incoming arriving soon — ${i.products?.model_name ?? 'Unknown model'}`,
+      detail: `ETA ${i.eta}`,
+      href: `/admin/inventory/${i.id}`,
+    })),
+    ...(newEnquiryRows.data ?? []).map((e: any) => ({
+      label: `Unhandled enquiry — ${e.name || e.source}`,
+      detail: timeAgo(e.created_at),
+      href: `/admin/enquiries`,
+    })),
+  ];
+
+  recentActivity = [
+    ...(recentLeads.data ?? []).map((l: any) => ({ label: 'New lead', detail: l.name, href: `/admin/leads/${l.id}`, when: l.created_at })),
+    ...(recentQuotes.data ?? []).map((q: any) => ({ label: 'Quote created', detail: q.quote_number || 'Quote', href: `/admin/quotes/${q.id}`, when: q.created_at })),
+    ...(recentOrders.data ?? []).map((o: any) => ({ label: 'Order created', detail: o.order_number || 'Order', href: `/admin/orders/${o.id}`, when: o.created_at })),
+    ...(recentCustomers.data ?? []).map((c: any) => ({ label: 'New customer', detail: c.name, href: `/admin/customers/${c.id}`, when: c.created_at })),
+    ...(recentEnquiries.data ?? []).map((e: any) => ({ label: 'Website enquiry', detail: e.name || e.source, href: `/admin/enquiries`, when: e.created_at })),
+  ]
+    .filter((r) => r.when)
+    .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
+    .slice(0, 6);
+
+  const productCounts = new Map<string, number>();
+  for (const row of orderProductRows.data ?? []) {
+    const name = (row as any).products?.model_name;
+    if (!name) continue;
+    productCounts.set(name, (productCounts.get(name) ?? 0) + 1);
   }
+  topProducts = [...productCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 } catch {
   dbReady = false;
 }
+
+const maxPipelineCount = Math.max(1, ...pipeline.map((p) => p.count));
+const totalPipelineValue = pipeline.reduce((sum, p) => sum + p.value, 0);
+
+// Donut geometry — plain SVG stroke segments, warm gold shades.
+const DONUT_COLORS = ['#c9a668', '#a5854e', '#7d6539', '#584727', '#3a2f1c'];
+const donutTotal = topProducts.reduce((sum, p) => sum + p.count, 0);
+const DONUT_R = 15.915; // circumference ≈ 100 for easy percentages
+let donutAcc = 0;
+const donutSegments = topProducts.map((p, i) => {
+  const pct = donutTotal > 0 ? (p.count / donutTotal) * 100 : 0;
+  const seg = { pct, offset: 25 - donutAcc, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+  donutAcc += pct;
+  return seg;
+});
 ---
 
-<AdminLayout title="Dashboard">
+<AdminLayout title="Dashboard" subtitle="Business overview">
+  <a slot="actions" class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
+
   {!dbReady && (
-    <div class="admin-placeholder" style="margin-bottom: 2rem;">
+    <div class="admin-placeholder" style="margin-bottom: 1.25rem;">
       <h2>Not connected to Supabase yet</h2>
       <p>
         Set <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code> and
@@ -80,26 +217,338 @@ try {
     </div>
   )}
 
-  <div class="admin-kpis">
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.newLeads}</span><span class="admin-kpi__label">New Leads</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.newQuoteRequests}</span><span class="admin-kpi__label">New Quote Requests</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.openQuotes}</span><span class="admin-kpi__label">Open Quotes</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.awaitingFollowUp}</span><span class="admin-kpi__label">Awaiting Follow-Up</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.ordersInProgress}</span><span class="admin-kpi__label">Orders In Progress</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.unitsInStock}</span><span class="admin-kpi__label">Units In Stock</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.incomingInventory}</span><span class="admin-kpi__label">Incoming Inventory</span></div>
-    <div class="admin-kpi"><span class="admin-kpi__value">{kpis.recentEnquiries}</span><span class="admin-kpi__label">New Website Enquiries</span></div>
+  <!-- KPI row -->
+  <div class="dx-kpis">
+    <a class="dx-kpi" href="/admin/leads">
+      <span class="dx-kpi__head">
+        <span class="dx-kpi__label">Total Leads</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5.2 5.5-5.2s4.9 1.8 5.5 5.2M17 8h5M19.5 5.5v5"/></svg>
+      </span>
+      <span class="dx-kpi__value">{totalLeadsCount}</span>
+      <span class="dx-kpi__foot">{activeLeadsCount} active{followUpCount > 0 ? ` · ${followUpCount} follow-ups due` : ''}</span>
+    </a>
+    <a class="dx-kpi" href="/admin/quotes">
+      <span class="dx-kpi__head">
+        <span class="dx-kpi__label">Open Quotes</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4M9 12h6M9 16h6"/></svg>
+      </span>
+      <span class="dx-kpi__value">{openQuotesCount}</span>
+      <span class="dx-kpi__foot">{money(openQuoteValue)} open value</span>
+    </a>
+    <a class="dx-kpi" href="/admin/orders">
+      <span class="dx-kpi__head">
+        <span class="dx-kpi__label">Orders in Progress</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>
+      </span>
+      <span class="dx-kpi__value">{ordersInProgressCount}</span>
+      <span class="dx-kpi__foot">{money(ordersInProgressValue)} in progress</span>
+    </a>
+    <a class="dx-kpi" href="/admin/inventory">
+      <span class="dx-kpi__head">
+        <span class="dx-kpi__label">Units in Stock</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8l2-4h14l2 4M10 12.5h4"/></svg>
+      </span>
+      <span class="dx-kpi__value">{unitsInStock}</span>
+      <span class="dx-kpi__foot">{incomingInventory} incoming</span>
+    </a>
   </div>
 
-  <h2 class="admin-section-title">Sales Pipeline</h2>
-  <div class="admin-pipeline">
-    {PIPELINE_STAGES.map((stage) => (
-      <div class="admin-pipeline__stage">
-        <span class="admin-pipeline__count">{pipelineCounts[stage] ?? 0}</span>
-        <span class="admin-pipeline__label">{stage}</span>
-      </div>
-    ))}
-  </div>
+  <!-- Sales pipeline -->
+  <section class="admin-panel dx-panel dx-pipeline-panel">
+    <header class="dx-panel__head">
+      <h2>Sales Pipeline</h2>
+      <span class="dx-panel__meta">{totalPipelineValue > 0 ? `${money(totalPipelineValue)} reported budgets` : ''}</span>
+      <a class="dx-panel__more" href="/admin/leads">View all</a>
+    </header>
+    <div class="dx-pipeline">
+      {pipeline.map((p) => (
+        <a class="dx-stage" href={`/admin/leads?status=${encodeURIComponent(p.stage)}`}>
+          <span class="dx-stage__count">{p.count}</span>
+          <span class="dx-stage__label">{p.stage}</span>
+          <span class="dx-stage__value">{p.value > 0 ? money(p.value) : ' '}</span>
+          <span class="dx-stage__bar"><span style={`--pct:${(p.count / maxPipelineCount) * 100}%`} /></span>
+        </a>
+      ))}
+    </div>
+  </section>
 
-  <a class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
+  <!-- Lower panels -->
+  <div class="dx-grid">
+    <section class="admin-panel dx-panel">
+      <header class="dx-panel__head">
+        <h2>Recent Activity</h2>
+        <a class="dx-panel__more" href="/admin/analytics">View all</a>
+      </header>
+      {recentActivity.length === 0 ? (
+        <p class="dx-empty">No activity yet.</p>
+      ) : (
+        <ul class="dx-list">
+          {recentActivity.map((item) => (
+            <li>
+              <a href={item.href}>
+                <span class="dx-list__label">{item.label} — {item.detail}</span>
+                <span class="dx-list__detail">{timeAgo(item.when)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="admin-panel dx-panel">
+      <header class="dx-panel__head">
+        <h2>Tasks / Follow-Ups</h2>
+        <a class="dx-panel__more" href="/admin/leads">View all</a>
+      </header>
+      {needsAttention.length === 0 ? (
+        <p class="dx-empty">Nothing needs attention right now.</p>
+      ) : (
+        <ul class="dx-list">
+          {needsAttention.slice(0, 8).map((item) => (
+            <li>
+              <a href={item.href}>
+                <span class="dx-list__label">{item.label}</span>
+                <span class="dx-list__detail">{item.detail}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="admin-panel dx-panel">
+      <header class="dx-panel__head">
+        <h2>Top Products</h2>
+        <a class="dx-panel__more" href="/admin/products">View all</a>
+      </header>
+      {topProducts.length === 0 ? (
+        <p class="dx-empty">No product orders yet.</p>
+      ) : (
+        <div class="dx-donut-wrap">
+          <svg class="dx-donut" viewBox="0 0 42 42" role="img" aria-label="Orders by product">
+            {donutSegments.map((s) => (
+              <circle
+                cx="21" cy="21" r={DONUT_R}
+                fill="none"
+                stroke={s.color}
+                stroke-width="5"
+                stroke-dasharray={`${Math.max(s.pct - 1.5, 0.5)} ${100 - Math.max(s.pct - 1.5, 0.5)}`}
+                stroke-dashoffset={s.offset}
+              />
+            ))}
+            <text x="21" y="20.2" text-anchor="middle" class="dx-donut__num">{donutTotal}</text>
+            <text x="21" y="25.4" text-anchor="middle" class="dx-donut__cap">orders</text>
+          </svg>
+          <ul class="dx-legend">
+            {topProducts.map((p, i) => (
+              <li>
+                <span class="dx-legend__dot" style={`background:${DONUT_COLORS[i % DONUT_COLORS.length]}`} />
+                <span class="dx-legend__name">{p.name}</span>
+                <span class="dx-legend__count">{p.count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  </div>
 </AdminLayout>
+
+<script>
+  // Keep the dashboard live: reload every 5 minutes while the tab is visible;
+  // if it fires while hidden, reload the moment the tab is next focused.
+  const REFRESH_MS = 5 * 60 * 1000;
+  let refreshDue = false;
+  setInterval(() => {
+    if (document.visibilityState === 'visible') location.reload();
+    else refreshDue = true;
+  }, REFRESH_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (refreshDue && document.visibilityState === 'visible') location.reload();
+  });
+</script>
+
+<style>
+  /* --- KPI row: compact, dense --- */
+  .dx-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: 0.7rem;
+  }
+  .dx-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.8rem 0.95rem;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+  }
+  .dx-kpi:hover { border-color: rgba(201, 166, 104, 0.45); }
+  .dx-kpi__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--admin-gold);
+  }
+  .dx-kpi__label {
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+  }
+  .dx-kpi__value {
+    font-size: 1.55rem;
+    font-weight: 600;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--admin-cream);
+  }
+  .dx-kpi__foot { font-size: 0.68rem; color: var(--admin-muted); }
+
+  /* --- shared panel chrome --- */
+  .dx-panel { padding: 0.85rem 1rem; border-radius: 4px; }
+  .dx-panel__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+  }
+  .dx-panel__head h2 {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--admin-cream);
+  }
+  .dx-panel__meta { font-size: 0.65rem; color: var(--admin-muted); }
+  .dx-panel__more {
+    margin-left: auto;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--admin-gold);
+    text-decoration: none;
+  }
+  .dx-panel__more:hover { text-decoration: underline; }
+
+  /* --- pipeline --- */
+  .dx-pipeline-panel { margin-top: 0.9rem; }
+  .dx-pipeline {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+  }
+  .dx-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.55rem 0.6rem;
+    background: var(--admin-panel-2);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+  }
+  .dx-stage:hover { border-color: rgba(201, 166, 104, 0.4); }
+  .dx-stage__count {
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--admin-gold);
+  }
+  .dx-stage__label {
+    font-size: 0.58rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dx-stage__value { font-size: 0.64rem; color: var(--admin-cream); min-height: 0.9rem; }
+  .dx-stage__bar {
+    display: block;
+    height: 2px;
+    margin-top: 0.3rem;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .dx-stage__bar span {
+    display: block;
+    height: 100%;
+    width: var(--pct, 0%);
+    background: var(--admin-gold);
+  }
+
+  /* --- lower grid --- */
+  .dx-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.9rem;
+    margin-top: 0.9rem;
+    align-items: start;
+  }
+
+  .dx-list { list-style: none; margin: 0; padding: 0; }
+  .dx-list a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.42rem 0.1rem;
+    border-bottom: 1px solid var(--admin-border);
+    text-decoration: none;
+    color: var(--admin-cream);
+    font-size: 0.76rem;
+  }
+  .dx-list li:last-child a { border-bottom: none; }
+  .dx-list a:hover .dx-list__label { color: var(--admin-gold); }
+  .dx-list__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.12s ease;
+  }
+  .dx-list__detail { flex: 0 0 auto; color: var(--admin-muted); font-size: 0.66rem; white-space: nowrap; }
+
+  .dx-empty { margin: 0; padding: 1.1rem 0.1rem; font-size: 0.76rem; color: var(--admin-muted); }
+
+  /* --- donut --- */
+  .dx-donut-wrap { display: flex; align-items: center; gap: 0.9rem; }
+  .dx-donut { flex: 0 0 auto; width: 6.4rem; height: 6.4rem; transform: rotate(0deg); }
+  .dx-donut__num { font-size: 0.42rem; font-weight: 600; fill: var(--admin-cream); font-family: inherit; }
+  .dx-donut__cap { font-size: 0.17rem; letter-spacing: 0.05em; text-transform: uppercase; fill: var(--admin-muted); font-family: inherit; }
+
+  .dx-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; }
+  .dx-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.22rem 0;
+    font-size: 0.72rem;
+  }
+  .dx-legend__dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 2px; }
+  .dx-legend__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--admin-cream);
+  }
+  .dx-legend__count { margin-left: auto; color: var(--admin-muted); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 1100px) {
+    .dx-pipeline { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .dx-pipeline { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

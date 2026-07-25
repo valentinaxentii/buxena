@@ -28,7 +28,6 @@ try {
       product_id: String(form.get('product_id') ?? '') || null,
       supplier_id: String(form.get('supplier_id') ?? '') || null,
       in_stock: Number(form.get('in_stock') ?? 0) || 0,
-      incoming: Number(form.get('incoming') ?? 0) || 0,
       reserved: Number(form.get('reserved') ?? 0) || 0,
       container_number: String(form.get('container_number') ?? '') || null,
       purchase_order: String(form.get('purchase_order') ?? '') || null,
@@ -65,8 +64,13 @@ try {
     </label>
 
     <label class="admin-field"><span>In Stock</span><input type="number" name="in_stock" value="0" /></label>
-    <label class="admin-field"><span>Incoming</span><input type="number" name="incoming" value="0" /></label>
     <label class="admin-field"><span>Reserved</span><input type="number" name="reserved" value="0" /></label>
+    <div class="admin-field">
+      <span>Incoming</span>
+      <p style="margin:0; padding:0.7rem 0.85rem; font-size:0.9rem; color:var(--admin-muted); background:rgba(255,255,255,0.03); border:1px solid var(--admin-border); border-radius:2px;">
+        Computed from Incoming Inventory shipments once one exists for this model — nothing to enter here.
+      </p>
+    </div>
 
     <label class="admin-field"><span>Container / Shipment</span><input type="text" name="container_number" /></label>
     <label class="admin-field"><span>Purchase Order</span><input type="text" name="purchase_order" /></label>

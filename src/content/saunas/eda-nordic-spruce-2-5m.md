@@ -1,10 +1,10 @@
 ---
-title: "EDA Nordic Spruce 2.5m"
+title: "BUH-EDA Nordic Spruce 2.5m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"
 series: "EDA"
-tagline: "The classic EDA barrel, in Nordic spruce"
+tagline: "A beautifully balanced barrel sauna, crafted for everyday relaxation and authentic Nordic heat."
 summary: "A Nordic spruce barrel sauna sized for four to six people."
 order: 130
 placeholder: false

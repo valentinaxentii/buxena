@@ -1,0 +1,186 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const ACTIVE_INCOMING_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
+
+const { id } = Astro.params;
+let supplier: any = null;
+let supplierProducts: any[] = [];
+let history = {
+  totalShipments: 0,
+  totalUnitsOrdered: 0,
+  currentIncomingUnits: 0,
+  lastOrderDate: null as string | null,
+  lastPriceUpdate: null as string | null,
+};
+let error: string | null = null;
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? 'update');
+
+    if (intent === 'delete') {
+      await supabase.from('suppliers').delete().eq('id', id);
+      return Astro.redirect('/admin/suppliers');
+    }
+
+    const payload = {
+      name: String(form.get('name') ?? ''),
+      contact_name: String(form.get('contact_name') ?? '') || null,
+      email: String(form.get('email') ?? '') || null,
+      phone: String(form.get('phone') ?? '') || null,
+      whatsapp: String(form.get('whatsapp') ?? '') || null,
+      country: String(form.get('country') ?? '') || null,
+      factory_address: String(form.get('factory_address') ?? '') || null,
+      website: String(form.get('website') ?? '') || null,
+      currency: String(form.get('currency') ?? '') || null,
+      payment_terms: String(form.get('payment_terms') ?? '') || null,
+      incoterm: String(form.get('incoterm') ?? '') || null,
+      typical_lead_time_days: form.get('typical_lead_time_days') ? Number(form.get('typical_lead_time_days')) : null,
+      warranty_terms: String(form.get('warranty_terms') ?? '') || null,
+      notes: String(form.get('notes') ?? '') || null,
+    };
+    const { error: updateError } = await supabase.from('suppliers').update(payload).eq('id', id);
+    if (updateError) error = updateError.message;
+  }
+
+  const [supplierRes, supplierProductsRes, shipmentsRes] = await Promise.all([
+    supabase.from('suppliers').select('*').eq('id', id).single(),
+    supabase
+      .from('supplier_products')
+      .select('*, products(model_name, category, is_active)')
+      .eq('supplier_id', id)
+      .order('created_at', { ascending: false }),
+    supabase.from('shipments').select('id, order_date, status, shipment_items(quantity, quantity_received)').eq('supplier_id', id),
+  ]);
+
+  if (supplierRes.error || !supplierRes.data) notFound = true;
+  else supplier = supplierRes.data;
+  supplierProducts = supplierProductsRes.data ?? [];
+
+  const shipments = shipmentsRes.data ?? [];
+  history.totalShipments = shipments.length;
+  history.totalUnitsOrdered = shipments.reduce(
+    (sum, s: any) => sum + (s.shipment_items ?? []).reduce((s2: number, i: any) => s2 + (i.quantity ?? 0), 0), 0
+  );
+  history.currentIncomingUnits = shipments
+    .filter((s: any) => ACTIVE_INCOMING_STATUSES.includes(s.status))
+    .reduce((sum, s: any) => sum + (s.shipment_items ?? []).reduce(
+      (s2: number, i: any) => s2 + Math.max(0, (i.quantity ?? 0) - (i.quantity_received ?? 0)), 0
+    ), 0);
+  history.lastOrderDate = shipments.reduce((max: string | null, s: any) =>
+    s.order_date && (!max || s.order_date > max) ? s.order_date : max, null);
+  history.lastPriceUpdate = supplierProducts.reduce((max: string | null, sp: any) =>
+    sp.last_price_update && (!max || sp.last_price_update > max) ? sp.last_price_update : max, null);
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+function money(n: number | null | undefined, currency?: string | null): string {
+  if (n == null) return '—';
+  return `${currency ? currency + ' ' : '$'}${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+---
+
+<AdminLayout title={supplier?.name ?? 'Supplier'}>
+  {notFound && <p class="admin-empty">Supplier not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {supplier && (
+    <>
+      <h2 class="admin-section-title">Supplier Information</h2>
+      <form class="admin-form" method="POST">
+        <label class="admin-field"><span>Name *</span><input type="text" name="name" value={supplier.name} required /></label>
+        <label class="admin-field"><span>Contact Name</span><input type="text" name="contact_name" value={supplier.contact_name ?? ''} /></label>
+        <label class="admin-field"><span>Email</span><input type="email" name="email" value={supplier.email ?? ''} /></label>
+        <label class="admin-field"><span>Phone</span><input type="tel" name="phone" value={supplier.phone ?? ''} /></label>
+        <label class="admin-field"><span>WhatsApp</span><input type="text" name="whatsapp" value={supplier.whatsapp ?? ''} /></label>
+        <label class="admin-field"><span>Country</span><input type="text" name="country" value={supplier.country ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Factory / Business Address</span><input type="text" name="factory_address" value={supplier.factory_address ?? ''} /></label>
+        <label class="admin-field"><span>Website</span><input type="text" name="website" value={supplier.website ?? ''} /></label>
+        <label class="admin-field"><span>Currency</span><input type="text" name="currency" maxlength="3" value={supplier.currency ?? ''} /></label>
+        <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" value={supplier.payment_terms ?? ''} /></label>
+        <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" value={supplier.incoterm ?? ''} placeholder="EXW / FOB / CIF / DDP" /></label>
+        <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" value={supplier.typical_lead_time_days ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Warranty Terms</span><input type="text" name="warranty_terms" value={supplier.warranty_terms ?? ''} /></label>
+        <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes">{supplier.notes ?? ''}</textarea></label>
+        <div class="admin-form__actions">
+          <button class="admin-btn" type="submit">Save Changes</button>
+          <a class="admin-btn admin-btn--ghost" href="/admin/suppliers">Back to Suppliers</a>
+        </div>
+      </form>
+
+      <h2 class="admin-section-title" style="margin-top:2.5rem;">Supplier History</h2>
+      <div class="admin-kpis" style="margin-bottom:2rem;">
+        <div class="admin-kpi"><span class="admin-kpi__value">{history.totalShipments}</span><span class="admin-kpi__label">Total Shipments</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value">{history.totalUnitsOrdered}</span><span class="admin-kpi__label">Total Units Ordered</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value">{history.currentIncomingUnits}</span><span class="admin-kpi__label">Current Incoming Units</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value" style="font-size:1.4rem;">{history.lastOrderDate || '—'}</span><span class="admin-kpi__label">Last Order Date</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value" style="font-size:1.4rem;">{history.lastPriceUpdate || '—'}</span><span class="admin-kpi__label">Last Price Update</span></div>
+      </div>
+      <p style="margin-top:-1.5rem; margin-bottom:2rem; font-size:0.78rem; color:var(--admin-muted);">
+        Average lead time isn't shown — ETA is a planning estimate, not a recorded actual-arrival date, so a
+        derived average would misrepresent itself as measured performance. Worth adding once a real "received date" exists.
+      </p>
+
+      <div class="admin-toolbar">
+        <h2 class="admin-section-title" style="margin:0;">Models Supplied</h2>
+        <a class="admin-btn" href={`/admin/suppliers/${id}/models/new`}>+ Add Model</a>
+      </div>
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Model</th>
+                <th>Supplier Code</th>
+                <th>Category</th>
+                <th>MOQ</th>
+                <th>Unit Cost</th>
+                <th>Lead Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {supplierProducts.map((sp) => (
+                <tr>
+                  <td>
+                    {sp.image_url
+                      ? <img src={sp.image_url} alt={sp.products?.model_name ?? ''} style="width:2.5rem; height:2.5rem; object-fit:cover; border-radius:2px; display:block;" />
+                      : <span style="display:block; width:2.5rem; height:2.5rem; background:rgba(255,255,255,0.05); border:1px solid var(--admin-border); border-radius:2px;" />}
+                  </td>
+                  <td><a href={`/admin/suppliers/${id}/models/${sp.id}`}>{sp.products?.model_name ?? 'Unknown model'}</a></td>
+                  <td>{sp.supplier_model_code || '—'}</td>
+                  <td>{sp.products?.category || '—'}</td>
+                  <td>{sp.moq ?? '—'}</td>
+                  <td>{money(sp.unit_cost, sp.currency)}</td>
+                  <td>{sp.lead_time_days != null ? `${sp.lead_time_days} days` : '—'}</td>
+                  <td><span class={`admin-badge ${sp.is_active ? 'admin-badge--green' : 'admin-badge--neutral'}`}>{sp.is_active ? 'Active' : 'Discontinued'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {supplierProducts.length === 0 && <p class="admin-empty">No models linked to this supplier yet.</p>}
+      </div>
+
+      <form method="POST" style="margin-top:2rem;" onsubmit="return confirm('Delete this supplier? This cannot be undone.');">
+        <input type="hidden" name="_intent" value="delete" />
+        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Supplier</button>
+      </form>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>

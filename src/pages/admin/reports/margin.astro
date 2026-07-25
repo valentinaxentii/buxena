@@ -1,0 +1,169 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
+
+type GroupKey = 'order' | 'product' | 'supplier' | 'month';
+const GROUPS: { value: GroupKey; label: string }[] = [
+  { value: 'order', label: 'By Order' },
+  { value: 'product', label: 'By Product' },
+  { value: 'supplier', label: 'By Supplier' },
+  { value: 'month', label: 'By Month' },
+];
+
+const range = resolveDateRange(Astro.url.searchParams);
+const group = (Astro.url.searchParams.get('group') as GroupKey) || 'order';
+
+let orders: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase
+    .from('orders_with_margin')
+    .select('id, order_number, created_at, selling_price, product_cost, ocean_freight, customs_duty, port_handling, inland_delivery, warehouse_cost, installation_cost, other_cost, landed_cost, gross_profit, gross_margin_pct, products(model_name), suppliers(name)')
+    .order('created_at', { ascending: false });
+  orders = (data ?? []).filter((o: any) => inRange(o.created_at, range));
+} catch {
+  dbReady = false;
+}
+
+const COST_FIELDS = ['product_cost', 'ocean_freight', 'customs_duty', 'port_handling', 'inland_delivery', 'warehouse_cost', 'installation_cost', 'other_cost'];
+
+function emptyAgg(label: string) {
+  return { label, selling_price: 0, landed_cost: 0, gross_profit: 0, count: 0 } as Record<string, any>;
+}
+
+let groupedRows: any[] = [];
+if (group === 'order') {
+  groupedRows = orders.map((o: any) => ({
+    label: o.order_number || o.id.slice(0, 8),
+    href: `/admin/orders/${o.id}`,
+    ...Object.fromEntries(COST_FIELDS.map((f) => [f, o[f] ?? 0])),
+    selling_price: o.selling_price ?? 0,
+    landed_cost: o.landed_cost ?? 0,
+    gross_profit: o.gross_profit ?? 0,
+    gross_margin_pct: o.gross_margin_pct,
+  }));
+} else {
+  const keyFn = group === 'product'
+    ? (o: any) => o.products?.model_name ?? 'Unspecified'
+    : group === 'supplier'
+      ? (o: any) => o.suppliers?.name ?? 'Unspecified'
+      : (o: any) => (o.created_at ?? '').slice(0, 7) || 'Unknown';
+
+  const map = new Map<string, any>();
+  for (const o of orders) {
+    const key = keyFn(o);
+    const agg = map.get(key) ?? emptyAgg(key);
+    for (const f of COST_FIELDS) agg[f] = (agg[f] ?? 0) + (o[f] ?? 0);
+    agg.selling_price += o.selling_price ?? 0;
+    agg.landed_cost += o.landed_cost ?? 0;
+    agg.gross_profit += o.gross_profit ?? 0;
+    agg.count += 1;
+    map.set(key, agg);
+  }
+  groupedRows = [...map.values()]
+    .map((r) => ({ ...r, gross_margin_pct: r.selling_price > 0 ? (r.gross_profit / r.selling_price) * 100 : null }))
+    .sort((a, b) => group === 'month' ? a.label.localeCompare(b.label) : b.selling_price - a.selling_price);
+}
+
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+function pct(n: number | null | undefined): string {
+  return n == null ? '—' : `${Number(n).toFixed(1)}%`;
+}
+
+if (Astro.url.searchParams.get('format') === 'csv') {
+  const headers = ['Group', ...COST_FIELDS.map((f) => f.replace(/_/g, ' ')), 'Landed Cost', 'Revenue', 'Gross Profit', 'Gross Margin %'];
+  const csvRows = groupedRows.map((r) => [
+    r.label, ...COST_FIELDS.map((f) => (r[f] ?? 0).toFixed(2)),
+    r.landed_cost.toFixed(2), r.selling_price.toFixed(2), r.gross_profit.toFixed(2), r.gross_margin_pct?.toFixed(1),
+  ]);
+  const csv = toCSV(headers, csvRows);
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="margin-report-${group}.csv"` } });
+}
+
+const totalRevenue = orders.reduce((s: number, o: any) => s + (o.selling_price ?? 0), 0);
+const totalLandedCost = orders.reduce((s: number, o: any) => s + (o.landed_cost ?? 0), 0);
+const totalGrossProfit = orders.reduce((s: number, o: any) => s + (o.gross_profit ?? 0), 0);
+const overallMarginPct = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : null;
+
+function qs(extra: Record<string, string>): string {
+  const params = new URLSearchParams();
+  if (range.key !== 'all') params.set('range', range.key);
+  if (range.from) params.set('from', range.from);
+  if (range.to) params.set('to', range.to);
+  params.set('group', group);
+  for (const [k, v] of Object.entries(extra)) params.set(k, v);
+  return `?${params.toString()}`;
+}
+---
+
+<AdminLayout title="Margin / Profitability" subtitle="Landed cost and gross margin from real order cost fields — nothing estimated.">
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={qs({ format: 'csv' })}>Export CSV</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <DateRangeFilter range={range} />
+
+  <div class="rpt-kpis">
+    <div class="rpt-kpi rpt-kpi--hero"><span class="rpt-kpi__value">{money(totalRevenue)}</span><span class="rpt-kpi__label">Total Revenue</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{money(totalLandedCost)}</span><span class="rpt-kpi__label">Total Landed Cost</span></div>
+    <div class="rpt-kpi rpt-kpi--accent"><span class="rpt-kpi__value">{money(totalGrossProfit)}</span><span class="rpt-kpi__label">Gross Profit</span></div>
+    <div class="rpt-kpi rpt-kpi--accent"><span class="rpt-kpi__value">{pct(overallMarginPct)}</span><span class="rpt-kpi__label">Gross Margin</span></div>
+  </div>
+
+  <div class="admin-toolbar" style="margin-bottom:1rem;">
+    <div class="admin-toolbar__filters">
+      {GROUPS.map((g) => (
+        <a class="admin-btn admin-btn--ghost" href={qs({ group: g.value })} style={g.value === group ? 'border-color:var(--admin-gold); color:var(--admin-gold);' : ''}>{g.label}</a>
+      ))}
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>{group === 'order' ? 'Order' : group === 'month' ? 'Month' : group === 'product' ? 'Product' : 'Supplier'}</th>
+            <th>Revenue</th><th>Product Cost</th><th>Ocean Freight</th><th>Customs/Duty</th><th>Port Handling</th>
+            <th>Inland Delivery</th><th>Warehouse</th><th>Installation</th><th>Other</th>
+            <th>Landed Cost</th><th>Gross Profit</th><th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groupedRows.map((r: any) => (
+            <tr>
+              <td>{r.href ? <a href={r.href}>{r.label}</a> : r.label}</td>
+              <td>{money(r.selling_price)}</td>
+              <td>{money(r.product_cost)}</td>
+              <td>{money(r.ocean_freight)}</td>
+              <td>{money(r.customs_duty)}</td>
+              <td>{money(r.port_handling)}</td>
+              <td>{money(r.inland_delivery)}</td>
+              <td>{money(r.warehouse_cost)}</td>
+              <td>{money(r.installation_cost)}</td>
+              <td>{money(r.other_cost)}</td>
+              <td>{money(r.landed_cost)}</td>
+              <td>{money(r.gross_profit)}</td>
+              <td>{pct(r.gross_margin_pct)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && groupedRows.length === 0 && <p class="admin-empty">No orders in this range.</p>}
+  </div>
+</AdminLayout>

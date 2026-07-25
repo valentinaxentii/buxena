@@ -1,0 +1,83 @@
+---
+import type { DateRange } from '../../lib/date-range';
+
+interface Props {
+  range: DateRange;
+  exportHref?: string; // if set, shows an "Export CSV" link preserving current filters
+}
+const { range, exportHref } = Astro.props;
+
+const PRESETS: { value: string; label: string }[] = [
+  { value: 'all', label: 'All Time' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'quarter', label: 'This Quarter' },
+  { value: 'year', label: 'This Year' },
+  { value: 'custom', label: 'Custom Range' },
+];
+---
+
+<form class="rpt-filters" method="GET" id="date-range-form">
+  <select name="range" id="date-range-preset">
+    {PRESETS.map((p) => <option value={p.value} selected={p.value === range.key}>{p.label}</option>)}
+  </select>
+  <label class="rpt-filters__date">From <input type="date" name="from" value={range.from ?? ''} /></label>
+  <label class="rpt-filters__date">To <input type="date" name="to" value={range.to ?? ''} /></label>
+  <button class="admin-btn admin-btn--ghost" type="submit">Apply</button>
+  {exportHref && <a class="admin-btn admin-btn--ghost" href={exportHref}>Export CSV</a>}
+</form>
+
+<style is:global>
+  .rpt-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    padding: 0.6rem 0.7rem;
+    background: rgba(212, 184, 140, 0.035);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+  }
+  .rpt-filters select,
+  .rpt-filters input {
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--admin-cream);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 2px;
+    padding: 0.5rem 0.7rem;
+  }
+  .rpt-filters select:focus,
+  .rpt-filters input:focus { outline: none; border-color: var(--admin-gold); }
+  .rpt-filters__date {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--admin-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+</style>
+
+<script>
+  const preset = document.getElementById('date-range-preset') as HTMLSelectElement | null;
+  const form = document.getElementById('date-range-form') as HTMLFormElement | null;
+  preset?.addEventListener('change', () => {
+    if (preset.value !== 'custom') {
+      const fromInput = form?.querySelector('input[name="from"]') as HTMLInputElement | null;
+      const toInput = form?.querySelector('input[name="to"]') as HTMLInputElement | null;
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+    }
+    form?.submit();
+  });
+  form?.querySelectorAll('input[type="date"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (preset) preset.value = 'custom';
+    });
+  });
+</script>

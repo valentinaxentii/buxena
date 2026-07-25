@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Figure from '../../components/Figure.astro';
 import QuoteForm from '../../components/QuoteForm.astro';
 import ProductCard from '../../components/ProductCard.astro';
+import AvailabilityBadge from '../../components/AvailabilityBadge.astro';
 import { categoryMap, showDev, site } from '../../data/site';
 import { getCollection, render } from 'astro:content';
 
@@ -52,6 +53,15 @@ const pendingRows = [
 ];
 
 const specRows = showDev ? [...verifiedRows, ...pendingRows] : verifiedRows;
+
+// Condensed key facts for the hero's right column — a subset of the full
+// specification sheet (still shown in full further down the page, unchanged).
+const heroSpecRows = [
+  ...(data.capacity ? [{ label: 'Capacity', value: data.capacity }] : []),
+  ...(data.dimensions ?? []),
+  ...(data.materials?.length ? [{ label: 'Material', value: data.materials.join(', ') }] : []),
+  ...(data.specs ?? []).slice(0, 2),
+];
 
 const blocks = [
   { title: 'Materials', items: data.materials },
@@ -106,8 +116,8 @@ const breadcrumbSchema = {
   <script type="application/ld+json" set:html={JSON.stringify(productSchema)} slot="head" />
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} slot="head" />
   <article>
-    <!-- Header -->
-    <section class="band band--tight prod-head">
+    <!-- Hero: product image + key info, side by side -->
+    <section class="band band--tight prod-hero">
       <div class="shell">
         <nav class="crumbs" aria-label="Breadcrumb">
           <a href="/saunas/">Saunas</a>
@@ -121,47 +131,54 @@ const breadcrumbSchema = {
           )}
         </nav>
 
-        <div class="prod-head__grid">
-          <div>
-            <h1 class="display">{data.title}</h1>
-            <p class="prod-head__tag serif-italic">{data.tagline}</p>
+        <div class="prod-hero__grid">
+          <div class="prod-hero__media">
+            <Figure
+              src={data.heroImage.src}
+              alt={data.heroImage.alt}
+              note={data.heroImage.note}
+              tone="dark"
+              priority={true}
+              fit="contain"
+              maxHeight="520px"
+            />
+
+            {data.gallery.length > 0 && (
+              <div class="prod-hero__thumbs">
+                {data.gallery.map((img) => (
+                  <Figure src={img.src} alt={img.alt} note={img.note} ratio="1 / 1" tone="mid" />
+                ))}
+              </div>
+            )}
           </div>
-          <div class="prod-head__side">
+
+          <div class="prod-hero__info">
+            <h1 class="display">{data.title}</h1>
+            <p class="prod-hero__tag serif-italic">{data.tagline}</p>
+            <AvailabilityBadge />
             <p class="lead">{data.summary}</p>
+
+            {heroSpecRows.length > 0 && (
+              <dl class="prod-hero__keyspecs">
+                {heroSpecRows.map((row) => (
+                  <div class="prod-hero__keyspecs-row">
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
             <a class="btn btn--bronze" href="#enquire">Request a Quote</a>
           </div>
         </div>
-      </div>
-    </section>
 
-    {data.placeholder && showDev && (
-      <div class="shell">
-        <p class="notice">
-          <strong>Placeholder listing.</strong> Images, dimensions, materials and
-          heater options for this model are not yet published. Nothing on this page
-          should be treated as a specification.
-        </p>
-      </div>
-    )}
-
-    <!-- Gallery -->
-    <section class="band band--tight">
-      <div class="shell">
-        <Figure
-          src={data.heroImage.src}
-          alt={data.heroImage.alt}
-          note={data.heroImage.note}
-          ratio="16 / 9"
-          tone="dark"
-          priority={true}
-        />
-
-        {data.gallery.length > 0 && (
-          <div class="gallery">
-            {data.gallery.map((img) => (
-              <Figure src={img.src} alt={img.alt} note={img.note} ratio="4 / 3" tone="mid" />
-            ))}
-          </div>
+        {data.placeholder && showDev && (
+          <p class="notice">
+            <strong>Placeholder listing.</strong> Images, dimensions, materials and
+            heater options for this model are not yet published. Nothing on this page
+            should be treated as a specification.
+          </p>
         )}
       </div>
     </section>
@@ -264,7 +281,7 @@ const breadcrumbSchema = {
 </BaseLayout>
 
 <style>
-  .prod-head { padding-bottom: 0; }
+  .prod-hero { padding-bottom: 0; }
 
   .crumbs {
     display: flex;
@@ -279,18 +296,44 @@ const breadcrumbSchema = {
   .crumbs a { text-decoration: none; }
   .crumbs a:hover { color: var(--ink); }
 
-  .prod-head__grid {
+  /* Two-column hero: image left (~53%), key info right (~47%). Image never
+     dominates — it supports the product info, capped height, never cropped. */
+  .prod-hero__grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(1.3rem, 0.4rem + 3vw, 3.75rem);
-    align-items: end;
+    grid-template-columns: minmax(0, 1.13fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 0.6rem + 3.5vw, 3.5rem);
+    align-items: start;
   }
-  .prod-head__tag {
-    font-size: clamp(1.15rem, 0.9rem + 0.9vw, 1.65rem);
+
+  .prod-hero__media { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .prod-hero__thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: 0.6rem;
+  }
+  .prod-hero__thumbs :global(.fig) { max-width: 6.5rem; }
+
+  .prod-hero__info { padding-top: 0.25rem; }
+  .prod-hero__tag {
+    font-size: clamp(1.05rem, 0.9rem + 0.5vw, 1.3rem);
     color: var(--bronze-ink);
-    margin-top: 0.75rem;
+    margin: 0.6rem 0 1rem;
   }
-  .prod-head__side .lead { margin-bottom: 1.5rem; }
+  .prod-hero__info :global(.avail) { margin-bottom: 1.1rem; }
+  .prod-hero__info .lead { margin-bottom: 1.5rem; }
+
+  .prod-hero__keyspecs { margin: 0 0 1.75rem; }
+  .prod-hero__keyspecs-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--t-small);
+  }
+  .prod-hero__keyspecs-row dt { color: var(--muted); margin: 0; }
+  .prod-hero__keyspecs-row dd { margin: 0; text-align: right; }
 
   .notice {
     border: 1px solid var(--line);
@@ -302,13 +345,6 @@ const breadcrumbSchema = {
     margin-top: 1.9rem;
   }
   .notice strong { color: var(--ink); font-weight: 500; }
-
-  .gallery {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.6rem, 0.3rem + 0.9vw, 1.1rem);
-    margin-top: clamp(0.6rem, 0.3rem + 0.9vw, 1.1rem);
-  }
 
   .prod-body--solo { grid-template-columns: minmax(0, 1fr); max-width: 52rem; }
   .prod-body {
@@ -364,10 +400,7 @@ const breadcrumbSchema = {
   .dl { color: var(--bronze-ink); }
 
   @media (max-width: 900px) {
-    .prod-head__grid, .prod-body { grid-template-columns: 1fr; }
-    .prod-head__grid { align-items: start; }
-  }
-  @media (max-width: 560px) {
-    .gallery { grid-template-columns: 1fr; }
+    .prod-hero__grid, .prod-body { grid-template-columns: 1fr; }
+    .prod-hero__grid { align-items: start; }
   }
 </style>

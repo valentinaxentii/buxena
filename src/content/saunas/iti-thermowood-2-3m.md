@@ -1,5 +1,5 @@
 ---
-title: "ITI Thermowood 2.3m"
+title: "BUH-ITI Thermowood 2.3m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"

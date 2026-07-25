@@ -1,0 +1,109 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
+
+const ACTIVE_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
+const range = resolveDateRange(Astro.url.searchParams);
+
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const [suppliersRes, shipmentsRes, supplierProductsRes] = await Promise.all([
+    supabase.from('suppliers').select('id, name').order('name'),
+    supabase.from('shipments').select('id, supplier_id, order_date, status, total_units, total_product_cost, shipment_items(quantity, quantity_received)'),
+    supabase.from('supplier_products').select('supplier_id, last_price_update'),
+  ]);
+  const suppliers = suppliersRes.data ?? [];
+  const shipments = shipmentsRes.data ?? [];
+  const supplierProducts = supplierProductsRes.data ?? [];
+
+  rows = suppliers.map((s: any) => {
+    const supplierShipments = shipments.filter((sh: any) => sh.supplier_id === s.id);
+    const inRangeShipments = supplierShipments.filter((sh: any) => inRange(sh.order_date, range));
+    const totalUnitsOrdered = inRangeShipments.reduce((sum: number, sh: any) =>
+      sum + (sh.shipment_items ?? []).reduce((s2: number, i: any) => s2 + (i.quantity ?? 0), 0), 0);
+    const totalPurchaseValue = inRangeShipments.reduce((sum: number, sh: any) => sum + (sh.total_product_cost ?? 0), 0);
+    const currentIncomingUnits = supplierShipments
+      .filter((sh: any) => ACTIVE_STATUSES.includes(sh.status))
+      .reduce((sum: number, sh: any) => sum + (sh.shipment_items ?? []).reduce(
+        (s2: number, i: any) => s2 + Math.max(0, (i.quantity ?? 0) - (i.quantity_received ?? 0)), 0), 0);
+    const lastOrderDate = supplierShipments.reduce((max: string | null, sh: any) =>
+      sh.order_date && (!max || sh.order_date > max) ? sh.order_date : max, null);
+    const modelsSupplied = supplierProducts.filter((sp: any) => sp.supplier_id === s.id).length;
+    const lastPriceUpdate = supplierProducts
+      .filter((sp: any) => sp.supplier_id === s.id)
+      .reduce((max: string | null, sp: any) => sp.last_price_update && (!max || sp.last_price_update > max) ? sp.last_price_update : max, null);
+
+    return {
+      id: s.id, name: s.name,
+      totalShipments: inRangeShipments.length, totalUnitsOrdered, totalPurchaseValue,
+      currentIncomingUnits, lastOrderDate, modelsSupplied, lastPriceUpdate,
+    };
+  });
+} catch {
+  dbReady = false;
+}
+
+function money(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+if (Astro.url.searchParams.get('format') === 'csv') {
+  const csv = toCSV(
+    ['Supplier', 'Total Shipments', 'Total Units Ordered', 'Total Purchase Value', 'Current Incoming Units', 'Last Order Date', 'Models Supplied', 'Last Price Update'],
+    rows.map((r) => [r.name, r.totalShipments, r.totalUnitsOrdered, r.totalPurchaseValue.toFixed(2), r.currentIncomingUnits, r.lastOrderDate, r.modelsSupplied, r.lastPriceUpdate])
+  );
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="supplier-report.csv"' } });
+}
+---
+
+<AdminLayout title="Supplier Report" subtitle="Purchase history and current standing by supplier.">
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/suppliers?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <DateRangeFilter range={range} />
+  <p class="rpt-note">Shipments/units/value reflect the date range above (by order date). Current Incoming Units is always a live snapshot, not affected by the range.</p>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Supplier</th><th>Shipments</th><th>Units Ordered</th><th>Purchase Value</th><th>Incoming Now</th><th>Last Order</th><th>Models Supplied</th><th>Last Price Update</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td><a href={`/admin/suppliers/${r.id}`}>{r.name}</a></td>
+              <td>{r.totalShipments}</td>
+              <td>{r.totalUnitsOrdered}</td>
+              <td>{money(r.totalPurchaseValue)}</td>
+              <td>{r.currentIncomingUnits}</td>
+              <td>{r.lastOrderDate || '—'}</td>
+              <td>{r.modelsSupplied}</td>
+              <td>{r.lastPriceUpdate || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No suppliers yet.</p>}
+  </div>
+  <p class="rpt-note" style="margin-top:1rem;">
+    Average lead time and on-time arrival performance aren't shown — there's no recorded actual-arrival
+    date anywhere yet (ETA is a planning estimate), so either would misrepresent an estimate as measured
+    performance. Per-model average cost is on each supplier's own detail page, linked above.
+  </p>
+</AdminLayout>

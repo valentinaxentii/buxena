@@ -1,0 +1,122 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { toCSV } from '../../../lib/date-range';
+
+const LOW_STOCK_THRESHOLD = 2;
+
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase
+    .from('inventory')
+    .select('product_id, in_stock, reserved, available, incoming, landed_cost, products(model_name, cost, selling_price, is_active)');
+  const raw = data ?? [];
+
+  // Report is per-model, not per-inventory-row — a product can have more
+  // than one inventory row (different containers/suppliers).
+  const byProduct = new Map<string, any>();
+  for (const r of raw) {
+    if (!r.product_id) continue;
+    const key = r.product_id;
+    const existing = byProduct.get(key) ?? {
+      product_id: key,
+      model_name: r.products?.model_name ?? 'Unknown model',
+      is_active: r.products?.is_active,
+      cost: r.products?.cost ?? 0,
+      selling_price: r.products?.selling_price ?? 0,
+      in_stock: 0, reserved: 0, available: 0, incoming: 0,
+      unit_cost_for_value: r.landed_cost ?? r.products?.cost ?? 0,
+    };
+    existing.in_stock += r.in_stock ?? 0;
+    existing.reserved += r.reserved ?? 0;
+    existing.available += r.available ?? 0;
+    existing.incoming += r.incoming ?? 0;
+    byProduct.set(key, existing);
+  }
+  rows = [...byProduct.values()].sort((a, b) => a.model_name.localeCompare(b.model_name));
+} catch {
+  dbReady = false;
+}
+
+function costValue(r: any): number { return (r.in_stock ?? 0) * (r.unit_cost_for_value ?? 0); }
+function retailValue(r: any): number { return (r.in_stock ?? 0) * (r.selling_price ?? 0); }
+function statusOf(r: any): string {
+  if ((r.available ?? 0) <= 0 && (r.incoming ?? 0) <= 0) return 'Preorder only';
+  if ((r.available ?? 0) <= 0) return 'Zero stock';
+  if ((r.available ?? 0) <= LOW_STOCK_THRESHOLD) return 'Low stock';
+  return 'Healthy';
+}
+
+if (Astro.url.searchParams.get('format') === 'csv') {
+  const csv = toCSV(
+    ['Model', 'In Stock', 'Reserved', 'Available', 'Incoming', 'Cost Value', 'Retail Value', 'Status'],
+    rows.map((r) => [r.model_name, r.in_stock, r.reserved, r.available, r.incoming, costValue(r).toFixed(2), retailValue(r).toFixed(2), statusOf(r)])
+  );
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="inventory-report.csv"' } });
+}
+
+const totalUnits = rows.reduce((s, r) => s + (r.in_stock ?? 0), 0);
+const totalCostValue = rows.reduce((s, r) => s + costValue(r), 0);
+const totalRetailValue = rows.reduce((s, r) => s + retailValue(r), 0);
+const lowStockCount = rows.filter((r) => statusOf(r) === 'Low stock').length;
+const zeroStockCount = rows.filter((r) => statusOf(r) === 'Zero stock').length;
+const preorderOnlyCount = rows.filter((r) => statusOf(r) === 'Preorder only').length;
+
+function money(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+---
+
+<AdminLayout title="Inventory Report" subtitle="Current stock position by model — a live snapshot, not filtered by date.">
+  <a slot="actions" class="admin-btn admin-btn--ghost" href="/admin/reports/inventory?format=csv">Export CSV</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="rpt-kpis">
+    <div class="rpt-kpi rpt-kpi--hero"><span class="rpt-kpi__value">{totalUnits}</span><span class="rpt-kpi__label">Total Inventory Units</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{money(totalCostValue)}</span><span class="rpt-kpi__label">Inventory Cost Value</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{money(totalRetailValue)}</span><span class="rpt-kpi__label">Estimated Retail Value</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{lowStockCount}</span><span class="rpt-kpi__label">Low-Stock Models</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{zeroStockCount}</span><span class="rpt-kpi__label">Zero-Stock Models</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{preorderOnlyCount}</span><span class="rpt-kpi__label">Preorder-Only Models</span></div>
+  </div>
+  <p class="rpt-note">Cost value uses landed cost where a shipment has established one, falling back to product cost otherwise. Retail value uses each model's current selling price.</p>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Model</th><th>In Stock</th><th>Reserved</th><th>Available</th><th>Incoming</th><th>Cost Value</th><th>Retail Value</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map((r) => {
+            const status = statusOf(r);
+            const tone = status === 'Healthy' ? 'green' : status === 'Preorder only' ? 'neutral' : 'red';
+            return (
+              <tr>
+                <td><a href={`/admin/products/${r.product_id}`}>{r.model_name}</a></td>
+                <td>{r.in_stock}</td>
+                <td>{r.reserved}</td>
+                <td>{r.available}</td>
+                <td>{r.incoming}</td>
+                <td>{money(costValue(r))}</td>
+                <td>{money(retailValue(r))}</td>
+                <td><span class={`admin-badge admin-badge--${tone}`}>{status}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No inventory records yet.</p>}
+  </div>
+</AdminLayout>

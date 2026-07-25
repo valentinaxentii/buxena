@@ -1,0 +1,29 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+
+const REPORTS = [
+  { href: '/admin/reports/inventory', title: 'Inventory Report', desc: 'What we have on hand, by model — stock, reserved, available, incoming, and value.' },
+  { href: '/admin/reports/shipments', title: 'Incoming Shipments Report', desc: 'What’s on the water or in production right now, and when it lands.' },
+  { href: '/admin/reports/suppliers', title: 'Supplier Report', desc: 'Purchase history and current standing, one row per supplier.' },
+  { href: '/admin/reports/products', title: 'Product Performance', desc: 'Sales, quote demand, margin and stock, side by side, per model.' },
+  { href: '/admin/reports/margin', title: 'Margin / Profitability', desc: 'Landed cost and gross margin, by order, product, supplier, or month.' },
+];
+---
+
+<AdminLayout title="Reports" subtitle="Detailed operational reports — drill-down, filters, and exports.">
+  <div class="rpt-cards">
+    {REPORTS.map((r) => (
+      <a class="rpt-card" href={r.href}>
+        <span class="rpt-card__title">{r.title}</span>
+        <span class="rpt-card__desc">{r.desc}</span>
+      </a>
+    ))}
+  </div>
+  <p class="rpt-note" style="margin-top:1.75rem;">
+    Sales, Quotes, Leads &amp; Conversion, and Customer reports are planned for a follow-up batch —
+    not listed here yet rather than linked and broken.
+  </p>
+</AdminLayout>

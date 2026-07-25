@@ -1,0 +1,309 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { getSettings } from '../../../lib/settings';
+import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
+
+const STATUSES = [
+  'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
+  'Arrived', 'Partially Received', 'Received', 'Cancelled',
+];
+const MAX_ROWS = 10;
+
+let suppliers: any[] = [];
+let products: any[] = [];
+let supplierProducts: any[] = [];
+let error: string | null = null;
+let settings = { currency: 'USD' };
+
+try {
+  const supabase = createSupabaseAdminClient();
+  settings = await getSettings(supabase);
+  const [supplierRows, productRows, supplierProductRows] = await Promise.all([
+    supabase.from('suppliers').select('id, name, currency').order('name'),
+    supabase.from('products').select('id, model_name, cost').eq('is_active', true).order('model_name'),
+    supabase.from('supplier_products').select('supplier_id, product_id, supplier_model_code, unit_cost, currency').eq('is_active', true),
+  ]);
+  suppliers = supplierRows.data ?? [];
+  products = productRows.data ?? [];
+  supplierProducts = supplierProductRows.data ?? [];
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? 'draft'); // 'draft' | 'place'
+
+    const productIds = form.getAll('item_product_id[]').map(String);
+    const quantities = form.getAll('item_quantity[]').map(Number);
+    const unitCosts = form.getAll('item_unit_cost[]').map(Number);
+    const heaters = form.getAll('item_heater[]').map(String);
+    const notesArr = form.getAll('item_notes[]').map(String);
+
+    const items = productIds
+      .map((productId, i) => ({
+        product_id: productId,
+        quantity: quantities[i] || 0,
+        unit_cost: unitCosts[i] || 0,
+        heater_configuration: heaters[i] || null,
+        notes: notesArr[i] || null,
+        line_total: (quantities[i] || 0) * (unitCosts[i] || 0),
+        sort_order: i,
+      }))
+      .filter((item) => item.product_id && item.quantity > 0);
+
+    const totalUnits = items.reduce((sum, i) => sum + i.quantity, 0);
+    const totalProductCost = items.reduce((sum, i) => sum + i.line_total, 0);
+    const oceanFreight = Number(form.get('ocean_freight') ?? 0) || 0;
+    const portCharges = Number(form.get('port_charges') ?? 0) || 0;
+    const customsBrokerage = Number(form.get('customs_brokerage') ?? 0) || 0;
+    const inlandDelivery = Number(form.get('inland_delivery') ?? 0) || 0;
+    const otherCosts = Number(form.get('other_costs') ?? 0) || 0;
+    const totalLandedCost = totalProductCost + oceanFreight + portCharges + customsBrokerage + inlandDelivery + otherCosts;
+
+    const shipmentPayload = {
+      shipment_number: `SH-${Date.now().toString(36).toUpperCase()}`,
+      po_reference: String(form.get('po_reference') ?? '') || null,
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      order_date: String(form.get('order_date') ?? '') || null,
+      container_number: String(form.get('container_number') ?? '') || null,
+      origin: String(form.get('origin') ?? '') || null,
+      destination: String(form.get('destination') ?? '') || null,
+      etd: String(form.get('etd') ?? '') || null,
+      eta: String(form.get('eta') ?? '') || null,
+      currency: String(form.get('currency') ?? settings.currency) || 'USD',
+      notes: String(form.get('notes') ?? '') || null,
+      ocean_freight: oceanFreight,
+      port_charges: portCharges,
+      customs_brokerage: customsBrokerage,
+      inland_delivery: inlandDelivery,
+      other_costs: otherCosts,
+      total_units: totalUnits,
+      total_product_cost: totalProductCost,
+      total_landed_cost: totalLandedCost,
+      status: intent === 'place' ? 'Ordered' : 'Draft',
+    };
+
+    if (!shipmentPayload.supplier_id) {
+      error = 'Supplier is required.';
+    } else if (items.length === 0) {
+      error = 'Add at least one sauna model with a quantity.';
+    } else {
+      const { data: shipment, error: insertError } = await supabase
+        .from('shipments').insert(shipmentPayload).select('id').single();
+
+      if (insertError) {
+        error = insertError.message;
+      } else {
+        await supabase.from('shipment_items').insert(items.map((item) => ({ ...item, shipment_id: shipment.id })));
+        if (intent === 'place') await recomputeIncomingForShipment(supabase, shipment.id);
+        return Astro.redirect(`/admin/shipments/${shipment.id}`);
+      }
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="Order New Shipment">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form" method="POST" id="shipment-form">
+    <label class="admin-field"><span>Supplier *</span>
+      <select name="supplier_id" id="shipment-supplier-select" required>
+        <option value="">— select —</option>
+        {suppliers.map((s) => <option value={s.id}>{s.name}</option>)}
+      </select>
+    </label>
+    <label class="admin-field"><span>PO / Order Reference</span><input type="text" name="po_reference" /></label>
+    <label class="admin-field"><span>Order Date</span><input type="date" name="order_date" value={new Date().toISOString().slice(0, 10)} /></label>
+    <label class="admin-field"><span>Container Number</span><input type="text" name="container_number" /></label>
+    <label class="admin-field"><span>Expected Departure (ETD)</span><input type="date" name="etd" /></label>
+    <label class="admin-field"><span>Expected Arrival (ETA)</span><input type="date" name="eta" /></label>
+    <label class="admin-field"><span>Origin</span><input type="text" name="origin" /></label>
+    <label class="admin-field"><span>Destination</span><input type="text" name="destination" /></label>
+    <label class="admin-field"><span>Currency</span><input type="text" name="currency" id="shipment-currency" value={settings.currency} maxlength="3" /></label>
+    <p class="ship-hint-inline">Model choices below narrow to this supplier's linked models once one is selected — models with no supplier link yet still show up, so this never blocks you.</p>
+
+    <script type="application/json" id="supplier-products-data" set:html={JSON.stringify(supplierProducts)} />
+    <script type="application/json" id="suppliers-data" set:html={JSON.stringify(suppliers)} />
+
+    <div class="admin-form__full">
+      <h2 class="admin-section-title" style="margin-top:1rem;">Add Models</h2>
+      <table class="admin-table" id="items-table">
+        <thead>
+          <tr><th>Model</th><th>Qty</th><th>Unit Cost</th><th>Heater / Configuration</th><th>Notes</th><th>Line Total</th><th></th></tr>
+        </thead>
+        <tbody id="items-body">
+          {Array.from({ length: MAX_ROWS }).map((_, i) => (
+            <tr class="item-row" data-row={i} style={i > 0 ? 'display:none;' : ''}>
+              <td style="min-width:14rem;">
+                <ModelSelect id={`item-${i}-product`} name="item_product_id[]" products={products} />
+              </td>
+              <td><input type="number" name="item_quantity[]" class="qty" min="0" style="width:5rem;" /></td>
+              <td><input type="number" step="0.01" name="item_unit_cost[]" class="cost" style="width:7rem;" /></td>
+              <td><input type="text" name="item_heater[]" style="width:10rem;" /></td>
+              <td><input type="text" name="item_notes[]" style="width:10rem;" /></td>
+              <td class="line-total">$0.00</td>
+              <td><button type="button" class="admin-btn admin-btn--ghost remove-row">×</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button type="button" class="admin-btn admin-btn--ghost" id="add-row" style="margin-top:0.75rem;">+ Add Model</button>
+    </div>
+
+    <div class="admin-form__full">
+      <h2 class="admin-section-title" style="margin-top:1rem;">Optional Shipment Costs</h2>
+    </div>
+    <label class="admin-field"><span>Ocean Freight</span><input type="number" step="0.01" name="ocean_freight" class="freight-input" value="0" /></label>
+    <label class="admin-field"><span>Port / Terminal Charges</span><input type="number" step="0.01" name="port_charges" class="freight-input" value="0" /></label>
+    <label class="admin-field"><span>Customs / Brokerage</span><input type="number" step="0.01" name="customs_brokerage" class="freight-input" value="0" /></label>
+    <label class="admin-field"><span>Inland Delivery</span><input type="number" step="0.01" name="inland_delivery" class="freight-input" value="0" /></label>
+    <label class="admin-field"><span>Other Costs</span><input type="number" step="0.01" name="other_costs" class="freight-input" value="0" /></label>
+
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+
+    <div class="admin-form__full" id="totals">
+      <p>
+        Total Units: <strong id="total-units-out">0</strong> &nbsp;
+        Total Product Cost: <strong id="total-product-out">$0.00</strong> &nbsp;
+        Total Landed Shipment Cost: <strong id="total-landed-out">$0.00</strong>
+      </p>
+    </div>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn admin-btn--ghost" type="submit" name="_intent" value="draft">Save Draft</button>
+      <button class="admin-btn" type="submit" name="_intent" value="place">Place Order</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/shipments">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  #items-table input { width: 100%; }
+  #totals p { margin: 0.3rem 0; font-size: 0.9rem; color: var(--admin-muted); }
+  .ship-hint-inline { grid-column: 1 / -1; margin: -0.5rem 0 0; font-size: 0.78rem; color: var(--admin-muted); }
+</style>
+
+<script define:vars={{ maxRows: MAX_ROWS }}>
+  const body = document.getElementById('items-body');
+  const addRowBtn = document.getElementById('add-row');
+  const rows = Array.from(document.querySelectorAll('.item-row'));
+  let nextHiddenIndex = rows.findIndex((r) => r.style.display === 'none');
+  if (nextHiddenIndex === -1) nextHiddenIndex = maxRows;
+
+  function recalc() {
+    let totalUnits = 0;
+    let totalProduct = 0;
+    rows.forEach((row) => {
+      if (row.style.display === 'none') return;
+      const qty = parseFloat(row.querySelector('.qty')?.value || '0');
+      const cost = parseFloat(row.querySelector('.cost')?.value || '0');
+      const lineTotal = qty * cost;
+      row.querySelector('.line-total').textContent = `$${lineTotal.toFixed(2)}`;
+      totalUnits += qty;
+      totalProduct += lineTotal;
+    });
+
+    let freight = 0;
+    document.querySelectorAll('.freight-input').forEach((el) => { freight += parseFloat(el.value || '0') || 0; });
+
+    document.getElementById('total-units-out').textContent = String(totalUnits);
+    document.getElementById('total-product-out').textContent = `$${totalProduct.toFixed(2)}`;
+    document.getElementById('total-landed-out').textContent = `$${(totalProduct + freight).toFixed(2)}`;
+  }
+
+  addRowBtn?.addEventListener('click', () => {
+    if (nextHiddenIndex >= rows.length) return;
+    rows[nextHiddenIndex].style.display = '';
+    nextHiddenIndex += 1;
+    if (nextHiddenIndex >= rows.length) addRowBtn.style.display = 'none';
+  });
+
+  body?.addEventListener('click', (e) => {
+    const target = e.target;
+    if (target.classList.contains('remove-row')) {
+      const row = target.closest('.item-row');
+      const qtyInput = row.querySelector('.qty');
+      const costInput = row.querySelector('.cost');
+      const heaterInput = row.querySelector('input[name="item_heater[]"]');
+      const notesInput = row.querySelector('input[name="item_notes[]"]');
+      const hiddenProduct = row.querySelector('[data-model-select-value]');
+      const textInput = row.querySelector('.model-select__input');
+      if (qtyInput) qtyInput.value = '';
+      if (costInput) costInput.value = '';
+      if (heaterInput) heaterInput.value = '';
+      if (notesInput) notesInput.value = '';
+      if (hiddenProduct) hiddenProduct.value = '';
+      if (textInput) textInput.value = '';
+      row.style.display = 'none';
+      addRowBtn.style.display = '';
+      recalc();
+    }
+  });
+
+  document.getElementById('shipment-form')?.addEventListener('input', recalc);
+
+  // Supplier-model links + supplier list, embedded server-side.
+  let supplierProducts = [];
+  let suppliersData = [];
+  try { supplierProducts = JSON.parse(document.getElementById('supplier-products-data')?.textContent || '[]'); } catch {}
+  try { suppliersData = JSON.parse(document.getElementById('suppliers-data')?.textContent || '[]'); } catch {}
+
+  const supplierSelect = document.getElementById('shipment-supplier-select');
+  const currencyInput = document.getElementById('shipment-currency');
+  const modelWraps = Array.from(document.querySelectorAll('[data-model-select]'));
+
+  function applySupplierFilter() {
+    const supplierId = supplierSelect?.value || '';
+    const linkedIds = supplierId ? supplierProducts.filter((sp) => sp.supplier_id === supplierId).map((sp) => sp.product_id) : [];
+    // No links recorded for this supplier yet -> don't block ordering, show everything.
+    const productIds = linkedIds.length > 0 ? linkedIds : null;
+    modelWraps.forEach((wrap) => {
+      wrap.dispatchEvent(new CustomEvent('modelselect:restrict', { detail: { productIds } }));
+    });
+  }
+
+  supplierSelect?.addEventListener('change', () => {
+    applySupplierFilter();
+    const supplier = suppliersData.find((s) => s.id === supplierSelect.value);
+    if (supplier?.currency && (!currencyInput.value || currencyInput.dataset.autofilled)) {
+      currencyInput.value = supplier.currency;
+      currencyInput.dataset.autofilled = 'true';
+      currencyInput.addEventListener('input', () => { delete currencyInput.dataset.autofilled; }, { once: true });
+    }
+  });
+  applySupplierFilter();
+
+  document.addEventListener('modelselect:change', ((e) => {
+    const product = e.detail?.product;
+    const wrap = e.target;
+    if (!product || !wrap?.closest) return;
+    const row = wrap.closest('.item-row');
+    if (!row) return;
+    const costInput = row.querySelector('.cost');
+    const notesInput = row.querySelector('input[name="item_notes[]"]');
+
+    const supplierId = supplierSelect?.value || '';
+    const link = supplierProducts.find((sp) => sp.supplier_id === supplierId && sp.product_id === product.id);
+
+    if (costInput && !costInput.value) {
+      if (link?.unit_cost != null) costInput.value = String(link.unit_cost);
+      else if (product.cost) costInput.value = String(product.cost);
+    }
+    if (link?.currency && currencyInput && (!currencyInput.value || currencyInput.dataset.autofilled)) {
+      currencyInput.value = link.currency;
+    }
+    if (link?.supplier_model_code && notesInput && !notesInput.value) {
+      notesInput.value = `Supplier code: ${link.supplier_model_code}`;
+    }
+    recalc();
+  }));
+
+  recalc();
+</script>

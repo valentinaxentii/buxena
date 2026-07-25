@@ -5,7 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 
-const search = Astro.url.searchParams.get('q') ?? '';
+const search = (Astro.url.searchParams.get('q') ?? '').trim();
 let products: any[] = [];
 let dbReady = true;
 
@@ -13,17 +13,52 @@ try {
   const supabase = createSupabaseAdminClient();
   let query = supabase
     .from('products')
-    .select('id, model_name, category, selling_price, stock_quantity, is_active')
+    .select('id, model_name, category, selling_price, is_active, suppliers(name)')
     .order('model_name');
   if (search) query = query.ilike('model_name', `%${search}%`);
   const { data } = await query.limit(300);
-  products = data ?? [];
+  const raw = data ?? [];
+
+  const ids = raw.map((p: any) => p.id);
+  const { data: invData } = ids.length
+    ? await supabase.from('inventory').select('product_id, available, incoming').in('product_id', ids)
+    : { data: [] as any[] };
+
+  const invByProduct = new Map<string, { available: number; incoming: number }>();
+  for (const row of invData ?? []) {
+    const agg = invByProduct.get(row.product_id) ?? { available: 0, incoming: 0 };
+    agg.available += row.available ?? 0;
+    agg.incoming += row.incoming ?? 0;
+    invByProduct.set(row.product_id, agg);
+  }
+
+  products = raw.map((p: any) => {
+    const inv = invByProduct.get(p.id) ?? { available: 0, incoming: 0 };
+    const availability = inv.available > 0 ? 'In Stock' : inv.incoming > 0 ? 'In Transit' : 'Preorder';
+    return { ...p, in_stock_available: inv.available, incoming: inv.incoming, availability };
+  });
 } catch {
   dbReady = false;
 }
+
+const totalModels = products.length;
+const inStockCount = products.filter((p) => p.availability === 'In Stock').length;
+const incomingCount = products.filter((p) => p.availability === 'In Transit').length;
+const preorderCount = products.filter((p) => p.availability === 'Preorder').length;
+
+function availabilityTone(a: string): string {
+  if (a === 'In Stock') return 'green';
+  if (a === 'In Transit') return 'amber';
+  return 'neutral';
+}
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
 ---
 
-<AdminLayout title="Products">
+<AdminLayout title="Products" subtitle="The BUXENA catalog — every sauna model BUXENA sells.">
+  <a slot="actions" class="admin-btn" href="/admin/products/new">+ New Product</a>
+
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -31,31 +66,44 @@ try {
     </div>
   )}
 
-  <div class="admin-toolbar">
-    <form class="admin-toolbar__filters" method="GET">
-      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search model name…" value={search} />
-      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
-    </form>
-    <a class="admin-btn" href="/admin/products/new">+ New Product</a>
+  <div class="rpt-kpis">
+    <div class="rpt-kpi rpt-kpi--hero"><span class="rpt-kpi__value">{totalModels}</span><span class="rpt-kpi__label">Total Models</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{inStockCount}</span><span class="rpt-kpi__label">In Stock</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{incomingCount}</span><span class="rpt-kpi__label">Incoming</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{preorderCount}</span><span class="rpt-kpi__label">Preorder</span></div>
   </div>
+
+  <form class="admin-filterbar" method="GET">
+    <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search model name…" value={search} />
+    <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    {search && <a class="admin-btn admin-btn--ghost" href="/admin/products">Clear</a>}
+  </form>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th>Model</th><th>Category</th><th>Selling Price</th><th>Stock</th><th>Status</th></tr></thead>
+        <thead>
+          <tr><th>Model</th><th>Category</th><th>Supplier</th><th>Selling Price</th><th>In Stock</th><th>Incoming</th><th>Availability</th><th>Status</th><th></th></tr>
+        </thead>
         <tbody>
           {products.map((p) => (
             <tr>
               <td><a href={`/admin/products/${p.id}`}>{p.model_name}</a></td>
               <td>{p.category || '—'}</td>
-              <td>{p.selling_price != null ? `$${p.selling_price}` : '—'}</td>
-              <td>{p.stock_quantity ?? 0}</td>
-              <td><span class={`admin-badge ${p.is_active ? 'admin-badge--green' : 'admin-badge--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td>{p.suppliers?.name || '—'}</td>
+              <td>{money(p.selling_price)}</td>
+              <td>{p.in_stock_available}</td>
+              <td>{p.incoming}</td>
+              <td><span class={`admin-pill admin-pill--${availabilityTone(p.availability)}`}>{p.availability}</span></td>
+              <td><span class={`admin-pill ${p.is_active ? 'admin-pill--green' : 'admin-pill--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td><a href={`/admin/products/${p.id}`} style="font-size:0.72rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--admin-gold); text-decoration:none;">View →</a></td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-    {dbReady && products.length === 0 && <p class="admin-empty">No products yet.</p>}
+    {dbReady && products.length === 0 && (
+      <p class="admin-empty">{search ? 'No products found.' : 'No products yet.'}</p>
+    )}
   </div>
 </AdminLayout>

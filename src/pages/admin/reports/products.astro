@@ -1,0 +1,134 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
+
+const OPEN_QUOTE_STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating'];
+const range = resolveDateRange(Astro.url.searchParams);
+
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const [productsRes, inventoryRes, ordersRes, quotesRes, supplierProductsRes] = await Promise.all([
+    supabase.from('products').select('id, model_name, cost, is_active, supplier_id, suppliers(name, typical_lead_time_days)').order('model_name'),
+    supabase.from('inventory').select('product_id, in_stock, incoming'),
+    supabase.from('orders').select('product_id, selling_price, product_cost, gross_profit, created_at, status'),
+    supabase.from('quotes').select('product_id, status, total, created_at'),
+    supabase.from('supplier_products').select('supplier_id, product_id, lead_time_days'),
+  ]);
+
+  const products = productsRes.data ?? [];
+  const inventory = inventoryRes.data ?? [];
+  const orders = ordersRes.data ?? [];
+  const quotes = quotesRes.data ?? [];
+  const supplierProducts = supplierProductsRes.data ?? [];
+
+  rows = products.map((p: any) => {
+    const inv = inventory.filter((i: any) => i.product_id === p.id);
+    const stock = inv.reduce((s: number, i: any) => s + (i.in_stock ?? 0), 0);
+    const incoming = inv.reduce((s: number, i: any) => s + (i.incoming ?? 0), 0);
+
+    const productOrdersAll = orders.filter((o: any) => o.product_id === p.id);
+    const productOrdersInRange = productOrdersAll.filter((o: any) => inRange(o.created_at, range));
+    const unitsSold = productOrdersInRange.length;
+    const avgSellingPrice = unitsSold > 0 ? productOrdersInRange.reduce((s: number, o: any) => s + (o.selling_price ?? 0), 0) / unitsSold : null;
+    const avgUnitCost = unitsSold > 0 ? productOrdersInRange.reduce((s: number, o: any) => s + (o.product_cost ?? 0), 0) / unitsSold : (p.cost ?? null);
+    const totalRevenue = productOrdersInRange.reduce((s: number, o: any) => s + (o.selling_price ?? 0), 0);
+    const totalGrossProfit = productOrdersInRange.reduce((s: number, o: any) => s + (o.gross_profit ?? 0), 0);
+    const grossMarginPct = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : null;
+    const lastSaleDate = productOrdersAll.reduce((max: string | null, o: any) => o.created_at && (!max || o.created_at > max) ? o.created_at : max, null);
+
+    const productQuotes = quotes.filter((q: any) => q.product_id === p.id);
+    const productQuotesInRange = productQuotes.filter((q: any) => inRange(q.created_at, range));
+    const unitsQuoted = productQuotesInRange.length;
+    const openQuotes = productQuotes.filter((q: any) => OPEN_QUOTE_STATUSES.includes(q.status));
+    const openQuoteValue = openQuotes.reduce((s: number, q: any) => s + (q.total ?? 0), 0);
+
+    const link = supplierProducts.find((sp: any) => sp.product_id === p.id && sp.supplier_id === p.supplier_id);
+    const leadTimeDays = link?.lead_time_days ?? p.suppliers?.typical_lead_time_days ?? null;
+
+    return {
+      id: p.id, model_name: p.model_name, is_active: p.is_active,
+      stock, incoming, unitsSold, unitsQuoted, openQuoteCount: openQuotes.length, openQuoteValue,
+      avgSellingPrice, avgUnitCost, grossMarginPct, supplierName: p.suppliers?.name ?? null,
+      leadTimeDays, lastSaleDate,
+    };
+  });
+} catch {
+  dbReady = false;
+}
+
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+function pct(n: number | null | undefined): string {
+  return n == null ? '—' : `${n.toFixed(1)}%`;
+}
+
+if (Astro.url.searchParams.get('format') === 'csv') {
+  const csv = toCSV(
+    ['Model', 'Stock', 'Incoming', 'Units Sold', 'Units Quoted', 'Open Quotes', 'Open Quote Value', 'Avg Selling Price', 'Avg Unit Cost', 'Gross Margin %', 'Supplier', 'Lead Time (days)', 'Last Sale Date'],
+    rows.map((r) => [r.model_name, r.stock, r.incoming, r.unitsSold, r.unitsQuoted, r.openQuoteCount, r.openQuoteValue.toFixed(2), r.avgSellingPrice?.toFixed(2), r.avgUnitCost?.toFixed(2), r.grossMarginPct?.toFixed(1), r.supplierName, r.leadTimeDays, r.lastSaleDate])
+  );
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="product-performance-report.csv"' } });
+}
+---
+
+<AdminLayout title="Product Performance" subtitle="Sales, demand, margin and stock, side by side, per model.">
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/products?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <DateRangeFilter range={range} />
+  <p class="rpt-note">Units Sold/Quoted, revenue and margin reflect the date range above. Stock, Incoming, and Open Quote Demand are always current, not affected by the range.</p>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Model</th><th>Stock</th><th>Incoming</th><th>Sold</th><th>Quoted</th><th>Open Demand</th>
+            <th>Avg Price</th><th>Avg Cost</th><th>Margin</th><th>Supplier</th><th>Lead Time</th><th>Last Sale</th>
+            <th title="Reserved for a future automated reorder recommendation (sales velocity + demand + lead time + safety stock) — not calculated yet.">Reorder Rec.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td><a href={`/admin/products/${r.id}`}>{r.model_name}</a></td>
+              <td>{r.stock}</td>
+              <td>{r.incoming}</td>
+              <td>{r.unitsSold}</td>
+              <td>{r.unitsQuoted}</td>
+              <td>{r.openQuoteCount > 0 ? `${r.openQuoteCount} · ${money(r.openQuoteValue)}` : '—'}</td>
+              <td>{money(r.avgSellingPrice)}</td>
+              <td>{money(r.avgUnitCost)}</td>
+              <td>{pct(r.grossMarginPct)}</td>
+              <td>{r.supplierName || '—'}</td>
+              <td>{r.leadTimeDays != null ? `${r.leadTimeDays}d` : '—'}</td>
+              <td>{r.lastSaleDate ? r.lastSaleDate.slice(0, 10) : '—'}</td>
+              <td style="color:var(--admin-muted);">—</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No products yet.</p>}
+  </div>
+  <p class="rpt-note" style="margin-top:1rem;">
+    Reorder Recommendation is reserved for a future BUXENA Purchasing Intelligence feature (sales velocity,
+    open demand, current + incoming stock, supplier lead time, safety stock, seasonality, container capacity).
+    Not calculated yet — shown honestly empty, not estimated.
+  </p>
+</AdminLayout>

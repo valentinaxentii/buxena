@@ -52,6 +52,51 @@ drop trigger if exists trg_suppliers_updated_at on suppliers;
 create trigger trg_suppliers_updated_at before update on suppliers
   for each row execute function set_updated_at();
 
+-- Additive supplier fields (2026-07-25 session) — sourcing/commercial terms
+-- that didn't have a home yet. Nullable, existing rows unaffected.
+alter table suppliers add column if not exists whatsapp text;
+alter table suppliers add column if not exists factory_address text;
+alter table suppliers add column if not exists website text;
+alter table suppliers add column if not exists currency text;
+alter table suppliers add column if not exists payment_terms text;
+alter table suppliers add column if not exists incoterm text;
+alter table suppliers add column if not exists typical_lead_time_days integer;
+alter table suppliers add column if not exists warranty_terms text;
+
+-- ----------------------------------------------------------------------------
+-- supplier_products — the commercial relationship between one supplier and
+-- one BUXENA product: their code for it, their price/MOQ/lead time. Deliberately
+-- does NOT duplicate spec fields (dimensions, material, glass, heater) that
+-- already live on `products` and don't vary by supplier — only genuinely
+-- supplier-specific facts get a column here. A product can have more than
+-- one supplier (one row per supplier+product pair); a supplier can have
+-- many products.
+-- ----------------------------------------------------------------------------
+create table if not exists supplier_products (
+  id uuid primary key default gen_random_uuid(),
+  supplier_id uuid not null references suppliers(id) on delete cascade,
+  product_id uuid not null references products(id) on delete cascade,
+  supplier_model_code text,
+  image_url text,
+  moq integer,
+  unit_cost numeric(12,2),
+  currency text,
+  lead_time_days integer,
+  production_time_days integer,
+  packed_dimensions text,
+  weight_kg numeric(10,2),
+  units_per_40hc integer,
+  notes text,
+  is_active boolean not null default true,
+  last_price_update date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (supplier_id, product_id)
+);
+drop trigger if exists trg_supplier_products_updated_at on supplier_products;
+create trigger trg_supplier_products_updated_at before update on supplier_products
+  for each row execute function set_updated_at();
+
 -- ----------------------------------------------------------------------------
 -- products
 -- ----------------------------------------------------------------------------
@@ -262,10 +307,75 @@ alter table orders add column if not exists warehouse text;
 alter table orders add column if not exists delivery_date date;
 alter table orders add column if not exists installation_date date;
 
+-- ----------------------------------------------------------------------------
+-- shipments / shipment_items — supplier/container purchase orders (inbound
+-- purchasing), distinct from `orders` (customer sales orders, outbound).
+-- Draft shipments never count as incoming inventory — only once a shipment
+-- leaves Draft does `src/lib/shipment-inventory.ts` recompute the affected
+-- products' `inventory.incoming`. Totals are plain stored columns computed
+-- by the app on save, same pattern as quotes.subtotal/total, since they
+-- aggregate child rows (Postgres generated columns can't do that).
+-- ----------------------------------------------------------------------------
+create table if not exists shipments (
+  id uuid primary key default gen_random_uuid(),
+  shipment_number text unique,
+  po_reference text,
+  supplier_id uuid references suppliers(id) on delete set null,
+  order_date date,
+  container_number text,
+  origin text,
+  destination text,
+  etd date,
+  eta date,
+  status text not null check (
+    status in (
+      'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
+      'Arrived', 'Partially Received', 'Received', 'Cancelled'
+    )
+  ) default 'Draft',
+  currency text not null default 'USD',
+  notes text,
+  ocean_freight numeric(12,2) default 0,
+  port_charges numeric(12,2) default 0,
+  customs_brokerage numeric(12,2) default 0,
+  inland_delivery numeric(12,2) default 0,
+  other_costs numeric(12,2) default 0,
+  total_units integer not null default 0,
+  total_product_cost numeric(12,2) not null default 0,
+  total_landed_cost numeric(12,2) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists trg_shipments_updated_at on shipments;
+create trigger trg_shipments_updated_at before update on shipments
+  for each row execute function set_updated_at();
+
+create table if not exists shipment_items (
+  id uuid primary key default gen_random_uuid(),
+  shipment_id uuid not null references shipments(id) on delete cascade,
+  product_id uuid not null references products(id),
+  quantity integer not null default 1,
+  quantity_received integer not null default 0,
+  unit_cost numeric(12,2) default 0,
+  heater_configuration text,
+  notes text,
+  line_total numeric(12,2) not null default 0,
+  sort_order integer not null default 0
+);
+
 -- gross_margin_pct needs division, which `generated always as` allows, but
 -- guard the divide-by-zero case with a plain view column instead of a stored
 -- generated column (division by a generated column in the same row is fine).
-create or replace view orders_with_margin as
+--
+-- Dropped and recreated rather than CREATE OR REPLACE: Postgres only allows
+-- REPLACE to *append* columns to a view, never to change the position of an
+-- existing one. Every `alter table orders add column` above inserts new
+-- columns before `gross_margin_pct` in this view's `select o.*` expansion,
+-- which REPLACE rejects outright (42P16). A view holds no data of its own —
+-- it's a saved query — so dropping and recreating it touches zero rows in
+-- the real `orders` table and is always safe to rerun.
+drop view if exists orders_with_margin;
+create view orders_with_margin as
   select o.*,
     case when coalesce(o.selling_price, 0) = 0 then null
       else round((o.gross_profit / o.selling_price) * 100, 2)
@@ -401,7 +511,7 @@ begin
   for t in select unnest(array[
     'profiles', 'suppliers', 'products', 'customers', 'leads', 'quotes',
     'quote_items', 'inventory', 'orders', 'enquiries', 'documents', 'activities',
-    'settings'
+    'settings', 'shipments', 'shipment_items', 'supplier_products'
   ])
   loop
     execute format('alter table %I enable row level security', t);
@@ -440,3 +550,7 @@ alter default privileges in schema public grant all on sequences to service_role
 -- the same "permission denied for table settings" error again.
 grant select, insert, update, delete on settings to service_role;
 grant select on settings to authenticated;
+grant select, insert, update, delete on shipments, shipment_items to service_role;
+grant select on shipments, shipment_items to authenticated;
+grant select, insert, update, delete on supplier_products to service_role;
+grant select on supplier_products to authenticated;

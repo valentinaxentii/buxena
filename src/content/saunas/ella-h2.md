@@ -1,5 +1,5 @@
 ---
-title: "ELLA H2"
+title: "BUH-ELLA H2"
 category: "indoor"
 location: "indoor"
 productType: "Oval"

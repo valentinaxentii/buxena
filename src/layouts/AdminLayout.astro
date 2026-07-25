@@ -1,28 +1,79 @@
 ---
 export const prerender = false;
 
+import { createSupabaseAdminClient } from '../lib/supabase-admin';
+
 interface Props {
   title: string;
-  staffEmail?: string | null;
+  subtitle?: string;
+  /** Optional header search — pages opt in with a GET action, e.g. "/admin/products". */
+  search?: { action: string; placeholder?: string; name?: string };
 }
-const { title, staffEmail } = Astro.props;
+const { title, subtitle, search } = Astro.props;
 
 const path = Astro.url.pathname;
 const isActive = (href: string) => path === href || (href !== '/admin' && path.startsWith(href));
 
+// Small line icons, stroke-based, rendered at 15px. Keyed by nav item.
+const ICONS: Record<string, string> = {
+  dashboard: '<rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/>',
+  leads: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><path d="M17 8h5M19.5 5.5v5"/>',
+  quotes: '<path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/><path d="M9 12h6M9 16h6"/>',
+  orders: '<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+  products: '<path d="M3 3h8l10 10-8 8L3 11z"/><circle cx="7.6" cy="7.6" r="1.3"/>',
+  inventory: '<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8l2-4h14l2 4M10 12.5h4"/>',
+  shipments: '<path d="M2.5 6h12v11h-12z"/><path d="M14.5 10h4l2.5 3.5V17h-7"/><circle cx="6.5" cy="17.8" r="1.8"/><circle cx="17" cy="17.8" r="1.8"/>',
+  customers: '<circle cx="8.5" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3 20c.5-3.2 2.7-5 5.5-5s5 1.8 5.5 5M15.5 15.4c2.3.2 4 1.8 4.5 4.6"/>',
+  suppliers: '<path d="M3 21V9l6 4V9l6 4V4h6v17z"/><path d="M3 21h18"/>',
+  enquiries: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3 7 9 6 9-6"/>',
+  documents: '<path d="M3 6.5V19a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 19V8.5A1.5 1.5 0 0 0 19.5 7H12l-2-2.5H4.5A1.5 1.5 0 0 0 3 6.5z"/>',
+  analytics: '<path d="M4.5 20V10.5M10 20V4.5M15.5 20v-7M21 20H3"/>',
+  reports: '<path d="M4 20h16M5.5 16.5l4.5-5.5 3 3 5.5-7.5"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/>',
+};
+
+// Flat, compact nav — every existing route preserved.
 const navItems = [
-  { href: '/admin', label: 'Dashboard' },
-  { href: '/admin/leads', label: 'Leads' },
-  { href: '/admin/customers', label: 'Customers' },
-  { href: '/admin/quotes', label: 'Quotes' },
-  { href: '/admin/products', label: 'Products' },
-  { href: '/admin/inventory', label: 'Inventory' },
-  { href: '/admin/orders', label: 'Orders' },
-  { href: '/admin/enquiries', label: 'Enquiries' },
-  { href: '/admin/documents', label: 'Documents' },
-  { href: '/admin/analytics', label: 'Analytics' },
+  { href: '/admin', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/admin/leads', label: 'Leads', icon: 'leads' },
+  { href: '/admin/quotes', label: 'Quotes', icon: 'quotes' },
+  { href: '/admin/orders', label: 'Orders', icon: 'orders' },
+  { href: '/admin/products', label: 'Products', icon: 'products' },
+  { href: '/admin/inventory', label: 'Inventory', icon: 'inventory' },
+  { href: '/admin/shipments', label: 'Incoming Inventory', icon: 'shipments' },
+  { href: '/admin/customers', label: 'Customers', icon: 'customers' },
+  { href: '/admin/suppliers', label: 'Suppliers', icon: 'suppliers' },
+  { href: '/admin/enquiries', label: 'Website Enquiries', icon: 'enquiries' },
+  { href: '/admin/documents', label: 'Documents', icon: 'documents' },
+  { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
+  { href: '/admin/reports', label: 'Reports', icon: 'reports' },
+  { href: '/admin/settings', label: 'Settings', icon: 'settings' },
 ];
-const settingsItem = { href: '/admin/settings', label: 'Settings' };
+
+let staffLabel: string | null = null;
+let staffSublabel: string | null = null;
+try {
+  const staffUser = Astro.locals.staffUser;
+  if (staffUser) {
+    const supabase = createSupabaseAdminClient();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', staffUser.id)
+      .single();
+    staffLabel = profile?.full_name || staffUser.email || null;
+    staffSublabel = profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : null;
+  }
+} catch {
+  staffLabel = Astro.locals.staffUser?.email ?? null;
+}
+
+const initials = (staffLabel ?? '')
+  .split(/[\s@.]+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((w) => w[0]?.toUpperCase())
+  .join('');
 ---
 
 <html lang="en">
@@ -41,39 +92,78 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
   <body>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand">
+        <a class="brand" href="/admin">
           <img src="/brand/buxena-logo-champagne.png" alt="BUXENA" width="1536" height="1024" />
-        </div>
+        </a>
 
         <nav class="nav">
           <ul>
             {navItems.map((item) => (
               <li>
-                <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
+                <a
+                  href={item.href}
+                  aria-current={
+                    (item.href === '/admin' ? path === '/admin' : isActive(item.href)) ? 'page' : undefined
+                  }
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    set:html={ICONS[item.icon]}
+                  />
+                  <span>{item.label}</span>
+                </a>
               </li>
             ))}
           </ul>
-
-          <ul>
-            <li>
-              <a href={settingsItem.href} aria-current={isActive(settingsItem.href) ? 'page' : undefined}>
-                {settingsItem.label}
-              </a>
-            </li>
-          </ul>
+          <a class="nav__cta" href="/admin/shipments/new">+ Order New Shipment</a>
         </nav>
 
         <div class="account">
-          {staffEmail && <p class="account__email">{staffEmail}</p>}
+          {staffLabel && (
+            <div class="account__who">
+              <span class="account__avatar" aria-hidden="true">{initials || 'BX'}</span>
+              <span class="account__meta">
+                <span class="account__name">{staffLabel}</span>
+                {staffSublabel && <span class="account__role">{staffSublabel}</span>}
+              </span>
+            </div>
+          )}
           <form method="POST" action="/api/logout">
-            <button type="submit">Sign Out</button>
+            <button type="submit" title="Sign out">Sign Out</button>
           </form>
         </div>
       </aside>
 
       <div class="main">
         <header class="topbar">
-          <h1>{title}</h1>
+          <div class="topbar__title">
+            <h1>{title}</h1>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          {search && (
+            <form class="topbar__search" method="GET" action={search.action} role="search">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" />
+              </svg>
+              <input
+                type="search"
+                name={search.name ?? 'q'}
+                placeholder={search.placeholder ?? 'Search…'}
+                value={Astro.url.searchParams.get(search.name ?? 'q') ?? ''}
+              />
+            </form>
+          )}
+          <div class="topbar__actions">
+            <slot name="actions" />
+          </div>
         </header>
         <main class="content">
           <slot />
@@ -87,12 +177,15 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
   * { box-sizing: border-box; }
 
   :root {
-    --admin-bg: #14120f;
-    --admin-panel: #1b1815;
-    --admin-border: rgba(212, 184, 140, 0.14);
-    --admin-cream: #f6f2ea;
-    --admin-muted: rgba(246, 242, 234, 0.6);
-    --admin-gold: #d4b88c;
+    --admin-bg: #11100e;
+    --admin-panel: #181613;
+    --admin-panel-2: #1d1a16;
+    --admin-border: rgba(212, 184, 140, 0.1);
+    --admin-cream: #f2ede3;
+    --admin-muted: rgba(242, 237, 227, 0.55);
+    --admin-gold: #c9a668;
+    --admin-gold-deep: #b98a45;
+    --admin-sidebar: #0c0b0a;
   }
 
   html, body {
@@ -105,88 +198,199 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
 
   .shell { display: flex; min-height: 100vh; }
 
+  /* --- sidebar: narrow, dense, black --- */
   .sidebar {
-    width: 15.5rem;
+    width: 12.75rem;
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    background: var(--admin-panel);
+    background: var(--admin-sidebar);
     border-right: 1px solid var(--admin-border);
-    padding: 1.75rem 1.25rem;
+    padding: 1rem 0.7rem 0.85rem;
   }
 
-  .brand { padding: 0 0.5rem 1.5rem; }
-  .brand img { width: 100%; max-width: 8rem; height: auto; display: block; }
+  .brand { display: block; padding: 0.15rem 0.55rem 0.9rem; }
+  .brand img { width: 100%; max-width: 5.75rem; height: auto; display: block; }
 
-  .nav { flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.25rem; }
-  .nav ul { list-style: none; margin: 0 0 0.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
   .nav a {
-    display: block;
-    padding: 0.6rem 0.6rem;
-    border-radius: 2px;
-    font-size: 0.85rem;
-    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.42rem 0.55rem;
+    border-left: 2px solid transparent;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
     color: var(--admin-muted);
     text-decoration: none;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+    transition: background-color 0.12s ease, color 0.12s ease;
   }
-  .nav a:hover { color: var(--admin-cream); background: rgba(255, 255, 255, 0.03); }
-  .nav a[aria-current='page'] { color: var(--admin-bg); background: var(--admin-gold); }
+  .nav a svg { flex: 0 0 auto; opacity: 0.75; }
+  .nav a:hover { color: var(--admin-cream); background: rgba(255, 255, 255, 0.04); }
+  .nav a[aria-current='page'] {
+    color: var(--admin-gold);
+    background: rgba(201, 166, 104, 0.1);
+    border-left-color: var(--admin-gold);
+  }
+  .nav a[aria-current='page'] svg { opacity: 1; }
 
+  .nav__cta {
+    display: block;
+    margin: 0.7rem 0.15rem 0.2rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--admin-gold);
+    background: none;
+    border: 1px solid rgba(201, 166, 104, 0.4);
+    border-radius: 3px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .nav__cta:hover { border-color: var(--admin-gold); color: var(--admin-cream); }
+
+  /* --- sidebar footer: user + role --- */
   .account {
-    margin-top: auto;
-    padding-top: 1.25rem;
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
     border-top: 1px solid var(--admin-border);
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
-  .account__email {
-    margin: 0;
-    font-size: 0.75rem;
+  .account__who { display: flex; align-items: center; gap: 0.5rem; min-width: 0; padding: 0 0.15rem; }
+  .account__avatar {
+    flex: 0 0 auto;
+    width: 1.7rem;
+    height: 1.7rem;
+    display: grid;
+    place-items: center;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--admin-gold);
+    background: rgba(201, 166, 104, 0.12);
+    border: 1px solid rgba(201, 166, 104, 0.3);
+    border-radius: 50%;
+  }
+  .account__meta { display: flex; flex-direction: column; min-width: 0; }
+  .account__name {
+    font-size: 0.72rem;
+    color: var(--admin-cream);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .account__role {
+    font-size: 0.58rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
     color: var(--admin-muted);
-    word-break: break-all;
   }
   .account form { margin: 0; }
   .account button {
     width: 100%;
-    padding: 0.55rem 0.75rem;
+    padding: 0.38rem 0.6rem;
     font-family: inherit;
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
+    font-size: 0.62rem;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--admin-muted);
     background: none;
     border: 1px solid var(--admin-border);
-    border-radius: 2px;
+    border-radius: 3px;
     cursor: pointer;
-    transition: color 0.2s ease, border-color 0.2s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
   .account button:hover { color: var(--admin-cream); border-color: var(--admin-gold); }
 
+  /* --- main column --- */
   .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 
+  /* compact dark header */
   .topbar {
-    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 0.65rem 1.25rem;
+    min-height: 3.2rem;
+    background: var(--admin-sidebar);
     border-bottom: 1px solid var(--admin-border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
   }
-  .topbar h1 {
+  .topbar__title { min-width: 0; }
+  .topbar__title h1 {
     margin: 0;
-    font-size: 1.3rem;
+    font-size: 0.95rem;
     font-weight: 500;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.02em;
+    color: var(--admin-cream);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar__title p {
+    margin: 0.1rem 0 0;
+    font-size: 0.68rem;
+    color: var(--admin-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .content { flex: 1 1 auto; padding: 2rem; }
+  .topbar__search {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 0 1 16rem;
+    margin-left: auto;
+    padding: 0.35rem 0.6rem;
+    color: var(--admin-muted);
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+  }
+  .topbar__search:focus-within { border-color: var(--admin-gold); }
+  .topbar__search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.78rem;
+    color: var(--admin-cream);
+    background: none;
+    border: none;
+    outline: none;
+  }
+  .topbar__search input::placeholder { color: var(--admin-muted); }
+
+  .topbar__actions { display: flex; gap: 0.5rem; align-items: center; margin-left: auto; }
+  .topbar__search + .topbar__actions { margin-left: 0; }
+  .topbar__actions:empty { display: none; }
+  /* compact any gold action buttons pages pass in */
+  .topbar__actions :global(.admin-btn) { padding: 0.45rem 0.85rem; font-size: 0.68rem; }
+
+  .content { flex: 1 1 auto; padding: 1.25rem; }
 
   @media (max-width: 860px) {
     .shell { flex-direction: column; }
-    .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 1rem; }
-    .brand { padding: 0; margin-right: 1rem; }
-    .brand img { max-width: 5rem; }
-    .nav { flex-direction: row; flex-wrap: wrap; }
+    .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+    .brand { padding: 0; margin-right: 0.5rem; }
+    .brand img { max-width: 4.25rem; }
+    .nav { overflow: visible; }
     .nav ul { flex-direction: row; flex-wrap: wrap; }
-    .account { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; flex-direction: row; align-items: center; }
-    .account__email { display: none; }
+    .nav a { border-left: none; }
+    .nav__cta { display: inline-block; margin: 0.3rem 0 0; }
+    .account { margin: 0 0 0 auto; padding: 0; border-top: none; flex-direction: row; align-items: center; }
+    .account__meta { display: none; }
+    .topbar { flex-wrap: wrap; }
+    .topbar__search { flex-basis: 100%; order: 3; margin-left: 0; }
   }
 </style>

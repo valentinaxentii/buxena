@@ -37,4 +37,16 @@ export default defineConfig({
       allowedHosts: ['.trycloudflare.com'],
     },
   },
+  // checkOrigin compares the browser's Origin header against the request's
+  // own computed origin, and rejects POSTs on mismatch. Behind an HTTPS
+  // tunnel the dev server computes its own origin as http://<tunnel-host>
+  // (it has no idea TLS is being terminated at Cloudflare's edge), while the
+  // browser's real Origin is https://<tunnel-host> — an unavoidable mismatch
+  // that has nothing to do with Supabase auth or the login flow itself, it's
+  // Astro rejecting the form POST before the route even runs.
+  // `process.argv.includes('dev')` is only ever true for `astro dev` — every
+  // production build runs `astro build`, so this can't affect what ships.
+  security: {
+    checkOrigin: !process.argv.includes('dev'),
+  },
 });

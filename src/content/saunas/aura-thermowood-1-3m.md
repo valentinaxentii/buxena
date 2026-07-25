@@ -1,5 +1,5 @@
 ---
-title: "AURA Thermowood 1.3m"
+title: "BUH-AURA Thermowood 1.3m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"

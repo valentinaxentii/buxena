@@ -1,0 +1,64 @@
+---
+/**
+ * Product availability badge — IN STOCK / IN TRANSIT / PREORDER.
+ *
+ * There is currently no live connection between this public catalog and
+ * Supabase inventory (that's the unit/shipment system discussed separately,
+ * not yet built). Until that exists, every model honestly gets "preorder":
+ * per the same rule that system will use (no available stock + no incoming
+ * quantity = preorder), that's the true state of every model today, since
+ * zero inventory data is connected yet. Once real inventory/shipment data
+ * exists, the caller can pass a real status instead of the default.
+ */
+interface Props {
+  status?: 'in-stock' | 'in-transit' | 'preorder';
+  etaNote?: string; // e.g. "Expected arrival: Aug 18" — only ever passed when a real ETA exists
+}
+const { status = 'preorder', etaNote } = Astro.props;
+
+const LABELS: Record<string, string> = {
+  'in-stock': 'In Stock',
+  'in-transit': 'In Transit',
+  preorder: 'Preorder',
+};
+---
+
+<div class="avail">
+  <span class={`avail__badge avail__badge--${status}`}>{LABELS[status]}</span>
+  {etaNote && <span class="avail__eta">{etaNote}</span>}
+</div>
+
+<style>
+  .avail { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+
+  .avail__badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid transparent;
+  }
+
+  .avail__badge--in-stock {
+    color: var(--ink);
+    background: var(--linen-deep);
+    border-color: var(--line);
+  }
+  .avail__badge--in-transit {
+    color: var(--bronze-ink);
+    background: rgba(156, 122, 74, 0.12);
+    border-color: var(--bronze-soft);
+  }
+  .avail__badge--preorder {
+    color: var(--muted);
+    background: transparent;
+    border-color: var(--line);
+  }
+
+  .avail__eta {
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+</style>

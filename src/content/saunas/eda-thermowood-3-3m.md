@@ -1,5 +1,5 @@
 ---
-title: "EDA Thermowood 3.3m"
+title: "BUH-EDA Thermowood 3.3m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"

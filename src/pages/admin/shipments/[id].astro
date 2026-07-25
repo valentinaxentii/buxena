@@ -1,0 +1,378 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
+
+const { id } = Astro.params;
+
+// Only the single valid "next" status is offered per current status — no
+// jumping stages, no acting on a status that isn't actually current.
+const NEXT_STATUS: Record<string, string> = {
+  Ordered: 'In Production',
+  'In Production': 'Ready to Ship',
+  'Ready to Ship': 'In Transit',
+  'In Transit': 'Arrived',
+};
+const CANCELLABLE_STATUSES = ['Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived'];
+const RECEIVABLE_STATUSES = ['Arrived', 'Partially Received'];
+
+let shipment: any = null;
+let items: any[] = [];
+let suppliers: any[] = [];
+let error: string | null = null;
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? 'update');
+
+    if (intent === 'delete') {
+      await supabase.from('shipments').delete().eq('id', id);
+      return Astro.redirect('/admin/shipments');
+    }
+
+    if (intent === 'advance_status') {
+      const nextStatus = String(form.get('next_status') ?? '');
+      if (nextStatus) {
+        await supabase.from('shipments').update({ status: nextStatus }).eq('id', id);
+        await recomputeIncomingForShipment(supabase, id!);
+      }
+    }
+
+    if (intent === 'place_order') {
+      await supabase.from('shipments').update({ status: 'Ordered' }).eq('id', id);
+      await recomputeIncomingForShipment(supabase, id!);
+    }
+
+    if (intent === 'cancel') {
+      await supabase.from('shipments').update({ status: 'Cancelled' }).eq('id', id);
+      await recomputeIncomingForShipment(supabase, id!);
+    }
+
+    if (intent === 'receive') {
+      const { data: currentItems } = await supabase
+        .from('shipment_items')
+        .select('id, product_id, quantity, quantity_received')
+        .eq('shipment_id', id);
+
+      for (const item of currentItems ?? []) {
+        const receivedNow = Number(form.get(`received_${item.id}`) ?? 0) || 0;
+        if (receivedNow <= 0) continue;
+
+        const remaining = (item.quantity ?? 0) - (item.quantity_received ?? 0);
+        const confirmedQty = Math.min(receivedNow, Math.max(0, remaining));
+        if (confirmedQty <= 0) continue;
+
+        await supabase
+          .from('shipment_items')
+          .update({ quantity_received: (item.quantity_received ?? 0) + confirmedQty })
+          .eq('id', item.id);
+
+        const { data: invRows } = await supabase
+          .from('inventory')
+          .select('id, in_stock')
+          .eq('product_id', item.product_id)
+          .order('available', { ascending: false })
+          .limit(1);
+
+        if (invRows && invRows.length > 0) {
+          await supabase.from('inventory').update({ in_stock: (invRows[0].in_stock ?? 0) + confirmedQty }).eq('id', invRows[0].id);
+        } else {
+          const { data: shipmentRow } = await supabase.from('shipments').select('supplier_id').eq('id', id).single();
+          await supabase.from('inventory').insert({ product_id: item.product_id, in_stock: confirmedQty, supplier_id: shipmentRow?.supplier_id ?? null });
+        }
+      }
+
+      const { data: updatedItems } = await supabase.from('shipment_items').select('quantity, quantity_received').eq('shipment_id', id);
+      const allReceived = (updatedItems ?? []).every((i) => (i.quantity_received ?? 0) >= (i.quantity ?? 0));
+      const anyReceived = (updatedItems ?? []).some((i) => (i.quantity_received ?? 0) > 0);
+      await supabase
+        .from('shipments')
+        .update({ status: allReceived ? 'Received' : anyReceived ? 'Partially Received' : 'Ordered' })
+        .eq('id', id);
+
+      await recomputeIncomingForShipment(supabase, id!);
+    }
+
+    if (intent === 'update_header') {
+      const payload = {
+        po_reference: String(form.get('po_reference') ?? '') || null,
+        supplier_id: String(form.get('supplier_id') ?? '') || null,
+        order_date: String(form.get('order_date') ?? '') || null,
+        container_number: String(form.get('container_number') ?? '') || null,
+        origin: String(form.get('origin') ?? '') || null,
+        destination: String(form.get('destination') ?? '') || null,
+        etd: String(form.get('etd') ?? '') || null,
+        eta: String(form.get('eta') ?? '') || null,
+        currency: String(form.get('currency') ?? '') || 'USD',
+        notes: String(form.get('notes') ?? '') || null,
+      };
+      const { error: updateError } = await supabase.from('shipments').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
+    }
+  }
+
+  const [shipmentRow, itemRows, supplierRows] = await Promise.all([
+    supabase.from('shipments').select('*, suppliers(name)').eq('id', id).single(),
+    supabase.from('shipment_items').select('*, products(model_name)').eq('shipment_id', id).order('sort_order'),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+
+  if (shipmentRow.error || !shipmentRow.data) notFound = true;
+  else shipment = shipmentRow.data;
+  items = itemRows.data ?? [];
+  suppliers = supplierRows.data ?? [];
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+const subtitle = shipment
+  ? `Incoming Inventory · ${shipment.po_reference || 'No PO reference'} · ${shipment.status} · ETA ${shipment.eta || '—'}`
+  : undefined;
+
+const totalOrdered = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
+const totalReceived = items.reduce((sum, i) => sum + (i.quantity_received ?? 0), 0);
+const receivingPct = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
+---
+
+<AdminLayout title={shipment?.shipment_number ?? 'Shipment'} subtitle={subtitle}>
+  {shipment && (
+    <>
+      <a slot="actions" class="admin-btn admin-btn--ghost" href="/admin/shipments">Back</a>
+      <button slot="actions" class="admin-btn admin-btn--ghost" type="submit" form="ship-header-form">Save Changes</button>
+      {shipment.status === 'Draft' && (
+        <button slot="actions" class="admin-btn" type="submit" form="ship-status-form">Place Order</button>
+      )}
+      {NEXT_STATUS[shipment.status] && (
+        <button slot="actions" class="admin-btn" type="submit" form="ship-status-form">Mark {NEXT_STATUS[shipment.status]}</button>
+      )}
+    </>
+  )}
+
+  {notFound && <p class="admin-empty">Shipment not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {shipment && (
+    <>
+      <form method="POST" id="ship-status-form" class="hidden-form">
+        {shipment.status === 'Draft' ? (
+          <input type="hidden" name="_intent" value="place_order" />
+        ) : (
+          <>
+            <input type="hidden" name="_intent" value="advance_status" />
+            <input type="hidden" name="next_status" value={NEXT_STATUS[shipment.status] ?? ''} />
+          </>
+        )}
+      </form>
+
+      <p style="margin-top:-0.5rem; margin-bottom:1.25rem;"><StatusBadge status={shipment.status} /></p>
+
+      <div class="ship-progress">
+        <div class="ship-progress__label">
+          <span>Received {totalReceived} of {totalOrdered} units</span>
+          {totalOrdered - totalReceived > 0 && <span class="ship-progress__remaining">{totalOrdered - totalReceived} remaining</span>}
+        </div>
+        <div class="ship-progress__bar"><span style={`--pct:${receivingPct}%`} /></div>
+      </div>
+
+      <div class="ship-layout">
+        <div class="ship-main">
+          {RECEIVABLE_STATUSES.includes(shipment.status) && (
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Receive Inventory</h2>
+              <form method="POST">
+                <input type="hidden" name="_intent" value="receive" />
+                <div class="admin-table-wrap">
+                  <table class="admin-table">
+                    <thead><tr><th>Model</th><th>Ordered</th><th>Already Received</th><th>Remaining</th><th>Receive Now</th></tr></thead>
+                    <tbody>
+                      {items.map((item) => {
+                        const remaining = (item.quantity ?? 0) - (item.quantity_received ?? 0);
+                        return (
+                          <tr>
+                            <td>{item.products?.model_name ?? 'Unknown model'}</td>
+                            <td>{item.quantity}</td>
+                            <td>{item.quantity_received}</td>
+                            <td>{remaining}</td>
+                            <td>
+                              <input type="number" name={`received_${item.id}`} min="0" max={remaining} value={remaining > 0 ? remaining : 0} style="width:5.5rem;" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div class="admin-form__actions">
+                  <button class="admin-btn" type="submit">Confirm Received Quantities</button>
+                </div>
+              </form>
+              <p class="ship-hint">
+                Enter the actual quantity received per line — partial receipt is recorded as-is, never assumed complete.
+              </p>
+            </div>
+          )}
+
+          <form method="POST" id="ship-header-form">
+            <input type="hidden" name="_intent" value="update_header" />
+
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Shipment Details</h2>
+              <div class="admin-form">
+                <label class="admin-field"><span>Supplier</span>
+                  <select name="supplier_id">
+                    <option value="">— select —</option>
+                    {suppliers.map((s) => <option value={s.id} selected={s.id === shipment.supplier_id}>{s.name}</option>)}
+                  </select>
+                </label>
+                <label class="admin-field"><span>PO / Order Reference</span><input type="text" name="po_reference" value={shipment.po_reference ?? ''} /></label>
+                <label class="admin-field"><span>Container Number</span><input type="text" name="container_number" value={shipment.container_number ?? ''} /></label>
+                <label class="admin-field"><span>Currency</span><input type="text" name="currency" value={shipment.currency ?? 'USD'} maxlength="3" /></label>
+              </div>
+            </div>
+
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Dates</h2>
+              <div class="admin-form">
+                <label class="admin-field"><span>Order Date</span><input type="date" name="order_date" value={shipment.order_date ?? ''} /></label>
+                <label class="admin-field"><span>Expected Departure (ETD)</span><input type="date" name="etd" value={shipment.etd ?? ''} /></label>
+                <label class="admin-field"><span>Expected Arrival (ETA)</span><input type="date" name="eta" value={shipment.eta ?? ''} /></label>
+              </div>
+            </div>
+
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Logistics</h2>
+              <div class="admin-form">
+                <label class="admin-field"><span>Origin</span><input type="text" name="origin" value={shipment.origin ?? ''} /></label>
+                <label class="admin-field"><span>Destination</span><input type="text" name="destination" value={shipment.destination ?? ''} /></label>
+              </div>
+            </div>
+
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Notes</h2>
+              <div class="admin-form">
+                <label class="admin-field admin-form__full"><span>Additional Notes</span><textarea name="notes">{shipment.notes ?? ''}</textarea></label>
+              </div>
+            </div>
+          </form>
+
+          <div class="admin-panel ship-section">
+            <h2 class="admin-section-title">Line Items</h2>
+            <div class="admin-table-wrap">
+              <table class="admin-table ship-items-table">
+                <thead><tr><th>Model</th><th>Qty</th><th>Unit Cost</th><th>Heater / Config</th><th>Received</th><th>Line Total</th></tr></thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr>
+                      <td>
+                        {item.product_id
+                          ? <a href={`/admin/products/${item.product_id}`}>{item.products?.model_name ?? 'Unknown model'}</a>
+                          : (item.products?.model_name ?? 'Unknown model')}
+                      </td>
+                      <td>{item.quantity}</td>
+                      <td>{money(item.unit_cost)}</td>
+                      <td>{item.heater_configuration || '—'}</td>
+                      <td>{item.quantity_received} / {item.quantity}</td>
+                      <td>{money(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {items.length === 0 && <p class="admin-empty">No line items.</p>}
+          </div>
+
+          {CANCELLABLE_STATUSES.includes(shipment.status) && (
+            <form method="POST" class="ship-danger" onsubmit="return confirm('Cancel this shipment?');">
+              <input type="hidden" name="_intent" value="cancel" />
+              <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Cancel Shipment</button>
+            </form>
+          )}
+        </div>
+
+        <aside class="admin-panel ship-summary">
+          <h2 class="admin-section-title">Summary</h2>
+          <dl class="ship-summary__list">
+            <div><dt>Total Units</dt><dd>{shipment.total_units ?? 0}</dd></div>
+            <div><dt>Total Product Cost</dt><dd>{money(shipment.total_product_cost)}</dd></div>
+            <div><dt>Ocean Freight</dt><dd>{money(shipment.ocean_freight)}</dd></div>
+            <div><dt>Port / Brokerage</dt><dd>{money((shipment.port_charges ?? 0) + (shipment.customs_brokerage ?? 0))}</dd></div>
+            <div><dt>Inland Delivery</dt><dd>{money(shipment.inland_delivery)}</dd></div>
+            <div class="ship-summary__total"><dt>Total Landed Cost</dt><dd>{money(shipment.total_landed_cost)}</dd></div>
+            <div><dt>ETA</dt><dd>{shipment.eta || '—'}</dd></div>
+            <div><dt>Received / Remaining</dt><dd>{totalReceived} / {totalOrdered - totalReceived}</dd></div>
+          </dl>
+        </aside>
+      </div>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .hidden-form { display: none; }
+
+  .ship-progress { margin-bottom: 2rem; }
+  .ship-progress__label {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--admin-cream);
+    margin-bottom: 0.5rem;
+  }
+  .ship-progress__remaining { color: var(--admin-muted); }
+  .ship-progress__bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .ship-progress__bar span { display: block; height: 100%; width: var(--pct, 0%); background: var(--admin-gold); }
+
+  .ship-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    gap: 1.75rem;
+    align-items: start;
+  }
+  .ship-main { display: flex; flex-direction: column; gap: 1.75rem; }
+  .ship-section { padding: 1.4rem 1.5rem; }
+  .ship-section .admin-form { max-width: none; margin-top: 0.25rem; }
+  .ship-hint { font-size: 0.78rem; color: var(--admin-muted); margin: 0.75rem 0 0; }
+
+  .ship-items-table tbody tr { transition: background-color 0.15s ease; }
+
+  .ship-danger { margin: 0; }
+
+  .ship-summary { position: sticky; top: 1.5rem; padding: 1.4rem 1.5rem; }
+  .ship-summary__list { margin: 0.5rem 0 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .ship-summary__list > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 0.82rem;
+  }
+  .ship-summary__list dt { color: var(--admin-muted); margin: 0; }
+  .ship-summary__list dd { margin: 0; text-align: right; color: var(--admin-cream); }
+  .ship-summary__total { border-bottom: none !important; margin-top: 0.2rem; }
+  .ship-summary__total dt, .ship-summary__total dd { color: var(--admin-gold); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    .ship-layout { grid-template-columns: 1fr; }
+    .ship-summary { position: static; }
+  }
+</style>

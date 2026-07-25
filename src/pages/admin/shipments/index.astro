@@ -1,0 +1,387 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const STATUSES = [
+  'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
+  'Arrived', 'Partially Received', 'Received', 'Cancelled',
+];
+const ACTIVE_INCOMING_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
+const ETA_BUCKETS = [
+  { value: '', label: 'All ETAs' },
+  { value: '7', label: 'Next 7 days' },
+  { value: '14', label: 'Next 14 days' },
+  { value: '30', label: 'Next 30 days' },
+  { value: 'overdue', label: 'Overdue' },
+];
+const ARRIVING_SOON_DAYS = 14;
+
+const search = (Astro.url.searchParams.get('q') ?? '').trim().toLowerCase();
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const supplierFilter = Astro.url.searchParams.get('supplier') ?? '';
+const etaFilter = Astro.url.searchParams.get('eta') ?? '';
+
+let allRows: any[] = [];
+let suppliers: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const [shipmentRows, supplierRows] = await Promise.all([
+    supabase
+      .from('shipments')
+      .select(
+        'id, shipment_number, po_reference, container_number, status, eta, total_units, total_landed_cost, supplier_id, suppliers(name), shipment_items(quantity, quantity_received, unit_cost, products(model_name))'
+      )
+      .order('created_at', { ascending: false })
+      .limit(300),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+  allRows = shipmentRows.data ?? [];
+  suppliers = supplierRows.data ?? [];
+} catch {
+  dbReady = false;
+}
+
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+function modelNames(row: any): string[] {
+  const names = (row.shipment_items ?? []).map((i: any) => i.products?.model_name).filter(Boolean);
+  return [...new Set(names)] as string[];
+}
+function unitsReceived(row: any): number {
+  return (row.shipment_items ?? []).reduce((sum: number, i: any) => sum + (i.quantity_received ?? 0), 0);
+}
+function unitsOrdered(row: any): number {
+  return (row.shipment_items ?? []).reduce((sum: number, i: any) => sum + (i.quantity ?? 0), 0);
+}
+function unitsRemaining(row: any): number {
+  return Math.max(0, unitsOrdered(row) - unitsReceived(row));
+}
+function formatDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+function statusTone(status: string): string {
+  if (status === 'Received') return 'green';
+  if (status === 'Cancelled') return 'red';
+  if (status === 'Draft') return 'neutral';
+  // Ordered, In Production, Ready to Ship, In Transit, Arrived, Partially
+  // Received — the whole "actively moving" tier reads as one restrained
+  // amber tint rather than a louder solid fill.
+  return 'amber';
+}
+// Remaining (not-yet-received) value of a shipment's line items — used for
+// the "Incoming Inventory Value" KPI. Deliberately NOT the shipment's total
+// value: a partially-received shipment has already converted part of its
+// value into physical stock, so only the outstanding portion still counts
+// as "incoming."
+function remainingValue(row: any): number {
+  return (row.shipment_items ?? []).reduce((sum: number, i: any) => {
+    const remaining = Math.max(0, (i.quantity ?? 0) - (i.quantity_received ?? 0));
+    return sum + remaining * (i.unit_cost ?? 0);
+  }, 0);
+}
+
+// Summary cards reflect the whole board, independent of whatever filter is
+// currently applied to the table below.
+const inProductionCount = allRows.filter((r) => r.status === 'In Production').length;
+const inTransitCount = allRows.filter((r) => r.status === 'In Transit').length;
+const arrivingSoonCount = allRows.filter((r) => {
+  const d = daysUntil(r.eta);
+  return d !== null && d >= 0 && d <= ARRIVING_SOON_DAYS && !['Received', 'Cancelled'].includes(r.status);
+}).length;
+const activeIncomingRows = allRows.filter((r) => ACTIVE_INCOMING_STATUSES.includes(r.status));
+const totalUnitsIncoming = activeIncomingRows.reduce((sum, r) => sum + unitsRemaining(r), 0);
+const incomingInventoryValue = activeIncomingRows.reduce((sum, r) => sum + remainingValue(r), 0);
+
+// Filters applied in-memory — dataset is small and this keeps the summary
+// cards and the table sharing one fetch.
+const today = new Date().toISOString().slice(0, 10);
+const rows = allRows.filter((row) => {
+  if (statusFilter && row.status !== statusFilter) return false;
+  if (supplierFilter && row.supplier_id !== supplierFilter) return false;
+  if (search) {
+    const haystack = [row.shipment_number, row.po_reference, row.container_number, row.suppliers?.name, ...modelNames(row)]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (!haystack.includes(search)) return false;
+  }
+  if (etaFilter === 'overdue') {
+    if (!row.eta || row.eta >= today) return false;
+  } else if (etaFilter) {
+    const days = Number(etaFilter);
+    const d = daysUntil(row.eta);
+    if (d === null || d < 0 || d > days) return false;
+  }
+  return true;
+});
+---
+
+<AdminLayout title="Incoming Inventory" subtitle="Track every BUXENA sauna from factory order to warehouse arrival.">
+  <a slot="actions" class="admin-btn" href="/admin/shipments/new">+ Order New Shipment</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="inc-cards">
+    <div class="inc-card">
+      <span class="inc-card__value">{inProductionCount}</span>
+      <span class="inc-card__label">In Production</span>
+    </div>
+    <div class="inc-card">
+      <span class="inc-card__value">{inTransitCount}</span>
+      <span class="inc-card__label">In Transit</span>
+    </div>
+    <div class="inc-card">
+      <span class="inc-card__value">{arrivingSoonCount}</span>
+      <span class="inc-card__label">Arriving Soon</span>
+      <span class="inc-card__foot">within {ARRIVING_SOON_DAYS} days</span>
+    </div>
+    <div class="inc-card inc-card--hero">
+      <span class="inc-card__value">{totalUnitsIncoming}</span>
+      <span class="inc-card__label">Total Units Incoming</span>
+    </div>
+    <div class="inc-card inc-card--financial">
+      <span class="inc-card__value">{money(incomingInventoryValue)}</span>
+      <span class="inc-card__label">Incoming Inventory Value</span>
+      <span class="inc-card__foot">committed, not yet received</span>
+    </div>
+  </div>
+
+  <form class="inc-filters" method="GET">
+    <input class="inc-filters__search" type="search" name="q" placeholder="Search shipments…" value={search} />
+    <select name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
+    </select>
+    <select name="supplier" onchange="this.form.submit()">
+      <option value="">All suppliers</option>
+      {suppliers.map((s) => <option value={s.id} selected={s.id === supplierFilter}>{s.name}</option>)}
+    </select>
+    <select name="eta" onchange="this.form.submit()">
+      {ETA_BUCKETS.map((b) => <option value={b.value} selected={b.value === etaFilter}>{b.label}</option>)}
+    </select>
+    <button class="inc-filters__submit-sr" type="submit">Search</button>
+  </form>
+
+  <div class="admin-panel inc-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table inc-table">
+        <thead>
+          <tr>
+            <th>Shipment</th>
+            <th>Supplier</th>
+            <th>Status</th>
+            <th>Models</th>
+            <th>Units</th>
+            <th>Received</th>
+            <th>ETA</th>
+            <th>Value</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const ordered = unitsOrdered(row);
+            const received = unitsReceived(row);
+            const pct = ordered > 0 ? (received / ordered) * 100 : 0;
+            const eta = formatDate(row.eta);
+            const etaDays = daysUntil(row.eta);
+            const names = modelNames(row);
+            return (
+              <tr>
+                <td>
+                  <a class="inc-shipment-link" href={`/admin/shipments/${row.id}`}>{row.shipment_number || row.id.slice(0, 8)}</a>
+                  {row.po_reference && <span class="inc-subtext">{row.po_reference}</span>}
+                </td>
+                <td>{row.suppliers?.name ?? '—'}</td>
+                <td><span class={`admin-pill admin-pill--${statusTone(row.status)}`}>{row.status}</span></td>
+                <td class="inc-models" title={names.join(', ')}>{names.join(', ') || '—'}</td>
+                <td>{ordered}</td>
+                <td>
+                  <div class="inc-progress">
+                    <span class="inc-progress__frac">{received} / {ordered}</span>
+                    {ordered > 0 && received >= ordered ? (
+                      <span class="inc-progress__note inc-progress__note--done">Received</span>
+                    ) : received > 0 ? (
+                      <span class="inc-progress__note">{ordered - received} remaining</span>
+                    ) : null}
+                    <span class="inc-progress__bar"><span style={`--pct:${pct}%`} /></span>
+                  </div>
+                </td>
+                <td>
+                  {eta ? <>
+                    <span>{eta}</span>
+                    {!['Received', 'Cancelled'].includes(row.status) && etaDays !== null && (
+                      etaDays < 0
+                        ? <span class="inc-subtext inc-subtext--overdue">Overdue</span>
+                        : <span class="inc-subtext">{etaDays} {etaDays === 1 ? 'day' : 'days'}</span>
+                    )}
+                  </> : '—'}
+                </td>
+                <td class="inc-value">{money(row.total_landed_cost)}</td>
+                <td><a class="inc-action" href={`/admin/shipments/${row.id}`}>View Details →</a></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No shipments match these filters.</p>}
+  </div>
+</AdminLayout>
+
+<style>
+  .inc-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1.6rem;
+  }
+  .inc-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.9rem 1.15rem;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+  }
+  .inc-card__label {
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+  }
+  .inc-card__value {
+    font-size: 1.55rem;
+    font-weight: 600;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--admin-cream);
+  }
+  .inc-card__foot { font-size: 0.7rem; color: var(--admin-muted); }
+
+  /* The hero — Total Units Incoming — is the one deliberately light card;
+     everything else stays dark. Not every card is cream on purpose. */
+  .inc-card--hero {
+    background: var(--admin-cream);
+    border-color: var(--admin-cream);
+  }
+  .inc-card--hero .inc-card__value { color: var(--admin-bg); }
+  .inc-card--hero .inc-card__label { color: rgba(20, 18, 15, 0.6); }
+
+  /* The financial KPI stays dark but reads as "the money one" via gold. */
+  .inc-card--financial .inc-card__value { color: var(--admin-gold); }
+
+  .inc-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 1.4rem;
+    padding: 0.6rem 0.7rem;
+    background: rgba(212, 184, 140, 0.035);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+  }
+  .inc-filters__search,
+  .inc-filters select {
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--admin-cream);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 2px;
+    padding: 0.5rem 0.7rem;
+    transition: border-color 0.15s ease;
+  }
+  .inc-filters__search { flex: 1 1 14rem; min-width: 10rem; }
+  .inc-filters__search:focus,
+  .inc-filters select:focus { outline: none; border-color: var(--admin-gold); }
+  /* Visually hidden but functionally present, so Enter-to-submit in the
+     search field stays reliable without a standalone arrow button on screen. */
+  .inc-filters__submit-sr {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .inc-panel { overflow: hidden; }
+  .inc-table th, .inc-table td { white-space: nowrap; padding-top: 1rem; padding-bottom: 1rem; }
+  .inc-table th:nth-child(4), .inc-table td.inc-models { white-space: normal; }
+  .inc-table thead tr { background: rgba(212, 184, 140, 0.04); }
+  .inc-table tbody tr { transition: background-color 0.15s ease; }
+
+  .inc-shipment-link {
+    display: block;
+    color: var(--admin-gold);
+    font-weight: 500;
+    font-size: 0.92rem;
+  }
+  .inc-subtext { display: block; font-size: 0.74rem; color: var(--admin-muted); margin-top: 0.15rem; white-space: nowrap; }
+  .inc-subtext--overdue { color: #d99a7f; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.68rem; }
+
+  .inc-models {
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important;
+  }
+
+  /* .admin-pill* now lives in admin.css as a shared primitive — used here
+     and on Products. */
+
+  .inc-progress { display: flex; flex-direction: column; gap: 0.3rem; min-width: 6.5rem; }
+  .inc-progress__frac { font-size: 0.78rem; color: var(--admin-cream); }
+  .inc-progress__note { font-size: 0.7rem; color: var(--admin-muted); }
+  .inc-progress__note--done { color: #a9cfa4; }
+  .inc-progress__bar {
+    display: block;
+    height: 5px;
+    width: 6.5rem;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .inc-progress__bar span { display: block; height: 100%; width: var(--pct, 0%); background: var(--admin-gold); }
+
+  .inc-value { text-align: right; }
+
+  .inc-action {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--admin-gold);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+  .inc-action:hover { color: #e6cda3; text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    .inc-cards { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

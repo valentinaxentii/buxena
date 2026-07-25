@@ -1,5 +1,5 @@
 ---
-title: "EDA Thermo-Treated Pine 1.6m"
+title: "BUH-EDA Thermo-Treated Pine 1.6m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"

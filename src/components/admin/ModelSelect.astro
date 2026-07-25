@@ -121,6 +121,19 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
 
       let activeIndex = -1;
       let currentMatches: ModelSelectProduct[] = [];
+      // Optional external restriction (e.g. "only this supplier's models") —
+      // opt-in only. Nothing dispatches this event unless a page explicitly
+      // wires it up, so every existing usage is completely unaffected.
+      let restrictedIds: Set<string> | null = null;
+      wrap.addEventListener('modelselect:restrict', ((e: CustomEvent) => {
+        const ids = e.detail?.productIds;
+        restrictedIds = Array.isArray(ids) ? new Set(ids) : null;
+        if (restrictedIds && hidden.value && !restrictedIds.has(hidden.value)) {
+          hidden.value = '';
+          input.value = '';
+          wrap.dispatchEvent(new CustomEvent('modelselect:change', { bubbles: true, detail: { product: null } }));
+        }
+      }) as EventListener);
 
       function highlight() {
         const optionEls = Array.from(menu!.querySelectorAll('.model-select__option'));
@@ -177,7 +190,8 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
 
       function filter(term: string) {
         const q = term.trim().toLowerCase();
-        const matches = !q ? products : products.filter((p) => p.model_name.toLowerCase().includes(q));
+        const pool = restrictedIds ? products.filter((p) => restrictedIds!.has(p.id)) : products;
+        const matches = !q ? pool : pool.filter((p) => p.model_name.toLowerCase().includes(q));
         render(matches);
       }
 

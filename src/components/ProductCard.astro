@@ -1,6 +1,6 @@
 ---
 import Figure from './Figure.astro';
-import { categoryMap, showDev } from '../data/site';
+import { showDev } from '../data/site';
 import { capacityBuckets } from '../data/catalog';
 
 interface Props {
@@ -23,8 +23,6 @@ const {
   slug, title, tagline, category, placeholder = true, image,
   location, productType, series, capacity, capacityMin, capacityMax, materials, dimensions,
 } = Astro.props;
-const cat = categoryMap[category];
-
 const primaryDimension = dimensions?.[0]?.value;
 const specLine = [productType, primaryDimension, capacity, materials?.[0]]
   .filter(Boolean)
@@ -51,18 +49,19 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
         note={image?.note}
         ratio="4 / 3"
         tone="mid"
+        fit="contain"
+        fixedRatio={true}
       />
       {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
     </div>
     <div class="pcard__body">
-      <span class="pcard__cat">{series ?? cat?.short ?? category}</span>
       <h3 class="pcard__title">{title}</h3>
       {specLine && <p class="pcard__specs">{specLine}</p>}
       <p class="pcard__tag">{tagline}</p>
     </div>
   </a>
   <div class="pcard__actions">
-    <a class="pcard__more" href={`/saunas/${slug}/`}>View Sauna</a>
+    <a class="pcard__more" href={`/saunas/${slug}/`}>Explore Model</a>
     <a class="pcard__quote" href="/quote/">Request a Quote</a>
   </div>
 </article>
@@ -91,31 +90,31 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     padding: 0.4rem 0.7rem;
   }
 
-  .pcard__body { padding-top: 1rem; }
+  .pcard__body { padding-top: 1.1rem; }
 
-  .pcard__cat {
-    display: block;
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--bronze-ink);
-    margin-bottom: 0.75rem;
+  .pcard__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 1.5rem + 0.7vw, 2.1rem); /* ~30-34px */
+    font-weight: 500;
+    line-height: 1.08;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
   }
 
-  .pcard__title { font-size: var(--t-h3); margin-bottom: 0.4rem; }
-
   .pcard__specs {
-    font-size: var(--t-small);
-    font-weight: 600;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
     color: var(--bronze-ink);
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.65rem;
   }
 
   .pcard__tag {
-    font-size: var(--t-small);
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 400;
     color: var(--muted);
-    line-height: 1.6;
+    line-height: 1.55;
     margin-bottom: 1rem;
   }
 
@@ -128,9 +127,10 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
   }
 
   .pcard__more {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
     text-decoration: none;
     color: inherit;
@@ -141,9 +141,11 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
   .pcard:hover .pcard__more { border-bottom-color: var(--ink); }
 
   .pcard__quote {
-    font-size: var(--t-small);
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     text-decoration: none;
     color: var(--bronze-ink);
     border-bottom: 1px solid transparent;

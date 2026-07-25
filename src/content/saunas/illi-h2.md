@@ -1,5 +1,5 @@
 ---
-title: "ILLI H2"
+title: "BUH-ILLI H2"
 category: "indoor"
 location: "indoor"
 productType: "Oval"

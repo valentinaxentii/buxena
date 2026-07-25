@@ -1,0 +1,118 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
+
+const ACTIVE_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
+
+const range = resolveDateRange(Astro.url.searchParams);
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase
+    .from('shipments')
+    .select('id, shipment_number, status, order_date, eta, total_units, total_product_cost, total_landed_cost, suppliers(name), shipment_items(quantity, quantity_received)')
+    .order('order_date', { ascending: false });
+  rows = (data ?? []).filter((r) => inRange(r.order_date, range));
+} catch {
+  dbReady = false;
+}
+
+function unitsOrdered(r: any): number { return (r.shipment_items ?? []).reduce((s: number, i: any) => s + (i.quantity ?? 0), 0); }
+function unitsReceived(r: any): number { return (r.shipment_items ?? []).reduce((s: number, i: any) => s + (i.quantity_received ?? 0), 0); }
+function isOverdue(r: any): boolean {
+  if (!r.eta || !ACTIVE_STATUSES.includes(r.status)) return false;
+  return r.eta < new Date().toISOString().slice(0, 10);
+}
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+if (Astro.url.searchParams.get('format') === 'csv') {
+  const csv = toCSV(
+    ['Shipment', 'Supplier', 'Status', 'Order Date', 'ETA', 'Units Ordered', 'Units Received', 'Product Cost', 'Landed Cost'],
+    rows.map((r) => [r.shipment_number, r.suppliers?.name, r.status, r.order_date, r.eta, unitsOrdered(r), unitsReceived(r), r.total_product_cost, r.total_landed_cost])
+  );
+  return new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="incoming-shipments-report.csv"' } });
+}
+
+const activeRows = rows.filter((r) => ACTIVE_STATUSES.includes(r.status));
+const totalIncomingUnits = activeRows.reduce((s, r) => s + Math.max(0, unitsOrdered(r) - unitsReceived(r)), 0);
+const totalIncomingProductCost = activeRows.reduce((s, r) => s + (r.total_product_cost ?? 0), 0);
+const totalLandedCost = activeRows.reduce((s, r) => s + (r.total_landed_cost ?? 0), 0);
+const overdueCount = rows.filter(isOverdue).length;
+
+const unitsBySupplier = new Map<string, number>();
+for (const r of activeRows) {
+  const name = r.suppliers?.name ?? 'Unspecified';
+  unitsBySupplier.set(name, (unitsBySupplier.get(name) ?? 0) + Math.max(0, unitsOrdered(r) - unitsReceived(r)));
+}
+const supplierBars = [...unitsBySupplier.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+const maxSupplierUnits = Math.max(1, ...supplierBars.map(([, v]) => v));
+---
+
+<AdminLayout title="Incoming Shipments Report" subtitle="Purchasing pipeline — what's ordered, in transit, or arriving.">
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/shipments?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
+
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <DateRangeFilter range={range} />
+
+  <div class="rpt-kpis">
+    <div class="rpt-kpi rpt-kpi--hero"><span class="rpt-kpi__value">{activeRows.length}</span><span class="rpt-kpi__label">Active Shipments</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{totalIncomingUnits}</span><span class="rpt-kpi__label">Total Incoming Units</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{money(totalIncomingProductCost)}</span><span class="rpt-kpi__label">Incoming Product Cost</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{money(totalLandedCost)}</span><span class="rpt-kpi__label">Total Landed Cost</span></div>
+    <div class="rpt-kpi"><span class="rpt-kpi__value">{overdueCount}</span><span class="rpt-kpi__label">Overdue</span></div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:minmax(0,1fr) 20rem; gap:1.5rem; align-items:start;">
+    <div class="admin-panel">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Shipment</th><th>Supplier</th><th>Status</th><th>ETA</th><th>Units</th><th>Received</th><th>Value</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr>
+                <td><a href={`/admin/shipments/${r.id}`}>{r.shipment_number || r.id.slice(0, 8)}</a></td>
+                <td>{r.suppliers?.name ?? '—'}</td>
+                <td><StatusBadge status={r.status} /></td>
+                <td>{r.eta || '—'}{isOverdue(r) && <strong style="color:#e08b73; margin-left:0.4rem;">Overdue</strong>}</td>
+                <td>{unitsOrdered(r)}</td>
+                <td>{unitsReceived(r)} / {unitsOrdered(r)}</td>
+                <td>{money(r.total_landed_cost)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {dbReady && rows.length === 0 && <p class="admin-empty">No shipments in this range.</p>}
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Incoming Units by Supplier</h2>
+      {supplierBars.length === 0 && <p class="admin-empty">No active shipments.</p>}
+      <div class="admin-bar-chart">
+        {supplierBars.map(([name, units]) => (
+          <div class="admin-bar-row" title={`${name}: ${units}`}>
+            <span class="admin-bar-row__label">{name}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(units / maxSupplierUnits) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{units}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</AdminLayout>

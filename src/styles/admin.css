@@ -21,12 +21,12 @@
 .admin-input,
 .admin-select {
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--admin-cream);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--admin-border);
-  border-radius: 2px;
-  padding: 0.55rem 0.75rem;
+  border-radius: 3px;
+  padding: 0.45rem 0.65rem;
 }
 .admin-input:focus,
 .admin-select:focus {
@@ -40,7 +40,7 @@
   align-items: center;
   gap: 0.5rem;
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -48,8 +48,8 @@
   color: var(--admin-bg);
   background: var(--admin-gold);
   border: 1px solid var(--admin-gold);
-  border-radius: 2px;
-  padding: 0.7rem 1.1rem;
+  border-radius: 3px;
+  padding: 0.5rem 0.9rem;
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
@@ -73,11 +73,11 @@
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 .admin-table th,
 .admin-table td {
-  padding: 0.85rem 1.1rem;
+  padding: 0.6rem 0.85rem;
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--admin-border);
@@ -94,47 +94,50 @@
 .admin-table a:hover { text-decoration: underline; }
 
 .admin-empty {
-  padding: 3rem 1.5rem;
+  padding: 2rem 1.25rem;
   text-align: center;
   color: var(--admin-muted);
   font-size: 0.9rem;
 }
 
+/* Same soft tint + outline language as .admin-pill, so the legacy list pages
+   read consistently with the compact design system — no solid bright chips. */
 .admin-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.3rem 0.6rem;
+  padding: 0.28rem 0.55rem;
   border-radius: 999px;
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.admin-badge--neutral { color: rgba(246, 242, 234, 0.75); background: rgba(255, 255, 255, 0.06); }
-.admin-badge--gold { color: #14120f; background: var(--admin-gold); }
-.admin-badge--green { color: #14120f; background: #8fbf8a; }
-.admin-badge--red { color: #14120f; background: #e08b73; }
-.admin-badge--blue { color: #14120f; background: #8fb4d9; }
+.admin-badge--neutral { color: rgba(246, 242, 234, 0.7); background: rgba(255, 255, 255, 0.05); border-color: var(--admin-border); }
+.admin-badge--gold { color: var(--admin-gold); background: rgba(201, 166, 104, 0.12); border-color: rgba(201, 166, 104, 0.35); }
+.admin-badge--green { color: #a9cfa4; background: rgba(143, 191, 138, 0.12); border-color: rgba(143, 191, 138, 0.35); }
+.admin-badge--red { color: #e0ab97; background: rgba(224, 139, 115, 0.12); border-color: rgba(224, 139, 115, 0.35); }
+.admin-badge--blue { color: #a6c3dd; background: rgba(143, 180, 217, 0.12); border-color: rgba(143, 180, 217, 0.35); }
 
 .admin-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
 }
 .admin-kpi {
-  padding: 1.25rem 1.4rem;
+  padding: 0.8rem 0.95rem;
   background: var(--admin-panel);
   border: 1px solid var(--admin-border);
   border-radius: 2px;
 }
 .admin-kpi__value {
   display: block;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 2.1rem;
+  font-size: 1.55rem;
+  font-weight: 600;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   color: var(--admin-cream);
 }
 .admin-kpi__label {
@@ -169,8 +172,9 @@
 }
 .admin-pipeline__count {
   display: block;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 1.6rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--admin-gold);
 }
 .admin-pipeline__label {
@@ -289,3 +293,103 @@
   text-transform: uppercase;
   color: var(--admin-muted);
 }
+
+/* Executive KPI cards — shared by /admin/reports/*. One designated "hero"
+   (light ivory) card per page is the intended pattern, everything else
+   stays dark; do not make every card cream. */
+.rpt-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
+}
+.rpt-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem 0.95rem;
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-border);
+  border-radius: 3px;
+}
+.rpt-kpi__label {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+.rpt-kpi__value {
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-cream);
+}
+.rpt-kpi__foot { font-size: 0.7rem; color: var(--admin-muted); }
+.rpt-kpi--hero { background: var(--admin-cream); border-color: var(--admin-cream); }
+.rpt-kpi--hero .rpt-kpi__value { color: var(--admin-bg); }
+.rpt-kpi--hero .rpt-kpi__label { color: rgba(20, 18, 15, 0.6); }
+.rpt-kpi--accent .rpt-kpi__value { color: var(--admin-gold); }
+
+.rpt-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.rpt-card {
+  display: block;
+  padding: 1rem 1.1rem;
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-border);
+  border-radius: 3px;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+.rpt-card:hover { border-color: var(--admin-gold); }
+.rpt-card__title {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--admin-cream);
+  margin-bottom: 0.4rem;
+}
+.rpt-card__desc { font-size: 0.82rem; color: var(--admin-muted); line-height: 1.5; }
+
+.rpt-note { font-size: 0.78rem; color: var(--admin-muted); margin: -1rem 0 1.75rem; }
+
+/* Shared status pill system — soft tint + outline, not a solid fill, reads
+   as editorial rather than a loud SaaS chip. Promoted from the Incoming
+   Inventory page so every list page can share one definition. */
+.admin-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.admin-pill--neutral { color: rgba(246, 242, 234, 0.7); background: rgba(255, 255, 255, 0.05); border-color: var(--admin-border); }
+.admin-pill--amber { color: var(--admin-gold); background: rgba(212, 184, 140, 0.12); border-color: rgba(212, 184, 140, 0.35); }
+.admin-pill--green { color: #a9cfa4; background: rgba(143, 191, 138, 0.12); border-color: rgba(143, 191, 138, 0.35); }
+.admin-pill--red { color: #e0ab97; background: rgba(224, 139, 115, 0.12); border-color: rgba(224, 139, 115, 0.35); }
+
+/* Shared filter-bar wrapper — a subtle warm-tinted strip around search +
+   filter controls, promoted from the Incoming Inventory page. */
+.admin-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.4rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(212, 184, 140, 0.035);
+  border: 1px solid var(--admin-border);
+  border-radius: 3px;
+}
+.admin-filterbar .admin-input,
+.admin-filterbar .admin-select { transition: border-color 0.15s ease; }
+.admin-filterbar .admin-input--search { flex: 1 1 14rem; min-width: 10rem; }

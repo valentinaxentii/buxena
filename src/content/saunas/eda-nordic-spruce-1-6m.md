@@ -1,5 +1,5 @@
 ---
-title: "EDA Nordic Spruce 1.6m"
+title: "BUH-EDA Nordic Spruce 1.6m"
 category: "barrel"
 location: "outdoor"
 productType: "Barrel"
