@@ -1,15 +1,276 @@
 ---
 export const prerender = false;
+
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const from = Astro.url.searchParams.get('from') ?? '';
+const to = Astro.url.searchParams.get('to') ?? '';
+
+let dbReady = true;
+
+let totalLeads = 0;
+let leadsBySource: [string, number][] = [];
+let leadsByStatus: [string, number][] = [];
+let salesPipelineValue = 0;
+
+let openQuotes = 0;
+let openQuoteValue = 0;
+let quoteConversionRate: number | null = null;
+
+let ordersByStatus: [string, number][] = [];
+let revenue = 0;
+let grossProfit = 0;
+let grossMarginPct: number | null = null;
+let averageOrderValue = 0;
+let bestSellingModels: [string, number][] = [];
+let salesBySupplier: [string, number][] = [];
+
+let mostRequestedModels: [string, number][] = [];
+
+let inventoryUnits = 0;
+let inventoryValue = 0;
+let incomingInventory = 0;
+let reservedInventory = 0;
+let availableInventory = 0;
+
+function groupCount<T>(rows: T[], keyFn: (r: T) => string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    const k = keyFn(r) || 'Unspecified';
+    out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+function groupSum<T>(rows: T[], keyFn: (r: T) => string, valFn: (r: T) => number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    const k = keyFn(r) || 'Unspecified';
+    out[k] = (out[k] ?? 0) + valFn(r);
+  }
+  return out;
+}
+function topEntries(obj: Record<string, number>, limit = 8): [string, number][] {
+  return Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, limit);
+}
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  let leadsQuery = supabase.from('leads').select('id, source, status, budget, product_id, created_at');
+  if (from) leadsQuery = leadsQuery.gte('created_at', from);
+  if (to) leadsQuery = leadsQuery.lte('created_at', `${to}T23:59:59`);
+
+  let quotesQuery = supabase.from('quotes').select('id, status, total, quote_date');
+  if (from) quotesQuery = quotesQuery.gte('quote_date', from);
+  if (to) quotesQuery = quotesQuery.lte('quote_date', to);
+
+  let ordersQuery = supabase
+    .from('orders_with_margin')
+    .select('id, status, selling_price, gross_profit, product_id, supplier_id, created_at');
+  if (from) ordersQuery = ordersQuery.gte('created_at', from);
+  if (to) ordersQuery = ordersQuery.lte('created_at', `${to}T23:59:59`);
+
+  const [leadsRes, quotesRes, ordersRes, productsRes, suppliersRes, inventoryRes] = await Promise.all([
+    leadsQuery.limit(5000),
+    quotesQuery.limit(5000),
+    ordersQuery.limit(5000),
+    supabase.from('products').select('id, model_name, cost'),
+    supabase.from('suppliers').select('id, name'),
+    supabase.from('inventory').select('in_stock, incoming, reserved, available, landed_cost, product_id'),
+  ]);
+
+  const leads = leadsRes.data ?? [];
+  const quotes = quotesRes.data ?? [];
+  const orders = ordersRes.data ?? [];
+  const products = productsRes.data ?? [];
+  const suppliers = suppliersRes.data ?? [];
+  const inventory = inventoryRes.data ?? [];
+
+  const productNames = new Map(products.map((p) => [p.id, p.model_name]));
+  const productCosts = new Map(products.map((p) => [p.id, Number(p.cost ?? 0)]));
+  const supplierNames = new Map(suppliers.map((s) => [s.id, s.name]));
+
+  // Leads
+  totalLeads = leads.length;
+  leadsBySource = topEntries(groupCount(leads, (l) => l.source || 'Unspecified'));
+  leadsByStatus = topEntries(groupCount(leads, (l) => l.status || 'Unspecified'));
+  salesPipelineValue = leads
+    .filter((l) => l.status !== 'Won' && l.status !== 'Lost')
+    .reduce((sum, l) => sum + Number(l.budget ?? 0), 0);
+  mostRequestedModels = topEntries(
+    groupCount(leads.filter((l) => l.product_id), (l) => productNames.get(l.product_id) ?? 'Unknown model')
+  );
+
+  // Quotes
+  const OPEN_QUOTE_STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating'];
+  const openQuoteRows = quotes.filter((q) => OPEN_QUOTE_STATUSES.includes(q.status));
+  openQuotes = openQuoteRows.length;
+  openQuoteValue = openQuoteRows.reduce((sum, q) => sum + Number(q.total ?? 0), 0);
+  const decidedQuotes = quotes.filter((q) => q.status !== 'Draft');
+  const acceptedQuotes = quotes.filter((q) => q.status === 'Accepted');
+  quoteConversionRate = decidedQuotes.length > 0 ? (acceptedQuotes.length / decidedQuotes.length) * 100 : null;
+
+  // Orders
+  ordersByStatus = topEntries(groupCount(orders, (o) => o.status || 'Unspecified'), 12);
+  const completedOrders = orders.filter((o) => o.status === 'Delivered' || o.status === 'Installed');
+  revenue = completedOrders.reduce((sum, o) => sum + Number(o.selling_price ?? 0), 0);
+  grossProfit = completedOrders.reduce((sum, o) => sum + Number(o.gross_profit ?? 0), 0);
+  grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : null;
+  averageOrderValue = orders.length > 0
+    ? orders.reduce((sum, o) => sum + Number(o.selling_price ?? 0), 0) / orders.length
+    : 0;
+  bestSellingModels = topEntries(
+    groupCount(orders.filter((o) => o.product_id), (o) => productNames.get(o.product_id) ?? 'Unknown model')
+  );
+  salesBySupplier = topEntries(
+    groupSum(orders, (o) => (o.supplier_id ? supplierNames.get(o.supplier_id) ?? 'Unknown supplier' : 'Unspecified'), (o) => Number(o.selling_price ?? 0))
+  );
+
+  // Inventory (current snapshot — not affected by the date range)
+  inventoryUnits = inventory.reduce((sum, i) => sum + Number(i.in_stock ?? 0), 0);
+  incomingInventory = inventory.reduce((sum, i) => sum + Number(i.incoming ?? 0), 0);
+  reservedInventory = inventory.reduce((sum, i) => sum + Number(i.reserved ?? 0), 0);
+  availableInventory = inventory.reduce((sum, i) => sum + Number(i.available ?? 0), 0);
+  inventoryValue = inventory.reduce((sum, i) => {
+    const unitCost = Number(i.landed_cost ?? productCosts.get(i.product_id) ?? 0);
+    return sum + Number(i.in_stock ?? 0) * unitCost;
+  }, 0);
+} catch {
+  dbReady = false;
+}
+
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+function pct(n: number | null): string {
+  return n == null ? '—' : `${n.toFixed(1)}%`;
+}
 ---
+
 <AdminLayout title="Analytics">
-  <div class="admin-placeholder">
-    <h2>Coming in Phase 2</h2>
-    <p>
-      Leads by source, leads by state, quote conversion, sales pipeline, most-requested models,
-      revenue and gross margin — all queryable from tables that already exist. The Dashboard
-      already shows a live pipeline breakdown; this page will go deeper.
-    </p>
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <form class="admin-filter-bar" method="GET">
+    <label>From<input class="admin-input" type="date" name="from" value={from} /></label>
+    <label>To<input class="admin-input" type="date" name="to" value={to} /></label>
+    <button class="admin-btn admin-btn--ghost" type="submit" style="align-self:flex-end;">Apply</button>
+    {(from || to) && <a class="admin-btn admin-btn--ghost" href="/admin/analytics" style="align-self:flex-end;">Clear</a>}
+  </form>
+
+  <div class="admin-kpis">
+    <div class="admin-kpi"><span class="admin-kpi__value">{totalLeads}</span><span class="admin-kpi__label">Total Leads</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{pct(quoteConversionRate)}</span><span class="admin-kpi__label">Quote Conversion Rate</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{openQuotes}</span><span class="admin-kpi__label">Open Quotes</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(openQuoteValue)}</span><span class="admin-kpi__label">Open Quote Value</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(salesPipelineValue)}</span><span class="admin-kpi__label">Sales Pipeline Value</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(revenue)}</span><span class="admin-kpi__label">Revenue</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(grossProfit)}</span><span class="admin-kpi__label">Gross Profit</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{pct(grossMarginPct)}</span><span class="admin-kpi__label">Gross Margin</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(averageOrderValue)}</span><span class="admin-kpi__label">Average Order Value</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{inventoryUnits}</span><span class="admin-kpi__label">Inventory Units</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{money(inventoryValue)}</span><span class="admin-kpi__label">Inventory Value</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{incomingInventory}</span><span class="admin-kpi__label">Incoming Inventory</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{reservedInventory}</span><span class="admin-kpi__label">Reserved Inventory</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{availableInventory}</span><span class="admin-kpi__label">Available Inventory</span></div>
+  </div>
+  <p style="margin:-1.25rem 0 2rem; font-size:0.78rem; color:var(--admin-muted);">
+    Inventory figures are a current snapshot and are not affected by the date range above. Quote
+    Conversion Rate = Accepted ÷ (all quotes except Draft). Revenue and Gross Profit count orders
+    with status Delivered or Installed only.
+  </p>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(20rem, 1fr)); gap:1.5rem;">
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Leads by Source</h2>
+      {leadsBySource.length === 0 && <p class="admin-empty">No leads in range.</p>}
+      <div class="admin-bar-chart">
+        {leadsBySource.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${value}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, leadsBySource[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Leads by Status</h2>
+      {leadsByStatus.length === 0 && <p class="admin-empty">No leads in range.</p>}
+      <div class="admin-bar-chart">
+        {leadsByStatus.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${value}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, leadsByStatus[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Orders by Status</h2>
+      {ordersByStatus.length === 0 && <p class="admin-empty">No orders in range.</p>}
+      <div class="admin-bar-chart">
+        {ordersByStatus.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${value}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, ordersByStatus[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Best-Selling Sauna Models</h2>
+      <p style="margin:-0.6rem 0 0.9rem; font-size:0.75rem; color:var(--admin-muted);">By order count, all statuses.</p>
+      {bestSellingModels.length === 0 && <p class="admin-empty">No orders in range.</p>}
+      <div class="admin-bar-chart">
+        {bestSellingModels.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${value}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, bestSellingModels[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Most-Requested Sauna Models</h2>
+      <p style="margin:-0.6rem 0 0.9rem; font-size:0.75rem; color:var(--admin-muted);">By lead interest, not sales.</p>
+      {mostRequestedModels.length === 0 && <p class="admin-empty">No leads in range.</p>}
+      <div class="admin-bar-chart">
+        {mostRequestedModels.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${value}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, mostRequestedModels[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="admin-panel" style="padding:1.25rem 1.4rem;">
+      <h2 class="admin-section-title">Sales by Supplier</h2>
+      {salesBySupplier.length === 0 && <p class="admin-empty">No orders in range.</p>}
+      <div class="admin-bar-chart">
+        {salesBySupplier.map(([label, value]) => (
+          <div class="admin-bar-row" title={`${label}: ${money(value)}`}>
+            <span class="admin-bar-row__label">{label}</span>
+            <span class="admin-bar-row__track"><span class="admin-bar-row__fill" style={`--pct:${(value / Math.max(1, salesBySupplier[0][1])) * 100}%`} /></span>
+            <span class="admin-bar-row__value">{money(value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   </div>
 </AdminLayout>

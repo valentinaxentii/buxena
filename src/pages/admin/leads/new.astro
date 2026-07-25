@@ -2,21 +2,25 @@
 export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
 
 const STATUSES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
-const SOURCES = ['Website', 'Instagram', 'Facebook', 'Google', 'Referral', 'Manual'];
 
 let products: any[] = [];
 let staff: any[] = [];
 let error: string | null = null;
+let SOURCES: string[] = FALLBACK_SETTINGS.lead_sources;
 
 try {
   const supabase = createSupabaseAdminClient();
+  const settings = await getSettings(supabase);
+  SOURCES = settings.lead_sources;
 
   const [productRows, staffRows] = await Promise.all([
-    supabase.from('products').select('id, model_name').order('model_name'),
+    supabase.from('products').select('id, model_name, heater_options').eq('is_active', true).order('model_name'),
     supabase.from('profiles').select('id, full_name'),
   ]);
   products = productRows.data ?? [];
@@ -72,10 +76,7 @@ try {
     </label>
     <label class="admin-field">
       <span>Sauna Model of Interest</span>
-      <select name="product_id">
-        <option value="">— none —</option>
-        {products.map((p) => <option value={p.id}>{p.model_name}</option>)}
-      </select>
+      <ModelSelect id="lead-product-select" name="product_id" products={products} />
     </label>
 
     <label class="admin-field">
@@ -88,7 +89,7 @@ try {
     </label>
     <label class="admin-field"><span>Budget (USD)</span><input type="number" step="0.01" name="budget" /></label>
 
-    <label class="admin-field"><span>Heater Preference</span><input type="text" name="heater_preference" /></label>
+    <label class="admin-field"><span>Heater Preference</span><input type="text" name="heater_preference" id="lead-heater-preference" /></label>
     <label class="admin-field"><span>Timeline</span><input type="text" name="timeline" placeholder="e.g. Within 3 months" /></label>
 
     <label class="admin-field"><span>Follow-Up Date</span><input type="date" name="follow_up_date" /></label>
@@ -124,3 +125,21 @@ try {
     border-radius: 2px;
   }
 </style>
+
+<script>
+  const productHidden = document.getElementById('lead-product-select') as HTMLInputElement | null;
+  const productWrap = productHidden?.closest('[data-model-select]');
+  const heaterInput = document.getElementById('lead-heater-preference') as HTMLInputElement | null;
+
+  productWrap?.addEventListener('modelselect:change', ((e: CustomEvent) => {
+    const product = e.detail?.product;
+    if (!product || !heaterInput) return;
+    if (heaterInput.value && !heaterInput.dataset.autofilled) return;
+    const heaterOptions = Array.isArray(product.heater_options) ? product.heater_options : [];
+    if (heaterOptions.length) {
+      heaterInput.value = heaterOptions[0];
+      heaterInput.dataset.autofilled = 'true';
+      heaterInput.addEventListener('input', () => { delete heaterInput.dataset.autofilled; }, { once: true });
+    }
+  }) as EventListener);
+</script>

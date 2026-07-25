@@ -1,16 +1,136 @@
 ---
 export const prerender = false;
+
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const STATUSES = [
+  'Deposit Received', 'Ordered', 'In Production', 'Shipped', 'At Port',
+  'Warehouse', 'Delivery Scheduled', 'Delivered', 'Installed',
+];
+
+const search = Astro.url.searchParams.get('q') ?? '';
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const sort = Astro.url.searchParams.get('sort') ?? 'created';
+const dir = Astro.url.searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
+
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  let query = supabase
+    .from('orders_with_margin')
+    .select('id, order_number, status, selling_price, deposit, balance, gross_margin_pct, eta, created_at, customer_id, product_id, customers(name), products(model_name)');
+
+  if (statusFilter) query = query.eq('status', statusFilter);
+
+  if (search) {
+    const [{ data: matchingCustomers }, { data: matchingOrders }] = await Promise.all([
+      supabase.from('customers').select('id').ilike('name', `%${search}%`),
+      supabase.from('orders').select('id').ilike('order_number', `%${search}%`),
+    ]);
+    const customerIds = (matchingCustomers ?? []).map((c) => c.id);
+    const orderIds = (matchingOrders ?? []).map((o) => o.id);
+    if (customerIds.length && orderIds.length) {
+      query = query.or(`customer_id.in.(${customerIds.join(',')}),id.in.(${orderIds.join(',')})`);
+    } else if (customerIds.length) {
+      query = query.in('customer_id', customerIds);
+    } else if (orderIds.length) {
+      query = query.in('id', orderIds);
+    } else {
+      query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+    }
+  }
+
+  const sortColumns: Record<string, string> = {
+    created: 'created_at', selling_price: 'selling_price', eta: 'eta', margin: 'gross_margin_pct',
+  };
+  query = query.order(sortColumns[sort] ?? 'created_at', { ascending: dir === 'asc' });
+
+  const { data } = await query.limit(300);
+  rows = data ?? [];
+} catch {
+  dbReady = false;
+}
+
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function sortHref(col: string): string {
+  const nextDir = sort === col && dir === 'desc' ? 'asc' : 'desc';
+  const params = new URLSearchParams();
+  if (search) params.set('q', search);
+  if (statusFilter) params.set('status', statusFilter);
+  params.set('sort', col);
+  params.set('dir', nextDir);
+  return `?${params.toString()}`;
+}
+function sortIndicator(col: string): string {
+  if (sort !== col) return '';
+  return dir === 'asc' ? ' ▲' : ' ▼';
+}
 ---
+
 <AdminLayout title="Orders">
-  <div class="admin-placeholder">
-    <h2>Coming in Phase 2</h2>
-    <p>
-      The <code>orders</code> table already exists — full workflow (Deposit Received → Ordered →
-      In Production → Shipped → At Port → Warehouse → Delivery Scheduled → Delivered → Installed)
-      plus landed cost / gross profit / gross margin, computed automatically. This screen isn't
-      built yet.
-    </p>
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search order # or customer…" value={search} />
+      <select class="admin-select" name="status">
+        <option value="">All statuses</option>
+        {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
+      </select>
+      <input type="hidden" name="sort" value={sort} />
+      <input type="hidden" name="dir" value={dir} />
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/orders/new">+ New Order</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Sauna Model</th>
+            <th>Status</th>
+            <th><a href={sortHref('selling_price')}>Selling Price{sortIndicator('selling_price')}</a></th>
+            <th>Deposit</th>
+            <th>Balance</th>
+            <th><a href={sortHref('margin')}>Gross Margin{sortIndicator('margin')}</a></th>
+            <th><a href={sortHref('eta')}>ETA{sortIndicator('eta')}</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr>
+              <td><a href={`/admin/orders/${row.id}`}>{row.order_number || row.id.slice(0, 8)}</a></td>
+              <td>{row.customers?.name ?? '—'}</td>
+              <td>{row.products?.model_name ?? '—'}</td>
+              <td><StatusBadge status={row.status} /></td>
+              <td>{money(row.selling_price)}</td>
+              <td>{money(row.deposit)}</td>
+              <td>{money(row.balance)}</td>
+              <td>{row.gross_margin_pct != null ? `${row.gross_margin_pct}%` : '—'}</td>
+              <td>{row.eta || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No orders yet.</p>}
   </div>
 </AdminLayout>

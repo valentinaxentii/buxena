@@ -252,6 +252,16 @@ drop trigger if exists trg_orders_updated_at on orders;
 create trigger trg_orders_updated_at before update on orders
   for each row execute function set_updated_at();
 
+-- Additive columns (2026-07-24 session) — nullable, no data/column changes.
+-- `eta` and `installation_status` already existed above; the rest of the
+-- shipping/install timeline didn't have a home yet.
+alter table orders add column if not exists production_completion_date date;
+alter table orders add column if not exists etd date;
+alter table orders add column if not exists port text;
+alter table orders add column if not exists warehouse text;
+alter table orders add column if not exists delivery_date date;
+alter table orders add column if not exists installation_date date;
+
 -- gross_margin_pct needs division, which `generated always as` allows, but
 -- guard the divide-by-zero case with a plain view column instead of a stored
 -- generated column (division by a generated column in the same row is fine).
@@ -303,6 +313,21 @@ create table if not exists documents (
   uploaded_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
+alter table documents add column if not exists notes text;
+
+-- Category list widened (2026-07-24 session) to cover Purchase Orders,
+-- Shipping Documents, job-level Installation Documents, and general Product
+-- Specifications, in addition to every category that already existed —
+-- purely additive, every previously-valid value is still valid.
+alter table documents drop constraint if exists documents_category_check;
+alter table documents add constraint documents_category_check check (
+  category in (
+    'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
+    'Product Specification', 'Electrical Specification', 'Warranty Document',
+    'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
+    'Customer Quote', 'Invoice'
+  )
+);
 
 -- ----------------------------------------------------------------------------
 -- activities — a simple timeline/audit trail against any lead/customer/etc.
@@ -319,6 +344,44 @@ create table if not exists activities (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_activities_entity on activities (entity_type, entity_id);
+
+-- ----------------------------------------------------------------------------
+-- settings — single-row business configuration (2026-07-24 session addition).
+-- `id` is pinned to 1 and checked, so there is always exactly one row: an
+-- upsert-by-id=1 pattern rather than a real multi-row table.
+-- ----------------------------------------------------------------------------
+create table if not exists settings (
+  id integer primary key default 1,
+  company_name text not null default 'BUXENA',
+  company_email text not null default 'info@buxena.com',
+  company_phone text,
+  company_address text,
+  company_website text default 'buxena.com',
+  pdf_tagline text not null default 'Where Wellness Starts',
+  currency text not null default 'USD',
+  default_tax_rate numeric(5,2) not null default 0,
+  default_quote_validity_days integer not null default 30,
+  default_deposit_percent numeric(5,2) not null default 50,
+  default_port text,
+  default_warehouse text,
+  quote_number_prefix text not null default 'Q-',
+  order_number_prefix text not null default 'O-',
+  lead_sources text[] not null default array['Website', 'Instagram', 'Facebook', 'Google', 'Referral', 'Manual'],
+  updated_at timestamptz not null default now(),
+  constraint settings_singleton check (id = 1)
+);
+insert into settings (id) values (1) on conflict (id) do nothing;
+drop trigger if exists trg_settings_updated_at on settings;
+create trigger trg_settings_updated_at before update on settings
+  for each row execute function set_updated_at();
+
+-- Lead sources are now configurable via the settings row above rather than a
+-- fixed list, so the old fixed-list CHECK constraint on leads.source is
+-- relaxed to allow any of the admin's configured sources. This only widens
+-- what's accepted — no existing leads rows or column types are touched, and
+-- every value that satisfied the old constraint still satisfies this one.
+alter table leads drop constraint if exists leads_source_check;
+alter table leads add constraint leads_source_check check (source is not null and length(trim(source)) > 0);
 
 -- ============================================================================
 -- Row Level Security
@@ -337,7 +400,8 @@ declare
 begin
   for t in select unnest(array[
     'profiles', 'suppliers', 'products', 'customers', 'leads', 'quotes',
-    'quote_items', 'inventory', 'orders', 'enquiries', 'documents', 'activities'
+    'quote_items', 'inventory', 'orders', 'enquiries', 'documents', 'activities',
+    'settings'
   ])
   loop
     execute format('alter table %I enable row level security', t);
@@ -368,3 +432,11 @@ grant all on all sequences in schema public to service_role;
 alter default privileges in schema public grant all on tables to service_role;
 alter default privileges in schema public grant select on tables to authenticated;
 alter default privileges in schema public grant all on sequences to service_role;
+
+-- Explicit per-table grant for the new `settings` table, in addition to the
+-- wildcard above — a prior session found the wildcard form didn't always
+-- take effect for a newly-added table (see HANDOFF.md), so this is the
+-- confirmed-working fallback applied proactively rather than after hitting
+-- the same "permission denied for table settings" error again.
+grant select, insert, update, delete on settings to service_role;
+grant select on settings to authenticated;

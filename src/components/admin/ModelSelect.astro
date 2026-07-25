@@ -1,0 +1,225 @@
+---
+export interface ModelSelectProduct {
+  id: string;
+  model_name: string;
+  [key: string]: unknown;
+}
+
+interface Props {
+  id: string;
+  name: string;
+  products: ModelSelectProduct[];
+  value?: string | null;
+  placeholder?: string;
+}
+
+const { id, name, products, value = '', placeholder = 'Search sauna models…' } = Astro.props;
+const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? null;
+---
+
+<div class="model-select" data-model-select>
+  <input
+    type="text"
+    class="model-select__input"
+    id={`${id}-input`}
+    role="combobox"
+    aria-expanded="false"
+    aria-autocomplete="list"
+    autocomplete="off"
+    placeholder={placeholder}
+    value={selected?.model_name ?? ''}
+  />
+  <input type="hidden" name={name} id={id} value={selected?.id ?? ''} data-model-select-value />
+  <div class="model-select__menu" id={`${id}-menu`} role="listbox" hidden></div>
+</div>
+<script type="application/json" data-model-select-data={id} set:html={JSON.stringify(products)} />
+
+<style>
+  .model-select {
+    position: relative;
+  }
+  .model-select__input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: var(--admin-cream);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 2px;
+    padding: 0.7rem 0.85rem;
+  }
+  .model-select__input:focus {
+    outline: none;
+    border-color: var(--admin-gold);
+  }
+  .model-select__menu {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 16rem;
+    overflow-y: auto;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  .model-select__option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: var(--admin-cream);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .model-select__option:hover,
+  .model-select__option--active {
+    background: rgba(212, 184, 140, 0.12);
+  }
+  .model-select__option--add {
+    color: var(--admin-gold);
+    border-top: 1px solid var(--admin-border);
+  }
+  .model-select__empty {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.8rem;
+    color: var(--admin-muted);
+  }
+</style>
+
+<script>
+  interface ModelSelectProduct {
+    id: string;
+    model_name: string;
+    [key: string]: unknown;
+  }
+
+  function initModelSelects() {
+    document.querySelectorAll<HTMLElement>('[data-model-select]:not([data-ms-ready])').forEach((wrap) => {
+      wrap.setAttribute('data-ms-ready', '1');
+      const input = wrap.querySelector<HTMLInputElement>('.model-select__input');
+      const hidden = wrap.querySelector<HTMLInputElement>('[data-model-select-value]');
+      const menu = wrap.querySelector<HTMLElement>('.model-select__menu');
+      if (!input || !hidden || !menu) return;
+
+      const dataScript = document.querySelector<HTMLScriptElement>(
+        `script[data-model-select-data="${hidden.id}"]`
+      );
+      let products: ModelSelectProduct[] = [];
+      try {
+        products = JSON.parse(dataScript?.textContent || '[]');
+      } catch {
+        products = [];
+      }
+      products.sort((a, b) => a.model_name.localeCompare(b.model_name));
+
+      let activeIndex = -1;
+      let currentMatches: ModelSelectProduct[] = [];
+
+      function highlight() {
+        const optionEls = Array.from(menu!.querySelectorAll('.model-select__option'));
+        optionEls.forEach((el, i) => el.classList.toggle('model-select__option--active', i === activeIndex));
+      }
+
+      function render(matches: ModelSelectProduct[]) {
+        currentMatches = matches;
+        activeIndex = -1;
+        menu!.innerHTML = '';
+        if (matches.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'model-select__empty';
+          empty.textContent = 'No matching sauna models.';
+          menu!.appendChild(empty);
+        }
+        matches.forEach((p) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'model-select__option';
+          btn.setAttribute('role', 'option');
+          btn.textContent = p.model_name;
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            select(p);
+          });
+          menu!.appendChild(btn);
+        });
+        const addLink = document.createElement('a');
+        addLink.href = '/admin/products/new';
+        addLink.target = '_blank';
+        addLink.rel = 'noopener';
+        addLink.className = 'model-select__option model-select__option--add';
+        addLink.textContent = '+ Add New Model';
+        menu!.appendChild(addLink);
+        open();
+      }
+
+      function open() {
+        menu!.hidden = false;
+        input!.setAttribute('aria-expanded', 'true');
+      }
+      function close() {
+        menu!.hidden = true;
+        input!.setAttribute('aria-expanded', 'false');
+      }
+
+      function select(product: ModelSelectProduct) {
+        hidden!.value = product.id;
+        input!.value = product.model_name;
+        close();
+        wrap.dispatchEvent(new CustomEvent('modelselect:change', { bubbles: true, detail: { product } }));
+      }
+
+      function filter(term: string) {
+        const q = term.trim().toLowerCase();
+        const matches = !q ? products : products.filter((p) => p.model_name.toLowerCase().includes(q));
+        render(matches);
+      }
+
+      input.addEventListener('focus', () => filter(input.value));
+      input.addEventListener('input', () => {
+        if (hidden.value) {
+          hidden.value = '';
+          wrap.dispatchEvent(new CustomEvent('modelselect:change', { bubbles: true, detail: { product: null } }));
+        }
+        filter(input.value);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (menu!.hidden) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeIndex = Math.min(activeIndex + 1, currentMatches.length - 1);
+          highlight();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIndex = Math.max(activeIndex - 1, 0);
+          highlight();
+        } else if (e.key === 'Enter') {
+          if (activeIndex >= 0 && currentMatches[activeIndex]) {
+            e.preventDefault();
+            select(currentMatches[activeIndex]);
+          }
+        } else if (e.key === 'Escape') {
+          close();
+        }
+      });
+      input.addEventListener('blur', () => {
+        const selectedProduct = products.find((p) => p.id === hidden.value);
+        input!.value = selectedProduct ? selectedProduct.model_name : '';
+        close();
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initModelSelects);
+  } else {
+    initModelSelects();
+  }
+  document.addEventListener('astro:page-load', initModelSelects);
+</script>

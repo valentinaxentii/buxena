@@ -1,0 +1,104 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
+
+let products: any[] = [];
+let suppliers: any[] = [];
+let error: string | null = null;
+let settings = FALLBACK_SETTINGS;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  settings = await getSettings(supabase);
+  const [productRows, supplierRows] = await Promise.all([
+    supabase.from('products').select('id, model_name, supplier_id, cost').eq('is_active', true).order('model_name'),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+  products = productRows.data ?? [];
+  suppliers = supplierRows.data ?? [];
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const payload = {
+      product_id: String(form.get('product_id') ?? '') || null,
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      in_stock: Number(form.get('in_stock') ?? 0) || 0,
+      incoming: Number(form.get('incoming') ?? 0) || 0,
+      reserved: Number(form.get('reserved') ?? 0) || 0,
+      container_number: String(form.get('container_number') ?? '') || null,
+      purchase_order: String(form.get('purchase_order') ?? '') || null,
+      eta: String(form.get('eta') ?? '') || null,
+      port: String(form.get('port') ?? '') || null,
+      warehouse: String(form.get('warehouse') ?? '') || null,
+      landed_cost: form.get('landed_cost') ? Number(form.get('landed_cost')) : null,
+    };
+    if (!payload.product_id) {
+      error = 'Sauna model is required.';
+    } else {
+      const { data: inserted, error: insertError } = await supabase.from('inventory').insert(payload).select('id').single();
+      if (insertError) error = insertError.message;
+      else return Astro.redirect(`/admin/inventory/${inserted.id}`);
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="Add Inventory">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form" method="POST">
+    <label class="admin-field"><span>Sauna Model *</span>
+      <ModelSelect id="inv-product-select" name="product_id" products={products} />
+    </label>
+    <label class="admin-field"><span>Supplier</span>
+      <select name="supplier_id" id="inv-supplier">
+        <option value="">— none —</option>
+        {suppliers.map((s) => <option value={s.id}>{s.name}</option>)}
+      </select>
+    </label>
+
+    <label class="admin-field"><span>In Stock</span><input type="number" name="in_stock" value="0" /></label>
+    <label class="admin-field"><span>Incoming</span><input type="number" name="incoming" value="0" /></label>
+    <label class="admin-field"><span>Reserved</span><input type="number" name="reserved" value="0" /></label>
+
+    <label class="admin-field"><span>Container / Shipment</span><input type="text" name="container_number" /></label>
+    <label class="admin-field"><span>Purchase Order</span><input type="text" name="purchase_order" /></label>
+    <label class="admin-field"><span>ETA</span><input type="date" name="eta" /></label>
+    <label class="admin-field"><span>Port</span><input type="text" name="port" value={settings.default_port ?? ''} /></label>
+    <label class="admin-field"><span>Warehouse</span><input type="text" name="warehouse" value={settings.default_warehouse ?? ''} /></label>
+    <label class="admin-field"><span>Landed Cost</span><input type="number" step="0.01" name="landed_cost" id="inv-landed-cost" /></label>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Add Inventory</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/inventory">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>
+
+<script>
+  const productHidden = document.getElementById('inv-product-select') as HTMLInputElement | null;
+  const productWrap = productHidden?.closest('[data-model-select]');
+  const supplierSelect = document.getElementById('inv-supplier') as HTMLSelectElement | null;
+
+  productWrap?.addEventListener('modelselect:change', ((e: CustomEvent) => {
+    const product = e.detail?.product;
+    if (!product || !supplierSelect) return;
+    if (supplierSelect.value && !supplierSelect.dataset.autofilled) return;
+    if (product.supplier_id && supplierSelect.querySelector(`option[value="${product.supplier_id}"]`)) {
+      supplierSelect.value = product.supplier_id;
+      supplierSelect.dataset.autofilled = 'true';
+      supplierSelect.addEventListener('change', () => { delete supplierSelect.dataset.autofilled; }, { once: true });
+    }
+  }) as EventListener);
+</script>

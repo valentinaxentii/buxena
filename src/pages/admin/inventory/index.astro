@@ -1,15 +1,152 @@
 ---
 export const prerender = false;
+
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const search = Astro.url.searchParams.get('q') ?? '';
+const supplierFilter = Astro.url.searchParams.get('supplier') ?? '';
+const sort = Astro.url.searchParams.get('sort') ?? 'model';
+const dir = Astro.url.searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+
+let rows: any[] = [];
+let suppliers: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  const { data: supplierRows } = await supabase.from('suppliers').select('id, name').order('name');
+  suppliers = supplierRows ?? [];
+
+  let query = supabase
+    .from('inventory')
+    .select(
+      'id, in_stock, incoming, reserved, available, container_number, purchase_order, eta, port, warehouse, landed_cost, product_id, supplier_id, products(model_name, cost, selling_price), suppliers(name)'
+    );
+
+  if (search) {
+    const { data: matchingProducts } = await supabase.from('products').select('id').ilike('model_name', `%${search}%`);
+    const ids = (matchingProducts ?? []).map((p) => p.id);
+    query = query.in('product_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000']);
+  }
+  if (supplierFilter) query = query.eq('supplier_id', supplierFilter);
+
+  const sortColumns: Record<string, string> = {
+    instock: 'in_stock',
+    incoming: 'incoming',
+    reserved: 'reserved',
+    available: 'available',
+    eta: 'eta',
+  };
+  if (sortColumns[sort]) query = query.order(sortColumns[sort], { ascending: dir === 'asc' });
+
+  const { data } = await query.limit(300);
+  rows = data ?? [];
+
+  if (sort === 'model') {
+    rows.sort((a, b) => {
+      const cmp = (a.products?.model_name ?? '').localeCompare(b.products?.model_name ?? '');
+      return dir === 'asc' ? cmp : -cmp;
+    });
+  }
+} catch {
+  dbReady = false;
+}
+
+function landedOrCost(row: any): number {
+  return Number(row.landed_cost ?? row.products?.cost ?? 0);
+}
+function inventoryValue(row: any): number {
+  return Number(row.in_stock ?? 0) * landedOrCost(row);
+}
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function sortHref(col: string): string {
+  const nextDir = sort === col && dir === 'asc' ? 'desc' : 'asc';
+  const params = new URLSearchParams();
+  if (search) params.set('q', search);
+  if (supplierFilter) params.set('supplier', supplierFilter);
+  params.set('sort', col);
+  params.set('dir', nextDir);
+  return `?${params.toString()}`;
+}
+function sortIndicator(col: string): string {
+  if (sort !== col) return '';
+  return dir === 'asc' ? ' ▲' : ' ▼';
+}
 ---
+
 <AdminLayout title="Inventory">
-  <div class="admin-placeholder">
-    <h2>Coming in Phase 2</h2>
-    <p>
-      The <code>inventory</code> table already exists (model, in stock, incoming, reserved,
-      available, supplier, container, PO, ETA, port, warehouse, landed cost) — this screen just
-      isn't built yet.
-    </p>
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search sauna model…" value={search} />
+      <select class="admin-select" name="supplier">
+        <option value="">All suppliers</option>
+        {suppliers.map((s) => <option value={s.id} selected={s.id === supplierFilter}>{s.name}</option>)}
+      </select>
+      <input type="hidden" name="sort" value={sort} />
+      <input type="hidden" name="dir" value={dir} />
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/inventory/new">+ Add Inventory</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th><a href={sortHref('model')}>Sauna Model{sortIndicator('model')}</a></th>
+            <th>Supplier</th>
+            <th><a href={sortHref('instock')}>In Stock{sortIndicator('instock')}</a></th>
+            <th><a href={sortHref('incoming')}>Incoming{sortIndicator('incoming')}</a></th>
+            <th><a href={sortHref('reserved')}>Reserved{sortIndicator('reserved')}</a></th>
+            <th><a href={sortHref('available')}>Available{sortIndicator('available')}</a></th>
+            <th>Container</th>
+            <th>PO</th>
+            <th><a href={sortHref('eta')}>ETA{sortIndicator('eta')}</a></th>
+            <th>Port</th>
+            <th>Warehouse</th>
+            <th>Product Cost</th>
+            <th>Landed Cost</th>
+            <th>Selling Price</th>
+            <th>Inventory Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr>
+              <td><a href={`/admin/inventory/${row.id}`}>{row.products?.model_name ?? '— unknown model —'}</a></td>
+              <td>{row.suppliers?.name ?? '—'}</td>
+              <td>{row.in_stock ?? 0}</td>
+              <td>{row.incoming ?? 0}</td>
+              <td>{row.reserved ?? 0}</td>
+              <td>{row.available ?? 0}</td>
+              <td>{row.container_number || '—'}</td>
+              <td>{row.purchase_order || '—'}</td>
+              <td>{row.eta || '—'}</td>
+              <td>{row.port || '—'}</td>
+              <td>{row.warehouse || '—'}</td>
+              <td>{money(row.products?.cost)}</td>
+              <td>{money(row.landed_cost)}</td>
+              <td>{money(row.products?.selling_price)}</td>
+              <td>{money(inventoryValue(row))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No inventory records yet.</p>}
   </div>
 </AdminLayout>

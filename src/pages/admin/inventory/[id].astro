@@ -1,0 +1,151 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const { id } = Astro.params;
+
+let record: any = null;
+let products: any[] = [];
+let suppliers: any[] = [];
+let error: string | null = null;
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? 'update');
+
+    if (intent === 'delete') {
+      await supabase.from('inventory').delete().eq('id', id);
+      return Astro.redirect('/admin/inventory');
+    }
+
+    const payload = {
+      product_id: String(form.get('product_id') ?? '') || null,
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      in_stock: Number(form.get('in_stock') ?? 0) || 0,
+      incoming: Number(form.get('incoming') ?? 0) || 0,
+      reserved: Number(form.get('reserved') ?? 0) || 0,
+      container_number: String(form.get('container_number') ?? '') || null,
+      purchase_order: String(form.get('purchase_order') ?? '') || null,
+      eta: String(form.get('eta') ?? '') || null,
+      port: String(form.get('port') ?? '') || null,
+      warehouse: String(form.get('warehouse') ?? '') || null,
+      landed_cost: form.get('landed_cost') ? Number(form.get('landed_cost')) : null,
+    };
+    const { error: updateError } = await supabase.from('inventory').update(payload).eq('id', id);
+    if (updateError) error = updateError.message;
+  }
+
+  const [recordRow, productRows, supplierRows] = await Promise.all([
+    supabase
+      .from('inventory')
+      .select('*, products(model_name, cost, selling_price)')
+      .eq('id', id)
+      .single(),
+    supabase.from('products').select('id, model_name, supplier_id, cost').eq('is_active', true).order('model_name'),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+
+  if (recordRow.error || !recordRow.data) notFound = true;
+  else record = recordRow.data;
+  products = productRows.data ?? [];
+  suppliers = supplierRows.data ?? [];
+
+  if (record?.product_id && !products.some((p) => p.id === record.product_id)) {
+    const { data: selectedProduct } = await supabase
+      .from('products')
+      .select('id, model_name, supplier_id, cost')
+      .eq('id', record.product_id)
+      .single();
+    if (selectedProduct) products = [selectedProduct, ...products];
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+---
+
+<AdminLayout title={record?.products?.model_name ?? 'Inventory'}>
+  {notFound && <p class="admin-empty">Inventory record not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {record && (
+    <>
+      <form class="admin-form" method="POST">
+        <label class="admin-field"><span>Sauna Model *</span>
+          <ModelSelect id="inv-product-select" name="product_id" products={products} value={record.product_id} />
+        </label>
+        <label class="admin-field"><span>Supplier</span>
+          <select name="supplier_id" id="inv-supplier">
+            <option value="">— none —</option>
+            {suppliers.map((s) => <option value={s.id} selected={s.id === record.supplier_id}>{s.name}</option>)}
+          </select>
+        </label>
+
+        <label class="admin-field"><span>In Stock</span><input type="number" name="in_stock" value={record.in_stock ?? 0} /></label>
+        <label class="admin-field"><span>Incoming</span><input type="number" name="incoming" value={record.incoming ?? 0} /></label>
+        <label class="admin-field"><span>Reserved</span><input type="number" name="reserved" value={record.reserved ?? 0} /></label>
+        <div class="admin-field">
+          <span>Available (computed)</span>
+          <p style="margin:0; padding:0.7rem 0.85rem; font-size:0.9rem; color:var(--admin-cream); background:rgba(255,255,255,0.03); border:1px solid var(--admin-border); border-radius:2px;">{record.available ?? 0}</p>
+        </div>
+
+        <label class="admin-field"><span>Container / Shipment</span><input type="text" name="container_number" value={record.container_number ?? ''} /></label>
+        <label class="admin-field"><span>Purchase Order</span><input type="text" name="purchase_order" value={record.purchase_order ?? ''} /></label>
+        <label class="admin-field"><span>ETA</span><input type="date" name="eta" value={record.eta ?? ''} /></label>
+        <label class="admin-field"><span>Port</span><input type="text" name="port" value={record.port ?? ''} /></label>
+        <label class="admin-field"><span>Warehouse</span><input type="text" name="warehouse" value={record.warehouse ?? ''} /></label>
+        <label class="admin-field"><span>Landed Cost</span><input type="number" step="0.01" name="landed_cost" id="inv-landed-cost" value={record.landed_cost ?? ''} /></label>
+
+        <div class="admin-form__full">
+          <p>
+            Product Cost: <strong>{money(record.products?.cost)}</strong> &nbsp;
+            Selling Price: <strong>{money(record.products?.selling_price)}</strong> &nbsp;
+            Inventory Value: <strong>{money(Number(record.in_stock ?? 0) * Number(record.landed_cost ?? record.products?.cost ?? 0))}</strong>
+          </p>
+        </div>
+
+        <div class="admin-form__actions">
+          <button class="admin-btn" type="submit">Save Changes</button>
+          <a class="admin-btn admin-btn--ghost" href="/admin/inventory">Back to Inventory</a>
+        </div>
+      </form>
+
+      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this inventory record? This cannot be undone.');">
+        <input type="hidden" name="_intent" value="delete" />
+        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Record</button>
+      </form>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+</style>
+
+<script>
+  const productHidden = document.getElementById('inv-product-select') as HTMLInputElement | null;
+  const productWrap = productHidden?.closest('[data-model-select]');
+  const supplierSelect = document.getElementById('inv-supplier') as HTMLSelectElement | null;
+
+  productWrap?.addEventListener('modelselect:change', ((e: CustomEvent) => {
+    const product = e.detail?.product;
+    if (!product || !supplierSelect) return;
+    if (supplierSelect.value && !supplierSelect.dataset.autofilled) return;
+    if (product.supplier_id && supplierSelect.querySelector(`option[value="${product.supplier_id}"]`)) {
+      supplierSelect.value = product.supplier_id;
+      supplierSelect.dataset.autofilled = 'true';
+      supplierSelect.addEventListener('change', () => { delete supplierSelect.dataset.autofilled; }, { once: true });
+    }
+  }) as EventListener);
+</script>

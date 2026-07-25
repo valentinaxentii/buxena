@@ -56,6 +56,153 @@ choice, not assumed): **one shared admin login** (not per-person accounts
 yet), and it's fine for Phase 2 sections to start as protected placeholders
 rather than full CRUD.
 
+## Session update — 2026-07-25 (same day, continued)
+
+Immediately following the batch above, the user asked to finish the entire
+admin system in one pass: real Orders shipping/install fields, real
+Analytics, real Documents, real Settings, and a full placeholder sweep. All
+done, build (`npm run build`) and `npx astro check` both clean except for
+61 pre-existing type errors in the **public site's** `saunas/*` pages
+(implicit-`any` params) — confirmed via `git status` to be files this
+session never touched, not a regression.
+
+**Database changes — you need to re-run `supabase/schema.sql` in the
+Supabase SQL editor.** It's still fully idempotent (every statement is
+`if not exists` / safe to re-run), but this session added real schema, not
+just app code:
+- `orders`: 6 new nullable columns — `production_completion_date`, `etd`,
+  `port`, `warehouse`, `delivery_date`, `installation_date`. (`eta` and
+  `installation_status` already existed.)
+- `documents`: new nullable `notes` column, plus the `category` CHECK
+  constraint widened to add Purchase Order / Shipping Document /
+  Installation Document / Product Specification — every previously-valid
+  category value is still valid.
+- **New `settings` table** — a singleton row (`id` pinned to 1) holding
+  company info, PDF tagline, currency, default tax rate, default quote
+  validity days, default deposit %, default port/warehouse, quote/order
+  number prefixes, and the lead-sources list. `src/lib/settings.ts`'s
+  `getSettings()` reads it with a hardcoded fallback if the table/row is
+  missing, so no page crashes if you haven't re-run the schema yet.
+  Explicit per-table grant added proactively (see the grants gotcha above).
+- **`leads.source` CHECK constraint relaxed** — it used to whitelist exactly
+  6 hardcoded values; now it just requires non-empty text, because Lead
+  Sources is a Settings-managed list now (`settings.lead_sources`), not a
+  fixed enum. This was a deliberate, disclosed change, not an accidental
+  side effect — flagged to the user in the same turn it was made.
+
+**What got wired to Settings** (i.e. no longer hardcoded): quote/order
+number prefixes (`Q-`/`O-` were literals, now `settings.quote_number_prefix`/
+`order_number_prefix`), quote default tax rate + expiry-date-from-validity-
+days, order default deposit % (used when converting an accepted quote),
+default Port/Warehouse prefill on Inventory and Orders forms, and the PDF
+generator's company name/email/website/tagline/currency (was hardcoded
+'BUXENA'/'info@buxena.com'/'buxena.com'/'Where Wellness Starts'/USD
+throughout `src/lib/pdf/build-quote-pdf.ts`).
+
+**Real pages, not placeholders, as of this session**: Inventory, Orders
+(now with the full shipping/install timeline), Analytics (14 live KPI tiles
++ 6 bar-chart breakdowns, date-range filter, zero mock data), Documents
+(real CRUD, category/search filters, linked-record display — file *storage*
+is explicitly not configured, see the callout on that page itself), and
+Settings (editable, persisted to the new table). The sidebar's "Phase 2" nav
+group label is gone too — one flat nav list now (`src/layouts/AdminLayout.astro`).
+
+**Genuinely still not done, disclosed rather than faked**: Documents file
+*upload* (no Supabase Storage bucket exists — the page explains exactly what
+config step is missing), email notifications on new leads/enquiries, the
+public `/quote/` form still isn't wired into `enquiries`, and
+roles/permissions beyond the one shared login.
+
+## Session update — 2026-07-24
+
+Picking up after Phase 1 sign-in verification, the user drove a rapid-fire
+batch of Phase 2 feature requests in one sitting (pasted from another AI
+conversation). Built, in order, all verified via `npm run build` + route
+smoke tests (dev server was already running locally with real Supabase data
+during this session — products table was confirmed empty at the start):
+
+1. **Sauna Model dropdown fix** (`src/pages/admin/quotes/new.astro`) — now
+   filters `is_active = true`, sorted alphabetically, shows "No sauna models
+   available" instead of a bare "— none —" when the table is empty.
+2. **Real PDF Quote generator** — `src/lib/pdf/build-quote-pdf.ts` (pdf-lib,
+   not pdfkit — deliberately chosen because pdfkit reads AFM font files off
+   disk at runtime, which is fragile inside bundled serverless functions;
+   pdf-lib's standard-14 fonts are pure JS, no runtime file reads, verified
+   bundle-safe in the Netlify function build). 6-page branded proposal
+   (cover, selected sauna, configuration, investment/pricing table, delivery
+   & installation, warranty & terms), BUXENA cream/charcoal/gold styling,
+   logo embedded as a base64 constant (`src/lib/pdf/logo-base64.ts`, from
+   `public/brand/buxena-logo-espresso.png`) so nothing reads from disk at
+   request time. Served from `src/pages/admin/quotes/[id]/pdf.ts` (GET,
+   under `/admin/*` so the existing middleware auth-gates it — deliberately
+   *not* under `/api/*`, which is unauthenticated by convention here).
+   Button on the quote detail page is only enabled once customer + sauna
+   model + at least one line item exist; otherwise it's disabled with a
+   visible "Add X, Y to enable PDF generation" note. **Known content
+   caveat**: warranty summary, payment terms, and delivery/site-readiness
+   copy are static placeholder boilerplate (`WARRANTY_SUMMARY`,
+   `PAYMENT_TERMS`, `TIMELINE_NOTES`, `SITE_READINESS_NOTES` constants at
+   the top of `build-quote-pdf.ts`) — no real warranty duration or deposit
+   percentage exists anywhere in the system, so nothing was fabricated;
+   these are the first thing to edit once real terms are decided.
+   **Gotcha hit and fixed**: pdf-lib's WinAnsi encoding cannot render the
+   Unicode minus sign `−` (U+2212) — only plain hyphen `-` (U+002D). Any new
+   text in this file must stick to WinAnsi-safe characters (smart quotes,
+   em/en dashes, and `×` are fine; math minus is not).
+3. **Reusable model-selector component** — `src/components/admin/ModelSelect.astro`.
+   A vanilla-JS (no framework) searchable combobox: type-to-filter over
+   active products sorted alphabetically, a hidden input carries the real
+   `product_id`, an always-visible "+ Add New Model" row opens
+   `/admin/products/new` in a new tab, never writes to `products` itself
+   (so it can't create duplicates). Dispatches a bubbling
+   `modelselect:change` CustomEvent with `{ product }` in its detail: each
+   consuming page owns its own autofill logic, tracking a per-field
+   `data-autofilled` flag so a model swap never clobbers a value the admin
+   typed by hand. Wired into the only four forms that actually reference a
+   sauna model today: Quotes new/edit and Leads new/edit. Products' own
+   "Model Name" field stays plain text, since that's where a model is first
+   created.
+4. **Real Inventory page** (`src/pages/admin/inventory/{index,new,[id]}.astro`) —
+   replaces the Phase 2 placeholder. List has search (by model name),
+   supplier filter, sortable columns, computed Inventory Value
+   (`in_stock × landed_cost`, falling back to product cost if no landed
+   cost recorded yet). Add/edit forms use ModelSelect and auto-fill
+   Supplier from the product's `supplier_id`. "Available" is never a form
+   field — it's the DB's generated column (`in_stock - reserved`), shown
+   read-only.
+5. **Real Orders page** (`src/pages/admin/orders/{index,new,[id]}.astro`) —
+   replaces the Phase 2 placeholder. Full workflow status, cost breakdown
+   (product/freight/customs/port/inland/warehouse/installation/other) with
+   a live client-side landed-cost/margin preview mirroring the DB's
+   generated `landed_cost`/`gross_profit` columns (list/detail read from
+   the existing `orders_with_margin` view for `gross_margin_pct`). An
+   Accepted quote now shows a **Convert to Order** button
+   (`/admin/orders/new?from_quote=<id>`) that prefills customer, product,
+   heater, and selling price from the quote — becomes **View Order** once
+   converted (checked via `orders.quote_id`, so it can't double-convert).
+   Creating an order reserves one unit against the product's inventory row
+   with the most availability (`src/lib/inventory-reservation.ts`);
+   deleting an order releases it. **Deliberately scoped to "one order = one
+   unit"** — there's no quantity column on `orders`, so this matches the
+   schema as built rather than inventing one.
+
+**Schema gap flagged, not silently resolved**: the user's Orders request
+asked for Production Completion Date, ETD, Port, Warehouse, Delivery Date,
+and Installation Date as order fields. None of those columns exist on
+`orders` (`supabase/schema.sql`) — Port/Warehouse exist only on `inventory`.
+Per the user's own "do not redesign the database unnecessarily" instruction
+(said about Inventory, applied here too), these were **not** added as new
+columns and **not** faked with placeholder values — they're just absent
+from the Orders form. This needs an explicit decision (a migration) before
+it can be built, same category of decision as the email-notification
+provider below.
+
+**Audited but intentionally left alone**: Documents, Analytics, and
+Settings are still real "Coming in Phase 2" placeholders
+(`src/pages/admin/{documents,analytics,settings}/index.astro`) — the user
+asked for and got a full audit of every such placeholder mid-session but
+has not yet asked for these three to be built.
+
 ## Where things actually stand right now
 
 **Phase 1 is built and locally verified working, end-to-end, against a real

@@ -1,0 +1,229 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { reserveInventoryUnit } from '../../../lib/inventory-reservation';
+import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
+
+const STATUSES = [
+  'Deposit Received', 'Ordered', 'In Production', 'Shipped', 'At Port',
+  'Warehouse', 'Delivery Scheduled', 'Delivered', 'Installed',
+];
+const INSTALLATION_STATUSES = ['Not Started', 'Scheduled', 'In Progress', 'Completed'];
+
+const fromQuoteId = Astro.url.searchParams.get('from_quote');
+
+let customers: any[] = [];
+let products: any[] = [];
+let suppliers: any[] = [];
+let prefill: any = null;
+let error: string | null = null;
+let settings = FALLBACK_SETTINGS;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  settings = await getSettings(supabase);
+  const [customerRows, productRows, supplierRows] = await Promise.all([
+    supabase.from('customers').select('id, name').order('name'),
+    supabase.from('products').select('id, model_name, supplier_id, cost').eq('is_active', true).order('model_name'),
+    supabase.from('suppliers').select('id, name').order('name'),
+  ]);
+  customers = customerRows.data ?? [];
+  products = productRows.data ?? [];
+  suppliers = supplierRows.data ?? [];
+
+  if (fromQuoteId) {
+    const { data: quote } = await supabase.from('quotes').select('*').eq('id', fromQuoteId).single();
+    if (quote) prefill = quote;
+  }
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const accessories = String(form.get('accessories') ?? '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+
+    const payload = {
+      order_number: `${settings.order_number_prefix}${Date.now().toString(36).toUpperCase()}`,
+      customer_id: String(form.get('customer_id') ?? '') || null,
+      quote_id: String(form.get('quote_id') ?? '') || null,
+      product_id: String(form.get('product_id') ?? '') || null,
+      supplier_id: String(form.get('supplier_id') ?? '') || null,
+      heater: String(form.get('heater') ?? '') || null,
+      accessories: accessories.length ? accessories : null,
+      selling_price: Number(form.get('selling_price') ?? 0) || 0,
+      deposit: Number(form.get('deposit') ?? 0) || 0,
+      balance: Number(form.get('balance') ?? 0) || 0,
+      purchase_order: String(form.get('purchase_order') ?? '') || null,
+      container_number: String(form.get('container_number') ?? '') || null,
+      production_completion_date: String(form.get('production_completion_date') ?? '') || null,
+      etd: String(form.get('etd') ?? '') || null,
+      eta: String(form.get('eta') ?? '') || null,
+      port: String(form.get('port') ?? '') || null,
+      warehouse: String(form.get('warehouse') ?? '') || null,
+      delivery_address: String(form.get('delivery_address') ?? '') || null,
+      delivery_date: String(form.get('delivery_date') ?? '') || null,
+      installation_status: String(form.get('installation_status') ?? '') || null,
+      installation_date: String(form.get('installation_date') ?? '') || null,
+      status: String(form.get('status') ?? 'Deposit Received'),
+      notes: String(form.get('notes') ?? '') || null,
+      product_cost: Number(form.get('product_cost') ?? 0) || 0,
+      ocean_freight: Number(form.get('ocean_freight') ?? 0) || 0,
+      customs_duty: Number(form.get('customs_duty') ?? 0) || 0,
+      port_handling: Number(form.get('port_handling') ?? 0) || 0,
+      inland_delivery: Number(form.get('inland_delivery') ?? 0) || 0,
+      warehouse_cost: Number(form.get('warehouse_cost') ?? 0) || 0,
+      installation_cost: Number(form.get('installation_cost') ?? 0) || 0,
+      other_cost: Number(form.get('other_cost') ?? 0) || 0,
+    };
+
+    if (!payload.customer_id) {
+      error = 'Customer is required.';
+    } else {
+      const { data: inserted, error: insertError } = await supabase.from('orders').insert(payload).select('id').single();
+      if (insertError) {
+        error = insertError.message;
+      } else {
+        await reserveInventoryUnit(supabase, payload.product_id);
+        return Astro.redirect(`/admin/orders/${inserted.id}`);
+      }
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="New Order">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form" method="POST">
+    {prefill && <input type="hidden" name="quote_id" value={prefill.id} />}
+
+    <label class="admin-field"><span>Customer *</span>
+      <select name="customer_id" required>
+        <option value="">— select —</option>
+        {customers.map((c) => <option value={c.id} selected={c.id === prefill?.customer_id}>{c.name}</option>)}
+      </select>
+    </label>
+    <label class="admin-field"><span>Sauna Model</span>
+      <ModelSelect id="order-product-select" name="product_id" products={products} value={prefill?.product_id ?? ''} />
+    </label>
+    <label class="admin-field"><span>Supplier</span>
+      <select name="supplier_id" id="order-supplier">
+        <option value="">— none —</option>
+        {suppliers.map((s) => <option value={s.id}>{s.name}</option>)}
+      </select>
+    </label>
+    <label class="admin-field"><span>Heater</span><input type="text" name="heater" value={prefill?.heater ?? ''} /></label>
+    <label class="admin-field admin-form__full"><span>Accessories (comma-separated)</span><input type="text" name="accessories" /></label>
+
+    <label class="admin-field"><span>Selling Price</span><input type="number" step="0.01" name="selling_price" id="order-selling-price" value={prefill?.total ?? 0} /></label>
+    <label class="admin-field"><span>Deposit Received</span><input type="number" step="0.01" name="deposit" id="order-deposit" value={prefill ? Number((Number(prefill.total ?? 0) * settings.default_deposit_percent / 100).toFixed(2)) : 0} /></label>
+    <label class="admin-field"><span>Balance Due</span><input type="number" step="0.01" name="balance" id="order-balance" value="0" /></label>
+
+    <label class="admin-field"><span>Status</span>
+      <select name="status">{STATUSES.map((s) => <option value={s}>{s}</option>)}</select>
+    </label>
+    <label class="admin-field"><span>Purchase Order</span><input type="text" name="purchase_order" /></label>
+    <label class="admin-field"><span>Container / Shipment</span><input type="text" name="container_number" /></label>
+    <label class="admin-field"><span>Production Completion Date</span><input type="date" name="production_completion_date" /></label>
+    <label class="admin-field"><span>ETD</span><input type="date" name="etd" /></label>
+    <label class="admin-field"><span>ETA</span><input type="date" name="eta" /></label>
+    <label class="admin-field"><span>Port</span><input type="text" name="port" value={settings.default_port ?? ''} /></label>
+    <label class="admin-field"><span>Warehouse</span><input type="text" name="warehouse" value={settings.default_warehouse ?? ''} /></label>
+    <label class="admin-field admin-form__full"><span>Delivery Address</span><input type="text" name="delivery_address" /></label>
+    <label class="admin-field"><span>Delivery Date</span><input type="date" name="delivery_date" /></label>
+    <label class="admin-field"><span>Installation Status</span>
+      <select name="installation_status">{INSTALLATION_STATUSES.map((s) => <option value={s}>{s}</option>)}</select>
+    </label>
+    <label class="admin-field"><span>Installation Date</span><input type="date" name="installation_date" /></label>
+
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+
+    <div class="admin-form__full">
+      <h2 class="admin-section-title" style="margin-top:1rem;">Landed Cost Breakdown</h2>
+    </div>
+    <label class="admin-field"><span>Product Cost</span><input type="number" step="0.01" name="product_cost" class="cost-input" value={0} /></label>
+    <label class="admin-field"><span>Ocean Freight</span><input type="number" step="0.01" name="ocean_freight" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Customs / Duty</span><input type="number" step="0.01" name="customs_duty" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Port Handling</span><input type="number" step="0.01" name="port_handling" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Inland Delivery</span><input type="number" step="0.01" name="inland_delivery" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Warehouse Cost</span><input type="number" step="0.01" name="warehouse_cost" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Installation Cost</span><input type="number" step="0.01" name="installation_cost" class="cost-input" value="0" /></label>
+    <label class="admin-field"><span>Other Cost</span><input type="number" step="0.01" name="other_cost" class="cost-input" value="0" /></label>
+
+    <div class="admin-form__full" id="margin-preview">
+      <p>Landed Cost: <strong id="landed-cost-out">$0.00</strong> &nbsp; Gross Profit: <strong id="gross-profit-out">$0.00</strong> &nbsp; Gross Margin: <strong id="gross-margin-out">—</strong></p>
+    </div>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Create Order</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/orders">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  #margin-preview p { margin: 0; font-size: 0.9rem; color: var(--admin-muted); }
+</style>
+
+<script>
+  const productHidden = document.getElementById('order-product-select') as HTMLInputElement | null;
+  const productWrap = productHidden?.closest('[data-model-select]');
+  const supplierSelect = document.getElementById('order-supplier') as HTMLSelectElement | null;
+
+  productWrap?.addEventListener('modelselect:change', ((e: CustomEvent) => {
+    const product = e.detail?.product;
+    if (!product || !supplierSelect) return;
+    if (supplierSelect.value && !supplierSelect.dataset.autofilled) return;
+    if (product.supplier_id && supplierSelect.querySelector(`option[value="${product.supplier_id}"]`)) {
+      supplierSelect.value = product.supplier_id;
+      supplierSelect.dataset.autofilled = 'true';
+      supplierSelect.addEventListener('change', () => { delete supplierSelect.dataset.autofilled; }, { once: true });
+    }
+    const productCostInput = document.querySelector('input[name="product_cost"]') as HTMLInputElement | null;
+    if (productCostInput && (!productCostInput.value || productCostInput.value === '0') && product.cost) {
+      productCostInput.value = String(product.cost);
+      recalcMargin();
+    }
+  }) as EventListener);
+
+  const sellingPriceInput = document.getElementById('order-selling-price') as HTMLInputElement | null;
+  const depositInput = document.getElementById('order-deposit') as HTMLInputElement | null;
+  const balanceInput = document.getElementById('order-balance') as HTMLInputElement | null;
+
+  function recalcBalance() {
+    const selling = parseFloat(sellingPriceInput?.value || '0') || 0;
+    const deposit = parseFloat(depositInput?.value || '0') || 0;
+    if (balanceInput) balanceInput.value = Math.max(0, selling - deposit).toFixed(2);
+  }
+  sellingPriceInput?.addEventListener('input', recalcBalance);
+  depositInput?.addEventListener('input', recalcBalance);
+
+  function money(n: number): string {
+    return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function recalcMargin() {
+    const costFields = ['product_cost', 'ocean_freight', 'customs_duty', 'port_handling', 'inland_delivery', 'warehouse_cost', 'installation_cost', 'other_cost'];
+    let landedCost = 0;
+    costFields.forEach((name) => {
+      const el = document.querySelector(`[name="${name}"]`) as HTMLInputElement | null;
+      landedCost += parseFloat(el?.value || '0') || 0;
+    });
+    const selling = parseFloat(sellingPriceInput?.value || '0') || 0;
+    const grossProfit = selling - landedCost;
+    const margin = selling > 0 ? (grossProfit / selling) * 100 : null;
+
+    document.getElementById('landed-cost-out')!.textContent = money(landedCost);
+    document.getElementById('gross-profit-out')!.textContent = money(grossProfit);
+    document.getElementById('gross-margin-out')!.textContent = margin == null ? '—' : `${margin.toFixed(2)}%`;
+  }
+  document.querySelectorAll('.cost-input').forEach((el) => el.addEventListener('input', recalcMargin));
+  sellingPriceInput?.addEventListener('input', recalcMargin);
+  recalcMargin();
+</script>

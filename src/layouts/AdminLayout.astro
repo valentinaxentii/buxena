@@ -10,14 +10,12 @@ const { title, staffEmail } = Astro.props;
 const path = Astro.url.pathname;
 const isActive = (href: string) => path === href || (href !== '/admin' && path.startsWith(href));
 
-const phase1 = [
+const navItems = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/leads', label: 'Leads' },
   { href: '/admin/customers', label: 'Customers' },
   { href: '/admin/quotes', label: 'Quotes' },
   { href: '/admin/products', label: 'Products' },
-];
-const phase2 = [
   { href: '/admin/inventory', label: 'Inventory' },
   { href: '/admin/orders', label: 'Orders' },
   { href: '/admin/enquiries', label: 'Enquiries' },
@@ -49,16 +47,7 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
 
         <nav class="nav">
           <ul>
-            {phase1.map((item) => (
-              <li>
-                <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
-              </li>
-            ))}
-          </ul>
-
-          <p class="nav__group-label">Phase 2</p>
-          <ul>
-            {phase2.map((item) => (
+            {navItems.map((item) => (
               <li>
                 <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
               </li>
@@ -144,15 +133,6 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
   .nav a:hover { color: var(--admin-cream); background: rgba(255, 255, 255, 0.03); }
   .nav a[aria-current='page'] { color: var(--admin-bg); background: var(--admin-gold); }
 
-  .nav__group-label {
-    margin: 0.9rem 0.6rem 0.35rem;
-    font-size: 0.65rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(246, 242, 234, 0.35);
-  }
-
   .account {
     margin-top: auto;
     padding-top: 1.25rem;
@@ -206,7 +186,6 @@ const settingsItem = { href: '/admin/settings', label: 'Settings' };
     .brand img { max-width: 5rem; }
     .nav { flex-direction: row; flex-wrap: wrap; }
     .nav ul { flex-direction: row; flex-wrap: wrap; }
-    .nav__group-label { display: none; }
     .account { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; flex-direction: row; align-items: center; }
     .account__email { display: none; }
   }

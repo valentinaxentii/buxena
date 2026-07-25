@@ -1,15 +1,103 @@
 ---
 export const prerender = false;
+
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const CATEGORIES = [
+  'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
+  'Product Specification', 'Electrical Specification', 'Warranty Document',
+  'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
+  'Customer Quote', 'Invoice',
+];
+
+const search = Astro.url.searchParams.get('q') ?? '';
+const categoryFilter = Astro.url.searchParams.get('category') ?? '';
+
+let rows: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  let query = supabase
+    .from('documents')
+    .select(
+      'id, category, file_name, file_url, notes, created_at, customers(name), suppliers(name), products(model_name), quotes(quote_number), orders(order_number)'
+    )
+    .order('created_at', { ascending: false });
+
+  if (categoryFilter) query = query.eq('category', categoryFilter);
+  if (search) query = query.ilike('file_name', `%${search}%`);
+
+  const { data } = await query.limit(300);
+  rows = data ?? [];
+} catch {
+  dbReady = false;
+}
+
+function relatedTo(row: any): string {
+  if (row.customers?.name) return `Customer: ${row.customers.name}`;
+  if (row.suppliers?.name) return `Supplier: ${row.suppliers.name}`;
+  if (row.products?.model_name) return `Product: ${row.products.model_name}`;
+  if (row.quotes?.quote_number) return `Quote: ${row.quotes.quote_number}`;
+  if (row.orders?.order_number) return `Order: ${row.orders.order_number}`;
+  return '—';
+}
 ---
+
 <AdminLayout title="Documents">
-  <div class="admin-placeholder">
-    <h2>Coming in Phase 2</h2>
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-placeholder" style="margin-bottom: 1.5rem; text-align:left; padding: 1.25rem 1.5rem;">
+    <h2 style="margin-bottom:0.4rem;">File storage isn't configured yet</h2>
     <p>
-      The <code>documents</code> table exists (category, file reference, and optional links to a
-      supplier, customer, product, quote or order) but file upload and this browsing screen
-      aren't built yet. Uploading needs Supabase Storage wired up first.
+      This page stores and organizes document <em>records</em> — category, what it's related to,
+      and a link to the file. There's no in-browser file upload button because no Supabase Storage
+      bucket exists in this project yet, and building an upload control against a bucket that
+      isn't there would just fail silently or fake success. For now, the <strong>File URL</strong>
+      field takes a link to wherever the file already lives (Google Drive, Dropbox, a Supabase
+      Storage public URL, etc). To add real drag-and-drop upload later: create a bucket in
+      Supabase → Storage, decide public vs. signed-URL access, then this form's File URL field
+      gets replaced with an actual upload control — that's a follow-up task, not done here.
     </p>
+  </div>
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search file name…" value={search} />
+      <select class="admin-select" name="category">
+        <option value="">All categories</option>
+        {CATEGORIES.map((c) => <option value={c} selected={c === categoryFilter}>{c}</option>)}
+      </select>
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <a class="admin-btn" href="/admin/documents/new">+ Add Document</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>File</th><th>Category</th><th>Related To</th><th>Notes</th><th>Date</th></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr>
+              <td><a href={`/admin/documents/${row.id}`}>{row.file_name || 'Untitled document'}</a></td>
+              <td>{row.category}</td>
+              <td>{relatedTo(row)}</td>
+              <td>{row.notes ? (row.notes.length > 60 ? `${row.notes.slice(0, 60)}…` : row.notes) : '—'}</td>
+              <td>{row.created_at ? new Date(row.created_at).toLocaleDateString() : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && rows.length === 0 && <p class="admin-empty">No documents yet.</p>}
   </div>
 </AdminLayout>

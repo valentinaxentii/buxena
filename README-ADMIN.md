@@ -68,29 +68,23 @@ role today — see "What's not built yet" for a real roles/permissions model).
   backed by real Supabase queries.
 - **Quotes** (`/admin/quotes`): create/edit with dynamic line items,
   delivery/installation/discount/tax, live-calculated subtotal and total.
-  "Generate PDF Quote" is visibly present but disabled — it is **not**
-  implemented, and I did not fake it.
-- **Enquiries** (`/admin/enquiries`): the Sauna Advisor chat widget now
-  records every conversation here automatically in the background (see
-  `src/pages/api/enquiries.ts`) — this was explicitly requested and is real,
-  not a placeholder. The chat's own canned-response behavior is completely
-  unchanged; the recording is fire-and-forget and never blocks or breaks it.
-- **Inventory, Orders, Documents, Analytics, Settings**: protected routes
-  exist and are in the nav, but show an honest "coming in Phase 2" notice —
-  see below.
+  "Generate PDF Quote" produces a real 6-page branded PDF once the quote has
+  a customer, sauna model and at least one line item (`src/lib/pdf/build-quote-pdf.ts`).
+- **Enquiries** (`/admin/enquiries`): the Sauna Advisor chat widget records
+  every conversation here automatically in the background (see
+  `src/pages/api/enquiries.ts`).
+- **Inventory, Orders, Documents, Analytics, Settings**: all real, full
+  screens now — see below. Nothing in `/admin/*` is a Phase 2 placeholder
+  anymore.
 
-## 5. What's NOT built yet (Phase 2, and beyond)
+## 5. What's NOT built yet
 
-- **Inventory** screen (table + schema exist; UI doesn't).
-- **Orders** screen (table + generated landed-cost/gross-profit columns
-  exist; UI doesn't).
-- **Documents**: no file upload yet — needs Supabase Storage configured
-  first, then an upload UI.
-- **Analytics**: no charts yet beyond the Dashboard's pipeline breakdown.
-- **Settings**: no company info / tax defaults / lead-source management UI.
-  Staff accounts are managed directly in Supabase for now.
-- **Quote PDF generation**: architecture is ready (a quote + its items is a
-  clean, self-contained record) but no PDF library is wired up.
+- **Documents file upload**: the `documents` table/UI is real (category,
+  linked customer/supplier/product/quote/order, notes), but there's no
+  in-browser upload — no Supabase Storage bucket exists in this project yet.
+  The File URL field takes a link to wherever the file already lives. See
+  `src/pages/admin/documents/index.astro` for exactly what's needed to wire
+  up real upload later.
 - **Website quote form → enquiries**: the public `/quote/` form still
   submits via **Netlify Forms**, unchanged. Only the Sauna Advisor chat
   writes to `enquiries` right now. Connecting the quote form too is a small
