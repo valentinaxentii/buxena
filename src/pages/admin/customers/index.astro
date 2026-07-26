@@ -23,7 +23,7 @@ try {
 }
 ---
 
-<AdminLayout title="Customers">
+<AdminLayout title="Customers" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -36,8 +36,8 @@ try {
       <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search name or email…" value={search} />
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
-    <a class="admin-btn" href="/admin/customers/new">+ New Customer</a>
   </div>
+  <a slot="actions" class="admin-btn" href="/admin/customers/new">+ New Customer</a>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

@@ -1,0 +1,514 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const LINE_TYPES = [
+  'product', 'freight', 'crating', 'liftgate', 'delivery_surcharge',
+  'installation', 'warranty', 'discount', 'other',
+];
+
+const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+
+let customers: any[] = [];
+let products: any[] = [];
+let settingsRow: any = null;
+let error: string | null = null;
+
+// Prefill state (from ?quote_id= / ?order_id=, or blank)
+type PrefillLine = {
+  line_type: string; model_code: string; description: string; spec_detail: string;
+  quantity: number; unit_price: number; line_discount: number; is_taxable: boolean;
+};
+let prefill = {
+  customer_id: '',
+  tax_rate: 0 as number,
+  lines: [] as PrefillLine[],
+  bill_to_name: '', bill_to_company: '', bill_to_address: '', bill_to_email: '', bill_to_phone: '',
+  ship_to_name: '', ship_to_company: '', ship_to_address: '', ship_to_email: '', ship_to_phone: '',
+  ship_to_state: '',
+};
+
+function partyAddress(c: any): string {
+  return [c?.address, [c?.city, c?.state].filter(Boolean).join(', '), c?.zip].filter(Boolean).join(', ');
+}
+function applyCustomerSnapshot(c: any) {
+  if (!c) return;
+  prefill.customer_id = c.id;
+  prefill.bill_to_name = c.name ?? '';
+  prefill.bill_to_address = partyAddress(c);
+  prefill.bill_to_email = c.email ?? '';
+  prefill.bill_to_phone = c.phone ?? '';
+  prefill.ship_to_name = prefill.bill_to_name;
+  prefill.ship_to_address = prefill.bill_to_address;
+  prefill.ship_to_email = prefill.bill_to_email;
+  prefill.ship_to_phone = prefill.bill_to_phone;
+  prefill.ship_to_state = (c.state ?? '').trim().toUpperCase().slice(0, 2);
+}
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const [customerRows, productRows, settingsRes] = await Promise.all([
+    supabase.from('customers').select('id, name, email, phone, address, city, state, zip, tax_exempt, tax_exemption_certificate').order('name'),
+    supabase.from('products').select('id, model_name, selling_price').eq('is_active', true).order('model_name'),
+    supabase.from('settings').select('*').eq('id', 1).single(),
+  ]);
+  customers = customerRows.data ?? [];
+  products = productRows.data ?? [];
+  settingsRow = settingsRes.data ?? null;
+
+  // --- origination prefill (GET only; values are copies, never links) ---
+  const quoteId = Astro.url.searchParams.get('quote_id');
+  const orderId = Astro.url.searchParams.get('order_id');
+  if (Astro.request.method === 'GET' && quoteId) {
+    const [{ data: quote }, { data: items }] = await Promise.all([
+      supabase.from('quotes').select('*').eq('id', quoteId).single(),
+      supabase.from('quote_items').select('description, quantity, unit_price').eq('quote_id', quoteId).order('sort_order'),
+    ]);
+    if (quote) {
+      applyCustomerSnapshot(customers.find((c) => c.id === quote.customer_id));
+      prefill.tax_rate = Number(quote.tax_rate ?? 0);
+      prefill.lines = (items ?? []).map((it: any) => ({
+        line_type: 'product', model_code: '', description: it.description ?? '', spec_detail: '',
+        quantity: Number(it.quantity ?? 1), unit_price: Number(it.unit_price ?? 0), line_discount: 0, is_taxable: true,
+      }));
+      if (Number(quote.delivery_cost) > 0) prefill.lines.push({ line_type: 'freight', model_code: '', description: 'Delivery', spec_detail: '', quantity: 1, unit_price: Number(quote.delivery_cost), line_discount: 0, is_taxable: true });
+      if (Number(quote.installation_cost) > 0) prefill.lines.push({ line_type: 'installation', model_code: '', description: 'Installation', spec_detail: '', quantity: 1, unit_price: Number(quote.installation_cost), line_discount: 0, is_taxable: true });
+      if (Number(quote.discount) > 0) prefill.lines.push({ line_type: 'discount', model_code: '', description: 'Discount', spec_detail: '', quantity: 1, unit_price: Number(quote.discount), line_discount: 0, is_taxable: true });
+    }
+  } else if (Astro.request.method === 'GET' && orderId) {
+    const { data: order } = await supabase.from('orders').select('*, products(model_name)').eq('id', orderId).single();
+    if (order) {
+      applyCustomerSnapshot(customers.find((c) => c.id === order.customer_id));
+      const modelName = order.products?.model_name ?? '';
+      prefill.lines = [{
+        line_type: 'product', model_code: modelName, description: modelName || 'Sauna', spec_detail: order.heater ? `Heater: ${order.heater}` : '',
+        quantity: 1, unit_price: Number(order.selling_price ?? 0), line_discount: 0, is_taxable: true,
+      }];
+      if (order.delivery_address) prefill.ship_to_address = order.delivery_address;
+    }
+  }
+
+  // --- save draft ---
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const g = (k: string) => String(form.get(k) ?? '').trim();
+
+    const lineTypes = form.getAll('item_line_type[]').map(String);
+    const modelCodes = form.getAll('item_model_code[]').map(String);
+    const descriptions = form.getAll('item_description[]').map(String);
+    const specDetails = form.getAll('item_spec_detail[]').map(String);
+    const quantities = form.getAll('item_quantity[]').map(Number);
+    const unitPrices = form.getAll('item_unit_price[]').map(Number);
+    const lineDiscounts = form.getAll('item_line_discount[]').map(Number);
+    const taxables = form.getAll('item_taxable[]').map((v) => String(v) === '1');
+
+    const items = descriptions
+      .map((description, i) => ({
+        line_type: LINE_TYPES.includes(lineTypes[i]) ? lineTypes[i] : 'other',
+        model_code: modelCodes[i]?.trim() || null,
+        description: description.trim(),
+        spec_detail: specDetails[i]?.trim() || null,
+        quantity: quantities[i] || 0,
+        unit_price: r2(unitPrices[i] || 0),
+        line_discount: r2(lineDiscounts[i] || 0),
+        line_total: r2((quantities[i] || 0) * (unitPrices[i] || 0) - (lineDiscounts[i] || 0)),
+        is_taxable: taxables[i] ?? true,
+        sort_order: i,
+      }))
+      .filter((item) => item.description);
+
+    const customerId = g('customer_id');
+    const shipToState = g('ship_to_state').toUpperCase();
+    const hasNegativeQty = items.some((it) => it.quantity < 0);
+
+    if (!customerId) {
+      error = 'Customer is required.';
+    } else if (!/^[A-Z]{2}$/.test(shipToState)) {
+      error = 'Ship-to state is required (2-letter code) — it drives tax treatment.';
+    } else if (items.length === 0) {
+      error = 'Add at least one line item.';
+    } else if (hasNegativeQty) {
+      error = 'Quantities cannot be negative.';
+    } else {
+      // totals — numeric(12,2) dollars, same representation and rounding as quotes
+      const isDiscount = (it: any) => it.line_type === 'discount';
+      const subtotal = r2(items.filter((it) => !isDiscount(it)).reduce((s, it) => s + it.quantity * it.unit_price, 0));
+      const discount_total = r2(
+        items.filter((it) => !isDiscount(it)).reduce((s, it) => s + it.line_discount, 0) +
+        items.filter(isDiscount).reduce((s, it) => s + it.line_total, 0)
+      );
+      const freight_total = r2(items.filter((it) => it.line_type === 'freight').reduce((s, it) => s + it.line_total, 0));
+      const signed = (it: any) => (isDiscount(it) ? -it.line_total : it.line_total);
+      const taxable_subtotal = r2(items.filter((it) => it.is_taxable).reduce((s, it) => s + signed(it), 0));
+      const non_taxable_subtotal = r2(items.filter((it) => !it.is_taxable).reduce((s, it) => s + signed(it), 0));
+      const tax_exempt = form.get('tax_exempt') === 'on';
+      const tax_rate = tax_exempt ? 0 : r2(Number(form.get('tax_rate') ?? 0) || 0);
+      const tax_total = tax_exempt ? 0 : r2(taxable_subtotal * (tax_rate / 100));
+      const grand_total = r2(taxable_subtotal + non_taxable_subtotal + tax_total);
+
+      const invoicePayload = {
+        document_type: g('document_type') === 'proforma' ? 'proforma' : 'invoice',
+        status: 'draft',
+        invoice_number: null, // drafts carry no number by design
+        customer_id: customerId,
+        quote_id: g('origin_quote_id') || null,
+        order_id: g('origin_order_id') || null,
+        issue_date: g('issue_date') || new Date().toISOString().slice(0, 10),
+        due_date: g('due_date') || null,
+        payment_terms: g('payment_terms') || null,
+        customer_po_reference: g('customer_po_reference') || null,
+        bill_to_name: g('bill_to_name') || null,
+        bill_to_company: g('bill_to_company') || null,
+        bill_to_address: g('bill_to_address') || null,
+        bill_to_email: g('bill_to_email') || null,
+        bill_to_phone: g('bill_to_phone') || null,
+        ship_to_name: g('ship_to_name') || null,
+        ship_to_company: g('ship_to_company') || null,
+        ship_to_address: g('ship_to_address') || null,
+        ship_to_email: g('ship_to_email') || null,
+        ship_to_phone: g('ship_to_phone') || null,
+        issuer_name: g('issuer_name') || null,
+        issuer_address: g('issuer_address') || null,
+        issuer_ein: g('issuer_ein') || null,
+        issuer_email: g('issuer_email') || null,
+        issuer_phone: g('issuer_phone') || null,
+        ship_to_state: shipToState,
+        tax_jurisdiction_label: g('tax_jurisdiction_label') || null,
+        tax_rate,
+        tax_exempt,
+        tax_exemption_certificate: g('tax_exemption_certificate') || null,
+        tax_not_collected_reason: g('tax_not_collected_reason') || null,
+        subtotal, discount_total, freight_total, taxable_subtotal, non_taxable_subtotal,
+        tax_total, grand_total,
+        deposit_received: 0,
+        balance_due: grand_total,
+        notes: g('notes') || null,
+        terms: g('terms') || null,
+      };
+
+      const { data: invoice, error: insertError } = await supabase
+        .from('invoices').insert(invoicePayload).select('id').single();
+      if (insertError) {
+        error = insertError.message;
+      } else {
+        const { error: itemsError } = await supabase
+          .from('invoice_line_items')
+          .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
+        if (itemsError) error = `Invoice saved but line items failed: ${itemsError.message}`;
+        else return Astro.redirect('/admin/invoices');
+      }
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+const today = new Date().toISOString().slice(0, 10);
+const issuer = {
+  name: settingsRow?.company_name ?? 'BUXENA',
+  address: [settingsRow?.company_address, settingsRow?.remit_to_address].filter(Boolean)[0] ?? '',
+  ein: settingsRow?.company_ein ?? '',
+  email: settingsRow?.company_email ?? '',
+  phone: settingsRow?.company_phone ?? '',
+};
+const initialLines: PrefillLine[] = prefill.lines.length
+  ? prefill.lines
+  : [{ line_type: 'product', model_code: '', description: '', spec_detail: '', quantity: 1, unit_price: 0, line_discount: 0, is_taxable: true }];
+---
+
+<AdminLayout title="New Invoice" subtitle="Draft — a number is assigned when the invoice is issued." parentLabel="Invoices" parentHref="/admin/invoices">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  <form class="admin-form inv-form" method="POST" id="invoice-form">
+    <input type="hidden" name="origin_quote_id" value={Astro.url.searchParams.get('quote_id') ?? ''} />
+    <input type="hidden" name="origin_order_id" value={Astro.url.searchParams.get('order_id') ?? ''} />
+
+    <div class="admin-form__full"><h2 class="admin-section-title">Document</h2></div>
+    <label class="admin-field"><span>Type</span>
+      <select name="document_type">
+        <option value="invoice" selected>Invoice</option>
+        <option value="proforma">Proforma</option>
+      </select>
+    </label>
+    <label class="admin-field"><span>Issue Date</span><input type="date" name="issue_date" id="issue-date" value={today} /></label>
+    <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" id="payment-terms" value="Net 30" /></label>
+    <label class="admin-field"><span>Due Date</span><input type="date" name="due_date" id="due-date" /></label>
+    <label class="admin-field"><span>Customer PO Reference</span><input type="text" name="customer_po_reference" /></label>
+
+    <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Customer &amp; Parties</h2></div>
+    <label class="admin-field admin-form__full"><span>Customer *</span>
+      <select name="customer_id" id="customer-select" required>
+        <option value="">— select —</option>
+        {customers.map((c) => <option value={c.id} selected={c.id === prefill.customer_id}>{c.name}</option>)}
+      </select>
+    </label>
+    <script type="application/json" id="customers-data" set:html={JSON.stringify(customers)} />
+
+    <div class="inv-parties admin-form__full">
+      <fieldset class="inv-party">
+        <legend>Bill To — editable snapshot; what is typed here is what prints</legend>
+        <label class="admin-field"><span>Name</span><input type="text" name="bill_to_name" value={prefill.bill_to_name} data-bill="name" /></label>
+        <label class="admin-field"><span>Company</span><input type="text" name="bill_to_company" value={prefill.bill_to_company} data-bill="company" /></label>
+        <label class="admin-field"><span>Address</span><input type="text" name="bill_to_address" value={prefill.bill_to_address} data-bill="address" /></label>
+        <label class="admin-field"><span>Email</span><input type="text" name="bill_to_email" value={prefill.bill_to_email} data-bill="email" /></label>
+        <label class="admin-field"><span>Phone</span><input type="text" name="bill_to_phone" value={prefill.bill_to_phone} data-bill="phone" /></label>
+      </fieldset>
+      <fieldset class="inv-party">
+        <legend>
+          Ship To
+          <label class="inv-same"><input type="checkbox" id="same-as-billing" /> same as billing</label>
+        </legend>
+        <label class="admin-field"><span>Name</span><input type="text" name="ship_to_name" value={prefill.ship_to_name} data-ship="name" /></label>
+        <label class="admin-field"><span>Company</span><input type="text" name="ship_to_company" value={prefill.ship_to_company} data-ship="company" /></label>
+        <label class="admin-field"><span>Address</span><input type="text" name="ship_to_address" value={prefill.ship_to_address} data-ship="address" /></label>
+        <label class="admin-field"><span>Email</span><input type="text" name="ship_to_email" value={prefill.ship_to_email} data-ship="email" /></label>
+        <label class="admin-field"><span>Phone</span><input type="text" name="ship_to_phone" value={prefill.ship_to_phone} data-ship="phone" /></label>
+        <label class="admin-field"><span>Ship-To State * (drives tax)</span><input type="text" name="ship_to_state" maxlength="2" style="text-transform:uppercase;" placeholder="CA" value={prefill.ship_to_state} required /></label>
+      </fieldset>
+    </div>
+
+    <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Issuer</h2></div>
+    <label class="admin-field"><span>Issuer Name</span><input type="text" name="issuer_name" value={issuer.name} /></label>
+    <label class="admin-field"><span>Issuer EIN</span><input type="text" name="issuer_ein" value={issuer.ein} /></label>
+    <label class="admin-field admin-form__full"><span>Issuer Address</span><input type="text" name="issuer_address" value={issuer.address} /></label>
+    <label class="admin-field"><span>Issuer Email</span><input type="text" name="issuer_email" value={issuer.email} /></label>
+    <label class="admin-field"><span>Issuer Phone</span><input type="text" name="issuer_phone" value={issuer.phone} /></label>
+
+    <div class="admin-form__full">
+      <h2 class="admin-section-title" style="margin-top:1rem;">Line Items</h2>
+      <p class="inv-hint">Freight, crating, and installation are their own rows with their own taxable flag — never folded into a product's price. Picking a model copies its values as frozen text.</p>
+      <div class="admin-table-wrap">
+      <table class="admin-table" id="items-table">
+        <thead><tr><th>Type</th><th>Copy From Model</th><th>Model Code</th><th>Description</th><th>Spec Detail</th><th>Qty</th><th>Unit Price</th><th>Line Disc.</th><th>Taxable</th><th>Line Total</th><th></th></tr></thead>
+        <tbody id="items-body">
+          {initialLines.map((ln) => (
+            <tr class="item-row">
+              <td>
+                <select name="item_line_type[]" class="ltype">
+                  {LINE_TYPES.map((t) => <option value={t} selected={t === ln.line_type}>{t.replace(/_/g, ' ')}</option>)}
+                </select>
+              </td>
+              <td>
+                <select class="product-pick">
+                  <option value="">—</option>
+                  {products.map((p) => <option value={p.id} data-name={p.model_name} data-price={p.selling_price ?? ''}>{p.model_name}</option>)}
+                </select>
+              </td>
+              <td><input type="text" name="item_model_code[]" class="mcode" value={ln.model_code} /></td>
+              <td><input type="text" name="item_description[]" class="desc" value={ln.description} /></td>
+              <td><input type="text" name="item_spec_detail[]" value={ln.spec_detail} /></td>
+              <td><input type="number" step="0.01" min="0" name="item_quantity[]" class="qty" value={ln.quantity} /></td>
+              <td><input type="number" step="0.01" name="item_unit_price[]" class="price" value={ln.unit_price} /></td>
+              <td><input type="number" step="0.01" name="item_line_discount[]" class="ldisc" value={ln.line_discount} /></td>
+              <td class="inv-taxcell">
+                <input type="hidden" name="item_taxable[]" value={ln.is_taxable ? '1' : '0'} class="taxable-hidden" />
+                <input type="checkbox" class="taxable-box" checked={ln.is_taxable} />
+              </td>
+              <td class="line-total">$0.00</td>
+              <td><button type="button" class="admin-btn admin-btn--ghost remove-row">×</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+      <button type="button" class="admin-btn admin-btn--ghost" id="add-row" style="margin-top:0.75rem;">+ Add Line</button>
+    </div>
+
+    <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Tax — manual entry</h2></div>
+    <label class="admin-field inv-check"><span>Tax Exempt</span><input type="checkbox" name="tax_exempt" id="tax-exempt" /></label>
+    <label class="admin-field"><span>Tax Rate (%)</span><input type="number" step="0.01" name="tax_rate" id="tax-rate" value={prefill.tax_rate} class="calc-input" /></label>
+    <label class="admin-field"><span>Tax Jurisdiction Label</span><input type="text" name="tax_jurisdiction_label" placeholder="Los Angeles County, CA" /></label>
+    <label class="admin-field"><span>Exemption Certificate</span><input type="text" name="tax_exemption_certificate" id="tax-cert" /></label>
+    <label class="admin-field admin-form__full"><span>Tax Not Collected Reason (optional — distinguishes no-nexus from error)</span><input type="text" name="tax_not_collected_reason" /></label>
+
+    <div class="admin-form__full" id="totals">
+      <p>Subtotal: <strong id="subtotal-out">$0.00</strong> &nbsp; Discounts: <strong id="discount-out">$0.00</strong> &nbsp; Freight: <strong id="freight-out">$0.00</strong></p>
+      <p>Taxable: <strong id="taxable-out">$0.00</strong> &nbsp; Non-taxable: <strong id="nontaxable-out">$0.00</strong> &nbsp; Tax: <strong id="tax-out">$0.00</strong></p>
+      <p>Grand Total: <strong id="grand-out" style="color:var(--admin-gold);">$0.00</strong> &nbsp; Balance Due: <strong id="balance-out">$0.00</strong></p>
+    </div>
+
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
+    <label class="admin-field admin-form__full"><span>Terms</span><textarea name="terms"></textarea></label>
+
+    <div class="admin-form__actions">
+      <button class="admin-btn" type="submit">Save Draft</button>
+      <a class="admin-btn admin-btn--ghost" href="/admin/invoices">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .inv-form { max-width: none; }
+  #items-table input, #items-table select { width: 100%; min-width: 5.5rem; }
+  #items-table .qty, #items-table .price, #items-table .ldisc { min-width: 4.5rem; }
+  #totals p { margin: 0.3rem 0; font-size: 0.9rem; color: var(--admin-muted); }
+  .inv-hint { margin: -0.4rem 0 0.75rem; font-size: 0.75rem; color: var(--admin-muted); }
+  .inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  .inv-party { display: grid; gap: 0.8rem; margin: 0; padding: 0.9rem 1rem 1.1rem; border: 1px solid var(--admin-border); border-radius: 4px; }
+  .inv-party legend { display: flex; align-items: center; gap: 1rem; padding: 0 0.4rem; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--admin-muted); }
+  .inv-same { display: inline-flex; align-items: center; gap: 0.35rem; text-transform: none; letter-spacing: 0; color: var(--admin-gold); cursor: pointer; }
+  .inv-check input[type='checkbox'] { width: 1.05rem; height: 1.05rem; accent-color: #c9a668; }
+  .inv-taxcell { text-align: center; }
+  .inv-taxcell .taxable-box { width: 1rem; height: 1rem; accent-color: #c9a668; }
+  @media (max-width: 900px) { .inv-parties { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  const form = document.getElementById('invoice-form') as HTMLFormElement;
+  const body = document.getElementById('items-body') as HTMLTableSectionElement;
+  const addRowBtn = document.getElementById('add-row');
+  const customersData = JSON.parse(document.getElementById('customers-data')?.textContent || '[]');
+
+  // --- due date from "Net N" terms ---
+  const issueDate = document.getElementById('issue-date') as HTMLInputElement;
+  const dueDate = document.getElementById('due-date') as HTMLInputElement;
+  const terms = document.getElementById('payment-terms') as HTMLInputElement;
+  function autoDue() {
+    const m = terms.value.match(/net\s*(\d{1,3})/i);
+    if (!m || !issueDate.value || dueDate.dataset.manual) return;
+    const d = new Date(issueDate.value);
+    d.setDate(d.getDate() + Number(m[1]));
+    dueDate.value = d.toISOString().slice(0, 10);
+  }
+  dueDate.addEventListener('input', () => { dueDate.dataset.manual = '1'; });
+  issueDate.addEventListener('change', autoDue);
+  terms.addEventListener('input', autoDue);
+  autoDue();
+
+  // --- customer -> snapshot fields (fills empty/autofilled fields only) ---
+  const customerSelect = document.getElementById('customer-select') as HTMLSelectElement;
+  function fillIfFree(el: HTMLInputElement | null, value: string) {
+    if (!el || (el.value && !el.dataset.autofilled)) return;
+    el.value = value;
+    el.dataset.autofilled = '1';
+    el.addEventListener('input', () => { delete el.dataset.autofilled; }, { once: true });
+  }
+  customerSelect.addEventListener('change', () => {
+    const c = customersData.find((x: any) => x.id === customerSelect.value);
+    if (!c) return;
+    const addr = [c.address, [c.city, c.state].filter(Boolean).join(', '), c.zip].filter(Boolean).join(', ');
+    fillIfFree(document.querySelector('[data-bill="name"]'), c.name ?? '');
+    fillIfFree(document.querySelector('[data-bill="address"]'), addr);
+    fillIfFree(document.querySelector('[data-bill="email"]'), c.email ?? '');
+    fillIfFree(document.querySelector('[data-bill="phone"]'), c.phone ?? '');
+    fillIfFree(document.querySelector('[data-ship="name"]'), c.name ?? '');
+    fillIfFree(document.querySelector('[data-ship="address"]'), addr);
+    fillIfFree(document.querySelector('[data-ship="email"]'), c.email ?? '');
+    fillIfFree(document.querySelector('[data-ship="phone"]'), c.phone ?? '');
+    fillIfFree(document.querySelector('[name="ship_to_state"]'), (c.state ?? '').toUpperCase().slice(0, 2));
+    // tax-exempt customers: surface their certificate
+    if (c.tax_exempt) {
+      (document.getElementById('tax-exempt') as HTMLInputElement).checked = true;
+      fillIfFree(document.getElementById('tax-cert') as HTMLInputElement, c.tax_exemption_certificate ?? '');
+      applyExempt();
+    }
+    recalc();
+  });
+
+  // --- same as billing ---
+  document.getElementById('same-as-billing')?.addEventListener('change', (e) => {
+    if (!(e.target as HTMLInputElement).checked) return;
+    for (const k of ['name', 'company', 'address', 'email', 'phone']) {
+      const from = document.querySelector(`[data-bill="${k}"]`) as HTMLInputElement;
+      const to = document.querySelector(`[data-ship="${k}"]`) as HTMLInputElement;
+      if (from && to) to.value = from.value;
+    }
+  });
+
+  // --- tax exempt zeroes the rate ---
+  const exemptBox = document.getElementById('tax-exempt') as HTMLInputElement;
+  const rateInput = document.getElementById('tax-rate') as HTMLInputElement;
+  function applyExempt() {
+    if (exemptBox.checked) { rateInput.value = '0'; rateInput.readOnly = true; }
+    else rateInput.readOnly = false;
+    recalc();
+  }
+  exemptBox.addEventListener('change', applyExempt);
+
+  // --- rows ---
+  function rowTemplate(): HTMLTableRowElement {
+    const first = body.querySelector('.item-row') as HTMLTableRowElement;
+    const tr = first.cloneNode(true) as HTMLTableRowElement;
+    tr.querySelectorAll('input').forEach((inp) => {
+      if (inp.classList.contains('taxable-hidden')) inp.value = '1';
+      else if (inp.classList.contains('taxable-box')) (inp as HTMLInputElement).checked = true;
+      else if (inp.classList.contains('qty')) inp.value = '1';
+      else if (inp.classList.contains('price') || inp.classList.contains('ldisc')) inp.value = '0';
+      else inp.value = '';
+    });
+    tr.querySelectorAll('select').forEach((sel) => { (sel as HTMLSelectElement).selectedIndex = sel.classList.contains('ltype') ? 0 : 0; });
+    (tr.querySelector('.line-total') as HTMLElement).textContent = '$0.00';
+    return tr;
+  }
+  addRowBtn?.addEventListener('click', () => { body.appendChild(rowTemplate()); recalc(); });
+  body.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.classList.contains('remove-row')) {
+      if (body.querySelectorAll('.item-row').length > 1) t.closest('.item-row')?.remove();
+      recalc();
+    }
+  });
+
+  // taxable checkbox <-> hidden field (checkbox arrays misalign when unchecked)
+  body.addEventListener('change', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.classList.contains('taxable-box')) {
+      (t.closest('td')!.querySelector('.taxable-hidden') as HTMLInputElement).value = t.checked ? '1' : '0';
+      recalc();
+    }
+    if (t.classList.contains('product-pick')) {
+      const opt = (t as unknown as HTMLSelectElement).selectedOptions[0];
+      if (!opt?.value) return;
+      const row = t.closest('.item-row')!;
+      // copy as frozen text — the product is a convenience, never the source of truth
+      (row.querySelector('.mcode') as HTMLInputElement).value = opt.dataset.name ?? '';
+      const desc = row.querySelector('.desc') as HTMLInputElement;
+      if (!desc.value) desc.value = opt.dataset.name ?? '';
+      const price = row.querySelector('.price') as HTMLInputElement;
+      if (!Number(price.value)) price.value = opt.dataset.price || '0';
+      recalc();
+    }
+  });
+
+  // --- live totals (mirrors the server math exactly) ---
+  const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
+  const $ = (n: number) => `$${n.toFixed(2)}`;
+  function recalc() {
+    let subtotal = 0, discountTotal = 0, freightTotal = 0, taxable = 0, nonTaxable = 0;
+    body.querySelectorAll('.item-row').forEach((row) => {
+      const type = (row.querySelector('.ltype') as HTMLSelectElement).value;
+      const qty = parseFloat((row.querySelector('.qty') as HTMLInputElement).value || '0');
+      const price = parseFloat((row.querySelector('.price') as HTMLInputElement).value || '0');
+      const ldisc = parseFloat((row.querySelector('.ldisc') as HTMLInputElement).value || '0');
+      const isTaxable = (row.querySelector('.taxable-hidden') as HTMLInputElement).value === '1';
+      const lineTotal = r2(qty * price - ldisc);
+      (row.querySelector('.line-total') as HTMLElement).textContent = $(lineTotal);
+      const isDiscount = type === 'discount';
+      if (!isDiscount) { subtotal += qty * price; discountTotal += ldisc; }
+      else discountTotal += lineTotal;
+      if (type === 'freight') freightTotal += lineTotal;
+      const signed = isDiscount ? -lineTotal : lineTotal;
+      if (isTaxable) taxable += signed; else nonTaxable += signed;
+    });
+    subtotal = r2(subtotal); discountTotal = r2(discountTotal); freightTotal = r2(freightTotal);
+    taxable = r2(taxable); nonTaxable = r2(nonTaxable);
+    const exempt = exemptBox.checked;
+    const rate = exempt ? 0 : parseFloat(rateInput.value || '0');
+    const tax = exempt ? 0 : r2(taxable * (rate / 100));
+    const grand = r2(taxable + nonTaxable + tax);
+    document.getElementById('subtotal-out')!.textContent = $(subtotal);
+    document.getElementById('discount-out')!.textContent = $(discountTotal);
+    document.getElementById('freight-out')!.textContent = $(freightTotal);
+    document.getElementById('taxable-out')!.textContent = $(taxable);
+    document.getElementById('nontaxable-out')!.textContent = $(nonTaxable);
+    document.getElementById('tax-out')!.textContent = $(tax);
+    document.getElementById('grand-out')!.textContent = $(grand);
+    document.getElementById('balance-out')!.textContent = $(grand);
+  }
+  form.addEventListener('input', recalc);
+  recalc();
+</script>

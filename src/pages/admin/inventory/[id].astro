@@ -74,7 +74,7 @@ function money(n: number | null | undefined): string {
 }
 ---
 
-<AdminLayout title={record?.products?.model_name ?? 'Inventory'}>
+<AdminLayout title={record?.products?.model_name ?? 'Inventory'} parentLabel="Inventory" parentHref="/admin/inventory">
   {notFound && <p class="admin-empty">Inventory record not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 

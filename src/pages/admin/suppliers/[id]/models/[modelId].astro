@@ -64,7 +64,7 @@ function dimsText(dims: any): string {
 }
 ---
 
-<AdminLayout title={record?.products?.model_name ?? 'Supplier Model'} subtitle={supplier ? `Supplied by ${supplier.name}` : undefined}>
+<AdminLayout title={record?.products?.model_name ?? 'Supplier Model'} subtitle={supplier ? `Supplied by ${supplier.name}` : undefined} parentLabel={supplier?.name ?? 'Supplier'} parentHref={`/admin/suppliers/${id}`}>
   {notFound && <p class="admin-empty">Supplier model record not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 

@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { COUNTRIES, FREQUENT_COUNTRIES } from '../../../lib/countries';
 
 const ACTIVE_INCOMING_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
 
@@ -43,13 +44,18 @@ try {
       website: String(form.get('website') ?? '') || null,
       currency: String(form.get('currency') ?? '') || null,
       payment_terms: String(form.get('payment_terms') ?? '') || null,
-      incoterm: String(form.get('incoterm') ?? '') || null,
-      typical_lead_time_days: form.get('typical_lead_time_days') ? Number(form.get('typical_lead_time_days')) : null,
+      incoterm: String(form.get('incoterm') ?? '').trim().toUpperCase() || null,
+      // blank = unknown = NULL; never store a fabricated 0
+      typical_lead_time_days: String(form.get('typical_lead_time_days') ?? '').trim() === '' ? null : Number(form.get('typical_lead_time_days')),
       warranty_terms: String(form.get('warranty_terms') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
-    const { error: updateError } = await supabase.from('suppliers').update(payload).eq('id', id);
-    if (updateError) error = updateError.message;
+    if (payload.typical_lead_time_days !== null && (!Number.isInteger(payload.typical_lead_time_days) || payload.typical_lead_time_days < 1)) {
+      error = 'Typical lead time must be a positive whole number of days.';
+    } else {
+      const { error: updateError } = await supabase.from('suppliers').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
+    }
   }
 
   const [supplierRes, supplierProductsRes, shipmentsRes] = await Promise.all([
@@ -90,7 +96,7 @@ function money(n: number | null | undefined, currency?: string | null): string {
 }
 ---
 
-<AdminLayout title={supplier?.name ?? 'Supplier'}>
+<AdminLayout title={supplier?.name ?? 'Supplier'} parentLabel="Suppliers" parentHref="/admin/suppliers">
   {notFound && <p class="admin-empty">Supplier not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
@@ -103,13 +109,57 @@ function money(n: number | null | undefined, currency?: string | null): string {
         <label class="admin-field"><span>Email</span><input type="email" name="email" value={supplier.email ?? ''} /></label>
         <label class="admin-field"><span>Phone</span><input type="tel" name="phone" value={supplier.phone ?? ''} /></label>
         <label class="admin-field"><span>WhatsApp</span><input type="text" name="whatsapp" value={supplier.whatsapp ?? ''} /></label>
-        <label class="admin-field"><span>Country</span><input type="text" name="country" value={supplier.country ?? ''} /></label>
+        <label class="admin-field"><span>Country</span>
+          {(() => {
+            // preselect case-insensitively; surface unmatched stored values
+            // instead of silently blanking them
+            const stored = (supplier.country ?? '').trim();
+            const selected = COUNTRIES.find((c) => c.toLowerCase() === stored.toLowerCase()) ?? '';
+            const unmatched = stored && !selected ? stored : '';
+            return (
+              <select name="country">
+                <option value="">— select —</option>
+                {unmatched && <option value={unmatched} selected>{unmatched}</option>}
+                <optgroup label="— Frequently used —">
+                  {FREQUENT_COUNTRIES.map((c) => (
+                    <option value={c} selected={c === selected}>{c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="All countries">
+                  {COUNTRIES.map((c) => (
+                    <option value={c} selected={c === selected && !(FREQUENT_COUNTRIES as readonly string[]).includes(c)}>{c}</option>
+                  ))}
+                </optgroup>
+              </select>
+            );
+          })()}
+        </label>
         <label class="admin-field admin-form__full"><span>Factory / Business Address</span><input type="text" name="factory_address" value={supplier.factory_address ?? ''} /></label>
         <label class="admin-field"><span>Website</span><input type="text" name="website" value={supplier.website ?? ''} /></label>
-        <label class="admin-field"><span>Currency</span><input type="text" name="currency" maxlength="3" value={supplier.currency ?? ''} /></label>
+        <label class="admin-field"><span>Currency</span>
+          {(() => {
+            const CURRENCIES = [
+              { code: 'USD', label: 'USD (US Dollar)' },
+              { code: 'EUR', label: 'EUR (Euro)' },
+              { code: 'CAD', label: 'CAD (Canadian Dollar)' },
+            ];
+            const stored = (supplier.currency ?? '').trim();
+            const match = CURRENCIES.find((c) => c.code.toLowerCase() === stored.toLowerCase());
+            const selected = match?.code ?? (stored ? '' : 'USD');
+            const unmatched = stored && !match ? stored : '';
+            return (
+              <select name="currency">
+                {unmatched && <option value={unmatched} selected>{unmatched}</option>}
+                {CURRENCIES.map((c) => (
+                  <option value={c.code} selected={c.code === selected}>{c.label}</option>
+                ))}
+              </select>
+            );
+          })()}
+        </label>
         <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" value={supplier.payment_terms ?? ''} /></label>
-        <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" value={supplier.incoterm ?? ''} placeholder="EXW / FOB / CIF / DDP" /></label>
-        <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" value={supplier.typical_lead_time_days ?? ''} /></label>
+        <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" value={supplier.incoterm ?? ''} placeholder="EXW / FOB / CIF / DDP" style="text-transform:uppercase;" /></label>
+        <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" step="1" min="1" placeholder="e.g. 45" value={supplier.typical_lead_time_days ?? ''} /></label>
         <label class="admin-field admin-form__full"><span>Warranty Terms</span><input type="text" name="warranty_terms" value={supplier.warranty_terms ?? ''} /></label>
         <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes">{supplier.notes ?? ''}</textarea></label>
         <div class="admin-form__actions">

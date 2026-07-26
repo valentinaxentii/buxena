@@ -49,7 +49,7 @@ try {
 }
 ---
 
-<AdminLayout title="Add Inventory">
+<AdminLayout title="Add Inventory" parentLabel="Inventory" parentHref="/admin/inventory">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   <form class="admin-form" method="POST">
@@ -68,7 +68,7 @@ try {
     <div class="admin-field">
       <span>Incoming</span>
       <p style="margin:0; padding:0.7rem 0.85rem; font-size:0.9rem; color:var(--admin-muted); background:rgba(255,255,255,0.03); border:1px solid var(--admin-border); border-radius:2px;">
-        Computed from Incoming Inventory shipments once one exists for this model — nothing to enter here.
+        Computed from Shipment Orders once one exists for this model — nothing to enter here.
       </p>
     </div>
 

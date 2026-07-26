@@ -58,7 +58,7 @@ const supplierBars = [...unitsBySupplier.entries()].sort((a, b) => b[1] - a[1]).
 const maxSupplierUnits = Math.max(1, ...supplierBars.map(([, v]) => v));
 ---
 
-<AdminLayout title="Incoming Shipments Report" subtitle="Purchasing pipeline — what's ordered, in transit, or arriving.">
+<AdminLayout title="Incoming Shipments Report" subtitle="Purchasing pipeline — what's ordered, in transit, or arriving." parentLabel="Reports" parentHref="/admin/reports">
   <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/shipments?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
 
   {!dbReady && (

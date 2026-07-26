@@ -62,7 +62,7 @@ try {
 const dims = product?.dimensions ?? {};
 ---
 
-<AdminLayout title={product ? product.model_name : 'Product'}>
+<AdminLayout title={product ? product.model_name : 'Product'} parentLabel="Products" parentHref="/admin/products">
   {notFound && <p class="admin-empty">Product not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 

@@ -84,7 +84,7 @@ try {
 }
 ---
 
-<AdminLayout title="New Quote">
+<AdminLayout title="New Quote" parentLabel="Quotes" parentHref="/admin/quotes">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   <form class="admin-form" method="POST" id="quote-form" data-quote-validity-days={settings.default_quote_validity_days}>

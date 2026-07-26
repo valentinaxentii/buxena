@@ -96,11 +96,16 @@ try {
 }
 ---
 
-<AdminLayout title="New Order">
+<AdminLayout title="New Order" parentLabel="Orders" parentHref="/admin/orders">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   <form class="admin-form" method="POST">
     {prefill && <input type="hidden" name="quote_id" value={prefill.id} />}
+
+    {/* read-only, no name attribute — never submitted; the number is assigned server-side on save */}
+    <label class="admin-field admin-form__full"><span>Order Number</span>
+      <input type="text" value="" placeholder="Assigned on save" readonly disabled style="color:var(--admin-muted); font-style:italic;" />
+    </label>
 
     <label class="admin-field"><span>Customer *</span>
       <select name="customer_id" required>

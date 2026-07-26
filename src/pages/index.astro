@@ -9,13 +9,28 @@ import { categories } from '../data/site';
 import { getCollection } from 'astro:content';
 
 const saunas = await getCollection('saunas', ({ data }) => !data.draft);
-const countFor = (id: string) => saunas.filter((s) => s.data.category === id).length;
-const featured = categories.filter((c) => countFor(c.id) > 0);
 
-const collectionImages: Record<string, string> = {
-  indoor: '/images/collection-indoor.jpg',
-  barrel: '/images/collection-barrel.jpg',
-};
+// Top-level range tiles are PLACEMENT (how people actually shop) — shape
+// (barrel/cube/cabin) is a filter on the collection page, not a category here.
+const locationCount = (loc: string) => saunas.filter((s) => s.data.location === loc).length;
+const rangeTiles = [
+  {
+    name: 'Indoor Saunas',
+    blurb: 'Rooms designed inside the home — basements, bathrooms, private suites.',
+    href: '/saunas/indoor-saunas/',
+    count: locationCount('indoor'),
+    image: '/images/collection-indoor.jpg',
+    note: 'Indoor Saunas — representative interior image, consistent treatment across both tiles.',
+  },
+  {
+    name: 'Outdoor Saunas',
+    blurb: 'Barrels, cubes and cabins for the garden, the deck or the tree line — freestanding rooms built to live outdoors.',
+    href: '/saunas/outdoor-saunas/',
+    count: locationCount('outdoor'),
+    image: '/images/collection-barrel.jpg',
+    note: 'Outdoor Saunas — representative exterior image, consistent treatment across both tiles.',
+  },
+];
 
 const reasons = [
   {
@@ -78,18 +93,18 @@ const steps = [
     <div class="shell">
       <div class="sec-head reveal">
         <span class="eyebrow">The Range</span>
-        <h2 class="h2 measure--tight">Four ways to put heat in a home</h2>
+        <h2 class="h2 measure--tight">Two ways to add heat to a home</h2>
       </div>
 
-      <div class="grid cols-4 reveal">
-        {featured.map((c) => (
+      <div class="grid cols-2 reveal">
+        {rangeTiles.map((tile) => (
           <CollectionCard
-            name={c.name}
-            blurb={c.blurb}
-            href={`/saunas/${c.id}-saunas/`}
-            count={countFor(c.id)}
-            image={collectionImages[c.id]}
-            note={`${c.name} — representative collection image, exterior or interior, consistent treatment across all four cards.`}
+            name={tile.name}
+            blurb={tile.blurb}
+            href={tile.href}
+            count={tile.count}
+            image={tile.image}
+            note={tile.note}
           />
         ))}
       </div>

@@ -64,7 +64,7 @@ if (Astro.url.searchParams.get('format') === 'csv') {
 }
 ---
 
-<AdminLayout title="Supplier Report" subtitle="Purchase history and current standing by supplier.">
+<AdminLayout title="Supplier Report" subtitle="Purchase history and current standing by supplier." parentLabel="Reports" parentHref="/admin/reports">
   <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/suppliers?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
 
   {!dbReady && (

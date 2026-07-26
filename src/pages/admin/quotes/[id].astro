@@ -119,7 +119,12 @@ const canGeneratePdf = quote !== null && pdfMissingFields.length === 0;
 const pdfError = Astro.url.searchParams.get('pdf_error');
 ---
 
-<AdminLayout title={quote ? (quote.quote_number || 'Quote') : 'Quote'}>
+<AdminLayout
+  title={quote ? (quote.quote_number || 'Quote') : 'Quote'}
+  parentLabel="Quotes"
+  parentHref="/admin/quotes"
+  printDocuments={quote ? [{ label: 'Quote PDF', href: `/admin/quotes/${id}/pdf` }] : undefined}
+>
   {notFound && <p class="admin-empty">Quote not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
   {pdfError && <p class="notice notice--error" style="margin-bottom:1.25rem;">{pdfError}</p>}

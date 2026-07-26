@@ -13,7 +13,7 @@ const REPORTS = [
 ];
 ---
 
-<AdminLayout title="Reports" subtitle="Detailed operational reports — drill-down, filters, and exports.">
+<AdminLayout title="Reports" subtitle="Detailed operational reports — drill-down, filters, and exports." parentLabel="Dashboard" parentHref="/admin">
   <div class="rpt-cards">
     {REPORTS.map((r) => (
       <a class="rpt-card" href={r.href}>

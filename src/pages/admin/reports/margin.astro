@@ -105,7 +105,7 @@ function qs(extra: Record<string, string>): string {
 }
 ---
 
-<AdminLayout title="Margin / Profitability" subtitle="Landed cost and gross margin from real order cost fields — nothing estimated.">
+<AdminLayout title="Margin / Profitability" subtitle="Landed cost and gross margin from real order cost fields — nothing estimated." parentLabel="Reports" parentHref="/admin/reports">
   <a slot="actions" class="admin-btn admin-btn--ghost" href={qs({ format: 'csv' })}>Export CSV</a>
 
   {!dbReady && (

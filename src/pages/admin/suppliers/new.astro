@@ -22,13 +22,16 @@ if (Astro.request.method === 'POST') {
       website: String(form.get('website') ?? '') || null,
       currency: String(form.get('currency') ?? '') || null,
       payment_terms: String(form.get('payment_terms') ?? '') || null,
-      incoterm: String(form.get('incoterm') ?? '') || null,
-      typical_lead_time_days: form.get('typical_lead_time_days') ? Number(form.get('typical_lead_time_days')) : null,
+      incoterm: String(form.get('incoterm') ?? '').trim().toUpperCase() || null,
+      // blank = unknown = NULL; never store a fabricated 0
+      typical_lead_time_days: String(form.get('typical_lead_time_days') ?? '').trim() === '' ? null : Number(form.get('typical_lead_time_days')),
       warranty_terms: String(form.get('warranty_terms') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
     if (!payload.name) {
       error = 'Name is required.';
+    } else if (payload.typical_lead_time_days !== null && (!Number.isInteger(payload.typical_lead_time_days) || payload.typical_lead_time_days < 1)) {
+      error = 'Typical lead time must be a positive whole number of days.';
     } else {
       const { data, error: insertError } = await supabase.from('suppliers').insert(payload).select('id').single();
       if (insertError) error = insertError.message;
@@ -40,7 +43,7 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<AdminLayout title="New Supplier">
+<AdminLayout title="New Supplier" parentLabel="Suppliers" parentHref="/admin/suppliers">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
   <form class="admin-form" method="POST">
     <label class="admin-field"><span>Name *</span><input type="text" name="name" required /></label>
@@ -51,10 +54,16 @@ if (Astro.request.method === 'POST') {
     <label class="admin-field"><span>Country</span><input type="text" name="country" /></label>
     <label class="admin-field admin-form__full"><span>Factory / Business Address</span><input type="text" name="factory_address" /></label>
     <label class="admin-field"><span>Website</span><input type="text" name="website" /></label>
-    <label class="admin-field"><span>Currency</span><input type="text" name="currency" maxlength="3" placeholder="USD" /></label>
+    <label class="admin-field"><span>Currency</span>
+      <select name="currency">
+        <option value="USD" selected>USD (US Dollar)</option>
+        <option value="EUR">EUR (Euro)</option>
+        <option value="CAD">CAD (Canadian Dollar)</option>
+      </select>
+    </label>
     <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" /></label>
-    <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" placeholder="EXW / FOB / CIF / DDP" /></label>
-    <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" /></label>
+    <label class="admin-field"><span>Incoterm</span><input type="text" name="incoterm" placeholder="EXW / FOB / CIF / DDP" style="text-transform:uppercase;" /></label>
+    <label class="admin-field"><span>Typical Lead Time (days)</span><input type="number" name="typical_lead_time_days" step="1" min="1" placeholder="e.g. 45" /></label>
     <label class="admin-field admin-form__full"><span>Warranty Terms</span><input type="text" name="warranty_terms" /></label>
     <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
     <div class="admin-form__actions">

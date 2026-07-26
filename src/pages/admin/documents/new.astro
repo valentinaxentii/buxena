@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { normalizeDocumentUrl } from '../../../lib/document-url';
 
 const CATEGORIES = [
   'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
@@ -47,9 +48,13 @@ try {
       order_id: String(form.get('order_id') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
+    const normalized = normalizeDocumentUrl(payload.file_url);
     if (!payload.category || !payload.file_url) {
       error = 'Category and File URL are required.';
+    } else if (normalized.error) {
+      error = normalized.error;
     } else {
+      payload.file_url = normalized.url!;
       const { data: inserted, error: insertError } = await supabase.from('documents').insert(payload).select('id').single();
       if (insertError) error = insertError.message;
       else return Astro.redirect(`/admin/documents/${inserted.id}`);
@@ -60,7 +65,7 @@ try {
 }
 ---
 
-<AdminLayout title="Add Document">
+<AdminLayout title="Add Document" parentLabel="Documents" parentHref="/admin/documents">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   <form class="admin-form" method="POST">
@@ -71,7 +76,7 @@ try {
       </select>
     </label>
     <label class="admin-field"><span>File Name</span><input type="text" name="file_name" placeholder="e.g. ELLA H2 Installation Manual.pdf" /></label>
-    <label class="admin-field admin-form__full"><span>File URL *</span><input type="url" name="file_url" required placeholder="https://…" /></label>
+    <label class="admin-field admin-form__full"><span>File URL or Web Link *</span><input type="text" name="file_url" required placeholder="buxena.com/specs/aura.pdf — https:// is added automatically" /></label>
 
     <label class="admin-field"><span>Related Customer</span>
       <select name="customer_id"><option value="">— none —</option>{customers.map((c) => <option value={c.id}>{c.name}</option>)}</select>

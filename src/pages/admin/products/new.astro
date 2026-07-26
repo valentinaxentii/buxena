@@ -52,7 +52,7 @@ try {
 }
 ---
 
-<AdminLayout title="New Product">
+<AdminLayout title="New Product" parentLabel="Products" parentHref="/admin/products">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
   <form class="admin-form" method="POST">
     <label class="admin-field"><span>Model Name *</span><input type="text" name="model_name" required /></label>

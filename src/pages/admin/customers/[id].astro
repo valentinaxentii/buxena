@@ -55,7 +55,7 @@ try {
 }
 ---
 
-<AdminLayout title={customer ? customer.name : 'Customer'}>
+<AdminLayout title={customer ? customer.name : 'Customer'} parentLabel="Customers" parentHref="/admin/customers">
   {notFound && <p class="admin-empty">Customer not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 

@@ -80,7 +80,7 @@ if (Astro.url.searchParams.get('format') === 'csv') {
 }
 ---
 
-<AdminLayout title="Product Performance" subtitle="Sales, demand, margin and stock, side by side, per model.">
+<AdminLayout title="Product Performance" subtitle="Sales, demand, margin and stock, side by side, per model." parentLabel="Reports" parentHref="/admin/reports">
   <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/reports/products?${new URLSearchParams({ ...(range.key !== 'all' && { range: range.key }), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }), format: 'csv' }).toString()}`}>Export CSV</a>
 
   {!dbReady && (
@@ -116,7 +116,7 @@ if (Astro.url.searchParams.get('format') === 'csv') {
               <td>{money(r.avgUnitCost)}</td>
               <td>{pct(r.grossMarginPct)}</td>
               <td>{r.supplierName || '—'}</td>
-              <td>{r.leadTimeDays != null ? `${r.leadTimeDays}d` : '—'}</td>
+              <td>{r.leadTimeDays != null ? `${r.leadTimeDays} days` : '—'}</td>
               <td>{r.lastSaleDate ? r.lastSaleDate.slice(0, 10) : '—'}</td>
               <td style="color:var(--admin-muted);">—</td>
             </tr>

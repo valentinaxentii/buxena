@@ -56,7 +56,7 @@ function money(n: number | null | undefined): string {
 }
 ---
 
-<AdminLayout title="Products" subtitle="The BUXENA catalog — every sauna model BUXENA sells.">
+<AdminLayout title="Products" subtitle="The BUXENA catalog — every sauna model BUXENA sells." parentLabel="Dashboard" parentHref="/admin">
   <a slot="actions" class="admin-btn" href="/admin/products/new">+ New Product</a>
 
   {!dbReady && (

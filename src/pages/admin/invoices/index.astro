@@ -1,0 +1,128 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+
+const search = (Astro.url.searchParams.get('q') ?? '').trim();
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const typeFilter = Astro.url.searchParams.get('type') ?? '';
+
+const STATUSES = ['draft', 'issued', 'partially_paid', 'paid', 'overdue', 'void'];
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  issued: 'Issued',
+  partially_paid: 'Partially Paid',
+  paid: 'Paid',
+  overdue: 'Overdue',
+  void: 'Void',
+};
+const TYPES = [
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'proforma', label: 'Proforma' },
+];
+
+let invoices: any[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from('invoices')
+    .select('id, invoice_number, document_type, status, bill_to_name, issue_date, due_date, grand_total, balance_due, created_at')
+    // drafts (null issue_date) first, then newest issued
+    .order('issue_date', { ascending: false, nullsFirst: true })
+    .order('created_at', { ascending: false });
+  if (search) query = query.or(`invoice_number.ilike.%${search}%,bill_to_name.ilike.%${search}%`);
+  if (statusFilter) query = query.eq('status', statusFilter);
+  if (typeFilter) query = query.eq('document_type', typeFilter);
+  const { data } = await query.limit(200);
+  invoices = data ?? [];
+} catch {
+  dbReady = false;
+}
+
+const today = new Date().toISOString().slice(0, 10);
+const isPastDue = (inv: any) =>
+  Boolean(inv.due_date) && inv.due_date < today && inv.status !== 'paid' && inv.status !== 'void';
+
+function pillClass(status: string): string {
+  switch (status) {
+    case 'issued': return 'admin-pill--amber';
+    case 'partially_paid': return 'admin-pill--amber inv-pill--soft';
+    case 'paid': return 'admin-pill--green';
+    case 'overdue': return 'admin-pill--red';
+    case 'void': return 'admin-pill--neutral inv-pill--void';
+    default: return 'admin-pill--neutral'; // draft
+  }
+}
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+---
+
+<AdminLayout title="Invoices" subtitle="Invoices and proformas — issued documents are immutable." parentLabel="Dashboard" parentHref="/admin">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search invoice # or customer…" value={search} />
+      <select class="admin-select" name="status">
+        <option value="">All statuses</option>
+        {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{STATUS_LABELS[s]}</option>)}
+      </select>
+      <select class="admin-select" name="type">
+        <option value="">All</option>
+        {TYPES.map((t) => <option value={t.value} selected={t.value === typeFilter}>{t.label}</option>)}
+      </select>
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+      {(search || statusFilter || typeFilter) && <a class="admin-btn admin-btn--ghost" href="/admin/invoices">Clear</a>}
+    </form>
+  </div>
+  <a slot="actions" class="admin-btn" href="/admin/invoices/new">+ New Invoice</a>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Invoice #</th><th>Type</th><th>Customer</th><th>Issue Date</th><th>Due Date</th><th>Total</th><th>Balance</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {invoices.map((inv) => (
+            <tr class={inv.status === 'void' ? 'inv-row--void' : ''}>
+              <td>
+                <a href={`/admin/invoices/${inv.id}`}>
+                  {inv.invoice_number || <span class="inv-num-none">—</span>}
+                </a>
+              </td>
+              <td>{inv.document_type === 'proforma' ? 'Proforma' : 'Invoice'}</td>
+              <td>{inv.bill_to_name || '—'}</td>
+              <td>{inv.issue_date || '—'}</td>
+              <td class={isPastDue(inv) ? 'inv-due--past' : ''}>{inv.due_date || '—'}</td>
+              <td>{money(inv.grand_total)}</td>
+              <td>{money(inv.balance_due)}</td>
+              <td><span class={`admin-pill ${pillClass(inv.status)}`}>{STATUS_LABELS[inv.status] ?? inv.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {dbReady && invoices.length === 0 && (
+      <p class="admin-empty">{search || statusFilter || typeFilter ? 'No invoices match those filters.' : 'No invoices yet.'}</p>
+    )}
+  </div>
+</AdminLayout>
+
+<style>
+  .inv-due--past { color: #d98a66; }
+  .inv-num-none { color: var(--admin-muted); }
+  .inv-pill--soft { opacity: 0.75; }
+  .inv-pill--void { opacity: 0.6; }
+  .inv-row--void { opacity: 0.45; }
+</style>

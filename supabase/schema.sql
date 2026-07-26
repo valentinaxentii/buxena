@@ -57,7 +57,7 @@ create trigger trg_suppliers_updated_at before update on suppliers
 alter table suppliers add column if not exists whatsapp text;
 alter table suppliers add column if not exists factory_address text;
 alter table suppliers add column if not exists website text;
-alter table suppliers add column if not exists currency text;
+alter table suppliers add column if not exists currency text default 'USD';
 alter table suppliers add column if not exists payment_terms text;
 alter table suppliers add column if not exists incoterm text;
 alter table suppliers add column if not exists typical_lead_time_days integer;
@@ -494,6 +494,215 @@ alter table leads drop constraint if exists leads_source_check;
 alter table leads add constraint leads_source_check check (source is not null and length(trim(source)) > 0);
 
 -- ============================================================================
+-- Invoicing — Stage 1: schema + gapless numbering only. No UI/routes/PDF yet.
+-- ============================================================================
+-- US business, USD only. All money columns are numeric(12,2) dollars, matching
+-- quotes/orders exactly — no second money representation.
+--
+-- Bill-to / ship-to / issuer blocks are TEXT SNAPSHOTS frozen at issue time,
+-- following the same philosophy as quote_items.description: an issued invoice
+-- must render identically in five years even if the customer moves or the
+-- Settings row changes.
+
+create table if not exists invoices (
+  id uuid primary key default gen_random_uuid(),
+  document_type text not null check (document_type in ('invoice', 'proforma')) default 'invoice',
+  -- Null while draft; assigned exactly once at the draft -> issued transition
+  -- by issue_document_number() below. Never reused, never renumbered.
+  invoice_number text unique,
+  status text not null check (
+    status in ('draft', 'issued', 'partially_paid', 'paid', 'overdue', 'void')
+  ) default 'draft',
+
+  -- an invoice may come from a quote, an order, or stand alone — none required
+  customer_id uuid references customers(id) on delete set null,
+  quote_id uuid references quotes(id) on delete set null,
+  order_id uuid references orders(id) on delete set null,
+
+  issue_date date,
+  due_date date,
+  payment_terms text,
+  customer_po_reference text,
+
+  -- snapshotted parties (frozen text, not live joins)
+  bill_to_name text,
+  bill_to_company text,
+  bill_to_address text,
+  bill_to_email text,
+  bill_to_phone text,
+  ship_to_name text,
+  ship_to_company text,
+  ship_to_address text,
+  ship_to_email text,
+  ship_to_phone text,
+  issuer_name text,
+  issuer_address text,
+  issuer_ein text,
+  issuer_email text,
+  issuer_phone text,
+
+  -- tax (US state/local sales tax)
+  ship_to_state text check (ship_to_state is null or ship_to_state ~ '^[A-Z]{2}$'),
+  tax_jurisdiction_label text,
+  tax_rate numeric(5,2) default 0,
+  tax_exempt boolean not null default false,
+  tax_exemption_certificate text,
+  -- distinguishes a legitimate no-nexus zero from a bug
+  tax_not_collected_reason text,
+
+  -- money: stored values at issue time, not computed on read (quotes pattern)
+  subtotal numeric(12,2) default 0,
+  discount_total numeric(12,2) default 0,
+  freight_total numeric(12,2) default 0,
+  taxable_subtotal numeric(12,2) default 0,
+  non_taxable_subtotal numeric(12,2) default 0,
+  tax_total numeric(12,2) default 0,
+  grand_total numeric(12,2) default 0,
+  deposit_received numeric(12,2) default 0,
+  balance_due numeric(12,2) default 0,
+
+  notes text,
+  terms text,
+  -- voiding keeps the row and its number; corrections happen via credit note
+  voided_at timestamptz,
+  void_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists trg_invoices_updated_at on invoices;
+create trigger trg_invoices_updated_at before update on invoices
+  for each row execute function set_updated_at();
+
+-- Line items mirror quote_items: description/model_code are frozen text
+-- snapshots. product_id exists for reporting ONLY — rendering must never
+-- depend on it. Freight/crating/installation are their own rows with their
+-- own is_taxable flag because their taxability varies by state.
+create table if not exists invoice_line_items (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  sort_order integer not null default 0,
+  line_type text not null check (
+    line_type in (
+      'product', 'freight', 'crating', 'liftgate', 'delivery_surcharge',
+      'installation', 'warranty', 'discount', 'other'
+    )
+  ) default 'product',
+  model_code text,
+  description text not null,
+  spec_detail text,
+  product_id uuid references products(id) on delete set null,
+  quantity numeric(10,2) not null default 1,
+  unit_price numeric(12,2) not null default 0,
+  line_discount numeric(12,2) not null default 0,
+  line_total numeric(12,2) not null default 0,
+  is_taxable boolean not null default true
+);
+
+-- Payments: deposits and balance payments are separate rows. The
+-- deposit_received / balance_due columns on invoices are maintained values —
+-- stage 2's mutation layer recomputes them from this table inside the same
+-- server-side write that inserts a payment. on delete restrict (not cascade):
+-- an invoice with recorded payments must never be silently deletable.
+create table if not exists payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete restrict,
+  amount numeric(12,2) not null,
+  payment_date date not null default current_date,
+  method text,
+  reference text,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- Gapless per-year counters. Deliberately NOT a Postgres sequence: nextval()
+-- does not roll back on a failed transaction and would leave gaps. A plain
+-- row updated under SELECT ... FOR UPDATE is fully transactional — a failed
+-- issue rolls the increment back too, so no number is ever consumed.
+create table if not exists document_counters (
+  scope text not null,          -- 'INV' | 'PRO'
+  year integer not null,
+  last_number integer not null default 0,
+  primary key (scope, year)
+);
+
+-- Assigns the next number at the draft -> issued transition, atomically.
+-- Concurrency: the FOR UPDATE row lock on the counter serializes concurrent
+-- issues for the same scope+year; each waiter re-reads after the lock is
+-- granted, so two simultaneous issues can neither collide nor skip.
+-- Sequence restarts each calendar year (year taken from the invoice's
+-- issue_date when set, else today). Format INV-YYYY-NNNN / PRO-YYYY-NNNN.
+create or replace function issue_document_number(p_invoice_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_doc record;
+  v_scope text;
+  v_year integer;
+  v_next integer;
+  v_number text;
+begin
+  -- lock the invoice row first (consistent lock order: invoice, then counter)
+  select id, document_type, status, invoice_number, issue_date
+    into v_doc
+    from invoices
+   where id = p_invoice_id
+   for update;
+
+  if not found then
+    raise exception 'invoice % not found', p_invoice_id;
+  end if;
+  if v_doc.status <> 'draft' or v_doc.invoice_number is not null then
+    raise exception 'invoice % is not an unnumbered draft (status=%, number=%)',
+      p_invoice_id, v_doc.status, coalesce(v_doc.invoice_number, 'null');
+  end if;
+
+  v_scope := case v_doc.document_type when 'proforma' then 'PRO' else 'INV' end;
+  v_year := extract(year from coalesce(v_doc.issue_date, current_date))::integer;
+
+  insert into document_counters (scope, year, last_number)
+  values (v_scope, v_year, 0)
+  on conflict (scope, year) do nothing;
+
+  select last_number + 1
+    into v_next
+    from document_counters
+   where scope = v_scope and year = v_year
+   for update;
+
+  update document_counters
+     set last_number = v_next
+   where scope = v_scope and year = v_year;
+
+  v_number := v_scope || '-' || v_year::text || '-' || lpad(v_next::text, 4, '0');
+
+  update invoices
+     set status = 'issued',
+         invoice_number = v_number,
+         issue_date = coalesce(issue_date, current_date)
+   where id = p_invoice_id;
+
+  return v_number;
+end;
+$$;
+
+-- Additive customer tax fields (no existing column altered)
+alter table customers add column if not exists tax_exempt boolean not null default false;
+alter table customers add column if not exists tax_exemption_certificate text;
+
+-- Additive issuer/company fields on the existing settings singleton (same
+-- storage pattern the quote PDF already reads company identity from)
+alter table settings add column if not exists company_ein text;
+alter table settings add column if not exists bank_name text;
+alter table settings add column if not exists bank_account_name text;
+alter table settings add column if not exists bank_account_number text;
+alter table settings add column if not exists bank_routing_number text;
+alter table settings add column if not exists bank_wire_instructions text;
+alter table settings add column if not exists remit_to_address text;
+
+-- ============================================================================
 -- Row Level Security
 -- ============================================================================
 -- Every table's real access path is server-side, using the service_role key
@@ -511,7 +720,8 @@ begin
   for t in select unnest(array[
     'profiles', 'suppliers', 'products', 'customers', 'leads', 'quotes',
     'quote_items', 'inventory', 'orders', 'enquiries', 'documents', 'activities',
-    'settings', 'shipments', 'shipment_items', 'supplier_products'
+    'settings', 'shipments', 'shipment_items', 'supplier_products',
+    'invoices', 'invoice_line_items', 'payments', 'document_counters'
   ])
   loop
     execute format('alter table %I enable row level security', t);
@@ -554,3 +764,6 @@ grant select, insert, update, delete on shipments, shipment_items to service_rol
 grant select on shipments, shipment_items to authenticated;
 grant select, insert, update, delete on supplier_products to service_role;
 grant select on supplier_products to authenticated;
+grant select, insert, update, delete on invoices, invoice_line_items, payments, document_counters to service_role;
+grant select on invoices, invoice_line_items, payments, document_counters to authenticated;
+grant execute on function issue_document_number(uuid) to service_role;

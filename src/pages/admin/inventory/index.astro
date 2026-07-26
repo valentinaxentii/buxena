@@ -80,7 +80,7 @@ function sortIndicator(col: string): string {
 }
 ---
 
-<AdminLayout title="Inventory">
+<AdminLayout title="Inventory" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -99,8 +99,8 @@ function sortIndicator(col: string): string {
       <input type="hidden" name="dir" value={dir} />
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
-    <a class="admin-btn" href="/admin/inventory/new">+ Add Inventory</a>
   </div>
+  <a slot="actions" class="admin-btn" href="/admin/inventory/new">+ Add Inventory</a>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { normalizeDocumentUrl, resolveDocumentHref, documentLinkLabel } from '../../../lib/document-url';
 
 const { id } = Astro.params;
 const CATEGORIES = [
@@ -45,8 +46,14 @@ try {
       order_id: String(form.get('order_id') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
-    const { error: updateError } = await supabase.from('documents').update(payload).eq('id', id);
-    if (updateError) error = updateError.message;
+    const normalized = normalizeDocumentUrl(payload.file_url);
+    if (normalized.error) {
+      error = normalized.error;
+    } else {
+      payload.file_url = normalized.url!;
+      const { error: updateError } = await supabase.from('documents').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
+    }
   }
 
   const [docRow, customerRows, supplierRows, productRows, quoteRows, orderRows] = await Promise.all([
@@ -68,14 +75,41 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+
+// Render-time defense for rows saved before normalization existed: a stored
+// value with no protocol still gets a working absolute href. No data touched.
+const docHref = doc ? resolveDocumentHref(doc.file_url) : '#';
+const docLinkLabel = doc ? documentLinkLabel(docHref, import.meta.env.SUPABASE_URL) : 'Open file';
+
+// Preview panel: what can the browser natively display?
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|svg)$/i;
+const PDF_EXT = /\.pdf$/i;
+let previewKind: 'image' | 'pdf' | 'other' | 'none' = 'none';
+let previewHost = '';
+if (doc?.file_url && docHref !== '#') {
+  previewKind = 'other';
+  let path = docHref;
+  try {
+    const u = new URL(docHref);
+    path = u.pathname;
+    previewHost = u.hostname;
+  } catch { /* keep raw string for the extension test */ }
+  if (IMAGE_EXT.test(path)) previewKind = 'image';
+  else if (PDF_EXT.test(path)) previewKind = 'pdf';
+}
+const previewName = doc?.file_name || previewHost || '';
+// a non-previewable target with no file extension is a plain website
+const previewIsSite =
+  previewKind === 'other' && !/\.[a-z0-9]{2,5}$/i.test((() => { try { return new URL(docHref).pathname; } catch { return docHref; } })());
 ---
 
-<AdminLayout title={doc?.file_name || 'Document'}>
+<AdminLayout title={doc?.file_name || 'Document'} parentLabel="Documents" parentHref="/admin/documents">
   {notFound && <p class="admin-empty">Document not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   {doc && (
-    <>
+    <div class="doc-layout">
+      <div class="doc-layout__form">
       <form class="admin-form" method="POST">
         <label class="admin-field"><span>Category *</span>
           <select name="category" required>
@@ -84,9 +118,9 @@ try {
         </label>
         <label class="admin-field"><span>File Name</span><input type="text" name="file_name" value={doc.file_name ?? ''} /></label>
         <label class="admin-field admin-form__full">
-          <span>File URL *</span>
-          <input type="url" name="file_url" required value={doc.file_url} />
-          <a href={doc.file_url} target="_blank" rel="noopener" style="font-size:0.8rem; color:var(--admin-gold);">Open file ↗</a>
+          <span>File URL or Web Link *</span>
+          <input type="text" name="file_url" required value={doc.file_url} placeholder="buxena.com/specs/aura.pdf — https:// is added automatically" />
+          <a href={docHref} target="_blank" rel="noopener noreferrer" style="font-size:0.8rem; color:var(--admin-gold);">{docLinkLabel} ↗</a>
         </label>
 
         <label class="admin-field"><span>Related Customer</span>
@@ -117,10 +151,216 @@ try {
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Record</button>
       </form>
-    </>
+      </div>
+
+      <aside class="doc-preview" id="doc-preview" data-kind={previewKind}>
+        <header class="doc-preview__head">
+          <button class="doc-preview__toggle" type="button" id="doc-preview-toggle" aria-expanded="true" title="Collapse preview">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+          </button>
+          <h2>Preview</h2>
+          {previewKind !== 'none' && (
+            <a class="doc-preview__open" href={docHref} target="_blank" rel="noopener noreferrer">Open ↗</a>
+          )}
+        </header>
+
+        <div class="doc-preview__body">
+          {previewKind === 'image' && (
+            <img class="doc-preview__img" src={docHref} alt={previewName || 'Document preview'} loading="lazy" />
+          )}
+          {previewKind === 'pdf' && (
+            <iframe
+              class="doc-preview__frame"
+              id="doc-preview-frame"
+              src={docHref}
+              title={previewName || 'PDF preview'}
+              sandbox="allow-same-origin allow-scripts allow-popups"
+              referrerpolicy="no-referrer"
+            />
+          )}
+          <div
+            class="doc-preview__fallback"
+            id="doc-preview-fallback"
+            hidden={previewKind === 'pdf' || previewKind === 'image'}
+          >
+            {previewKind === 'none' ? (
+              <>
+                <svg class="doc-preview__icon" viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/></svg>
+                <p class="doc-preview__name">No file linked</p>
+              </>
+            ) : (
+              <>
+                <svg class="doc-preview__icon" viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  {previewIsSite ? (
+                    <Fragment><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 2.8 15.4 0 18M12 3c-2.8 2.6-2.8 15.4 0 18"/></Fragment>
+                  ) : (
+                    <Fragment><path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/></Fragment>
+                  )}
+                </svg>
+                {previewName && <p class="doc-preview__name">{previewName}</p>}
+                <p class="doc-preview__msg" id="doc-preview-msg">
+                  {previewIsSite ? 'This source does not allow embedded preview' : 'Preview not available for this file type'}
+                </p>
+                <a class="admin-btn admin-btn--ghost doc-preview__btn" href={docHref} target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
+              </>
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
   )}
 </AdminLayout>
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+
+  /* --- two-column layout: form left (~current width), preview right --- */
+  .doc-layout { display: flex; gap: 24px; align-items: flex-start; }
+  .doc-layout__form { flex: 0 1 740px; min-width: 0; }
+
+  .doc-preview {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: sticky;
+    top: calc(4.25rem + 16px); /* below the sticky admin header */
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4.25rem - 32px);
+    background: #181613;
+    border: 1px solid rgba(201, 166, 104, 0.1);
+    border-radius: 8px;
+  }
+  .doc-preview__head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(201, 166, 104, 0.08);
+  }
+  .doc-preview__head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--admin-cream);
+  }
+  .doc-preview__open {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--admin-gold);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .doc-preview__open:hover { text-decoration: underline; }
+
+  .doc-preview__toggle {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    color: var(--admin-gold);
+    cursor: pointer;
+  }
+  .doc-preview__toggle:hover { background: rgba(201, 166, 104, 0.1); }
+  .doc-preview__toggle svg { transition: transform 150ms ease; }
+
+  .doc-preview__body {
+    flex: 1 1 auto;
+    min-height: 22rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    overflow: hidden;
+  }
+  .doc-preview__img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .doc-preview__frame {
+    width: 100%;
+    height: 100%;
+    min-height: 22rem;
+    border: none;
+    border-radius: 4px;
+    background: #14120f;
+  }
+
+  .doc-preview__fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    text-align: center;
+    max-width: 24rem;
+  }
+  .doc-preview__fallback[hidden] { display: none; }
+  .doc-preview__icon { color: rgba(242, 237, 227, 0.3); }
+  .doc-preview__name {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--admin-cream);
+    word-break: break-all;
+  }
+  .doc-preview__msg { margin: 0; font-size: 0.72rem; color: var(--admin-muted); }
+  .doc-preview__btn { margin-top: 0.4rem; }
+  .doc-preview[data-kind='none'] .doc-preview__fallback { opacity: 0.55; }
+
+  /* collapsed: narrow strip, chevron flips, form gets the width */
+  .doc-preview.is-collapsed { flex: 0 0 2.4rem; min-width: 2.4rem; }
+  .doc-preview.is-collapsed .doc-preview__head { border-bottom: none; padding: 10px 0; justify-content: center; }
+  .doc-preview.is-collapsed .doc-preview__head h2,
+  .doc-preview.is-collapsed .doc-preview__open,
+  .doc-preview.is-collapsed .doc-preview__body { display: none; }
+  .doc-preview.is-collapsed .doc-preview__toggle svg { transform: rotate(180deg); }
+  .doc-preview.is-collapsed ~ * { flex: 1 1 auto; }
+
+  @media (max-width: 1200px) {
+    .doc-layout { flex-direction: column; }
+    .doc-layout__form { flex: 1 1 auto; width: 100%; }
+    .doc-preview { position: static; width: 100%; max-height: none; }
+    .doc-preview__frame { height: 28rem; }
+  }
 </style>
+
+<script>
+  // Collapse toggle, persisted so it survives navigation. Default: expanded.
+  const KEY = 'buxena-doc-preview-collapsed';
+  const panel = document.getElementById('doc-preview');
+  const toggle = document.getElementById('doc-preview-toggle');
+  if (panel && toggle) {
+    const apply = (collapsed: boolean) => {
+      panel.classList.toggle('is-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('title', collapsed ? 'Expand preview' : 'Collapse preview');
+    };
+    try { apply(localStorage.getItem(KEY) === '1'); } catch { /* storage unavailable */ }
+    toggle.addEventListener('click', () => {
+      const collapsed = !panel.classList.contains('is-collapsed');
+      apply(collapsed);
+      try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
+    });
+  }
+
+  // PDF iframe: if the frame hasn't loaded within ~3s (X-Frame-Options / CSP
+  // blocks are the common case for external hosts), swap to the fallback card.
+  const frame = document.getElementById('doc-preview-frame') as HTMLIFrameElement | null;
+  const fallback = document.getElementById('doc-preview-fallback');
+  const msg = document.getElementById('doc-preview-msg');
+  if (frame && fallback) {
+    let loaded = false;
+    frame.addEventListener('load', () => { loaded = true; });
+    frame.addEventListener('error', () => showFallback());
+    const showFallback = () => {
+      frame.hidden = true;
+      frame.style.display = 'none';
+      fallback.hidden = false;
+      if (msg) msg.textContent = 'This source does not allow embedded preview';
+    };
+    setTimeout(() => { if (!loaded) showFallback(); }, 3000);
+  }
+</script>

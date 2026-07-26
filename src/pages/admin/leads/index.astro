@@ -34,7 +34,7 @@ try {
 }
 ---
 
-<AdminLayout title="Leads">
+<AdminLayout title="Leads" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -55,8 +55,8 @@ try {
       </select>
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
-    <a class="admin-btn" href="/admin/leads/new">+ New Lead</a>
   </div>
+  <a slot="actions" class="admin-btn" href="/admin/leads/new">+ New Lead</a>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

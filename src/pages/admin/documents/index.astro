@@ -47,7 +47,7 @@ function relatedTo(row: any): string {
 }
 ---
 
-<AdminLayout title="Documents">
+<AdminLayout title="Documents" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -78,8 +78,8 @@ function relatedTo(row: any): string {
       </select>
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
-    <a class="admin-btn" href="/admin/documents/new">+ Add Document</a>
   </div>
+  <a slot="actions" class="admin-btn" href="/admin/documents/new">+ Add Document</a>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

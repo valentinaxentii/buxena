@@ -2,9 +2,16 @@
 export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ExportMenu from '../../../components/admin/ExportMenu.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { getSettings } from '../../../lib/settings';
 import { toCSV } from '../../../lib/date-range';
+import { buildInventoryReportPdf } from '../../../lib/pdf/build-inventory-report-pdf';
+import { buildReportWorkbook } from '../../../lib/xlsx/report-workbook';
+
+const SUBTITLE = 'Current stock position by model — a live snapshot, not filtered by date.';
+const COST_NOTE = 'Cost value uses landed cost where a shipment has established one, falling back to product cost otherwise. Retail value uses each model\'s current selling price.';
 
 const LOW_STOCK_THRESHOLD = 2;
 
@@ -71,10 +78,108 @@ const preorderOnlyCount = rows.filter((r) => statusOf(r) === 'Preorder only').le
 function money(n: number): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
+
+if (Astro.url.searchParams.get('format') === 'xlsx') {
+  const xlsx = await buildReportWorkbook({
+    sheetName: 'Inventory',
+    title: 'BUXENA — Inventory Report',
+    subtitle: SUBTITLE,
+    generatedAt: new Date(),
+    columns: [
+      { header: 'Model', key: 'model_name', type: 'text' },
+      { header: 'In Stock', key: 'in_stock', type: 'integer' },
+      { header: 'Reserved', key: 'reserved', type: 'integer' },
+      { header: 'Available', key: 'available', type: 'integer' },
+      { header: 'Incoming', key: 'incoming', type: 'integer' },
+      { header: 'Cost Value', key: 'cost_value', type: 'money' },
+      { header: 'Retail Value', key: 'retail_value', type: 'money' },
+      { header: 'Status', key: 'status', type: 'status' },
+    ],
+    rows: rows.map((r) => ({
+      model_name: r.model_name,
+      in_stock: r.in_stock, reserved: r.reserved, available: r.available, incoming: r.incoming,
+      cost_value: costValue(r), retail_value: retailValue(r), status: statusOf(r),
+    })),
+    statusTints: { 'Zero stock': 'red', 'Low stock': 'amber', 'Healthy': 'green', 'Preorder only': 'grey' },
+    totals: {
+      label: 'TOTAL',
+      values: {
+        in_stock: totalUnits,
+        reserved: rows.reduce((s, r) => s + (r.reserved ?? 0), 0),
+        available: rows.reduce((s, r) => s + (r.available ?? 0), 0),
+        incoming: rows.reduce((s, r) => s + (r.incoming ?? 0), 0),
+        cost_value: totalCostValue,
+        retail_value: totalRetailValue,
+      },
+    },
+    footnote: COST_NOTE,
+  });
+  const date = new Date().toISOString().slice(0, 10);
+  return new Response(xlsx, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="buxena-inventory-${date}.xlsx"`,
+    },
+  });
+}
+
+if (Astro.url.searchParams.get('format') === 'pdf') {
+  // Company identity for the letterhead/footer only — the report data itself
+  // comes solely from the rows already computed above.
+  const settings = await getSettings(createSupabaseAdminClient());
+  const pdf = await buildInventoryReportPdf({
+    subtitle: SUBTITLE,
+    note: COST_NOTE,
+    generatedAt: new Date(),
+    kpis: [
+      { label: 'Total Inventory Units', value: String(totalUnits) },
+      { label: 'Inventory Cost Value', value: money(totalCostValue) },
+      { label: 'Estimated Retail Value', value: money(totalRetailValue) },
+      { label: 'Low-Stock Models', value: String(lowStockCount) },
+      { label: 'Zero-Stock Models', value: String(zeroStockCount) },
+      { label: 'Preorder-Only Models', value: String(preorderOnlyCount) },
+    ],
+    rows: rows.map((r) => ({
+      model_name: r.model_name,
+      in_stock: r.in_stock, reserved: r.reserved, available: r.available, incoming: r.incoming,
+      cost_value: costValue(r), retail_value: retailValue(r), status: statusOf(r),
+    })),
+    totals: {
+      units: totalUnits,
+      reserved: rows.reduce((s, r) => s + (r.reserved ?? 0), 0),
+      available: rows.reduce((s, r) => s + (r.available ?? 0), 0),
+      incoming: rows.reduce((s, r) => s + (r.incoming ?? 0), 0),
+      cost: totalCostValue,
+      retail: totalRetailValue,
+    },
+    company: {
+      name: settings.company_name,
+      email: settings.company_email,
+      website: settings.company_website,
+      tagline: settings.pdf_tagline,
+      ein: (settings as any).company_ein ?? null,
+      address: settings.company_address,
+      phone: settings.company_phone,
+    },
+  });
+  const date = new Date().toISOString().slice(0, 10);
+  return new Response(pdf, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="buxena-inventory-${date}.pdf"`,
+    },
+  });
+}
 ---
 
-<AdminLayout title="Inventory Report" subtitle="Current stock position by model — a live snapshot, not filtered by date.">
-  <a slot="actions" class="admin-btn admin-btn--ghost" href="/admin/reports/inventory?format=csv">Export CSV</a>
+<AdminLayout title="Inventory Report" subtitle="Current stock position by model — a live snapshot, not filtered by date." parentLabel="Reports" parentHref="/admin/reports">
+  <div slot="actions">
+    {/* CSV route (?format=csv) stays functional but unreferenced — per instruction. */}
+    <ExportMenu options={[
+      { label: 'Excel (.xlsx)', href: '/admin/reports/inventory?format=xlsx', icon: 'table' },
+      { label: 'PDF (.pdf)', href: '/admin/reports/inventory?format=pdf', icon: 'file' },
+    ]} />
+  </div>
 
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">

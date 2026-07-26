@@ -138,7 +138,7 @@ function money(n: number | null | undefined): string {
 }
 
 const subtitle = shipment
-  ? `Incoming Inventory · ${shipment.po_reference || 'No PO reference'} · ${shipment.status} · ETA ${shipment.eta || '—'}`
+  ? `Shipment Orders · ${shipment.po_reference || 'No PO reference'} · ${shipment.status} · ETA ${shipment.eta || '—'}`
   : undefined;
 
 const totalOrdered = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
@@ -146,7 +146,7 @@ const totalReceived = items.reduce((sum, i) => sum + (i.quantity_received ?? 0),
 const receivingPct = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
 ---
 
-<AdminLayout title={shipment?.shipment_number ?? 'Shipment'} subtitle={subtitle}>
+<AdminLayout title={shipment?.shipment_number ?? 'Shipment'} subtitle={subtitle} parentLabel="Shipment Orders" parentHref="/admin/shipments">
   {shipment && (
     <>
       <a slot="actions" class="admin-btn admin-btn--ghost" href="/admin/shipments">Back</a>

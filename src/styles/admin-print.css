@@ -1,0 +1,200 @@
+/* Print stylesheet for the entire admin portal — the CSS side of the unified
+   document design. All design tokens come from src/lib/doc-theme.ts, injected
+   as --doc-* custom properties by AdminLayout, so print CSS and the PDF kit
+   share ONE source of truth.
+
+   White paper only. Colour exists solely as bronze/black rules, black/#444/
+   #333 text, status colours, and the logo image. On screen this file is
+   completely inert — every rule lives inside @media print. */
+
+@media print {
+  /* margin: 0 suppresses Chrome/Edge's own date/title/URL header & footer;
+     the 0.6in appears as padding on the print container instead. Firefox and
+     Safari handle @page differently, and users can re-enable browser
+     headers/footers in the print dialog. */
+  @page {
+    size: letter;
+    margin: 0;
+  }
+
+  * {
+    background: #fff !important;
+    color: var(--doc-ink, #000) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+    font-family: 'Jost', system-ui, sans-serif;
+  }
+
+  /* on-screen-only chrome — includes the entire topbar: the printed title
+     lives in the injected letterhead instead */
+  .sidebar,
+  .scrim,
+  .hamburger,
+  .topbar,
+  .admin-toolbar,
+  .admin-filterbar,
+  .admin-filter-bar,
+  .expmenu,
+  .account,
+  .admin-btn,
+  .print-btn,
+  form[method='POST'] button[type='submit'] {
+    display: none !important;
+  }
+
+  .shell { display: block !important; }
+  .main { display: block !important; }
+  /* the print container carries the page margins (see @page note above) */
+  .content {
+    padding: var(--doc-margin, 0.6in) !important;
+    padding-bottom: calc(var(--doc-margin, 0.6in) + 0.5in) !important; /* clears the anchored footer */
+  }
+
+  /* --- header: logo IMAGE only left; title block right; bronze rule below.
+         Elements share a bottom edge. --- */
+  .print-letterhead {
+    display: flex !important;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10mm;
+    padding-bottom: 3mm;
+    border-bottom: 1.5px solid var(--doc-bronze, #9c7a4a) !important;
+    margin-bottom: 6mm;
+  }
+  .print-letterhead img {
+    width: var(--doc-logo-w, 160px); /* scaled by width only */
+    height: auto;
+    filter: none !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-letterhead__title {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+  .print-letterhead__doc {
+    font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+    font-size: var(--doc-title-size, 21pt);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--doc-ink, #000) !important;
+    line-height: 1.1;
+  }
+  .print-letterhead__sub {
+    font-size: var(--doc-sub-size, 8.5pt);
+    color: var(--doc-secondary, #444) !important;
+    line-height: 1.4;
+  }
+
+  /* --- footer anchored to the bottom of the sheet --- */
+  .print-footer {
+    display: flex !important;
+    position: fixed;
+    bottom: var(--doc-margin, 0.6in);
+    left: var(--doc-margin, 0.6in);
+    right: var(--doc-margin, 0.6in);
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8mm;
+    padding-top: 2mm;
+    border-top: 1px solid var(--doc-bronze, #9c7a4a) !important;
+    font-size: var(--doc-footer-size, 7.5pt);
+    color: var(--doc-footer, #333) !important;
+  }
+  .print-footer__left { display: flex; flex-direction: column; gap: 1pt; color: var(--doc-footer, #333) !important; }
+  .print-footer__right { display: flex; flex-direction: column; align-items: flex-end; gap: 1pt; color: var(--doc-footer, #333) !important; }
+  /* counter(page) in body content: supported in Firefox, not Chromium — the
+     page number renders where the engine supports it, omitted elsewhere. */
+  .print-footer__page::after { content: 'Page ' counter(page); }
+
+  /* --- tables: identical treatment to the PDFs --- */
+  .admin-table-wrap { overflow: visible !important; }
+  .admin-table {
+    width: 100% !important;
+    font-size: 8.5pt !important;
+  }
+  .admin-table thead { display: table-header-group; }
+  .admin-table tr { break-inside: avoid; }
+  .admin-table thead th {
+    background: #fff !important;
+    color: var(--doc-ink, #000) !important;
+    font-size: 7pt !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase;
+    border: none !important;
+    border-bottom: 2px solid var(--doc-ink, #000) !important;
+  }
+  .admin-table td {
+    border-bottom: 0.5pt solid var(--doc-hairline, #ddd) !important;
+    white-space: normal !important;
+  }
+  /* numeric-heavy trailing columns: last column reaches the right margin */
+  .admin-table th:last-child,
+  .admin-table td:last-child {
+    text-align: right !important;
+    padding-right: 0 !important;
+  }
+  .admin-table th:first-child,
+  .admin-table td:first-child { padding-left: 0 !important; }
+  .admin-table a { color: var(--doc-ink, #000) !important; text-decoration: none !important; }
+  .admin-panel { border: none !important; border-radius: 0 !important; background: #fff !important; }
+
+  /* --- status pills: outlined, coloured text, transparent fill --- */
+  .admin-pill,
+  .admin-badge {
+    background: transparent !important;
+    border: 1px solid currentColor !important;
+  }
+  .admin-pill--red, .admin-badge--red { color: #a32d2d !important; }
+  .admin-pill--amber, .admin-badge--amber, .admin-badge--gold { color: #854f0b !important; }
+  .admin-pill--green, .admin-badge--green { color: #3b6d11 !important; }
+  .admin-pill--neutral, .admin-badge--neutral, .admin-badge--blue { color: var(--doc-secondary, #444) !important; }
+
+  /* --- KPI / summary cards: compact strip between bronze rules --- */
+  .rpt-kpis,
+  .admin-kpis,
+  .dx-kpis {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 2mm 8mm !important;
+    border-top: 0.75pt solid var(--doc-bronze, #9c7a4a) !important;
+    border-bottom: 0.75pt solid var(--doc-bronze, #9c7a4a) !important;
+    padding: 2.5mm 0 !important;
+    margin-bottom: 5mm !important;
+  }
+  .rpt-kpi,
+  .admin-kpi,
+  .dx-kpi {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: baseline !important;
+    gap: 2mm !important;
+    border: none !important;
+    padding: 0 !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+  .rpt-kpi__value, .admin-kpi__value, .dx-kpi__value { font-size: 11pt !important; color: var(--doc-ink, #000) !important; }
+  .rpt-kpi__label, .admin-kpi__label, .dx-kpi__label {
+    font-size: 7.5pt !important;
+    letter-spacing: 0.1em !important;
+    color: var(--doc-bronze, #9c7a4a) !important;
+  }
+  .dx-kpi__icon, .dx-kpi__spark { display: none !important; }
+
+  .rpt-note, .dx-caption { color: var(--doc-secondary, #444) !important; font-size: 7.5pt !important; }
+}
+
+/* on screen the print-only elements never render */
+.print-letterhead,
+.print-footer {
+  display: none;
+}

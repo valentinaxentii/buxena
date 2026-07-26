@@ -1,0 +1,164 @@
+---
+/**
+ * Reusable dropdown for report/record actions (export formats, print menus).
+ * No native <select>, no library — a trigger button opening a dark menu.
+ * Keyboard: Enter/Space opens, Arrow keys move, Enter follows, Escape closes.
+ *
+ * Options may be links (href), a print action (action: 'print' → window.print),
+ * or { divider: true } separators.
+ */
+export interface ExportOption {
+  label: string;
+  href?: string;
+  /** 'print' renders a button that calls window.print() */
+  action?: 'print';
+  /** 'table' (spreadsheet) | 'file' (document) | 'printer' — picks the line icon */
+  icon?: 'table' | 'file' | 'printer';
+}
+type MenuEntry = ExportOption | { divider: true };
+interface Props {
+  options: MenuEntry[];
+  /** Trigger button label. Default "Export". */
+  label?: string;
+  /** 'primary' = solid gold (default), 'ghost' = outlined secondary */
+  variant?: 'primary' | 'ghost';
+}
+const { options, label = 'Export', variant = 'primary' } = Astro.props;
+const uid = `expmenu-${Math.random().toString(36).slice(2, 8)}`;
+
+const ICON_PATHS: Record<string, string> = {
+  table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M9 9v11M15 9v11"/>',
+  file: '<path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/>',
+  printer: '<path d="M7 8V3.5h10V8M7 16H4.5V9.5h15V16H17M7 13.5h10V20H7z"/>',
+};
+---
+
+<div class="expmenu" data-expmenu>
+  <button class={`admin-btn expmenu__btn ${variant === 'ghost' ? 'expmenu__btn--ghost' : ''}`} type="button" aria-haspopup="menu" aria-expanded="false" aria-controls={uid}>
+    {label}
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+  </button>
+  <ul class="expmenu__list" id={uid} role="menu" hidden>
+    {options.map((o) =>
+      'divider' in o ? (
+        <li role="separator" class="expmenu__sep" />
+      ) : (
+        <li role="none">
+          {o.action === 'print' ? (
+            <button type="button" role="menuitem" tabindex="-1" data-print-action>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICON_PATHS[o.icon ?? 'printer']} />
+              <span>{o.label}</span>
+            </button>
+          ) : (
+            <a role="menuitem" tabindex="-1" href={o.href}>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICON_PATHS[o.icon ?? 'file']} />
+              <span>{o.label}</span>
+            </a>
+          )}
+        </li>
+      )
+    )}
+  </ul>
+</div>
+
+<style>
+  .expmenu { position: relative; display: inline-block; }
+  .expmenu__btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .expmenu__btn--ghost {
+    background: transparent;
+    border: 1px solid rgba(201, 166, 104, 0.3);
+    color: #c9a668;
+    font-size: 11px;
+  }
+  .expmenu__btn--ghost:hover { background: rgba(201, 166, 104, 0.08); border-color: rgba(201, 166, 104, 0.5); color: #c9a668; }
+  .expmenu__list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 50;
+    min-width: 11rem;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: #181613;
+    border: 1px solid rgba(201, 166, 104, 0.2);
+    border-radius: 6px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  }
+  .expmenu__list[hidden] { display: none; }
+  .expmenu__sep { height: 1px; margin: 4px 2px; background: rgba(201, 166, 104, 0.15); }
+  .expmenu__list a,
+  .expmenu__list button[data-print-action] {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--admin-cream, #f2ede3);
+    text-decoration: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .expmenu__list a svg,
+  .expmenu__list button[data-print-action] svg { color: #c9a668; }
+  .expmenu__list a:hover,
+  .expmenu__list a:focus,
+  .expmenu__list button[data-print-action]:hover,
+  .expmenu__list button[data-print-action]:focus {
+    background: #c9a668;
+    color: #11100e;
+    outline: none;
+  }
+  .expmenu__list a:hover svg,
+  .expmenu__list a:focus svg,
+  .expmenu__list button[data-print-action]:hover svg,
+  .expmenu__list button[data-print-action]:focus svg { color: #11100e; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-expmenu]:not([data-em-ready])').forEach((root) => {
+    root.setAttribute('data-em-ready', '1');
+    const btn = root.querySelector('button.expmenu__btn') as HTMLButtonElement;
+    const list = root.querySelector('ul')!;
+    const items = [...list.querySelectorAll<HTMLElement>('a, button[data-print-action]')];
+
+    const setOpen = (open: boolean) => {
+      list.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      if (open) items[0]?.focus();
+    };
+
+    btn.addEventListener('click', () => setOpen(list.hidden));
+
+    list.querySelectorAll('[data-print-action]').forEach((el) =>
+      el.addEventListener('click', () => {
+        setOpen(false);
+        window.print();
+      })
+    );
+
+    document.addEventListener('click', (e) => {
+      if (!list.hidden && !root.contains(e.target as Node)) setOpen(false);
+    });
+
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !list.hidden) {
+        setOpen(false);
+        btn.focus();
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !list.hidden) {
+        e.preventDefault();
+        const idx = items.indexOf(document.activeElement as HTMLElement);
+        const next = e.key === 'ArrowDown' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+        items[next]?.focus();
+      } else if (e.key === 'ArrowDown' && list.hidden && document.activeElement === btn) {
+        e.preventDefault();
+        setOpen(true);
+      }
+    });
+  });
+</script>

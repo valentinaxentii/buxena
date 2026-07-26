@@ -27,8 +27,8 @@ let ordersInProgressValue = 0;
 let unitsInStock = 0;
 let incomingInventory = 0;
 
-let needsAttention: { label: string; detail: string; href: string }[] = [];
-let recentActivity: { label: string; detail: string; href: string; when: string }[] = [];
+let needsAttention: { label: string; detail: string; href: string; overdue?: boolean }[] = [];
+let recentActivity: { label: string; detail: string; href: string; when: string; kind: string }[] = [];
 let topProducts: { name: string; count: number }[] = [];
 
 function daysFromNow(n: number): string {
@@ -47,6 +47,12 @@ function timeAgo(iso: string): string {
 }
 function money(n: number | null | undefined): string {
   return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+// Presentation only: split "Type — Entity" labels into the two-line stack.
+function splitLabel(label: string): { primary: string; secondary: string } {
+  const idx = label.indexOf(' — ');
+  if (idx === -1) return { primary: label, secondary: '' };
+  return { primary: label.slice(idx + 3), secondary: label.slice(0, idx) };
 }
 
 try {
@@ -136,13 +142,14 @@ try {
 
   needsAttention = [
     ...(followUpRows.data ?? []).map((l: any) => ({
-      label: `Follow-up overdue — ${l.name}`,
+      label: `Follow-up — ${l.name}`,
       detail: l.follow_up_date ? `Due ${l.follow_up_date}` : '',
       href: `/admin/leads/${l.id}`,
+      overdue: true,
     })),
     ...(expiringQuoteRows.data ?? []).map((q: any) => ({
-      label: `Quote expiring soon — ${q.quote_number || 'Quote'}`,
-      detail: `${q.customers?.name ?? 'Unknown customer'} · expires ${q.expiry_date}`,
+      label: `Quote expiring — ${q.quote_number || 'Quote'}`,
+      detail: `Expires ${q.expiry_date}`,
       href: `/admin/quotes/${q.id}`,
     })),
     ...(lowStockRows.data ?? []).map((i: any) => ({
@@ -151,7 +158,7 @@ try {
       href: `/admin/inventory/${i.id}`,
     })),
     ...(etaSoonRows.data ?? []).map((i: any) => ({
-      label: `Incoming arriving soon — ${i.products?.model_name ?? 'Unknown model'}`,
+      label: `Arriving — ${i.products?.model_name ?? 'Unknown model'}`,
       detail: `ETA ${i.eta}`,
       href: `/admin/inventory/${i.id}`,
     })),
@@ -163,15 +170,15 @@ try {
   ];
 
   recentActivity = [
-    ...(recentLeads.data ?? []).map((l: any) => ({ label: 'New lead', detail: l.name, href: `/admin/leads/${l.id}`, when: l.created_at })),
-    ...(recentQuotes.data ?? []).map((q: any) => ({ label: 'Quote created', detail: q.quote_number || 'Quote', href: `/admin/quotes/${q.id}`, when: q.created_at })),
-    ...(recentOrders.data ?? []).map((o: any) => ({ label: 'Order created', detail: o.order_number || 'Order', href: `/admin/orders/${o.id}`, when: o.created_at })),
-    ...(recentCustomers.data ?? []).map((c: any) => ({ label: 'New customer', detail: c.name, href: `/admin/customers/${c.id}`, when: c.created_at })),
-    ...(recentEnquiries.data ?? []).map((e: any) => ({ label: 'Website enquiry', detail: e.name || e.source, href: `/admin/enquiries`, when: e.created_at })),
+    ...(recentLeads.data ?? []).map((l: any) => ({ label: 'New lead', detail: l.name, href: `/admin/leads/${l.id}`, when: l.created_at, kind: 'lead' })),
+    ...(recentQuotes.data ?? []).map((q: any) => ({ label: 'Quote created', detail: q.quote_number || 'Quote', href: `/admin/quotes/${q.id}`, when: q.created_at, kind: 'quote' })),
+    ...(recentOrders.data ?? []).map((o: any) => ({ label: 'Order created', detail: o.order_number || 'Order', href: `/admin/orders/${o.id}`, when: o.created_at, kind: 'order' })),
+    ...(recentCustomers.data ?? []).map((c: any) => ({ label: 'New customer', detail: c.name, href: `/admin/customers/${c.id}`, when: c.created_at, kind: 'customer' })),
+    ...(recentEnquiries.data ?? []).map((e: any) => ({ label: 'Website enquiry', detail: e.name || e.source, href: `/admin/enquiries`, when: e.created_at, kind: 'enquiry' })),
   ]
     .filter((r) => r.when)
     .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
-    .slice(0, 6);
+    .slice(0, 5);
 
   const productCounts = new Map<string, number>();
   for (const row of orderProductRows.data ?? []) {
@@ -181,33 +188,58 @@ try {
   }
   topProducts = [...productCounts.entries()]
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+    .sort((a, b) => b.count - a.count);
 } catch {
   dbReady = false;
 }
 
 const maxPipelineCount = Math.max(1, ...pipeline.map((p) => p.count));
-const totalPipelineValue = pipeline.reduce((sum, p) => sum + p.value, 0);
 
-// Donut geometry — plain SVG stroke segments, warm gold shades.
-const DONUT_COLORS = ['#c9a668', '#a5854e', '#7d6539', '#584727', '#3a2f1c'];
+// KPI corner icons — same line-icon set the sidebar uses, matched to each metric.
+const KPI_ICONS: Record<string, string> = {
+  leads: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><path d="M17 8h5M19.5 5.5v5"/>',
+  quotes: '<path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/><path d="M9 12h6M9 16h6"/>',
+  orders: '<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+  inventory: '<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8l2-4h14l2 4M10 12.5h4"/>',
+};
+
+// Small line icons for the activity chips, keyed by entry kind.
+const ACT_ICONS: Record<string, string> = {
+  lead: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5.2 5.5-5.2s4.9 1.8 5.5 5.2M17 8h5M19.5 5.5v5"/>',
+  quote: '<path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4M9 12h6M9 16h6"/>',
+  order: '<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+  customer: '<circle cx="12" cy="8.5" r="3.4"/><path d="M5 20.5c.7-3.8 3.4-5.8 7-5.8s6.3 2 7 5.8"/>',
+  enquiry: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3 7 9 6 9-6"/>',
+};
+
+// Donut: top 4 products + an "Others" remainder from the same existing data.
+// Graduated gold→bronze ramp; Others uses the darkest step.
+const DONUT_RAMP = ['#c9a668', '#a8874f', '#86683a', '#5f4a29'];
+const OTHERS_COLOR = '#3a2f1c';
 const donutTotal = topProducts.reduce((sum, p) => sum + p.count, 0);
-const DONUT_R = 15.915; // circumference ≈ 100 for easy percentages
+const top4 = topProducts.slice(0, 4);
+const othersCount = topProducts.slice(4).reduce((sum, p) => sum + p.count, 0);
+const donutSlices = [
+  ...top4.map((p, i) => ({ ...p, color: DONUT_RAMP[i] })),
+  ...(othersCount > 0 ? [{ name: 'Others', count: othersCount, color: OTHERS_COLOR }] : []),
+];
 let donutAcc = 0;
-const donutSegments = topProducts.map((p, i) => {
-  const pct = donutTotal > 0 ? (p.count / donutTotal) * 100 : 0;
-  const seg = { pct, offset: 25 - donutAcc, color: DONUT_COLORS[i % DONUT_COLORS.length] };
-  donutAcc += pct;
-  return seg;
-});
+const donutStops = donutSlices
+  .map((s) => {
+    const from = donutTotal > 0 ? (donutAcc / donutTotal) * 100 : 0;
+    donutAcc += s.count;
+    const to = donutTotal > 0 ? (donutAcc / donutTotal) * 100 : 0;
+    return `${s.color} ${from}% ${to}%`;
+  })
+  .join(', ');
+const pct = (n: number) => (donutTotal > 0 ? Math.round((n / donutTotal) * 100) : 0);
 ---
 
 <AdminLayout title="Dashboard" subtitle="Business overview">
   <a slot="actions" class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
 
   {!dbReady && (
-    <div class="admin-placeholder" style="margin-bottom: 1.25rem;">
+    <div class="admin-placeholder" style="margin-bottom: 1rem;">
       <h2>Not connected to Supabase yet</h2>
       <p>
         Set <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code> and
@@ -217,139 +249,173 @@ const donutSegments = topProducts.map((p, i) => {
     </div>
   )}
 
-  <!-- KPI row -->
+  <!-- BAND 2: KPI row -->
   <div class="dx-kpis">
     <a class="dx-kpi" href="/admin/leads">
       <span class="dx-kpi__head">
         <span class="dx-kpi__label">Total Leads</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5.2 5.5-5.2s4.9 1.8 5.5 5.2M17 8h5M19.5 5.5v5"/></svg>
+        <svg class="dx-kpi__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={KPI_ICONS.leads} />
       </span>
       <span class="dx-kpi__value">{totalLeadsCount}</span>
-      <span class="dx-kpi__foot">{activeLeadsCount} active{followUpCount > 0 ? ` · ${followUpCount} follow-ups due` : ''}</span>
+      <span class="dx-kpi__lower">
+        <span class="dx-kpi__support">
+          <span class="dx-kpi__delta">{activeLeadsCount} active</span>
+          <span class="dx-kpi__caption">{followUpCount} follow-ups due</span>
+        </span>
+        {/* No time series exists in the current leads query — flat baseline, not a fabricated trend. */}
+        <svg class="dx-kpi__spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 15 H100" fill="none" stroke="#c9a668" stroke-width="1.5" opacity="0.2" />
+        </svg>
+      </span>
     </a>
     <a class="dx-kpi" href="/admin/quotes">
       <span class="dx-kpi__head">
         <span class="dx-kpi__label">Open Quotes</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4M9 12h6M9 16h6"/></svg>
+        <svg class="dx-kpi__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={KPI_ICONS.quotes} />
       </span>
       <span class="dx-kpi__value">{openQuotesCount}</span>
-      <span class="dx-kpi__foot">{money(openQuoteValue)} open value</span>
+      <span class="dx-kpi__support">
+        <span class="dx-kpi__money">{money(openQuoteValue)}</span>
+        <span class="dx-kpi__caption">open value</span>
+      </span>
     </a>
     <a class="dx-kpi" href="/admin/orders">
       <span class="dx-kpi__head">
         <span class="dx-kpi__label">Orders in Progress</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>
+        <svg class="dx-kpi__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={KPI_ICONS.orders} />
       </span>
       <span class="dx-kpi__value">{ordersInProgressCount}</span>
-      <span class="dx-kpi__foot">{money(ordersInProgressValue)} in progress</span>
+      <span class="dx-kpi__support">
+        <span class="dx-kpi__money">{money(ordersInProgressValue)}</span>
+        <span class="dx-kpi__caption">value in progress</span>
+      </span>
     </a>
     <a class="dx-kpi" href="/admin/inventory">
       <span class="dx-kpi__head">
         <span class="dx-kpi__label">Units in Stock</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8l2-4h14l2 4M10 12.5h4"/></svg>
+        <svg class="dx-kpi__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={KPI_ICONS.inventory} />
       </span>
       <span class="dx-kpi__value">{unitsInStock}</span>
-      <span class="dx-kpi__foot">{incomingInventory} incoming</span>
+      <span class="dx-kpi__support">
+        <span class="dx-kpi__delta">{incomingInventory}</span>
+        <span class="dx-kpi__caption">units incoming</span>
+      </span>
     </a>
   </div>
 
-  <!-- Sales pipeline -->
-  <section class="admin-panel dx-panel dx-pipeline-panel">
+  <!-- BAND 3: Sales Pipeline — one continuous bar -->
+  <section class="dx-panel">
     <header class="dx-panel__head">
       <h2>Sales Pipeline</h2>
-      <span class="dx-panel__meta">{totalPipelineValue > 0 ? `${money(totalPipelineValue)} reported budgets` : ''}</span>
-      <a class="dx-panel__more" href="/admin/leads">View all</a>
+      <a class="dx-panel__more" href="/admin/leads">View all leads →</a>
     </header>
-    <div class="dx-pipeline">
+    <div class="dx-pipebar">
       {pipeline.map((p) => (
-        <a class="dx-stage" href={`/admin/leads?status=${encodeURIComponent(p.stage)}`}>
-          <span class="dx-stage__count">{p.count}</span>
-          <span class="dx-stage__label">{p.stage}</span>
-          <span class="dx-stage__value">{p.value > 0 ? money(p.value) : ' '}</span>
-          <span class="dx-stage__bar"><span style={`--pct:${(p.count / maxPipelineCount) * 100}%`} /></span>
+        <a class="dx-pipebar__cell" href={`/admin/leads?status=${encodeURIComponent(p.stage)}`}>
+          <span class="dx-pipebar__toprow">
+            <span class="dx-pipebar__stage">{p.stage}</span>
+            <span class="dx-pipebar__badge">{p.count}</span>
+          </span>
+          <span class={`dx-pipebar__value ${p.value > 0 ? '' : 'dx-pipebar__value--zero'}`}>{money(p.value)}</span>
         </a>
       ))}
     </div>
   </section>
 
-  <!-- Lower panels -->
+  <!-- BAND 4: three panels -->
   <div class="dx-grid">
-    <section class="admin-panel dx-panel">
+    <section class="dx-panel">
       <header class="dx-panel__head">
         <h2>Recent Activity</h2>
-        <a class="dx-panel__more" href="/admin/analytics">View all</a>
+        <a class="dx-panel__more" href="/admin/analytics">View all →</a>
       </header>
-      {recentActivity.length === 0 ? (
-        <p class="dx-empty">No activity yet.</p>
-      ) : (
-        <ul class="dx-list">
-          {recentActivity.map((item) => (
-            <li>
-              <a href={item.href}>
-                <span class="dx-list__label">{item.label} — {item.detail}</span>
-                <span class="dx-list__detail">{timeAgo(item.when)}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul class="dx-rows">
+        {recentActivity.map((item) => (
+          <li>
+            <a class="dx-row" href={item.href}>
+              <span class="dx-row__chip" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" set:html={ACT_ICONS[item.kind] ?? ACT_ICONS.lead} />
+              </span>
+              <span class="dx-row__text">
+                <span class="dx-row__primary">{item.detail}</span>
+                <span class="dx-row__secondary">{item.label}</span>
+              </span>
+              <span class="dx-row__meta">{timeAgo(item.when)}</span>
+            </a>
+          </li>
+        ))}
+        {Array.from({ length: Math.max(0, 5 - recentActivity.length) }).map(() => (
+          <li class="dx-row dx-row--ghost dx-row--activity" aria-hidden="true" />
+        ))}
+      </ul>
     </section>
 
-    <section class="admin-panel dx-panel">
+    <section class="dx-panel">
       <header class="dx-panel__head">
         <h2>Tasks / Follow-Ups</h2>
-        <a class="dx-panel__more" href="/admin/leads">View all</a>
+        <a class="dx-panel__more" href="/admin/leads">View all →</a>
       </header>
-      {needsAttention.length === 0 ? (
-        <p class="dx-empty">Nothing needs attention right now.</p>
-      ) : (
-        <ul class="dx-list">
-          {needsAttention.slice(0, 8).map((item) => (
+      <ul class="dx-rows">
+        {needsAttention.slice(0, 6).map((item) => {
+          const parts = splitLabel(item.label);
+          return (
             <li>
-              <a href={item.href}>
-                <span class="dx-list__label">{item.label}</span>
-                <span class="dx-list__detail">{item.detail}</span>
+              <a class="dx-row" href={item.href}>
+                <span class="dx-row__dot" aria-hidden="true" />
+                <span class="dx-row__text">
+                  <span class="dx-row__primary">{parts.primary}</span>
+                  {parts.secondary && <span class="dx-row__secondary">{parts.secondary}</span>}
+                </span>
+                <span class={`dx-row__meta ${item.overdue ? 'dx-row__meta--overdue' : 'dx-row__meta--gold'}`}>{item.detail}</span>
               </a>
             </li>
-          ))}
-        </ul>
-      )}
+          );
+        })}
+        {Array.from({ length: Math.max(0, 5 - needsAttention.length) }).map(() => (
+          <li class="dx-row dx-row--ghost dx-row--task" aria-hidden="true" />
+        ))}
+      </ul>
     </section>
 
-    <section class="admin-panel dx-panel">
+    <section class="dx-panel">
       <header class="dx-panel__head">
         <h2>Top Products</h2>
-        <a class="dx-panel__more" href="/admin/products">View all</a>
+        <a class="dx-panel__more" href="/admin/products">View all →</a>
       </header>
-      {topProducts.length === 0 ? (
-        <p class="dx-empty">No product orders yet.</p>
-      ) : (
-        <div class="dx-donut-wrap">
-          <svg class="dx-donut" viewBox="0 0 42 42" role="img" aria-label="Orders by product">
-            {donutSegments.map((s) => (
-              <circle
-                cx="21" cy="21" r={DONUT_R}
-                fill="none"
-                stroke={s.color}
-                stroke-width="5"
-                stroke-dasharray={`${Math.max(s.pct - 1.5, 0.5)} ${100 - Math.max(s.pct - 1.5, 0.5)}`}
-                stroke-dashoffset={s.offset}
-              />
-            ))}
-            <text x="21" y="20.2" text-anchor="middle" class="dx-donut__num">{donutTotal}</text>
-            <text x="21" y="25.4" text-anchor="middle" class="dx-donut__cap">orders</text>
-          </svg>
+      <div class="dx-donut-wrap">
+        <div
+          class="dx-donut"
+          style={donutTotal > 0 ? `background: conic-gradient(${donutStops});` : 'background: rgba(201, 166, 104, 0.10);'}
+          role="img"
+          aria-label={`${donutTotal} orders by product`}
+        >
+          <span class="dx-donut__hole">
+            <span class="dx-donut__num">{donutTotal}</span>
+            <span class="dx-donut__cap">orders</span>
+          </span>
+        </div>
+        <div class="dx-legend-col">
           <ul class="dx-legend">
-            {topProducts.map((p, i) => (
+            {donutSlices.map((s) => (
               <li>
-                <span class="dx-legend__dot" style={`background:${DONUT_COLORS[i % DONUT_COLORS.length]}`} />
-                <span class="dx-legend__name">{p.name}</span>
-                <span class="dx-legend__count">{p.count}</span>
+                <span class="dx-legend__dot" style={`background:${s.color}`} />
+                <span class="dx-legend__name">{s.name}</span>
+                <span class="dx-legend__count">{s.count} · {pct(s.count)}%</span>
               </li>
             ))}
+            {donutSlices.length === 0 &&
+              Array.from({ length: 4 }).map(() => (
+                <li class="dx-legend__ghost" aria-hidden="true">
+                  <span class="dx-legend__dot" />
+                  <span class="dx-legend__name">—</span>
+                  <span class="dx-legend__count">0</span>
+                </li>
+              ))}
           </ul>
+          {donutSlices.length === 0 && <p class="dx-caption">No product orders yet.</p>}
         </div>
-      )}
+      </div>
+      <a class="dx-products-btn" href="/admin/products">View all products →</a>
     </section>
   </div>
 </AdminLayout>
@@ -369,186 +435,287 @@ const donutSegments = topProducts.map((p, i) => {
 </script>
 
 <style>
-  /* --- KPI row: compact, dense --- */
+  /* --- vertical fill: content column stretches; Band C absorbs the rest --- */
+  :global(main.content) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- BAND 2: KPI row — exactly 4 across at desktop --- */
   .dx-kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
-    gap: 0.7rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    flex: 0 0 auto;
   }
   .dx-kpi {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.8rem 0.95rem;
-    background: var(--admin-panel);
-    border: 1px solid var(--admin-border);
-    border-radius: 4px;
+    gap: 0.2rem;
+    padding: 14px 16px;
+    height: 112px;
+    background: #181613;
+    /* identical rest border on every card — no card is brighter unless hovered */
+    border: 1px solid rgba(201, 166, 104, 0.1);
+    border-radius: 8px;
     text-decoration: none;
-    transition: border-color 0.15s ease;
+    transition: border-color 120ms ease;
   }
-  .dx-kpi:hover { border-color: rgba(201, 166, 104, 0.45); }
+  .dx-kpi:hover { border-color: rgba(201, 166, 104, 0.25); }
+  /* deliberate focus style in place of the browser default ring */
+  .dx-kpi:focus-visible {
+    outline: 1px solid rgba(201, 166, 104, 0.45);
+    outline-offset: 1px;
+  }
   .dx-kpi__head {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem;
-    color: var(--admin-gold);
   }
+  .dx-kpi__icon { color: #c9a668; opacity: 0.45; align-self: flex-start; }
   .dx-kpi__label {
-    font-size: 0.62rem;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--admin-muted);
+    color: rgba(242, 237, 227, 0.5);
   }
   .dx-kpi__value {
-    font-size: 1.55rem;
-    font-weight: 600;
+    font-size: 1.875rem; /* ~30px */
+    font-weight: 500;
     line-height: 1.05;
     font-variant-numeric: tabular-nums;
     color: var(--admin-cream);
   }
-  .dx-kpi__foot { font-size: 0.68rem; color: var(--admin-muted); }
+  .dx-kpi__lower { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+  .dx-kpi__support { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
+  .dx-kpi__money { font-size: 13px; color: var(--admin-cream); font-variant-numeric: tabular-nums; }
+  .dx-kpi__delta { font-size: 11px; color: var(--admin-gold); font-variant-numeric: tabular-nums; }
+  .dx-kpi__caption { font-size: 10px; color: var(--admin-muted); }
+  .dx-kpi__spark { flex: 0 0 45%; width: 45%; height: 30px; }
 
   /* --- shared panel chrome --- */
-  .dx-panel { padding: 0.85rem 1rem; border-radius: 4px; }
+  .dx-panel {
+    margin-top: 16px;
+    padding: 10px 16px;
+    background: #181613;
+    border: 1px solid rgba(201, 166, 104, 0.1);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dx-panel > :not(.dx-panel__head) { flex: 0 0 auto; }
   .dx-panel__head {
     display: flex;
     align-items: baseline;
+    justify-content: space-between;
     gap: 0.75rem;
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.5rem;
   }
   .dx-panel__head h2 {
     margin: 0;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--admin-cream);
   }
-  .dx-panel__meta { font-size: 0.65rem; color: var(--admin-muted); }
   .dx-panel__more {
-    margin-left: auto;
-    font-size: 0.65rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-size: 11px;
     color: var(--admin-gold);
     text-decoration: none;
+    white-space: nowrap;
   }
   .dx-panel__more:hover { text-decoration: underline; }
 
-  /* --- pipeline --- */
-  .dx-pipeline-panel { margin-top: 0.9rem; }
-  .dx-pipeline {
+  /* --- BAND 3: pipeline as one continuous bar, ~104px band --- */
+  .dx-pipebar {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.5rem;
   }
-  .dx-stage {
+  .dx-pipebar__cell {
     display: flex;
     flex-direction: column;
-    gap: 0.12rem;
-    padding: 0.55rem 0.6rem;
-    background: var(--admin-panel-2);
-    border: 1px solid transparent;
-    border-radius: 3px;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 12px 14px;
+    text-align: left;
     text-decoration: none;
-    transition: border-color 0.15s ease;
+    border-left: 1px solid rgba(201, 166, 104, 0.08);
+    transition: background-color 120ms ease;
   }
-  .dx-stage:hover { border-color: rgba(201, 166, 104, 0.4); }
-  .dx-stage__count {
-    font-size: 1.05rem;
-    font-weight: 600;
+  .dx-pipebar__cell:first-child { border-left: none; }
+  .dx-pipebar__cell:hover { background: rgba(201, 166, 104, 0.04); }
+  .dx-pipebar__toprow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dx-pipebar__stage {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(242, 237, 227, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dx-pipebar__badge {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    background: #181613;
+    border: 1px solid rgba(201, 166, 104, 0.35);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--admin-gold);
   }
-  .dx-stage__label {
-    font-size: 0.58rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+  .dx-pipebar__value { font-size: 11px; color: var(--admin-gold); font-variant-numeric: tabular-nums; }
+  .dx-pipebar__value--zero { opacity: 0.35; }
+
+  /* --- BAND C: absorbs all remaining height; Recent Activity is wider --- */
+  .dx-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 16px;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 320px;
+  }
+  .dx-grid .dx-panel { margin-top: 16px; height: calc(100% - 16px); }
+
+  .dx-rows { list-style: none; margin: 0; padding: 0; }
+  .dx-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(201, 166, 104, 0.08);
+    text-decoration: none;
+  }
+  .dx-rows li:last-child .dx-row { border-bottom: none; }
+
+  /* rounded-square chip, not a circle */
+  .dx-row__chip {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    background: #1d1a16;
+    border: 1px solid rgba(201, 166, 104, 0.14);
+    border-radius: 6px;
+    color: rgba(201, 166, 104, 0.85);
+  }
+  /* 6px status dot — gold = open (no "completed" state exists in this data) */
+  .dx-row__dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--admin-gold);
+  }
+
+  .dx-row__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.06rem; }
+  .dx-row__primary {
+    font-size: 12px;
+    color: var(--admin-cream);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dx-row:hover .dx-row__primary { color: var(--admin-gold); }
+  .dx-row__secondary {
+    font-size: 11px;
     color: var(--admin-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .dx-stage__value { font-size: 0.64rem; color: var(--admin-cream); min-height: 0.9rem; }
-  .dx-stage__bar {
-    display: block;
-    height: 2px;
-    margin-top: 0.3rem;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .dx-stage__bar span {
-    display: block;
-    height: 100%;
-    width: var(--pct, 0%);
-    background: var(--admin-gold);
-  }
+  .dx-row__meta { flex: 0 0 auto; font-size: 10px; color: var(--admin-muted); white-space: nowrap; }
+  .dx-row__meta--gold { color: var(--admin-gold); }
+  .dx-row__meta--overdue { color: #d98a66; }
 
-  /* --- lower grid --- */
-  .dx-grid {
+  /* ghost rows: empty slots preserving the list rhythm — no content, just the
+     divider at the correct row height. Not data. */
+  .dx-row--ghost { display: block; }
+  .dx-row--activity { height: 50px; }
+  .dx-row--task { height: 40px; }
+
+  .dx-caption { margin: 0.4rem 0 0; font-size: 10px; color: var(--admin-muted); }
+
+  /* --- donut: 110px, ~18px ring, conic-gradient --- */
+  .dx-donut-wrap { display: flex; align-items: center; gap: 14px; }
+  .dx-donut {
+    flex: 0 0 auto;
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: 0.9rem;
-    margin-top: 0.9rem;
-    align-items: start;
+    place-items: center;
   }
-
-  .dx-list { list-style: none; margin: 0; padding: 0; }
-  .dx-list a {
+  .dx-donut__hole {
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    background: #181613;
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.75rem;
-    padding: 0.42rem 0.1rem;
-    border-bottom: 1px solid var(--admin-border);
-    text-decoration: none;
-    color: var(--admin-cream);
-    font-size: 0.76rem;
-  }
-  .dx-list li:last-child a { border-bottom: none; }
-  .dx-list a:hover .dx-list__label { color: var(--admin-gold); }
-  .dx-list__label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: color 0.12s ease;
-  }
-  .dx-list__detail { flex: 0 0 auto; color: var(--admin-muted); font-size: 0.66rem; white-space: nowrap; }
-
-  .dx-empty { margin: 0; padding: 1.1rem 0.1rem; font-size: 0.76rem; color: var(--admin-muted); }
-
-  /* --- donut --- */
-  .dx-donut-wrap { display: flex; align-items: center; gap: 0.9rem; }
-  .dx-donut { flex: 0 0 auto; width: 6.4rem; height: 6.4rem; transform: rotate(0deg); }
-  .dx-donut__num { font-size: 0.42rem; font-weight: 600; fill: var(--admin-cream); font-family: inherit; }
-  .dx-donut__cap { font-size: 0.17rem; letter-spacing: 0.05em; text-transform: uppercase; fill: var(--admin-muted); font-family: inherit; }
-
-  .dx-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; }
-  .dx-legend li {
-    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.22rem 0;
-    font-size: 0.72rem;
+    justify-content: center;
+    gap: 0.05rem;
   }
-  .dx-legend__dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 2px; }
+  .dx-donut__num { font-size: 20px; font-weight: 500; color: var(--admin-cream); font-variant-numeric: tabular-nums; }
+  .dx-donut__cap { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); }
+
+  .dx-legend-col { flex: 1 1 auto; min-width: 0; }
+  .dx-legend { list-style: none; margin: 0; padding: 0; min-width: 0; }
+  .dx-legend li { display: flex; align-items: center; gap: 0.45rem; padding: 0.2rem 0; }
+  .dx-legend__ghost { opacity: 0.3; }
+  .dx-legend__ghost .dx-legend__dot { background: rgba(242, 237, 227, 0.35); }
+  .dx-legend__dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 2px; }
   .dx-legend__name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 11px;
     color: var(--admin-cream);
   }
-  .dx-legend__count { margin-left: auto; color: var(--admin-muted); font-variant-numeric: tabular-nums; }
+  .dx-legend__count { margin-left: auto; font-size: 11px; color: var(--admin-gold); font-variant-numeric: tabular-nums; }
+
+  /* full-width outline button pinned to the panel bottom */
+  .dx-products-btn {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    border: 1px solid rgba(201, 166, 104, 0.3);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--admin-gold);
+    text-decoration: none;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .dx-products-btn:hover { border-color: rgba(201, 166, 104, 0.55); background: rgba(201, 166, 104, 0.05); }
 
   @media (max-width: 1100px) {
-    .dx-pipeline { grid-template-columns: repeat(4, 1fr); }
+    .dx-kpis { grid-template-columns: repeat(2, 1fr); }
+    .dx-kpi { height: auto; }
+    .dx-grid { grid-template-columns: 1fr; }
+    .dx-pipebar { grid-template-columns: repeat(4, 1fr); }
+    .dx-pipebar__cell:nth-child(5) { border-left: none; }
   }
-  @media (max-width: 640px) {
-    .dx-pipeline { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 560px) {
+    .dx-kpis { grid-template-columns: 1fr; }
+    .dx-pipebar { grid-template-columns: repeat(2, 1fr); }
+    .dx-pipebar__cell { border-left: none; }
   }
 </style>

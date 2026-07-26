@@ -104,7 +104,7 @@ function money(n: number | null | undefined): string {
 }
 ---
 
-<AdminLayout title={order ? (order.order_number || 'Order') : 'Order'}>
+<AdminLayout title={order ? (order.order_number || 'Order') : 'Order'} parentLabel="Orders" parentHref="/admin/orders">
   {notFound && <p class="admin-empty">Order not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
@@ -113,6 +113,10 @@ function money(n: number | null | undefined): string {
       <p style="margin-top:-0.5rem;"><StatusBadge status={order.status} /></p>
 
       <form class="admin-form" method="POST">
+        {/* identifies the record — read-only, no name attribute, never submitted */}
+        <label class="admin-field admin-form__full"><span>Order Number</span>
+          <input type="text" value={order.order_number ?? ''} placeholder="—" readonly disabled />
+        </label>
         <label class="admin-field"><span>Customer *</span>
           <select name="customer_id" required>
             <option value="">— select —</option>

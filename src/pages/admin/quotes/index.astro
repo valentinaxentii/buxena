@@ -26,7 +26,7 @@ try {
 }
 ---
 
-<AdminLayout title="Quotes">
+<AdminLayout title="Quotes" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
       <h2>Not connected to Supabase yet</h2>
@@ -42,8 +42,8 @@ try {
       </select>
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
-    <a class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
   </div>
+  <a slot="actions" class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

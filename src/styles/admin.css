@@ -327,9 +327,12 @@
   color: var(--admin-cream);
 }
 .rpt-kpi__foot { font-size: 0.7rem; color: var(--admin-muted); }
-.rpt-kpi--hero { background: var(--admin-cream); border-color: var(--admin-cream); }
-.rpt-kpi--hero .rpt-kpi__value { color: var(--admin-bg); }
-.rpt-kpi--hero .rpt-kpi__label { color: rgba(20, 18, 15, 0.6); }
+/* Hero card: emphasized IN THE DARK PALETTE — cream is the public-site
+   palette and never appears in the admin. Hierarchy comes from the stronger
+   gold border and gold value instead of a light fill. */
+.rpt-kpi--hero { background: var(--admin-panel); border-color: rgba(201, 166, 104, 0.45); }
+.rpt-kpi--hero .rpt-kpi__value { color: var(--admin-gold); }
+.rpt-kpi--hero .rpt-kpi__label { color: var(--admin-muted); }
 .rpt-kpi--accent .rpt-kpi__value { color: var(--admin-gold); }
 
 .rpt-cards {
@@ -393,3 +396,30 @@
 .admin-filterbar .admin-input,
 .admin-filterbar .admin-select { transition: border-color 0.15s ease; }
 .admin-filterbar .admin-input--search { flex: 1 1 14rem; min-width: 10rem; }
+
+/* Native <select> popups: dark, on-brand. `color-scheme: dark` is the key —
+   it forces the native option list dark even where per-option styling is
+   ignored (e.g. macOS). Option rules below apply where the platform honors
+   them. Deliberately NO custom JS dropdown — native control only. */
+select { color-scheme: dark; }
+select option {
+  background-color: #181613;
+  color: #f2ede3;
+}
+select option:hover,
+select option:checked {
+  background-color: #c9a668;
+  color: #11100e;
+}
+
+.admin-select,
+.admin-field select {
+  border-color: rgba(201, 166, 104, 0.12);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23c9a668' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 0.6rem auto;
+  padding-right: 1.7rem;
+}

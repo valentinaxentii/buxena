@@ -77,7 +77,7 @@ try {
 }
 ---
 
-<AdminLayout title={lead ? lead.name : 'Lead'}>
+<AdminLayout title={lead ? lead.name : 'Lead'} parentLabel="Leads" parentHref="/admin/leads">
   {notFound && <p class="admin-empty">Lead not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 

@@ -13,7 +13,7 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/eda-thermowood-1-3m-hero.jpg"
+  src: "/images/saunas/eda-thermowood-1-3m-hero.png"
   alt: "EDA Thermowood 1.3m barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Length", value: "4.3 ft (130 cm)" }

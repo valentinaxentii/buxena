@@ -130,8 +130,8 @@ const rows = allRows.filter((row) => {
 });
 ---
 
-<AdminLayout title="Incoming Inventory" subtitle="Track every BUXENA sauna from factory order to warehouse arrival.">
-  <a slot="actions" class="admin-btn" href="/admin/shipments/new">+ Order New Shipment</a>
+<AdminLayout title="Shipment Orders" subtitle="Track every BUXENA sauna from factory order to warehouse arrival." parentLabel="Dashboard" parentHref="/admin">
+  <a slot="actions" class="admin-btn" href="/admin/shipments/new">+ New Shipment Order</a>
 
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
@@ -280,14 +280,14 @@ const rows = allRows.filter((row) => {
   }
   .inc-card__foot { font-size: 0.7rem; color: var(--admin-muted); }
 
-  /* The hero — Total Units Incoming — is the one deliberately light card;
-     everything else stays dark. Not every card is cream on purpose. */
+  /* The hero — Total Units Incoming — is emphasized within the dark palette
+     (gold border + gold value). Cream never appears in the admin. */
   .inc-card--hero {
-    background: var(--admin-cream);
-    border-color: var(--admin-cream);
+    background: var(--admin-panel);
+    border-color: rgba(201, 166, 104, 0.45);
   }
-  .inc-card--hero .inc-card__value { color: var(--admin-bg); }
-  .inc-card--hero .inc-card__label { color: rgba(20, 18, 15, 0.6); }
+  .inc-card--hero .inc-card__value { color: var(--admin-gold); }
+  .inc-card--hero .inc-card__label { color: var(--admin-muted); }
 
   /* The financial KPI stays dark but reads as "the money one" via gold. */
   .inc-card--financial .inc-card__value { color: var(--admin-gold); }

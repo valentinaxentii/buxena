@@ -1,0 +1,299 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { issueInvoiceNumber } from '../../../lib/invoice-number';
+
+const { id } = Astro.params;
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft', issued: 'Issued', partially_paid: 'Partially Paid',
+  paid: 'Paid', overdue: 'Overdue', void: 'Void',
+};
+const VOIDABLE = ['issued', 'partially_paid', 'overdue'];
+
+let invoice: any = null;
+let items: any[] = [];
+let error: string | null = null;
+let notice: string | null = null;
+let notFound = false;
+
+function money(n: number | null | undefined): string {
+  return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+    const { data: current } = await supabase.from('invoices').select('id, status, invoice_number').eq('id', id).single();
+
+    if (!current) {
+      notFound = true;
+    } else if (intent === 'issue') {
+      if (current.invoice_number) {
+        // idempotent-safe: never reassign or overwrite an existing number
+        notice = `Already issued as ${current.invoice_number} — no new number was assigned.`;
+      } else if (current.status !== 'draft') {
+        error = `Only drafts can be issued (status is ${current.status}).`;
+      } else {
+        try {
+          const assigned = await issueInvoiceNumber(supabase, id!);
+          return Astro.redirect(`/admin/invoices/${id}?issued=${encodeURIComponent(assigned)}`);
+        } catch (e) {
+          error = e instanceof Error ? e.message : 'Issue failed — no number was consumed.';
+        }
+      }
+    } else if (intent === 'void') {
+      const reason = String(form.get('void_reason') ?? '').trim();
+      if (!VOIDABLE.includes(current.status)) {
+        error = `Only issued, partially paid, or overdue invoices can be voided (status is ${current.status}).`;
+      } else if (!reason) {
+        error = 'A void reason is required.';
+      } else {
+        const { error: voidError } = await supabase
+          .from('invoices')
+          .update({ status: 'void', voided_at: new Date().toISOString(), void_reason: reason })
+          .eq('id', id)
+          .in('status', VOIDABLE); // guard against a concurrent status change
+        if (voidError) error = voidError.message;
+        else return Astro.redirect(`/admin/invoices/${id}`);
+      }
+    } else if (intent === 'delete') {
+      if (current.status !== 'draft' || current.invoice_number) {
+        error = 'Only unnumbered drafts can be deleted — issued invoices are permanent.';
+      } else {
+        const { error: delError } = await supabase
+          .from('invoices').delete().eq('id', id).eq('status', 'draft').is('invoice_number', null);
+        if (delError) error = delError.message;
+        else return Astro.redirect('/admin/invoices');
+      }
+    }
+  }
+
+  const [invoiceRes, itemsRes] = await Promise.all([
+    supabase.from('invoices').select('*').eq('id', id).single(),
+    supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('sort_order'),
+  ]);
+  if (invoiceRes.error || !invoiceRes.data) notFound = true;
+  else invoice = invoiceRes.data;
+  items = itemsRes.data ?? [];
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+const justIssued = Astro.url.searchParams.get('issued');
+if (justIssued && !notice) notice = `Issued as ${justIssued}. This invoice is now immutable.`;
+
+function pillClass(status: string): string {
+  switch (status) {
+    case 'issued': return 'admin-pill--amber';
+    case 'partially_paid': return 'admin-pill--amber';
+    case 'paid': return 'admin-pill--green';
+    case 'overdue': return 'admin-pill--red';
+    default: return 'admin-pill--neutral';
+  }
+}
+
+// Integrity check — display only, never silently corrected: the stored totals
+// are the document of record; a mismatch with the line items is surfaced.
+const lineSum = items.reduce((s, it) => s + (it.line_type === 'discount' ? -Number(it.line_total) : Number(it.line_total)), 0);
+const storedNet = Number(invoice?.taxable_subtotal ?? 0) + Number(invoice?.non_taxable_subtotal ?? 0);
+const totalsMismatch = invoice && items.length > 0 && Math.abs(lineSum - storedNet) > 0.01;
+
+const isDraft = invoice?.status === 'draft';
+const isVoid = invoice?.status === 'void';
+const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
+---
+
+<AdminLayout title={title} subtitle={invoice ? (invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice') : undefined} parentLabel="Invoices" parentHref="/admin/invoices">
+  {isDraft && (
+    <form slot="actions" method="POST" onsubmit="return confirm('Issue this invoice?\n\nIssuing assigns a permanent invoice number and makes the document immutable. This cannot be undone.');" style="margin:0;">
+      <input type="hidden" name="_intent" value="issue" />
+      <button class="admin-btn" type="submit">Issue Invoice</button>
+    </form>
+  )}
+
+  {notFound && <p class="admin-empty">Invoice not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--ok" style="margin-bottom:1.25rem;">{notice}</p>}
+  {totalsMismatch && (
+    <p class="notice notice--error" style="margin-bottom:1.25rem;">
+      Data problem: the stored totals ({money(storedNet)} net) do not match the sum of the line items ({money(lineSum)}).
+      Stored values are displayed as-is — nothing has been silently corrected.
+    </p>
+  )}
+
+  {invoice && (
+    <div class={`inv-detail ${isVoid ? 'inv-detail--void' : ''}`}>
+      {isVoid && (
+        <p class="inv-void-marker">
+          VOID{invoice.voided_at ? ` — ${String(invoice.voided_at).slice(0, 10)}` : ''}{invoice.void_reason ? ` — ${invoice.void_reason}` : ''}
+          <span class="inv-void-note">Invoice number {invoice.invoice_number ?? '—'} is retained and will never be reused.</span>
+        </p>
+      )}
+
+      <section class="admin-panel inv-sec">
+        <h2 class="inv-sec__h">Document <span class={`admin-pill ${pillClass(invoice.status)}`}>{STATUS_LABELS[invoice.status] ?? invoice.status}</span></h2>
+        <dl class="inv-kv">
+          <div><dt>Type</dt><dd>{invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice'}</dd></div>
+          <div><dt>Invoice #</dt><dd>{invoice.invoice_number ?? '— unassigned (draft)'}</dd></div>
+          <div><dt>Issue Date</dt><dd>{invoice.issue_date ?? '—'}</dd></div>
+          <div><dt>Due Date</dt><dd>{invoice.due_date ?? '—'}</dd></div>
+          <div><dt>Payment Terms</dt><dd>{invoice.payment_terms ?? '—'}</dd></div>
+          <div><dt>Customer PO</dt><dd>{invoice.customer_po_reference ?? '—'}</dd></div>
+        </dl>
+      </section>
+
+      <div class="inv-parties-view">
+        <section class="admin-panel inv-sec">
+          <h2 class="inv-sec__h">Bill To <span class="inv-snap-note">snapshot at creation</span></h2>
+          <p class="inv-party-text">
+            {[invoice.bill_to_name, invoice.bill_to_company, invoice.bill_to_address, invoice.bill_to_email, invoice.bill_to_phone].filter(Boolean).map((l) => <span>{l}<br /></span>)}
+            {![invoice.bill_to_name, invoice.bill_to_company, invoice.bill_to_address, invoice.bill_to_email, invoice.bill_to_phone].some(Boolean) && '—'}
+          </p>
+        </section>
+        <section class="admin-panel inv-sec">
+          <h2 class="inv-sec__h">Ship To <span class="inv-snap-note">state drives tax: {invoice.ship_to_state ?? '—'}</span></h2>
+          <p class="inv-party-text">
+            {[invoice.ship_to_name, invoice.ship_to_company, invoice.ship_to_address, invoice.ship_to_email, invoice.ship_to_phone].filter(Boolean).map((l) => <span>{l}<br /></span>)}
+            {![invoice.ship_to_name, invoice.ship_to_company, invoice.ship_to_address, invoice.ship_to_email, invoice.ship_to_phone].some(Boolean) && '—'}
+          </p>
+        </section>
+      </div>
+
+      <section class="admin-panel inv-sec">
+        <h2 class="inv-sec__h">Issued By</h2>
+        <p class="inv-party-text">
+          {[invoice.issuer_name, invoice.issuer_address, invoice.issuer_ein ? `EIN: ${invoice.issuer_ein}` : null, invoice.issuer_email, invoice.issuer_phone].filter(Boolean).map((l) => <span>{l}<br /></span>)}
+        </p>
+      </section>
+
+      <section class="admin-panel inv-sec">
+        <h2 class="inv-sec__h">Line Items</h2>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Type</th><th>Model Code</th><th>Description</th><th>Spec Detail</th><th>Qty</th><th>Unit Price</th><th>Line Disc.</th><th>Taxable</th><th>Line Total</th></tr></thead>
+            <tbody>
+              {items.map((it) => (
+                <tr>
+                  <td>{String(it.line_type).replace(/_/g, ' ')}</td>
+                  <td>{it.model_code ?? '—'}</td>
+                  <td style="white-space:normal;">{it.description}</td>
+                  <td style="white-space:normal;">{it.spec_detail ?? '—'}</td>
+                  <td>{it.quantity}</td>
+                  <td>{money(it.unit_price)}</td>
+                  <td>{Number(it.line_discount) > 0 ? money(it.line_discount) : '—'}</td>
+                  <td>{it.is_taxable ? '✓' : '—'}</td>
+                  <td>{money(it.line_total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {items.length === 0 && <p class="admin-empty">No line items.</p>}
+      </section>
+
+      <section class="admin-panel inv-sec inv-totals">
+        <dl class="inv-totals__list">
+          <div><dt>Subtotal</dt><dd>{money(invoice.subtotal)}</dd></div>
+          <div><dt>Discount</dt><dd>{money(invoice.discount_total)}</dd></div>
+          <div><dt>Freight</dt><dd>{money(invoice.freight_total)}</dd></div>
+          <div><dt>Taxable Subtotal</dt><dd>{money(invoice.taxable_subtotal)}</dd></div>
+          <div><dt>Non-Taxable Subtotal</dt><dd>{money(invoice.non_taxable_subtotal)}</dd></div>
+          <div><dt>Tax ({Number(invoice.tax_rate) || 0}%{invoice.tax_jurisdiction_label ? ` — ${invoice.tax_jurisdiction_label}` : ''})</dt><dd>{money(invoice.tax_total)}</dd></div>
+          <div class="inv-totals__grand"><dt>Grand Total</dt><dd>{money(invoice.grand_total)}</dd></div>
+          <div><dt>Deposit Received</dt><dd>{money(invoice.deposit_received)}</dd></div>
+          <div class="inv-totals__balance"><dt>Balance Due</dt><dd>{money(invoice.balance_due)}</dd></div>
+        </dl>
+      </section>
+
+      {(invoice.tax_exempt || invoice.tax_not_collected_reason) && (
+        <section class="admin-panel inv-sec">
+          <h2 class="inv-sec__h">Tax Notes</h2>
+          {invoice.tax_exempt && <p class="inv-party-text">Tax exempt{invoice.tax_exemption_certificate ? ` — certificate: ${invoice.tax_exemption_certificate}` : ''}.</p>}
+          {invoice.tax_not_collected_reason && <p class="inv-party-text">Tax not collected: {invoice.tax_not_collected_reason}</p>}
+        </section>
+      )}
+
+      {(invoice.notes || invoice.terms) && (
+        <section class="admin-panel inv-sec">
+          {invoice.notes && <><h2 class="inv-sec__h">Notes</h2><p class="inv-party-text">{invoice.notes}</p></>}
+          {invoice.terms && <><h2 class="inv-sec__h" style="margin-top:0.9rem;">Terms</h2><p class="inv-party-text">{invoice.terms}</p></>}
+        </section>
+      )}
+
+      <div class="inv-actions">
+        {isDraft && (
+          <form method="POST" onsubmit="return confirm('Delete this draft? Drafts have no number, so nothing is consumed and no gap is created.');" style="margin:0;">
+            <input type="hidden" name="_intent" value="delete" />
+            <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Draft</button>
+          </form>
+        )}
+        {VOIDABLE.includes(invoice.status) && (
+          <form method="POST" class="inv-void-form" onsubmit="return confirm('Void this invoice? The invoice number is retained forever and the document stays on record marked VOID.');">
+            <input type="hidden" name="_intent" value="void" />
+            <input class="admin-input" type="text" name="void_reason" placeholder="Reason for voiding (required)" required style="min-width:18rem;" />
+            <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Void Invoice</button>
+          </form>
+        )}
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
+
+  .inv-detail { display: flex; flex-direction: column; gap: 0.9rem; }
+  .inv-detail--void > :not(.inv-void-marker) { opacity: 0.45; }
+  .inv-void-marker {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #d98a66;
+    background: rgba(217, 138, 102, 0.08);
+    border: 1px solid rgba(217, 138, 102, 0.4);
+    border-radius: 4px;
+  }
+  .inv-void-note { display: block; margin-top: 0.25rem; font-weight: 400; letter-spacing: 0; color: var(--admin-muted); font-size: 0.72rem; }
+
+  .inv-sec { padding: 0.9rem 1.1rem; border-radius: 6px; }
+  .inv-sec__h {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--admin-cream);
+  }
+  .inv-snap-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 0.68rem; color: var(--admin-muted); }
+
+  .inv-kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem 1.25rem; margin: 0; }
+  .inv-kv dt { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .inv-kv dd { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--admin-cream); }
+
+  .inv-parties-view { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  .inv-party-text { margin: 0; font-size: 0.82rem; line-height: 1.6; color: var(--admin-cream); }
+
+  .inv-totals__list { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; margin: 0; }
+  .inv-totals__list > div { display: flex; justify-content: flex-end; gap: 1.5rem; min-width: 22rem; }
+  .inv-totals__list dt { color: var(--admin-muted); font-size: 0.78rem; }
+  .inv-totals__list dd { margin: 0; font-size: 0.78rem; color: var(--admin-cream); font-variant-numeric: tabular-nums; min-width: 7rem; text-align: right; }
+  .inv-totals__grand dt, .inv-totals__grand dd { font-size: 0.9rem !important; color: var(--admin-gold) !important; font-weight: 600; }
+  .inv-totals__balance dt, .inv-totals__balance dd { font-size: 0.95rem !important; font-weight: 600; color: var(--admin-cream) !important; }
+
+  .inv-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+  .inv-void-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
+
+  @media (max-width: 860px) {
+    .inv-parties-view { grid-template-columns: 1fr; }
+    .inv-kv { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
