@@ -24,7 +24,11 @@ const LABELS: Record<string, string> = {
 ---
 
 <div class="avail">
-  <span class={`avail__badge avail__badge--${status}`}>{LABELS[status]}</span>
+  {status === 'preorder' ? (
+    <a class="avail__badge avail__badge--preorder" href="#enquire">{LABELS[status]}</a>
+  ) : (
+    <span class={`avail__badge avail__badge--${status}`}>{LABELS[status]}</span>
+  )}
   {etaNote && <span class="avail__eta">{etaNote}</span>}
 </div>
 
@@ -39,7 +43,12 @@ const LABELS: Record<string, string> = {
     text-transform: uppercase;
     padding: 0.4rem 0.75rem;
     border: 1px solid transparent;
+    /* neutralizes browser default <a> styling (underline, visited color) so
+       the now-clickable preorder badge looks identical to the plain <span>
+       it replaces for the other two states — no visual change, just a fix. */
+    text-decoration: none;
   }
+  a.avail__badge:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
 
   .avail__badge--in-stock {
     color: var(--ink);

@@ -1,13 +1,17 @@
 ---
 export const prerender = false;
 
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import '../../../styles/admin.css';
-import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { INVOICE_LINE_TYPES, parseInvoiceItems, computeInvoiceTotals } from '../../../lib/invoice-totals';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+import { INVOICE_LINE_TYPES, parseInvoiceItems, computeInvoiceTotals } from '../../../../lib/invoice-totals';
 
 const LINE_TYPES = INVOICE_LINE_TYPES;
 
+const { id } = Astro.params;
+
+let inv: any = null;
+let invItems: any[] = [];
 let customers: any[] = [];
 let products: any[] = [];
 let settingsRow: any = null;
@@ -55,36 +59,19 @@ try {
   products = productRows.data ?? [];
   settingsRow = settingsRes.data ?? null;
 
-  // --- origination prefill (GET only; values are copies, never links) ---
-  const quoteId = Astro.url.searchParams.get('quote_id');
-  const orderId = Astro.url.searchParams.get('order_id');
-  if (Astro.request.method === 'GET' && quoteId) {
-    const [{ data: quote }, { data: items }] = await Promise.all([
-      supabase.from('quotes').select('*').eq('id', quoteId).single(),
-      supabase.from('quote_items').select('description, quantity, unit_price').eq('quote_id', quoteId).order('sort_order'),
-    ]);
-    if (quote) {
-      applyCustomerSnapshot(customers.find((c) => c.id === quote.customer_id));
-      prefill.tax_rate = Number(quote.tax_rate ?? 0);
-      prefill.lines = (items ?? []).map((it: any) => ({
-        line_type: 'product', model_code: '', description: it.description ?? '', spec_detail: '',
-        quantity: Number(it.quantity ?? 1), unit_price: Number(it.unit_price ?? 0), line_discount: 0, is_taxable: true,
-      }));
-      if (Number(quote.delivery_cost) > 0) prefill.lines.push({ line_type: 'freight', model_code: '', description: 'Delivery', spec_detail: '', quantity: 1, unit_price: Number(quote.delivery_cost), line_discount: 0, is_taxable: true });
-      if (Number(quote.installation_cost) > 0) prefill.lines.push({ line_type: 'installation', model_code: '', description: 'Installation', spec_detail: '', quantity: 1, unit_price: Number(quote.installation_cost), line_discount: 0, is_taxable: true });
-      if (Number(quote.discount) > 0) prefill.lines.push({ line_type: 'discount', model_code: '', description: 'Discount', spec_detail: '', quantity: 1, unit_price: Number(quote.discount), line_discount: 0, is_taxable: true });
-    }
-  } else if (Astro.request.method === 'GET' && orderId) {
-    const { data: order } = await supabase.from('orders').select('*, products(model_name)').eq('id', orderId).single();
-    if (order) {
-      applyCustomerSnapshot(customers.find((c) => c.id === order.customer_id));
-      const modelName = order.products?.model_name ?? '';
-      prefill.lines = [{
-        line_type: 'product', model_code: modelName, description: modelName || 'Sauna', spec_detail: order.heater ? `Heater: ${order.heater}` : '',
-        quantity: 1, unit_price: Number(order.selling_price ?? 0), line_discount: 0, is_taxable: true,
-      }];
-      if (order.delivery_address) prefill.ship_to_address = order.delivery_address;
-    }
+  // --- load the draft; ONLY drafts are editable (enforced server-side) ---
+  const [invRes, itemRes] = await Promise.all([
+    supabase.from('invoices').select('*').eq('id', id).single(),
+    supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('sort_order'),
+  ]);
+  if (invRes.error || !invRes.data) {
+    return Astro.redirect('/admin/invoices');
+  }
+  inv = invRes.data;
+  invItems = itemRes.data ?? [];
+  if (inv.status !== 'draft') {
+    // issued invoices are immutable - corrections happen via a credit note
+    return Astro.redirect(`/admin/invoices/${id}?edit_error=${encodeURIComponent(`This ${inv.document_type} is ${inv.status} and can no longer be edited.`)}`);
   }
 
   // --- save draft ---
@@ -111,14 +98,13 @@ try {
       const totals = computeInvoiceTotals(items, { taxExempt: tax_exempt, taxRate: Number(form.get('tax_rate') ?? 0) || 0 });
       const { subtotal, discount_total, freight_total, taxable_subtotal, non_taxable_subtotal, tax_rate, tax_total, grand_total } = totals;
 
+      const depositReceived = Number(inv.deposit_received ?? 0);
       const invoicePayload = {
         document_type: g('document_type') === 'proforma' ? 'proforma' : 'invoice',
-        status: 'draft',
-        invoice_number: null, // drafts carry no number by design
+        // status stays 'draft'; invoice_number stays NULL - numbering happens
+        // only at issue, never here
         customer_id: customerId,
-        quote_id: g('origin_quote_id') || null,
-        order_id: g('origin_order_id') || null,
-        issue_date: g('issue_date') || new Date().toISOString().slice(0, 10),
+        issue_date: g('issue_date') || inv.issue_date,
         due_date: g('due_date') || null,
         payment_terms: g('payment_terms') || null,
         customer_po_reference: g('customer_po_reference') || null,
@@ -145,22 +131,22 @@ try {
         tax_not_collected_reason: g('tax_not_collected_reason') || null,
         subtotal, discount_total, freight_total, taxable_subtotal, non_taxable_subtotal,
         tax_total, grand_total,
-        deposit_received: 0,
-        balance_due: grand_total,
+        balance_due: Math.round((grand_total - depositReceived) * 100) / 100,
         notes: g('notes') || null,
         terms: g('terms') || null,
       };
 
-      const { data: invoice, error: insertError } = await supabase
-        .from('invoices').insert(invoicePayload).select('id').single();
-      if (insertError) {
-        error = insertError.message;
+      const { error: updateError } = await supabase
+        .from('invoices').update(invoicePayload).eq('id', id).eq('status', 'draft');
+      if (updateError) {
+        error = updateError.message;
       } else {
+        await supabase.from('invoice_line_items').delete().eq('invoice_id', id);
         const { error: itemsError } = await supabase
           .from('invoice_line_items')
-          .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
-        if (itemsError) error = `Invoice saved but line items failed: ${itemsError.message}`;
-        else return Astro.redirect('/admin/invoices');
+          .insert(items.map((it) => ({ ...it, invoice_id: id })));
+        if (itemsError) error = `Saved, but line items failed: ${itemsError.message}`;
+        else return Astro.redirect(`/admin/invoices/${id}`);
       }
     }
   }
@@ -168,37 +154,47 @@ try {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const issuer = {
-  name: settingsRow?.company_name ?? 'BUXENA',
-  address: [settingsRow?.company_address, settingsRow?.remit_to_address].filter(Boolean)[0] ?? '',
-  ein: settingsRow?.company_ein ?? '',
-  email: settingsRow?.company_email ?? '',
-  phone: settingsRow?.company_phone ?? '',
+// every field prefills from the STORED record - snapshots stay as saved
+prefill = {
+  customer_id: inv.customer_id ?? '',
+  tax_rate: Number(inv.tax_rate ?? 0),
+  lines: [],
+  bill_to_name: inv.bill_to_name ?? '', bill_to_company: inv.bill_to_company ?? '', bill_to_address: inv.bill_to_address ?? '', bill_to_email: inv.bill_to_email ?? '', bill_to_phone: inv.bill_to_phone ?? '',
+  ship_to_name: inv.ship_to_name ?? '', ship_to_company: inv.ship_to_company ?? '', ship_to_address: inv.ship_to_address ?? '', ship_to_email: inv.ship_to_email ?? '', ship_to_phone: inv.ship_to_phone ?? '',
+  ship_to_state: inv.ship_to_state ?? '',
 };
-const initialLines: PrefillLine[] = prefill.lines.length
-  ? prefill.lines
+const today = inv.issue_date ?? new Date().toISOString().slice(0, 10);
+const issuer = {
+  name: inv.issuer_name ?? '',
+  address: inv.issuer_address ?? '',
+  ein: inv.issuer_ein ?? '',
+  email: inv.issuer_email ?? '',
+  phone: inv.issuer_phone ?? '',
+};
+const initialLines: PrefillLine[] = invItems.length
+  ? invItems.map((it: any) => ({
+      line_type: it.line_type, model_code: it.model_code ?? '', description: it.description ?? '', spec_detail: it.spec_detail ?? '',
+      quantity: Number(it.quantity ?? 1), unit_price: Number(it.unit_price ?? 0), line_discount: Number(it.line_discount ?? 0), is_taxable: !!it.is_taxable,
+    }))
   : [{ line_type: 'product', model_code: '', description: '', spec_detail: '', quantity: 1, unit_price: 0, line_discount: 0, is_taxable: true }];
 ---
 
-<AdminLayout title="New Invoice" subtitle="Draft — a number is assigned when the invoice is issued." parentLabel="Invoices" parentHref="/admin/invoices">
+<AdminLayout title="Edit Draft" subtitle={`${inv.document_type === 'proforma' ? 'Proforma' : 'Invoice'} — unnumbered draft; a number is assigned at issue.`} parentLabel="Invoices" parentHref={`/admin/invoices/${id}`}>
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   <form class="admin-form inv-form" method="POST" id="invoice-form">
-    <input type="hidden" name="origin_quote_id" value={Astro.url.searchParams.get('quote_id') ?? ''} />
-    <input type="hidden" name="origin_order_id" value={Astro.url.searchParams.get('order_id') ?? ''} />
 
     <div class="admin-form__full"><h2 class="admin-section-title">Document</h2></div>
     <label class="admin-field"><span>Type</span>
       <select name="document_type">
-        <option value="invoice" selected>Invoice</option>
-        <option value="proforma">Proforma</option>
+        <option value="invoice" selected={inv.document_type !== 'proforma'}>Invoice</option>
+        <option value="proforma" selected={inv.document_type === 'proforma'}>Proforma</option>
       </select>
     </label>
     <label class="admin-field"><span>Issue Date</span><input type="date" name="issue_date" id="issue-date" value={today} /></label>
-    <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" id="payment-terms" value="Net 30" /></label>
-    <label class="admin-field"><span>Due Date</span><input type="date" name="due_date" id="due-date" /></label>
-    <label class="admin-field"><span>Customer PO Reference</span><input type="text" name="customer_po_reference" /></label>
+    <label class="admin-field"><span>Payment Terms</span><input type="text" name="payment_terms" id="payment-terms" value={inv.payment_terms ?? 'Net 30'} /></label>
+    <label class="admin-field"><span>Due Date</span><input type="date" name="due_date" id="due-date" value={inv.due_date ?? ''} data-manual={inv.due_date ? '1' : undefined} /></label>
+    <label class="admin-field"><span>Customer PO Reference</span><input type="text" name="customer_po_reference" value={inv.customer_po_reference ?? ''} /></label>
 
     <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Customer &amp; Parties</h2></div>
     <label class="admin-field admin-form__full"><span>Customer *</span>
@@ -280,11 +276,11 @@ const initialLines: PrefillLine[] = prefill.lines.length
     </div>
 
     <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Tax — manual entry</h2></div>
-    <label class="admin-field inv-check"><span>Tax Exempt</span><input type="checkbox" name="tax_exempt" id="tax-exempt" /></label>
+    <label class="admin-field inv-check"><span>Tax Exempt</span><input type="checkbox" name="tax_exempt" id="tax-exempt" checked={!!inv.tax_exempt} /></label>
     <label class="admin-field"><span>Tax Rate (%)</span><input type="number" step="0.01" name="tax_rate" id="tax-rate" value={prefill.tax_rate} class="calc-input" /></label>
-    <label class="admin-field"><span>Tax Jurisdiction Label</span><input type="text" name="tax_jurisdiction_label" placeholder="Los Angeles County, CA" /></label>
-    <label class="admin-field"><span>Exemption Certificate</span><input type="text" name="tax_exemption_certificate" id="tax-cert" /></label>
-    <label class="admin-field admin-form__full"><span>Tax Not Collected Reason (optional — distinguishes no-nexus from error)</span><input type="text" name="tax_not_collected_reason" /></label>
+    <label class="admin-field"><span>Tax Jurisdiction Label</span><input type="text" name="tax_jurisdiction_label" placeholder="Los Angeles County, CA" value={inv.tax_jurisdiction_label ?? ''} /></label>
+    <label class="admin-field"><span>Exemption Certificate</span><input type="text" name="tax_exemption_certificate" id="tax-cert" value={inv.tax_exemption_certificate ?? ''} /></label>
+    <label class="admin-field admin-form__full"><span>Tax Not Collected Reason (optional — distinguishes no-nexus from error)</span><input type="text" name="tax_not_collected_reason" value={inv.tax_not_collected_reason ?? ''} /></label>
 
     <div class="admin-form__full" id="totals">
       <p>Subtotal: <strong id="subtotal-out">$0.00</strong> &nbsp; Discounts: <strong id="discount-out">$0.00</strong> &nbsp; Freight: <strong id="freight-out">$0.00</strong></p>
@@ -292,12 +288,12 @@ const initialLines: PrefillLine[] = prefill.lines.length
       <p>Grand Total: <strong id="grand-out" style="color:var(--admin-gold);">$0.00</strong> &nbsp; Balance Due: <strong id="balance-out">$0.00</strong></p>
     </div>
 
-    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
-    <label class="admin-field admin-form__full"><span>Terms</span><textarea name="terms"></textarea></label>
+    <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes">{inv.notes ?? ''}</textarea></label>
+    <label class="admin-field admin-form__full"><span>Terms</span><textarea name="terms">{inv.terms ?? ''}</textarea></label>
 
     <div class="admin-form__actions">
-      <button class="admin-btn" type="submit">Save Draft</button>
-      <a class="admin-btn admin-btn--ghost" href="/admin/invoices">Cancel</a>
+      <button class="admin-btn" type="submit">Save Changes</button>
+      <a class="admin-btn admin-btn--ghost" href={`/admin/invoices/${id}`}>Cancel</a>
     </div>
   </form>
 </AdminLayout>
@@ -370,6 +366,19 @@ const initialLines: PrefillLine[] = prefill.lines.length
   customerSelect.addEventListener('change', () => {
     const c = customersData.find((x: any) => x.id === customerSelect.value);
     if (!c) return;
+    // snapshots are the document of record: never silently overwritten
+    const hasContent = ['name', 'address', 'email', 'phone'].some((k) => {
+      const el = document.querySelector(`[data-bill="${k}"]`) as HTMLInputElement | null;
+      return el && el.value.trim() !== '';
+    });
+    if (hasContent && !confirm("Replace the Bill To / Ship To fields with this customer's details?\n\nCancel keeps the addresses exactly as they are.")) {
+      recalc();
+      return;
+    }
+    document.querySelectorAll<HTMLInputElement>('[data-bill], [data-ship], [name="ship_to_state"]').forEach((el) => {
+      el.value = '';
+      delete el.dataset.autofilled;
+    });
     const addr = [c.address, [c.city, c.state].filter(Boolean).join(', '), c.zip].filter(Boolean).join(', ');
     fillIfFree(document.querySelector('[data-bill="name"]'), c.name ?? '');
     fillIfFree(document.querySelector('[data-bill="address"]'), addr);

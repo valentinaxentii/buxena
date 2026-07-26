@@ -1,0 +1,76 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+
+const { id } = Astro.params;
+
+let shipment: any = null;
+let units: any[] = [];
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data: shipmentRow } = await supabase.from('shipments').select('id, shipment_number').eq('id', id).single();
+  if (!shipmentRow) {
+    notFound = true;
+  } else {
+    shipment = shipmentRow;
+    const { data: unitRows } = await supabase
+      .from('inventory_units')
+      .select('id, unit_code, status, products(model_name)')
+      .eq('shipment_id', id)
+      .order('unit_code');
+    units = unitRows ?? [];
+  }
+} catch {
+  notFound = true;
+}
+---
+
+<AdminLayout title="Print Unit Labels" subtitle={shipment?.shipment_number} parentLabel={shipment?.shipment_number ?? 'Shipment'} parentHref={`/admin/shipments/${id}`}>
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/shipments/${id}`}>Back to Shipment</a>
+
+  {notFound && <p class="admin-empty">Shipment not found.</p>}
+
+  {shipment && (
+    <>
+      <div class="admin-panel" style="padding: 0.9rem 1.1rem; margin-bottom: 1rem; display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+        <button class="admin-btn" type="button" id="print-all">Print All ({units.length})</button>
+        <button class="admin-btn admin-btn--ghost" type="button" id="print-selected">Print Selected</button>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th></th><th>Unit ID</th><th>Model</th><th>Status</th></tr></thead>
+            <tbody>
+              {units.map((u) => (
+                <tr>
+                  <td><input type="checkbox" name="unit" value={u.id} /></td>
+                  <td>{u.unit_code}</td>
+                  <td>{u.products?.model_name ?? '—'}</td>
+                  <td>{u.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {units.length === 0 && <p class="admin-empty">No units on this shipment yet.</p>}
+      </div>
+    </>
+  )}
+
+  <script define:vars={{ shipmentId: id, allIds: units.map((u) => u.id) }}>
+    document.getElementById('print-all')?.addEventListener('click', () => {
+      window.open(`/admin/shipments/${shipmentId}/labels/print?ids=${allIds.join(',')}`, '_blank');
+    });
+    document.getElementById('print-selected')?.addEventListener('click', () => {
+      const ids = Array.from(document.querySelectorAll('input[name="unit"]:checked')).map((el) => el.value);
+      if (ids.length === 0) { alert('Select at least one unit first.'); return; }
+      window.open(`/admin/shipments/${shipmentId}/labels/print?ids=${ids.join(',')}`, '_blank');
+    });
+  </script>
+</AdminLayout>

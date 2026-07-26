@@ -402,5 +402,15 @@ const breadcrumbSchema = {
   @media (max-width: 900px) {
     .prod-hero__grid, .prod-body { grid-template-columns: 1fr; }
     .prod-hero__grid { align-items: start; }
+
+    /* PREORDER / Request a Quote both link to #enquire. The header is
+       position:sticky, so without this the anchor scroll lands the section's
+       top edge flush under the viewport top — exactly where the sticky
+       header sits — covering the "Request a quote…" heading. This value is
+       the same clamp() as Header.astro's .hdr__inner height, so the gap
+       always exactly matches the header's real height at any mobile width,
+       never over- or under-shooting. Desktop is untouched — the header is
+       sticky there too, but this rule only applies inside this breakpoint. */
+    #enquire { scroll-margin-top: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem); }
   }
 </style>

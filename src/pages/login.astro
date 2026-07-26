@@ -3,8 +3,17 @@ export const prerender = false;
 
 import { createSupabaseServerClient } from '../lib/supabase-auth';
 
+// The requested destination survives the POST via a hidden field (belt) in
+// addition to the query string (braces) — losing the query no longer dumps
+// the user on the Dashboard. Only relative /admin paths are ever honoured;
+// an external URL smuggled into `next` is rejected.
+function safeNext(raw: string | null): string {
+  const v = (raw ?? '').trim();
+  if (v.startsWith('/admin') && !v.includes('\\') && !v.startsWith('//')) return v;
+  return '/admin';
+}
 const nextParam = Astro.url.searchParams.get('next');
-const redirectTo = nextParam && nextParam.startsWith('/admin') ? nextParam : '/admin';
+let redirectTo = safeNext(nextParam);
 
 let error: string | null = null;
 let notConfigured = false;
@@ -13,6 +22,8 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const email = String(form.get('email') ?? '').trim();
   const password = String(form.get('password') ?? '');
+  // hidden field wins over the query so the destination can't be lost mid-POST
+  redirectTo = safeNext(String(form.get('next') ?? '') || nextParam);
 
   if (!email || !password) {
     error = 'Enter both your email and password.';
@@ -61,6 +72,7 @@ if (Astro.request.method === 'POST') {
         {error && <p class="notice notice--error">{error}</p>}
 
         <form method="POST" class="form">
+          <input type="hidden" name="next" value={redirectTo} />
           <label class="field">
             <span>Email</span>
             <input type="email" name="email" autocomplete="username" required />

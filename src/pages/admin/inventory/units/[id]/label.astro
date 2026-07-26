@@ -1,0 +1,81 @@
+---
+export const prerender = false;
+
+import { createSupabaseAdminClient } from '../../../../../lib/supabase-admin';
+import { generateUnitQrDataUrl } from '../../../../../lib/qr';
+
+const { id } = Astro.params;
+
+let unit: any = null;
+let qrDataUrl = '';
+let notFound = false;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data: row } = await supabase
+    .from('inventory_units')
+    .select('unit_code, public_token, products(model_name), shipments(po_reference)')
+    .eq('id', id)
+    .single();
+
+  if (!row) {
+    notFound = true;
+  } else {
+    unit = row;
+    qrDataUrl = await generateUnitQrDataUrl(unit.public_token);
+  }
+} catch {
+  notFound = true;
+}
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{unit ? `QR Label — ${unit.unit_code}` : 'QR Label'}</title>
+  <style>
+    @page { size: 4in 3in; margin: 0.15in; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: 'Jost', system-ui, sans-serif; }
+    .label {
+      width: 3.7in;
+      height: 2.7in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.08in;
+      padding: 0.1in;
+      color: #000;
+    }
+    .label__brand { font-size: 13pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .label__qr { width: 1.5in; height: 1.5in; }
+    .label__unit-code { font-size: 14pt; font-weight: 700; letter-spacing: 0.03em; }
+    .label__model { font-size: 9pt; text-align: center; max-width: 3.4in; }
+    .label__po { font-size: 7.5pt; color: #444; }
+    .no-print { margin: 12px; font-family: system-ui, sans-serif; }
+    @media print {
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  {notFound && <p class="no-print">Unit not found.</p>}
+  {unit && (
+    <>
+      <p class="no-print">
+        <button onclick="window.print()">Print</button>
+        — this label is sized for a 4in × 3in label; use your printer's label/paper size setting.
+      </p>
+      <div class="label">
+        <div class="label__brand">BUXENA</div>
+        <img class="label__qr" src={qrDataUrl} alt={`QR code for unit ${unit.unit_code}`} />
+        <div class="label__unit-code">{unit.unit_code}</div>
+        <div class="label__model">{unit.products?.model_name ?? ''}</div>
+        {unit.shipments?.po_reference && <div class="label__po">PO: {unit.shipments.po_reference}</div>}
+      </div>
+    </>
+  )}
+</body>
+</html>

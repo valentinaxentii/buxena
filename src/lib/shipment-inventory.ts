@@ -1,14 +1,25 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recomputeInventoryFromUnits } from './inventory-units';
+import { ACTIVE_SHIPMENT_STATUSES } from './shipment-statuses';
 
-// Statuses that count toward "incoming" — Draft never does (a PO that isn't
-// placed yet isn't real incoming stock), Cancelled/Received are resolved.
-export const ACTIVE_SHIPMENT_STATUSES = [
-  'Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received',
-];
+export { ACTIVE_SHIPMENT_STATUSES };
 
 // inventory.incoming is derived, not hand-typed, once shipments exist for a
 // product — sum of (ordered - received) across every active shipment.
+//
+// Unit-tracked products (products.unit_tracked) are the ONE exception: for
+// those, inventory_units is the sole authoritative source for BOTH in_stock
+// and incoming (see recomputeInventoryFromUnits in inventory-units.ts) — this
+// quantity-math version never runs for them, so a unit-tracked product's
+// stock numbers only ever have one writer. Every other product keeps the
+// original behaviour below, unchanged.
 export async function recomputeIncomingForProduct(supabase: SupabaseClient, productId: string) {
+  const { data: product } = await supabase.from('products').select('unit_tracked').eq('id', productId).maybeSingle();
+  if (product?.unit_tracked) {
+    await recomputeInventoryFromUnits(supabase, productId);
+    return;
+  }
+
   const { data: items } = await supabase
     .from('shipment_items')
     .select('quantity, quantity_received, shipments!inner(status)')

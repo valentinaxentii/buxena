@@ -767,3 +767,426 @@ grant select on supplier_products to authenticated;
 grant select, insert, update, delete on invoices, invoice_line_items, payments, document_counters to service_role;
 grant select on invoices, invoice_line_items, payments, document_counters to authenticated;
 grant execute on function issue_document_number(uuid) to service_role;
+
+-- ============================================================================
+-- Unit-level inventory foundation (2026-07-26 session)
+-- ============================================================================
+-- One row per physical sauna, generated from shipment_items when a shipment
+-- leaves Draft. `unit_tracked` on products is the gate — deliberately a plain
+-- boolean per product (not a hardcoded category check) so unit tracking can
+-- extend to other product types later without a schema change. Backfilled
+-- true below only for the existing BUH-* sauna rows; every other/future
+-- product defaults to false and is untouched by any of the code this adds.
+alter table products add column if not exists unit_tracked boolean not null default false;
+update products set unit_tracked = true
+ where model_name ilike 'BUH-%' and unit_tracked = false;
+
+-- RECEIVED and IN_STOCK are deliberately separate states (not one event):
+-- RECEIVED = physically scanned in at the warehouse, condition assessed.
+-- IN_STOCK = accepted and available for sale — a distinct, later action for
+-- good-condition units. DAMAGED/HOLD units are received but can never reach
+-- IN_STOCK. public_token is generated at creation (random, app-side) so a
+-- future public /unit/[token] lookup page can be added without ever changing
+-- unit_code, the permanent internal identity.
+create table if not exists inventory_units (
+  id uuid primary key default gen_random_uuid(),
+  unit_code text not null unique,
+  public_token text unique,
+  product_id uuid not null references products(id) on delete restrict,
+  shipment_id uuid references shipments(id) on delete set null,
+  shipment_item_id uuid references shipment_items(id) on delete set null,
+  status text not null check (
+    status in ('EXPECTED', 'RECEIVED', 'IN_STOCK', 'DAMAGED', 'HOLD', 'RESERVED', 'SOLD', 'DELIVERED')
+  ) default 'EXPECTED',
+  condition text check (condition in ('good', 'damaged', 'hold')),
+  warehouse text,
+  zone text,
+  bay text,
+  unit_cost numeric(12,2),
+  supplier_serial text,
+  order_id uuid references orders(id) on delete set null,
+  received_at timestamptz,
+  accepted_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_inventory_units_product on inventory_units (product_id, status);
+create index if not exists idx_inventory_units_shipment on inventory_units (shipment_id);
+create index if not exists idx_inventory_units_shipment_item on inventory_units (shipment_item_id);
+drop trigger if exists trg_inventory_units_updated_at on inventory_units;
+create trigger trg_inventory_units_updated_at before update on inventory_units
+  for each row execute function set_updated_at();
+
+-- Reuse the existing gapless per-year counter table/pattern (scope 'UNIT')
+-- rather than inventing a second numbering mechanism. Format BUX-YYNNNN
+-- (2-digit year + 4-digit sequence, e.g. BUX-260001) — locks the counter row
+-- exactly like issue_document_number() above, then inserts the unit row in
+-- the same atomic call so a code can never be minted without its row (or vice
+-- versa).
+create or replace function issue_inventory_unit(
+  p_product_id uuid,
+  p_shipment_id uuid,
+  p_shipment_item_id uuid,
+  p_unit_cost numeric,
+  p_public_token text
+) returns table (id uuid, unit_code text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_year integer;
+  v_next integer;
+  v_code text;
+  v_id uuid;
+begin
+  v_year := extract(year from current_date)::integer;
+
+  insert into document_counters (scope, year, last_number)
+  values ('UNIT', v_year, 0)
+  on conflict (scope, year) do nothing;
+
+  select last_number + 1 into v_next
+    from document_counters
+   where scope = 'UNIT' and year = v_year
+   for update;
+
+  update document_counters
+     set last_number = v_next
+   where scope = 'UNIT' and year = v_year;
+
+  v_code := 'BUX-' || right(v_year::text, 2) || lpad(v_next::text, 4, '0');
+
+  insert into inventory_units (product_id, shipment_id, shipment_item_id, unit_cost, unit_code, public_token, status)
+  values (p_product_id, p_shipment_id, p_shipment_item_id, p_unit_cost, v_code, p_public_token, 'EXPECTED')
+  returning inventory_units.id into v_id;
+
+  return query select v_id, v_code;
+end;
+$$;
+
+-- `activities` (used elsewhere for lead/customer/quote/order history) gets a
+-- new entity_type so unit receiving events use the same audit-trail table
+-- rather than a parallel one. Looks up the check constraint by inspecting
+-- pg_constraint rather than assuming Postgres's default auto-generated name,
+-- so this is safe to run regardless of how the original constraint ended up
+-- named.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'activities'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%entity_type%'
+  loop
+    execute format('alter table activities drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table activities add constraint activities_entity_type_check
+  check (entity_type in ('lead', 'customer', 'quote', 'order', 'inventory_unit'));
+
+alter table inventory_units enable row level security;
+drop policy if exists "authenticated read only" on inventory_units;
+create policy "authenticated read only" on inventory_units for select to authenticated using (true);
+
+grant select, insert, update, delete on inventory_units to service_role;
+grant select on inventory_units to authenticated;
+grant execute on function issue_inventory_unit(uuid, uuid, uuid, numeric, text) to service_role;
+
+-- ============================================================================
+-- Website Enquiries management (2026-07-26 session)
+-- ============================================================================
+-- Enquiry status: replace the old 4-value set with the approved 6-value
+-- pipeline (New -> Contacted -> Qualified -> Quoted -> Won/Lost). Verified
+-- against live data first: the only status any real row has is 'New', which
+-- is unchanged in the new set, so this replace is safe. Dynamic constraint
+-- lookup (not a guessed name), same technique used for activities above.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'enquiries'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%status%'
+  loop
+    execute format('alter table enquiries drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table enquiries add constraint enquiries_status_check
+  check (status in ('New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'));
+
+-- Linked Quote (linked Lead already exists: enquiries.lead_id).
+alter table enquiries add column if not exists quote_id uuid references quotes(id) on delete set null;
+
+-- When the enquiry was first contacted (created_at only says when it arrived).
+alter table enquiries add column if not exists contacted_at timestamptz;
+
+-- Enquiry timeline reuses the shared activities table (same one leads/
+-- customers/quotes/orders/inventory_units already use) — one more
+-- entity_type, no new table, no new activity_type values (status_change and
+-- note already cover every timeline event this needs).
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'activities'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%entity_type%'
+  loop
+    execute format('alter table activities drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table activities add constraint activities_entity_type_check
+  check (entity_type in ('lead', 'customer', 'quote', 'order', 'inventory_unit', 'enquiry'));
+
+-- ============================================================================
+-- QR Stage 2 foundation (2026-07-26 session)
+-- ============================================================================
+-- Invoice line -> physical unit. Nullable, additive — matches the existing
+-- product_id FK already on this table. A live FK is safe here despite
+-- invoices otherwise freezing party/amount data as text: unit_code and
+-- public_token are permanent by construction (no code anywhere mutates them
+-- after creation), so this reference can never drift the way a live
+-- customer/price join could. Existing issued invoices are unaffected: this
+-- column defaults to null on every existing row, and nothing renders a QR
+-- unless it is explicitly set — no retroactive inference, ever.
+alter table invoice_line_items add column if not exists assigned_unit_id uuid references inventory_units(id) on delete set null;
+
+-- Warranty start-date policy — configurable in Settings, not hardcoded.
+-- Default matches the approved business rule (delivery date) without baking
+-- it permanently into application code, so changing the policy later never
+-- requires another schema change.
+alter table settings add column if not exists warranty_start_source text
+  not null default 'delivery_date'
+  check (warranty_start_source in ('delivery_date', 'installation_date', 'invoice_date', 'manual'));
+
+-- Warranty foundation only — no claims table yet (explicitly deferred to a
+-- later stage). unique(unit_id): one physical unit can have exactly one
+-- primary warranty record, enforced at the database level, not just in
+-- application code. on delete restrict (not cascade/set null), matching the
+-- existing payments -> invoices pattern: a unit with a real warranty record
+-- must never be silently deletable out from under it.
+create table if not exists warranties (
+  id uuid primary key default gen_random_uuid(),
+  unit_id uuid not null unique references inventory_units(id) on delete restrict,
+  customer_id uuid references customers(id) on delete set null,
+  order_id uuid references orders(id) on delete set null,
+  warranty_start_date date,
+  warranty_end_date date,
+  status text not null check (status in ('NOT_REGISTERED', 'ACTIVE', 'EXPIRED', 'VOID')) default 'NOT_REGISTERED',
+  terms_version text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists trg_warranties_updated_at on warranties;
+create trigger trg_warranties_updated_at before update on warranties
+  for each row execute function set_updated_at();
+
+alter table warranties enable row level security;
+drop policy if exists "authenticated read only" on warranties;
+create policy "authenticated read only" on warranties for select to authenticated using (true);
+
+grant select, insert, update, delete on warranties to service_role;
+grant select on warranties to authenticated;
+
+-- ============================================================================
+-- Unit lifecycle Stage A: Delivery, Installation, Service/Warranty Claims,
+-- Documents foundation (2026-07-26 session) — Tier 1 + Tier 2 combined
+-- ============================================================================
+
+-- --- Delivery — recorded on the physical unit (the digital passport this
+-- whole system is built around), not the order. Nullable/additive; every
+-- existing inventory_units row is unaffected.
+alter table inventory_units add column if not exists delivery_date date;
+alter table inventory_units add column if not exists delivered_by text;
+alter table inventory_units add column if not exists delivery_condition text;
+alter table inventory_units add column if not exists customer_acknowledged_at timestamptz;
+alter table inventory_units add column if not exists delivery_notes text;
+
+-- --- Installation
+alter table inventory_units add column if not exists installation_date date;
+alter table inventory_units add column if not exists installation_type text
+  check (installation_type in ('DIY', 'BUXENA', 'THIRD_PARTY'));
+alter table inventory_units add column if not exists installer_company text;
+alter table inventory_units add column if not exists electrician_name text;
+-- Free text, matching the existing orders.installation_status convention
+-- (also unconstrained, validated at the app layer) rather than introducing a
+-- second, differently-shaped status pattern.
+alter table inventory_units add column if not exists installation_status text;
+alter table inventory_units add column if not exists installation_notes text;
+
+-- --- Service cases / warranty claims (Tier 2). One row per case, always
+-- tied to the exact physical unit — on delete restrict, matching the same
+-- "a unit with real history must never be silently deletable" rule already
+-- used for warranties. warranty_status_at_open is a deliberate snapshot (the
+-- same principle invoices already use for frozen data): a case should always
+-- remember what the warranty state actually was the day it was opened, even
+-- if the warranty's live status changes later.
+create table if not exists service_cases (
+  id uuid primary key default gen_random_uuid(),
+  case_number text not null unique,
+  unit_id uuid not null references inventory_units(id) on delete restrict,
+  customer_id uuid references customers(id) on delete set null,
+  order_id uuid references orders(id) on delete set null,
+  warranty_status_at_open text,
+  category text check (
+    category in ('Heater', 'Controller/Wi-Fi', 'Lighting', 'Door/Glass', 'Wood', 'Roof', 'Electrical', 'Installation', 'Other')
+  ),
+  issue_description text,
+  status text not null check (
+    status in ('NEW', 'REVIEWING', 'WAITING_CUSTOMER', 'WAITING_SUPPLIER', 'APPROVED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'DENIED')
+  ) default 'NEW',
+  assigned_staff uuid references profiles(id) on delete set null,
+  opened_date date not null default current_date,
+  resolution text,
+  parts_replaced text,
+  completed_date date,
+  internal_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_service_cases_unit on service_cases (unit_id);
+drop trigger if exists trg_service_cases_updated_at on service_cases;
+create trigger trg_service_cases_updated_at before update on service_cases
+  for each row execute function set_updated_at();
+
+-- Reuses the same gapless per-year counter table/pattern as invoices and
+-- unit codes (scope 'CASE'). Format SVC-YYYY-NNNN. Unlike issue_inventory_unit
+-- this only mints the number — service_cases has many more app-supplied
+-- fields than a bare unit row, so the insert itself stays in application
+-- code rather than being folded into the function.
+create or replace function issue_service_case_number()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_year integer;
+  v_next integer;
+  v_number text;
+begin
+  v_year := extract(year from current_date)::integer;
+
+  insert into document_counters (scope, year, last_number)
+  values ('CASE', v_year, 0)
+  on conflict (scope, year) do nothing;
+
+  select last_number + 1 into v_next
+    from document_counters
+   where scope = 'CASE' and year = v_year
+   for update;
+
+  update document_counters
+     set last_number = v_next
+   where scope = 'CASE' and year = v_year;
+
+  v_number := 'SVC-' || v_year::text || '-' || lpad(v_next::text, 4, '0');
+  return v_number;
+end;
+$$;
+
+alter table service_cases enable row level security;
+drop policy if exists "authenticated read only" on service_cases;
+create policy "authenticated read only" on service_cases for select to authenticated using (true);
+grant select, insert, update, delete on service_cases to service_role;
+grant select on service_cases to authenticated;
+grant execute on function issue_service_case_number() to service_role;
+
+-- --- Documents: unit-level and service-case-level attachments. Product/
+-- model-level documents already work today via the existing documents.
+-- product_id — a unit inherits its model's manuals by querying through
+-- product_id, never by duplicating the file per physical unit.
+alter table documents add column if not exists unit_id uuid references inventory_units(id) on delete set null;
+alter table documents add column if not exists service_case_id uuid references service_cases(id) on delete set null;
+
+-- Category widened for delivery/installation/service/warranty document
+-- types. Every existing value — confirmed live, only 'Brochure' is actually
+-- in use today — stays exactly as-is; nothing is removed.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'documents'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%category%'
+  loop
+    execute format('alter table documents drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table documents add constraint documents_category_check check (
+  category in (
+    'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
+    'Product Specification', 'Electrical Specification', 'Warranty Document',
+    'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
+    'Customer Quote', 'Invoice',
+    'Receiving Report', 'Quality Inspection', 'Delivery Document', 'Delivery Photo',
+    'Installation Photo', 'Warranty Certificate', 'Service Document', 'Service Photo'
+  )
+);
+
+-- --- activities: service cases get their own timeline entries in the same
+-- shared audit-trail table as everything else this session.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+     where conrelid = 'activities'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%entity_type%'
+  loop
+    execute format('alter table activities drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table activities add constraint activities_entity_type_check
+  check (entity_type in ('lead', 'customer', 'quote', 'order', 'inventory_unit', 'enquiry', 'service_case'));
+
+-- --- Configuration fields needed for the approved Unit Detail Configuration
+-- card (Lighting, Bench type) — no existing column captures either, and
+-- nothing else on `products` is touched.
+alter table products add column if not exists lighting text;
+alter table products add column if not exists bench_type text;
+
+-- ============================================================================
+-- Warranty duration architecture (2026-07-26 session) — Stage C follow-up
+-- ============================================================================
+-- Makes `warranties.warranty_end_date` computable instead of permanently
+-- null. Three additive columns, no existing row touched, no existing
+-- constraint altered, no data backfilled.
+
+-- BUXENA-wide default warranty length — 24 months (2 years), the confirmed
+-- standard BUXENA warranty term. Editable in Settings — same shape as
+-- default_tax_rate/default_deposit_percent/default_quote_validity_days above
+-- (plain not-null-with-default numeric column, no check constraint, matching
+-- every other default_* field already on this table).
+alter table settings add column if not exists default_warranty_months integer not null default 24;
+
+-- Optional per-model override. Null (the case for every existing product)
+-- means "use the BUXENA default" — resolved in application code as
+-- `product.warranty_duration_months ?? settings.default_warranty_months`,
+-- never inferred here.
+alter table products add column if not exists warranty_duration_months integer;
+
+-- Snapshot of whichever duration was actually applied when a warranty was
+-- activated — set once, at activation, and never recomputed afterward. This
+-- is what keeps an already-activated warranty's end date stable if the
+-- default or a product's override changes later: only warranties activated
+-- AFTER a terms change pick up the new duration. Same "freeze what actually
+-- happened" principle already used by service_cases.warranty_status_at_open
+-- above.
+alter table warranties add column if not exists duration_months_applied integer;

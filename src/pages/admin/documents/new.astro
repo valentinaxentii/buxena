@@ -11,29 +11,38 @@ const CATEGORIES = [
   'Product Specification', 'Electrical Specification', 'Warranty Document',
   'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
   'Customer Quote', 'Invoice',
+  'Receiving Report', 'Quality Inspection', 'Delivery Document', 'Delivery Photo',
+  'Installation Photo', 'Warranty Certificate', 'Service Document', 'Service Photo',
 ];
+
+const prefillUnitId = Astro.url.searchParams.get('unit_id') ?? '';
+const prefillCategory = Astro.url.searchParams.get('category') ?? '';
+const returnTo = Astro.url.searchParams.get('return_to') ?? '';
 
 let customers: any[] = [];
 let suppliers: any[] = [];
 let products: any[] = [];
 let quotes: any[] = [];
 let orders: any[] = [];
+let units: { id: string; unit_code: string }[] = [];
 let error: string | null = null;
 
 try {
   const supabase = createSupabaseAdminClient();
-  const [customerRows, supplierRows, productRows, quoteRows, orderRows] = await Promise.all([
+  const [customerRows, supplierRows, productRows, quoteRows, orderRows, unitRows] = await Promise.all([
     supabase.from('customers').select('id, name').order('name'),
     supabase.from('suppliers').select('id, name').order('name'),
     supabase.from('products').select('id, model_name').order('model_name'),
     supabase.from('quotes').select('id, quote_number').order('quote_date', { ascending: false }).limit(200),
     supabase.from('orders').select('id, order_number').order('created_at', { ascending: false }).limit(200),
+    supabase.from('inventory_units').select('id, unit_code').order('unit_code').limit(500),
   ]);
   customers = customerRows.data ?? [];
   suppliers = supplierRows.data ?? [];
   products = productRows.data ?? [];
   quotes = quoteRows.data ?? [];
   orders = orderRows.data ?? [];
+  units = unitRows.data ?? [];
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
@@ -46,8 +55,10 @@ try {
       product_id: String(form.get('product_id') ?? '') || null,
       quote_id: String(form.get('quote_id') ?? '') || null,
       order_id: String(form.get('order_id') ?? '') || null,
+      unit_id: String(form.get('unit_id') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
+    const formReturnTo = String(form.get('return_to') ?? '');
     const normalized = normalizeDocumentUrl(payload.file_url);
     if (!payload.category || !payload.file_url) {
       error = 'Category and File URL are required.';
@@ -57,7 +68,7 @@ try {
       payload.file_url = normalized.url!;
       const { data: inserted, error: insertError } = await supabase.from('documents').insert(payload).select('id').single();
       if (insertError) error = insertError.message;
-      else return Astro.redirect(`/admin/documents/${inserted.id}`);
+      else return Astro.redirect(formReturnTo || `/admin/documents/${inserted.id}`);
     }
   }
 } catch (e) {
@@ -72,7 +83,7 @@ try {
     <label class="admin-field"><span>Category *</span>
       <select name="category" required>
         <option value="">— select —</option>
-        {CATEGORIES.map((c) => <option value={c}>{c}</option>)}
+        {CATEGORIES.map((c) => <option value={c} selected={c === prefillCategory}>{c}</option>)}
       </select>
     </label>
     <label class="admin-field"><span>File Name</span><input type="text" name="file_name" placeholder="e.g. ELLA H2 Installation Manual.pdf" /></label>
@@ -93,12 +104,19 @@ try {
     <label class="admin-field"><span>Related Order</span>
       <select name="order_id"><option value="">— none —</option>{orders.map((o) => <option value={o.id}>{o.order_number || o.id.slice(0, 8)}</option>)}</select>
     </label>
+    <label class="admin-field"><span>Related Inventory Unit</span>
+      <select name="unit_id">
+        <option value="">— none —</option>
+        {units.map((u) => <option value={u.id} selected={u.id === prefillUnitId}>{u.unit_code}</option>)}
+      </select>
+    </label>
 
     <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
 
+    <input type="hidden" name="return_to" value={returnTo} />
     <div class="admin-form__actions">
       <button class="admin-btn" type="submit">Add Document</button>
-      <a class="admin-btn admin-btn--ghost" href="/admin/documents">Cancel</a>
+      <a class="admin-btn admin-btn--ghost" href={returnTo || '/admin/documents'}>Cancel</a>
     </div>
   </form>
 </AdminLayout>

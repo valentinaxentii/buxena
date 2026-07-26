@@ -6,6 +6,7 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
+import { ensureExpectedUnitsForShipment } from '../../../lib/inventory-units';
 
 const { id } = Astro.params;
 
@@ -42,12 +43,16 @@ try {
       const nextStatus = String(form.get('next_status') ?? '');
       if (nextStatus) {
         await supabase.from('shipments').update({ status: nextStatus }).eq('id', id);
+        await ensureExpectedUnitsForShipment(supabase, id!);
         await recomputeIncomingForShipment(supabase, id!);
       }
     }
 
     if (intent === 'place_order') {
       await supabase.from('shipments').update({ status: 'Ordered' }).eq('id', id);
+      // Generates one EXPECTED inventory_units row per unit ordered, for
+      // unit_tracked (sauna) products only — idempotent, safe to re-run.
+      await ensureExpectedUnitsForShipment(supabase, id!);
       await recomputeIncomingForShipment(supabase, id!);
     }
 
@@ -59,10 +64,15 @@ try {
     if (intent === 'receive') {
       const { data: currentItems } = await supabase
         .from('shipment_items')
-        .select('id, product_id, quantity, quantity_received')
+        .select('id, product_id, quantity, quantity_received, products(unit_tracked)')
         .eq('shipment_id', id);
 
       for (const item of currentItems ?? []) {
+        // Unit-tracked products are received exclusively via QR scan
+        // (/receive) — never via this bulk quantity form, so the two paths
+        // can never both increment the same product's stock.
+        if ((item as any).products?.unit_tracked) continue;
+
         const receivedNow = Number(form.get(`received_${item.id}`) ?? 0) || 0;
         if (receivedNow <= 0) continue;
 
@@ -121,7 +131,7 @@ try {
 
   const [shipmentRow, itemRows, supplierRows] = await Promise.all([
     supabase.from('shipments').select('*, suppliers(name)').eq('id', id).single(),
-    supabase.from('shipment_items').select('*, products(model_name)').eq('shipment_id', id).order('sort_order'),
+    supabase.from('shipment_items').select('*, products(model_name, unit_tracked)').eq('shipment_id', id).order('sort_order'),
     supabase.from('suppliers').select('id, name').order('name'),
   ]);
 
@@ -144,6 +154,9 @@ const subtitle = shipment
 const totalOrdered = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
 const totalReceived = items.reduce((sum, i) => sum + (i.quantity_received ?? 0), 0);
 const receivingPct = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
+
+const unitTrackedItems = items.filter((i) => i.products?.unit_tracked);
+const bulkReceiveItems = items.filter((i) => !i.products?.unit_tracked);
 ---
 
 <AdminLayout title={shipment?.shipment_number ?? 'Shipment'} subtitle={subtitle} parentLabel="Shipment Orders" parentHref="/admin/shipments">
@@ -188,7 +201,24 @@ const receivingPct = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0
 
       <div class="ship-layout">
         <div class="ship-main">
-          {RECEIVABLE_STATUSES.includes(shipment.status) && (
+          {unitTrackedItems.length > 0 && (
+            <div class="admin-panel ship-section">
+              <h2 class="admin-section-title">Unit Tracked</h2>
+              <p class="ship-hint">
+                {unitTrackedItems.map((i) => i.products?.model_name).join(', ')} — received one at a time by QR/unit
+                code scan, not by quantity. Each physical unit is scanned individually so it can be identified for
+                the rest of its lifecycle.
+              </p>
+              <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                {RECEIVABLE_STATUSES.includes(shipment.status) && (
+                  <a class="admin-btn" href={`/admin/shipments/${id}/receive`}>Receive via QR Scan</a>
+                )}
+                <a class="admin-btn admin-btn--ghost" href={`/admin/shipments/${id}/labels`}>Print Unit Labels</a>
+              </div>
+            </div>
+          )}
+
+          {RECEIVABLE_STATUSES.includes(shipment.status) && bulkReceiveItems.length > 0 && (
             <div class="admin-panel ship-section">
               <h2 class="admin-section-title">Receive Inventory</h2>
               <form method="POST">
@@ -197,7 +227,7 @@ const receivingPct = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0
                   <table class="admin-table">
                     <thead><tr><th>Model</th><th>Ordered</th><th>Already Received</th><th>Remaining</th><th>Receive Now</th></tr></thead>
                     <tbody>
-                      {items.map((item) => {
+                      {bulkReceiveItems.map((item) => {
                         const remaining = (item.quantity ?? 0) - (item.quantity_received ?? 0);
                         return (
                           <tr>

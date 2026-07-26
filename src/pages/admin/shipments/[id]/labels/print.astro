@@ -1,0 +1,83 @@
+---
+export const prerender = false;
+
+import { createSupabaseAdminClient } from '../../../../../lib/supabase-admin';
+import { generateUnitQrDataUrl } from '../../../../../lib/qr';
+
+const { id } = Astro.params;
+const idsParam = Astro.url.searchParams.get('ids');
+
+let shipment: any = null;
+let labels: { unit_code: string; model_name: string; po_reference: string | null; qrDataUrl: string }[] = [];
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const { data: shipmentRow } = await supabase.from('shipments').select('shipment_number, po_reference').eq('id', id).single();
+  shipment = shipmentRow;
+
+  const ids = idsParam ? idsParam.split(',').filter(Boolean) : [];
+  let query = supabase.from('inventory_units').select('unit_code, public_token, products(model_name)').eq('shipment_id', id);
+  if (ids.length > 0) query = query.in('id', ids);
+  const { data: unitRows } = await query.order('unit_code');
+
+  for (const u of unitRows ?? []) {
+    labels.push({
+      unit_code: u.unit_code,
+      model_name: (u as any).products?.model_name ?? '',
+      po_reference: shipment?.po_reference ?? null,
+      qrDataUrl: await generateUnitQrDataUrl(u.public_token),
+    });
+  }
+} catch {
+  // leave labels empty — rendered as "No units matched" below
+}
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QR Labels — {shipment?.shipment_number ?? 'Shipment'}</title>
+  <style>
+    @page { size: 4in 3in; margin: 0.15in; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: 'Jost', system-ui, sans-serif; }
+    .label {
+      width: 3.7in;
+      height: 2.7in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.08in;
+      padding: 0.1in;
+      color: #000;
+      break-after: page;
+      page-break-after: always;
+    }
+    .label:last-child { break-after: auto; page-break-after: auto; }
+    .label__brand { font-size: 13pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .label__qr { width: 1.5in; height: 1.5in; }
+    .label__unit-code { font-size: 14pt; font-weight: 700; letter-spacing: 0.03em; }
+    .label__model { font-size: 9pt; text-align: center; max-width: 3.4in; }
+    .label__po { font-size: 7.5pt; color: #444; }
+    .no-print { margin: 12px; font-family: system-ui, sans-serif; }
+    @media print {
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <p class="no-print"><button onclick="window.print()">Print {labels.length} label{labels.length === 1 ? '' : 's'}</button></p>
+  {labels.map((l) => (
+    <div class="label">
+      <div class="label__brand">BUXENA</div>
+      <img class="label__qr" src={l.qrDataUrl} alt={`QR code for unit ${l.unit_code}`} />
+      <div class="label__unit-code">{l.unit_code}</div>
+      <div class="label__model">{l.model_name}</div>
+      {l.po_reference && <div class="label__po">PO: {l.po_reference}</div>}
+    </div>
+  ))}
+  {labels.length === 0 && <p class="no-print">No units matched.</p>}
+</body>
+</html>

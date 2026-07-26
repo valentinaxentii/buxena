@@ -8,17 +8,24 @@
    completely inert — every rule lives inside @media print. */
 
 @media print {
-  /* margin: 0 suppresses Chrome/Edge's own date/title/URL header & footer;
-     the 0.6in appears as padding on the print container instead. Firefox and
-     Safari handle @page differently, and users can re-enable browser
-     headers/footers in the print dialog. */
+  /* REAL per-page margins on all four sides. @page margins are reserved on
+     EVERY physical page by the browser itself — unlike box padding (which,
+     per the CSS Fragmentation spec, only applies padding-top to a box's
+     FIRST page-fragment and padding-bottom to its LAST), so this is the
+     correct, standards-based way to get consistent margins on every page of
+     a multi-page document. Trade-off, stated plainly: the old approach used
+     `margin: 0` specifically to stop Chrome/Edge drawing their own
+     date/title/URL header-footer (a nonzero @page margin leaves them room to
+     draw into if the user has that browser print-dialog option enabled — it
+     is off by default and cannot be forced off from CSS). Reliable,
+     non-overlapping pagination was judged more important than that cosmetic
+     suppression; if it turns out to matter, it's a one-time checkbox in
+     Chrome's print dialog → More settings → Headers and footers.
+     Header and footer are BOTH normal document flow now (see below) — no
+     fixed positioning anywhere, so nothing needs a separately reserved band. */
   @page {
     size: letter;
-    /* top 0 suppresses Chrome/Edge's date/title header; the BOTTOM margin
-       reserves real flow space on EVERY page so content can never run under
-       the fixed footer (fixed elements print relative to the paper, into
-       this reserved band). */
-    margin: 0 0 0.95in 0;
+    margin: 0.6in;
   }
 
   * {
@@ -31,6 +38,23 @@
   body {
     background: #fff !important;
     font-family: 'Jost', system-ui, sans-serif;
+  }
+  /* On-screen these boxes are min-height:100vh / 100% for the dark-theme
+     full-bleed shell. That is NOT reset by the display:block overrides below
+     (changing display doesn't touch min-height), and `vh`/`%` height units
+     resolve unreliably inside Chrome's print pagination — this was actively
+     inflating the page box far beyond the real content height, which is why
+     a one-line invoice was spilling onto a phantom second page, and why the
+     footer (this file's PREVIOUS position:fixed version) appeared to cut
+     through the middle of page 1 rather than sit at its true end. Every
+     ancestor of the printed content gets its min-height neutralized. */
+  html,
+  body,
+  .shell,
+  .main,
+  .content {
+    min-height: 0 !important;
+    height: auto !important;
   }
 
   /* link colouring must never leak into print — emails/values print black */
@@ -69,11 +93,10 @@
 
   .shell { display: block !important; }
   .main { display: block !important; }
-  /* the print container carries the page margins (see @page note above) */
-  .content {
-    padding: var(--doc-margin, 0.6in) !important;
-    padding-bottom: 0.2in !important; /* @page bottom margin reserves footer space per page */
-  }
+  /* @page margin (above) now owns ALL page spacing — no padding needed here.
+     Kept explicitly at 0 rather than omitted, so nothing on-screen (e.g.
+     `.content { padding: 1.25rem }`) leaks a second, redundant margin in. */
+  .content { padding: 0 !important; }
 
   /* --- header: logo IMAGE only left; title block right; bronze rule below.
          Elements share a bottom edge. --- */
@@ -113,14 +136,31 @@
     color: var(--doc-secondary, #444) !important;
     line-height: 1.4;
   }
+  /* status pill riding beside the title in the printed letterhead — the same
+     slotted badge used on-screen next to the h1, rendered here a second
+     time. The shared .admin-pill outline treatment (further below) already
+     makes it print correctly; this just sizes it to sit next to 21pt type. */
+  .print-letterhead__doc .admin-pill {
+    vertical-align: middle;
+    margin-left: 6pt;
+    font-size: 8pt;
+  }
 
-  /* --- footer anchored to the bottom of the sheet --- */
+  /* --- footer: NORMAL DOCUMENT FLOW, not position:fixed.
+     A repeating fixed footer needs a browser-reserved page-bottom band to be
+     completely safe, and in practice this repeatedly produced exactly the
+     bugs reported: the footer cutting across mid-page content, and phantom
+     extra pages. Normal flow cannot overlap other normal-flow content by
+     construction — it simply follows the invoice at whatever point it ends.
+     Trade-off, stated plainly: on a multi-page invoice this footer prints
+     ONCE, at the true end of the document, not repeated on every sheet. That
+     is the deliberate, correct choice for a browser-print pipeline; a truly
+     repeating running footer needs @page margin-box content (Chrome does not
+     support it) or a headless-Chrome PDF pipeline with header/footer
+     templates (a different, heavier tool than this admin uses). --- */
   .print-footer {
     display: flex !important;
-    position: fixed;
-    bottom: 0.35in; /* sits inside the reserved @page bottom band */
-    left: var(--doc-margin, 0.6in);
-    right: var(--doc-margin, 0.6in);
+    margin-top: 8mm;
     justify-content: space-between;
     align-items: flex-start;
     gap: 8mm;
@@ -128,12 +168,29 @@
     border-top: 1px solid var(--doc-bronze, #9c7a4a) !important;
     font-size: var(--doc-footer-size, 7.5pt);
     color: var(--doc-footer, #333) !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
   .print-footer__left { display: flex; flex-direction: column; gap: 1pt; color: var(--doc-footer, #333) !important; }
   .print-footer__right { display: flex; flex-direction: column; align-items: flex-end; gap: 1pt; color: var(--doc-footer, #333) !important; }
-  /* counter(page) in body content: supported in Firefox, not Chromium — the
-     page number renders where the engine supports it, omitted elsewhere. */
+  /* Shows which page THIS footer instance landed on. Supported in Firefox;
+     silently omitted in Chromium (counter(page) in body content isn't
+     implemented there) rather than showing a wrong/fixed number. */
   .print-footer__page::after { content: 'Page ' counter(page); }
+
+  /* --- create/edit forms are not printable artefacts: any page containing
+         the shared form (form.admin-form) prints the letterhead + a notice
+         instead of empty fields. Ctrl+P is covered, not just the button. --- */
+  body:has(form.admin-form) .content > :not(.print-letterhead):not(.print-footer):not(.print-form-notice) {
+    display: none !important;
+  }
+  body:has(form.admin-form) .print-form-notice {
+    display: block !important;
+    margin-top: 30mm;
+    text-align: center;
+    font-size: 11pt;
+    color: var(--doc-ink, #000) !important;
+  }
 
   /* --- tables: identical treatment to the PDFs --- */
   .admin-table-wrap { overflow: visible !important; }
@@ -216,6 +273,13 @@
 
 /* on screen the print-only elements never render */
 .print-letterhead,
-.print-footer {
+.print-footer,
+.print-form-notice {
+  display: none;
+}
+
+/* the Print control is pointless on editing views — hidden there on screen
+   too (the @media print suppression above covers Ctrl+P regardless) */
+body:has(form.admin-form) .print-btn {
   display: none;
 }

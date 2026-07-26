@@ -1,0 +1,397 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+import { receiveUnitByCode, acceptUnitIntoStock, type ScanResult } from '../../../../lib/inventory-units';
+
+const { id } = Astro.params;
+const RECEIVABLE_STATUSES = ['Arrived', 'Partially Received'];
+
+let shipment: any = null;
+let units: any[] = [];
+let notFound = false;
+let error: string | null = null;
+let scanResult: ScanResult | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const staffId = Astro.locals.staffUser?.id ?? null;
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+
+    if (intent === 'scan') {
+      const unitCode = String(form.get('unit_code') ?? '').trim();
+      const condition = (String(form.get('condition') ?? 'good') as 'good' | 'damaged' | 'hold');
+      if (unitCode) {
+        scanResult = await receiveUnitByCode(supabase, {
+          shipmentId: id!,
+          unitCode,
+          condition,
+          warehouse: String(form.get('warehouse') ?? ''),
+          zone: String(form.get('zone') ?? ''),
+          bay: String(form.get('bay') ?? ''),
+          staffId,
+        });
+      }
+
+      // re-check overall shipment completion, same rule the bulk-receive
+      // path uses, now driven by shipment_items.quantity_received which the
+      // scan path also updates — one shared completion rule either way.
+      const { data: updatedItems } = await supabase.from('shipment_items').select('quantity, quantity_received').eq('shipment_id', id);
+      const allReceived = (updatedItems ?? []).every((i) => (i.quantity_received ?? 0) >= (i.quantity ?? 0));
+      const anyReceived = (updatedItems ?? []).some((i) => (i.quantity_received ?? 0) > 0);
+      await supabase
+        .from('shipments')
+        .update({ status: allReceived ? 'Received' : anyReceived ? 'Partially Received' : 'Ordered' })
+        .eq('id', id);
+    }
+
+    if (intent === 'accept') {
+      const unitId = String(form.get('unit_id') ?? '');
+      if (unitId) await acceptUnitIntoStock(supabase, unitId, staffId);
+    }
+  }
+
+  const [shipmentRow, unitRows] = await Promise.all([
+    supabase.from('shipments').select('*, suppliers(name)').eq('id', id).single(),
+    supabase
+      .from('inventory_units')
+      .select('id, unit_code, status, condition, received_at, warehouse, zone, bay, products(model_name)')
+      .eq('shipment_id', id)
+      .order('received_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: true }),
+  ]);
+
+  if (shipmentRow.error || !shipmentRow.data) notFound = true;
+  else shipment = shipmentRow.data;
+  units = unitRows.data ?? [];
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+const expected = units.filter((u) => u.status === 'EXPECTED');
+const received = units.filter((u) => u.status !== 'EXPECTED');
+const receivedNeedingAccept = units.filter((u) => u.status === 'RECEIVED');
+const recentScans = received.slice(0, 15);
+const pct = units.length > 0 ? (received.length / units.length) * 100 : 0;
+
+const STATUS_LABEL: Record<string, string> = {
+  EXPECTED: 'Expected', RECEIVED: 'Received', IN_STOCK: 'In Stock',
+  DAMAGED: 'Damaged', HOLD: 'Hold', RESERVED: 'Reserved', SOLD: 'Sold', DELIVERED: 'Delivered',
+};
+
+interface ScanCard {
+  kind: 'ok' | 'error';
+  heading: string;
+  unitCode?: string;
+  modelName?: string;
+  statusLabel?: string;
+  detail?: string;
+}
+function scanMessage(r: ScanResult | null): ScanCard | null {
+  if (!r) return null;
+  if (r.ok) return { kind: 'ok', heading: 'RECEIVED', unitCode: r.unitCode, modelName: r.modelName, statusLabel: STATUS_LABEL[r.status] ?? r.status };
+  if (r.reason === 'UNIT_NOT_FOUND') return { kind: 'error', heading: 'UNIT NOT FOUND', detail: 'This code is not recognized. Nothing was received.' };
+  if (r.reason === 'WRONG_SHIPMENT') return { kind: 'error', heading: 'WRONG SHIPMENT', detail: `This unit belongs to ${r.actualShipmentNumber ?? 'a different shipment'}.` };
+  return { kind: 'error', heading: 'ALREADY RECEIVED', detail: `This unit is already ${STATUS_LABEL[r.status] ?? r.status}${r.receivedAt ? ` (${new Date(r.receivedAt).toLocaleString()})` : ''}.` };
+}
+const message = scanMessage(scanResult);
+---
+
+<AdminLayout title={shipment?.shipment_number ?? 'Receive Shipment'} subtitle="Receive via QR Scan" parentLabel={shipment?.shipment_number ?? 'Shipment'} parentHref={`/admin/shipments/${id}`}>
+  <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/shipments/${id}`}>Back to Shipment</a>
+
+  {notFound && <p class="admin-empty">Shipment not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {shipment && !RECEIVABLE_STATUSES.includes(shipment.status) && (
+    <p class="notice notice--error" style="margin-bottom:1.25rem;">
+      This shipment is not in a receivable status ({shipment.status}) — scanning is disabled.
+    </p>
+  )}
+
+  {shipment && (
+    <>
+      {message && (
+        <div class={`scan-result scan-result--${message.kind}`}>
+          <p class="scan-result__heading">{message.heading}</p>
+          {message.kind === 'ok' ? (
+            <dl class="scan-result__detail">
+              <div><dt>Unit ID</dt><dd>{message.unitCode}</dd></div>
+              <div><dt>Model</dt><dd>{message.modelName}</dd></div>
+              <div><dt>Condition</dt><dd>{message.statusLabel}</dd></div>
+            </dl>
+          ) : (
+            <p class="scan-result__text">{message.detail}</p>
+          )}
+        </div>
+      )}
+
+      <div class="ship-stats">
+        <div class="ship-stat">
+          <span class="ship-stat__value">{shipment.shipment_number}</span>
+          <span class="ship-stat__label">{shipment.container_number || 'Container TBD'}</span>
+        </div>
+        <div class="ship-stat-row">
+          <div class="ship-stat ship-stat--num">
+            <span class="ship-stat__value">{expected.length}</span>
+            <span class="ship-stat__label">Expected</span>
+          </div>
+          <div class="ship-stat ship-stat--num">
+            <span class="ship-stat__value">{received.length}</span>
+            <span class="ship-stat__label">Received</span>
+          </div>
+          <div class="ship-stat ship-stat--num">
+            <span class="ship-stat__value">{expected.length}</span>
+            <span class="ship-stat__label">Remaining</span>
+          </div>
+        </div>
+        <div class="ship-progress__bar ship-progress__bar--lg"><span style={`--pct:${pct}%`} /></div>
+      </div>
+
+      {units.length === 0 && (
+        <p class="admin-empty">No unit-tracked line items on this shipment yet — go back and place the order first.</p>
+      )}
+
+      {RECEIVABLE_STATUSES.includes(shipment.status) && units.length > 0 && (
+        <div class="admin-panel ship-section scan-panel">
+          <h2 class="admin-section-title">Scan Unit</h2>
+          <form method="POST" class="scan-form">
+            <input type="hidden" name="_intent" value="scan" />
+            <label class="scan-form__code-field">
+              <span>Unit Code (scan or type)</span>
+              <input type="text" name="unit_code" class="scan-form__code-input" autofocus autocomplete="off" placeholder="BUX-260001" />
+            </label>
+
+            <fieldset class="cond-group">
+              <legend>Condition</legend>
+              <label class="cond-option">
+                <input type="radio" name="condition" value="good" checked />
+                <span>Good</span>
+              </label>
+              <label class="cond-option">
+                <input type="radio" name="condition" value="damaged" />
+                <span>Damaged</span>
+              </label>
+              <label class="cond-option">
+                <input type="radio" name="condition" value="hold" />
+                <span>Hold</span>
+              </label>
+            </fieldset>
+
+            <details class="scan-form__location">
+              <summary>Warehouse / Zone / Bay</summary>
+              <div class="scan-form__location-fields">
+                <label class="admin-field"><span>Warehouse</span><input type="text" name="warehouse" value={shipment.destination ?? ''} /></label>
+                <label class="admin-field"><span>Zone</span><input type="text" name="zone" /></label>
+                <label class="admin-field"><span>Bay</span><input type="text" name="bay" /></label>
+              </div>
+            </details>
+
+            <button class="admin-btn scan-form__submit" type="submit">Receive Scanned Unit</button>
+          </form>
+          <p class="ship-hint">
+            A USB/Bluetooth scanner types the code and presses Enter for you — just leave the field focused.
+            Unknown codes are rejected, units from another shipment are rejected, and a unit already received
+            cannot be received twice.
+          </p>
+        </div>
+      )}
+
+      {receivedNeedingAccept.length > 0 && (
+        <div class="admin-panel ship-section">
+          <h2 class="admin-section-title">Awaiting Acceptance ({receivedNeedingAccept.length})</h2>
+          <p class="ship-hint">Received and condition-checked as Good, but not yet accepted into sellable stock.</p>
+
+          <div class="admin-table-wrap mobile-hide">
+            <table class="admin-table">
+              <thead><tr><th>Unit</th><th>Model</th><th>Received</th><th>Location</th><th></th></tr></thead>
+              <tbody>
+                {receivedNeedingAccept.map((u) => (
+                  <tr>
+                    <td>{u.unit_code}</td>
+                    <td>{u.products?.model_name ?? '—'}</td>
+                    <td>{u.received_at ? new Date(u.received_at).toLocaleString() : '—'}</td>
+                    <td>{[u.warehouse, u.zone, u.bay].filter(Boolean).join(' / ') || '—'}</td>
+                    <td>
+                      <form method="POST" style="margin:0;">
+                        <input type="hidden" name="_intent" value="accept" />
+                        <input type="hidden" name="unit_id" value={u.id} />
+                        <button class="admin-btn admin-btn--ghost" type="submit">Accept into Stock</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mobile-cards mobile-show">
+            {receivedNeedingAccept.map((u) => (
+              <div class="mobile-card">
+                <div class="mobile-card__top">
+                  <span class="mobile-card__code">{u.unit_code}</span>
+                  <span class="mobile-card__model">{u.products?.model_name ?? '—'}</span>
+                </div>
+                <div class="mobile-card__meta">
+                  <span>{u.received_at ? new Date(u.received_at).toLocaleString() : '—'}</span>
+                  <span>{[u.warehouse, u.zone, u.bay].filter(Boolean).join(' / ') || '—'}</span>
+                </div>
+                <form method="POST" style="margin:0;">
+                  <input type="hidden" name="_intent" value="accept" />
+                  <input type="hidden" name="unit_id" value={u.id} />
+                  <button class="admin-btn mobile-card__action" type="submit">Accept into Stock</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recentScans.length > 0 && (
+        <div class="admin-panel ship-section">
+          <h2 class="admin-section-title">Recent Scans</h2>
+
+          <div class="admin-table-wrap mobile-hide">
+            <table class="admin-table">
+              <thead><tr><th>Unit</th><th>Model</th><th>Time</th><th>Result</th></tr></thead>
+              <tbody>
+                {recentScans.map((u) => (
+                  <tr>
+                    <td>{u.unit_code}</td>
+                    <td>{u.products?.model_name ?? '—'}</td>
+                    <td>{u.received_at ? new Date(u.received_at).toLocaleString() : '—'}</td>
+                    <td><span class={`admin-badge admin-badge--${u.status === 'IN_STOCK' ? 'green' : u.status === 'DAMAGED' ? 'red' : 'neutral'}`}>{STATUS_LABEL[u.status] ?? u.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mobile-cards mobile-show">
+            {recentScans.map((u) => (
+              <div class="mobile-card">
+                <div class="mobile-card__top">
+                  <span class="mobile-card__code">{u.unit_code}</span>
+                  <span class={`admin-badge admin-badge--${u.status === 'IN_STOCK' ? 'green' : u.status === 'DAMAGED' ? 'red' : 'neutral'}`}>{STATUS_LABEL[u.status] ?? u.status}</span>
+                </div>
+                <div class="mobile-card__meta">
+                  <span>{u.products?.model_name ?? '—'}</span>
+                  <span>{u.received_at ? new Date(u.received_at).toLocaleString() : '—'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
+
+  .ship-progress__bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .ship-progress__bar span { display: block; height: 100%; width: var(--pct); background: var(--admin-gold); }
+  .ship-progress__bar--lg { height: 12px; border-radius: 6px; }
+
+  .ship-section { padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .ship-hint { font-size: 0.78rem; color: var(--admin-muted); margin-top: 0.75rem; }
+
+  /* --- stats header: shipment / container, EXPECTED · RECEIVED · REMAINING, progress --- */
+  .ship-stats { margin-bottom: 1.5rem; }
+  .ship-stats .ship-stat:first-child { margin-bottom: 0.9rem; }
+  .ship-stat__value { display: block; font-size: 1.1rem; font-weight: 500; color: var(--admin-cream); letter-spacing: 0.02em; }
+  .ship-stat__label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); margin-top: 0.1rem; }
+  .ship-stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 0.9rem; }
+  .ship-stat--num {
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .ship-stat--num .ship-stat__value { font-size: 1.6rem; font-weight: 600; }
+
+  /* --- scan result banner: large, unmissable from arm's length --- */
+  .scan-result {
+    margin-bottom: 1.25rem;
+    padding: 1.1rem 1.25rem;
+    border-radius: 8px;
+    border: 1px solid;
+  }
+  .scan-result--ok { background: rgba(143, 191, 138, 0.08); border-color: rgba(143, 191, 138, 0.4); }
+  .scan-result--error { background: rgba(230, 130, 90, 0.08); border-color: rgba(230, 130, 90, 0.4); }
+  .scan-result__heading {
+    margin: 0 0 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .scan-result--ok .scan-result__heading { color: #a9cfa4; }
+  .scan-result--error .scan-result__heading { color: #e6b7a0; }
+  .scan-result__detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 0; }
+  .scan-result__detail dt { font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); }
+  .scan-result__detail dd { margin: 0.15rem 0 0; font-size: 1.05rem; color: var(--admin-cream); font-weight: 500; }
+  .scan-result__text { margin: 0; font-size: 0.95rem; color: var(--admin-cream); }
+
+  /* --- scan form: big, thumb-friendly --- */
+  .scan-form { display: flex; flex-direction: column; gap: 1.1rem; }
+  .scan-form__code-field { display: flex; flex-direction: column; gap: 0.4rem; }
+  .scan-form__code-field span { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); }
+  .scan-form__code-input {
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--admin-cream);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(201, 166, 104, 0.25);
+    border-radius: 6px;
+    padding: 0.9rem 1rem;
+    min-height: 3.2rem;
+  }
+  .scan-form__code-input:focus { outline: none; border-color: var(--admin-gold); }
+
+  .cond-group { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+  .cond-group legend { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); margin-bottom: 0.4rem; grid-column: 1 / -1; padding: 0; }
+  .cond-option { position: relative; }
+  .cond-option input {
+    position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .cond-option span {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 3.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--admin-border);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .cond-option input:checked + span { border-color: var(--admin-gold); background: var(--admin-gold); color: var(--admin-bg); }
+  .cond-option input:focus-visible + span { outline: 2px solid var(--admin-gold); outline-offset: 2px; }
+
+  .scan-form__location { border: 1px solid var(--admin-border); border-radius: 6px; padding: 0.15rem 0.9rem; }
+  .scan-form__location summary {
+    cursor: pointer; padding: 0.65rem 0; font-size: 0.78rem; letter-spacing: 0.04em; color: var(--admin-muted);
+  }
+  .scan-form__location-fields { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 0.9rem; }
+  .scan-form__location-fields .admin-field { flex: 1 1 8rem; }
+
+  .scan-form__submit { width: 100%; justify-content: center; min-height: 3.4rem; font-size: 0.8rem; }
+
+  @media (max-width: 480px) {
+    .scan-result__detail { grid-template-columns: 1fr; gap: 0.4rem; }
+    .ship-stat-row { gap: 0.5rem; }
+    .ship-stat--num .ship-stat__value { font-size: 1.35rem; }
+  }
+</style>

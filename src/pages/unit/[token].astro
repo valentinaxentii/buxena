@@ -1,0 +1,447 @@
+---
+export const prerender = false;
+
+// Public "My Sauna" passport page — the destination every printed unit QR
+// label points to (see src/lib/qr.ts: unitPublicUrl). Looked up by
+// public_token ONLY, never by unit_code or any internal id — the token is
+// an unguessable capability credential, so knowing it is the only thing
+// that grants access to a unit's page. No admin auth, no session required
+// by design (a customer scanning a label isn't signed in to anything).
+//
+// SECURITY: every value rendered below is copied field-by-field into a
+// plain object before use in the template. Nothing from the raw Supabase
+// rows (unit.id, product_id, order_id, warranty.id, document ids, supplier/
+// shipment/customer data, cost or margin fields) is ever passed to the
+// template directly, so there is no risk of an internal field leaking
+// through an incidental {JSON.stringify(row)} or a future careless edit.
+import { createSupabaseAdminClient } from '../../lib/supabase-admin';
+import { getSettings } from '../../lib/settings';
+
+const { token } = Astro.params;
+
+let found = false;
+let safe: {
+  unitCode: string;
+  modelName: string;
+  category: string | null;
+  image: string | null;
+  warrantyStatus: string;
+  warrantyStart: string | null;
+  warrantyEnd: string | null;
+  purchaseDate: string | null;
+  deliveryDate: string | null;
+  heater: string | null;
+  heaterSerial: string | null;
+  woodType: string | null;
+  glass: string | null;
+  lighting: string | null;
+  benchType: string | null;
+  installationType: string | null;
+  installationDate: string | null;
+  installerCompany: string | null;
+  manuals: { label: string; url: string }[];
+  warrantyCertificateUrl: string | null;
+  contactEmail: string;
+  contactPhone: string | null;
+} | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  const { data: unit } = await supabase
+    .from('inventory_units')
+    .select(
+      'id, unit_code, product_id, order_id, delivery_date, installation_date, installation_type, installation_status, installer_company, ' +
+      'products(model_name, category, images, timber_type, glass_configuration, heater_options, lighting, ' +
+      'bench_type, installation_manual_url, brochure_url, warranty_document_url)'
+    )
+    .eq('public_token', token ?? '')
+    .maybeSingle();
+
+  if (unit) {
+    found = true;
+    const product = (unit as any).products ?? {};
+
+    const [warrantyRes, docsRes, orderRes, settings] = await Promise.all([
+      supabase.from('warranties').select('status, warranty_start_date, warranty_end_date').eq('unit_id', unit.id).maybeSingle(),
+      supabase.from('documents').select('category, file_url, file_name').or(`unit_id.eq.${unit.id},product_id.eq.${unit.product_id}`),
+      unit.order_id
+        ? supabase.from('orders').select('created_at').eq('id', unit.order_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      getSettings(supabase),
+    ]);
+
+    const warranty = warrantyRes.data;
+    const docs = docsRes.data ?? [];
+
+    const MANUAL_CATEGORIES = new Set(['Installation Manual', 'Brochure', 'Product Specification']);
+    const manuals: { label: string; url: string }[] = [];
+    if (product.installation_manual_url) manuals.push({ label: 'Installation Manual', url: product.installation_manual_url });
+    if (product.brochure_url) manuals.push({ label: 'Brochure', url: product.brochure_url });
+    for (const d of docs) {
+      if (MANUAL_CATEGORIES.has(d.category) && d.file_url) {
+        manuals.push({ label: d.file_name || d.category, url: d.file_url });
+      }
+    }
+
+    // Prefer a unit-specific certificate over the model-level warranty PDF.
+    const unitCert = docs.find((d: any) => d.category === 'Warranty Document' && d.file_url);
+    const warrantyCertificateUrl = unitCert?.file_url ?? product.warranty_document_url ?? null;
+
+    const heaterOptions: string[] = Array.isArray(product.heater_options) ? product.heater_options : [];
+
+    safe = {
+      unitCode: unit.unit_code,
+      modelName: product.model_name ?? 'BUXENA Sauna',
+      category: product.category ?? null,
+      image: Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null,
+      warrantyStatus: warranty?.status ?? 'NOT_REGISTERED',
+      warrantyStart: warranty?.warranty_start_date ?? null,
+      warrantyEnd: warranty?.warranty_end_date ?? null,
+      purchaseDate: (orderRes as any).data?.created_at ?? null,
+      deliveryDate: unit.delivery_date ?? null,
+      heater: heaterOptions.length > 0 ? heaterOptions.join(', ') : null,
+      heaterSerial: null, // not captured anywhere in the current data model
+      woodType: product.timber_type ?? null,
+      glass: product.glass_configuration ?? null,
+      lighting: product.lighting ?? null,
+      benchType: product.bench_type ?? null,
+      // Installation date/installer are only customer-facing once the
+      // installation workflow has actually reached COMPLETED — a
+      // scheduled-but-not-done installation shouldn't display as if it
+      // already happened. Installation type is safe to show any time (it's
+      // just a category, not an event record). installation_status itself,
+      // electrician_name, and installation_notes are never exposed here.
+      installationType: unit.installation_type ?? null,
+      installationDate: unit.installation_status === 'COMPLETED' ? unit.installation_date ?? null : null,
+      installerCompany: unit.installation_status === 'COMPLETED' ? unit.installer_company ?? null : null,
+      manuals,
+      warrantyCertificateUrl,
+      contactEmail: settings.company_email,
+      contactPhone: settings.company_phone,
+    };
+  }
+} catch {
+  found = false;
+}
+
+if (!found) Astro.response.status = 404;
+
+function fmtDate(d: string | null): string {
+  if (!d) return '—';
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  // timeZone: 'UTC' is deliberate — plain SQL `date` values (delivery_date,
+  // warranty dates, installation_date) have no time component, so JS parses
+  // them as UTC midnight. Formatting in the viewer's local zone can then
+  // roll the displayed day backward (e.g. a US visitor sees the day before
+  // the real date). Anchoring to UTC always shows the actual stored date.
+  return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+function warrantyLabel(status: string): string {
+  if (status === 'ACTIVE') return 'Active';
+  if (status === 'EXPIRED') return 'Expired';
+  if (status === 'VOID') return 'Void';
+  return 'Not Registered';
+}
+function warrantyTone(status: string): string {
+  if (status === 'ACTIVE') return 'active';
+  if (status === 'EXPIRED' || status === 'VOID') return 'expired';
+  return 'none';
+}
+function installationTypeLabel(t: string | null): string {
+  if (t === 'DIY') return 'Customer Self-Install';
+  if (t === 'BUXENA') return 'BUXENA Installation Team';
+  if (t === 'THIRD_PARTY') return 'Third-Party Installer';
+  return '—';
+}
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{found ? `${safe!.unitCode} — Your Sauna · BUXENA` : 'Unit Not Found · BUXENA'}</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@200;300;400;500;600;700&display=swap"
+  />
+  <style>
+    :root {
+      --linen: #f6f2ea;
+      --ember: #1b1917;
+      --bronze: #9c7a4a;
+      --bronze-ink: #6e532f;
+      --bronze-btn: #8f6e42;
+      --ink: #241f1a;
+      --muted: #4d4238;
+      --line: #cbbfa9;
+      --font-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+      --font-sans: 'Jost', 'Futura', 'Century Gothic', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--linen);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-weight: 300;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .shell {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: clamp(1.1rem, 0.9rem + 1vw, 2rem) clamp(1.1rem, 0.8rem + 1.5vw, 2.25rem) 3.5rem;
+    }
+
+    /* -- brand -- */
+    .brand {
+      display: flex;
+      justify-content: center;
+      margin-bottom: clamp(1.1rem, 0.9rem + 1vw, 1.75rem);
+    }
+    .brand img { width: clamp(150px, 120px + 10vw, 230px); height: auto; }
+
+    /* -- hero: eyebrow, image, ownership card -- */
+    .eyebrow {
+      font-family: var(--font-sans); font-size: 0.72rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--bronze-ink); font-weight: 500;
+      text-align: center; margin: 0 0 0.9rem;
+    }
+    .hero-image-wrap {
+      margin-bottom: 1.1rem; border-radius: 14px; overflow: hidden;
+      border: 1px solid var(--line); background: var(--birch, #eae3d7);
+      box-shadow: 0 18px 40px -22px rgba(27, 25, 23, 0.35);
+    }
+    .hero-image {
+      display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+    }
+    @media (min-width: 640px) { .hero-image { aspect-ratio: 16 / 9; } }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: clamp(1.25rem, 1.05rem + 1vw, 1.85rem);
+      margin-bottom: 0.9rem;
+    }
+
+    .owner-card { text-align: center; }
+    .model-name {
+      font-family: var(--font-display); font-weight: 500; font-size: clamp(1.75rem, 1.45rem + 1.3vw, 2.5rem);
+      margin: 0 0 0.75rem; color: var(--ember); line-height: 1.15;
+    }
+    .owner-meta {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+      gap: 0.6rem; margin-bottom: 0.6rem;
+    }
+    .unit-chip {
+      display: inline-flex; align-items: baseline; gap: 0.4rem;
+      padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid var(--line);
+      background: var(--linen); font-size: 0.85rem; letter-spacing: 0.02em; color: var(--ink);
+    }
+    .unit-chip__label {
+      font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+    }
+    .unit-chip__code { font-weight: 500; letter-spacing: 0.04em; }
+
+    .w-badge {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.35rem 0.9rem; border-radius: 999px;
+      font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500;
+      border: 1px solid var(--line);
+    }
+    .w-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+    .w-badge--active { color: #3f7a44; border-color: #b9d3ba; background: #f1f7f1; }
+    .w-badge--expired { color: #a2513a; border-color: #e3c3b6; background: #fbf1ee; }
+    .w-badge--none { color: var(--muted); background: var(--linen); }
+
+    .owner-quickfacts {
+      margin: 0.7rem 0 0; font-size: 0.82rem; color: var(--muted); letter-spacing: 0.01em;
+    }
+
+    /* -- key/value grids -- */
+    .kv-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.25rem;
+    }
+    .kv dt { font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+    .kv dd { margin: 0.15rem 0 0; font-size: 0.95rem; color: var(--ink); }
+
+    .section-title {
+      font-family: var(--font-display); font-weight: 500; font-size: 1.35rem;
+      color: var(--ember); margin: 0 0 1rem;
+    }
+
+    /* -- customer actions: premium stacked navigation rows -- */
+    .action-list {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    }
+    .action-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1rem 1.15rem; min-height: 3.4rem;
+      font-size: 0.95rem; letter-spacing: 0.01em; color: var(--ink);
+      text-decoration: none; border-bottom: 1px solid var(--line);
+      transition: background 0.15s ease;
+    }
+    .action-row:last-child { border-bottom: none; }
+    .action-row:hover, .action-row:active { background: var(--linen); }
+    .action-row__arrow { color: var(--bronze-ink); font-family: var(--font-display); font-size: 1.15rem; }
+
+    /* -- documents (manuals, certificate) -- */
+    .manual-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .manual-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 0.7rem 0.9rem; border: 1px solid var(--line); border-radius: 8px; background: var(--linen);
+      text-decoration: none; color: var(--ink); font-size: 0.9rem;
+    }
+    .manual-row:hover { border-color: var(--bronze); }
+    .manual-row span:last-child { color: var(--bronze-ink); font-size: 0.78rem; white-space: nowrap; }
+
+    /* -- warranty detail section -- */
+    .warranty-status-row { margin-bottom: 1.1rem; }
+    .warranty-note { font-size: 0.85rem; color: var(--muted); margin: 1rem 0 0; }
+    .warranty-note a { color: var(--bronze-ink); }
+
+    /* -- footer -- */
+    .page-footer {
+      text-align: center; margin-top: 2.25rem; padding-top: 1.75rem; border-top: 1px solid var(--line);
+    }
+    .page-footer__mark {
+      font-family: var(--font-display); font-size: 1.1rem; letter-spacing: 0.08em;
+      color: var(--ember); font-weight: 500; margin: 0 0 0.2rem;
+    }
+    .page-footer__tagline {
+      font-family: var(--font-display); font-style: italic; font-size: 0.9rem; color: var(--bronze-ink);
+      margin: 0 0 0.9rem;
+    }
+    .page-footer__links { font-size: 0.82rem; color: var(--muted); margin: 0 0 0.5rem; }
+    .page-footer__links a { color: var(--bronze-ink); text-decoration: none; }
+    .page-footer__copyright { font-size: 0.72rem; color: var(--muted); opacity: 0.8; margin: 0; }
+
+    .not-found { text-align: center; padding: 3rem 1rem; }
+    .not-found h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--ember); margin-bottom: 0.6rem; }
+    .not-found p { color: var(--muted); max-width: 34rem; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="brand">
+      <img src="/brand/buxena-logo-espresso.png" alt="BUXENA" />
+    </div>
+
+    {!found && (
+      <div class="not-found">
+        <h1>Unit Not Found</h1>
+        <p>
+          We couldn't find a BUXENA sauna matching this QR code. If you believe this is an error,
+          please <a href="/contact" style="color: var(--bronze-ink);">contact us</a> and we'll help
+          you look it up.
+        </p>
+      </div>
+    )}
+
+    {found && safe && (
+      <>
+        <p class="eyebrow">Your Sauna</p>
+
+        {safe.image && (
+          <div class="hero-image-wrap">
+            <img class="hero-image" src={safe.image} alt={safe.modelName} />
+          </div>
+        )}
+
+        <section class="card owner-card">
+          <h1 class="model-name">{safe.modelName}</h1>
+          <div class="owner-meta">
+            <span class="unit-chip"><span class="unit-chip__label">Unit</span> <span class="unit-chip__code">{safe.unitCode}</span></span>
+            <span class={`w-badge w-badge--${warrantyTone(safe.warrantyStatus)}`}>
+              <span class="w-dot"></span>{warrantyLabel(safe.warrantyStatus)}
+            </span>
+          </div>
+          <p class="owner-quickfacts">Purchased {fmtDate(safe.purchaseDate)} · Delivered {fmtDate(safe.deliveryDate)}</p>
+        </section>
+
+        <section class="card" id="sauna-information">
+          <h2 class="section-title">Sauna Information</h2>
+          <dl class="kv-grid">
+            <div class="kv"><dt>Heater</dt><dd>{safe.heater ?? '—'}</dd></div>
+            <div class="kv"><dt>Heater Serial</dt><dd>{safe.heaterSerial ?? '—'}</dd></div>
+            <div class="kv"><dt>Wood Type</dt><dd>{safe.woodType ?? '—'}</dd></div>
+            <div class="kv"><dt>Glass</dt><dd>{safe.glass ?? '—'}</dd></div>
+            <div class="kv"><dt>Lighting</dt><dd>{safe.lighting ?? '—'}</dd></div>
+            <div class="kv"><dt>Bench Type</dt><dd>{safe.benchType ?? '—'}</dd></div>
+            <div class="kv"><dt>Installation Type</dt><dd>{installationTypeLabel(safe.installationType)}</dd></div>
+            <div class="kv"><dt>Installation Date</dt><dd>{fmtDate(safe.installationDate)}</dd></div>
+            <div class="kv"><dt>Installer / Company</dt><dd>{safe.installerCompany ?? '—'}</dd></div>
+          </dl>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Customer Actions</h2>
+          <div class="action-list">
+            {safe.manuals.length > 0 && (
+              <a class="action-row" href="#manuals"><span>Manuals &amp; Guides</span><span class="action-row__arrow">›</span></a>
+            )}
+            <a class="action-row" href="#warranty-info"><span>Warranty</span><span class="action-row__arrow">›</span></a>
+            <a class="action-row" href="#sauna-information"><span>Installation Info</span><span class="action-row__arrow">›</span></a>
+            <a class="action-row" href={`mailto:${safe.contactEmail}?subject=${encodeURIComponent(`Service Request — Unit ${safe.unitCode}`)}`}>
+              <span>Request Service</span><span class="action-row__arrow">›</span>
+            </a>
+            <a class="action-row" href="/contact"><span>Contact Us</span><span class="action-row__arrow">›</span></a>
+          </div>
+        </section>
+
+        {safe.manuals.length > 0 && (
+          <section class="card" id="manuals">
+            <h2 class="section-title">Manuals &amp; Guides</h2>
+            <div class="manual-list">
+              {safe.manuals.map((m) => (
+                <a class="manual-row" href={m.url} target="_blank" rel="noopener noreferrer">
+                  <span>{m.label}</span>
+                  <span>View →</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section class="card" id="warranty-info">
+          <h2 class="section-title">Warranty</h2>
+          <div class="warranty-status-row">
+            <span class={`w-badge w-badge--${warrantyTone(safe.warrantyStatus)}`}>
+              <span class="w-dot"></span>{warrantyLabel(safe.warrantyStatus)}
+            </span>
+          </div>
+          <dl class="kv-grid">
+            <div class="kv"><dt>Start Date</dt><dd>{fmtDate(safe.warrantyStart)}</dd></div>
+            <div class="kv"><dt>Expiry Date</dt><dd>{fmtDate(safe.warrantyEnd)}</dd></div>
+          </dl>
+          {safe.warrantyCertificateUrl && (
+            <div class="manual-list" style="margin-top: 1rem;">
+              <a class="manual-row" href={safe.warrantyCertificateUrl} target="_blank" rel="noopener noreferrer">
+                <span>Warranty Certificate</span>
+                <span>View →</span>
+              </a>
+            </div>
+          )}
+          <p class="warranty-note">Full terms and coverage — <a href="/warranty">view our warranty policy</a>.</p>
+        </section>
+
+        <footer class="page-footer">
+          <p class="page-footer__mark">BUXENA</p>
+          <p class="page-footer__tagline">Where Wellness Starts</p>
+          <p class="page-footer__links">
+            <a href="/contact">Contact Us</a>{safe.contactPhone ? ` · ${safe.contactPhone}` : ''} · <a href="/warranty">Warranty Policy</a>
+          </p>
+          <p class="page-footer__copyright">© {new Date().getFullYear()} BUXENA. All rights reserved.</p>
+        </footer>
+      </>
+    )}
+  </div>
+</body>
+</html>

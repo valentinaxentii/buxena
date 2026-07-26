@@ -21,21 +21,40 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.from('enquiries').insert({
-      name: name || null,
-      email: email || null,
-      phone: phone || null,
-      location: location || null,
-      message: message || null,
-      chat_transcript: chatTranscript || null,
-      sauna_interest: saunaInterest || null,
-      source: source || 'Sauna Advisor',
-      status: 'New',
-    });
+    const { data: inserted, error } = await supabase
+      .from('enquiries')
+      .insert({
+        name: name || null,
+        email: email || null,
+        phone: phone || null,
+        location: location || null,
+        message: message || null,
+        chat_transcript: chatTranscript || null,
+        sauna_interest: saunaInterest || null,
+        source: source || 'Sauna Advisor',
+        status: 'New',
+      })
+      .select('id')
+      .single();
 
     if (error) {
       return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500 });
     }
+
+    // Best-effort audit trail entry — never blocks or changes the response
+    // the visitor gets, matching this route's existing best-effort posture.
+    if (inserted) {
+      supabase
+        .from('activities')
+        .insert({
+          entity_type: 'enquiry',
+          entity_id: inserted.id,
+          activity_type: 'note',
+          description: `Enquiry received — ${source || 'Sauna Advisor'}`,
+        })
+        .then(() => {});
+    }
+
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   } catch (e) {
     return new Response(

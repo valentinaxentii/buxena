@@ -16,6 +16,8 @@ export interface BuxenaSettings {
   quote_number_prefix: string;
   order_number_prefix: string;
   lead_sources: string[];
+  warranty_start_source: 'delivery_date' | 'installation_date' | 'invoice_date' | 'manual';
+  default_warranty_months: number;
 }
 
 // Used whenever the `settings` table/migration hasn't been applied yet, or
@@ -37,6 +39,8 @@ export const FALLBACK_SETTINGS: BuxenaSettings = {
   quote_number_prefix: 'Q-',
   order_number_prefix: 'O-',
   lead_sources: ['Website', 'Instagram', 'Facebook', 'Google', 'Referral', 'Manual'],
+  warranty_start_source: 'delivery_date',
+  default_warranty_months: 24,
 };
 
 export async function getSettings(supabase: SupabaseClient): Promise<BuxenaSettings> {

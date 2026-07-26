@@ -164,5 +164,14 @@ const hasImage = fs.existsSync(new URL('../../public/images/hero.jpg', import.me
   @media (max-width: 700px) {
     .hero__scroll { display: none; }
     .hero__actions .btn { flex: 1 1 auto; justify-content: center; }
+
+    /* Desktop's min-height (92svh) makes the hero nearly full-screen. The
+       video/image fills that full box via object-fit:cover regardless of
+       height, so a taller box just shows proportionally more of the video's
+       dark upper-sky framing before the lit sauna cabin appears — reading as
+       empty black space above the "real" image. Shortening the box on mobile
+       only crops tighter toward the video's already-existing lower framing;
+       nothing about the video/image itself, the logo, or the header changes. */
+    .hero { min-height: clamp(28rem, 70svh, 42rem); }
   }
 </style>

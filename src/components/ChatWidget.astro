@@ -260,6 +260,18 @@ const quickQuestions = [
       width: auto;
       max-height: min(30rem, calc(100vh - 7rem));
     }
+
+    /* Fixed-position FAB sits over whatever content scrolls beneath it —
+       on narrow screens the desktop size/offset (3.75rem, ~1rem clamped
+       inset) was landing on top of body copy near the last "Four Steps"
+       tile. Smaller footprint + more inset keeps it clear of page text
+       while staying anchored to the same bottom-right corner. */
+    .chat-fab {
+      width: 3.25rem;
+      height: 3.25rem;
+      right: 1.25rem;
+      bottom: 1.25rem;
+    }
   }
 </style>
 

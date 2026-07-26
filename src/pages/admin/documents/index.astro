@@ -10,6 +10,8 @@ const CATEGORIES = [
   'Product Specification', 'Electrical Specification', 'Warranty Document',
   'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
   'Customer Quote', 'Invoice',
+  'Receiving Report', 'Quality Inspection', 'Delivery Document', 'Delivery Photo',
+  'Installation Photo', 'Warranty Certificate', 'Service Document', 'Service Photo',
 ];
 
 const search = Astro.url.searchParams.get('q') ?? '';
@@ -24,7 +26,7 @@ try {
   let query = supabase
     .from('documents')
     .select(
-      'id, category, file_name, file_url, notes, created_at, customers(name), suppliers(name), products(model_name), quotes(quote_number), orders(order_number)'
+      'id, category, file_name, file_url, notes, created_at, customers(name), suppliers(name), products(model_name), quotes(quote_number), orders(order_number), inventory_units(unit_code)'
     )
     .order('created_at', { ascending: false });
 
@@ -38,6 +40,7 @@ try {
 }
 
 function relatedTo(row: any): string {
+  if (row.inventory_units?.unit_code) return `Unit: ${row.inventory_units.unit_code}`;
   if (row.customers?.name) return `Customer: ${row.customers.name}`;
   if (row.suppliers?.name) return `Supplier: ${row.suppliers.name}`;
   if (row.products?.model_name) return `Product: ${row.products.model_name}`;

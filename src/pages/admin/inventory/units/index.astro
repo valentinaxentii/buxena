@@ -1,0 +1,208 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+
+const search = Astro.url.searchParams.get('q') ?? '';
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const productFilter = Astro.url.searchParams.get('product') ?? '';
+const shipmentFilter = Astro.url.searchParams.get('shipment') ?? '';
+const conditionFilter = Astro.url.searchParams.get('condition') ?? '';
+const warehouseFilter = Astro.url.searchParams.get('warehouse') ?? '';
+
+const STATUSES = ['EXPECTED', 'RECEIVED', 'IN_STOCK', 'DAMAGED', 'HOLD', 'RESERVED', 'SOLD', 'DELIVERED'];
+
+let units: any[] = [];
+let products: { id: string; model_name: string }[] = [];
+let shipments: { id: string; shipment_number: string }[] = [];
+let warehouses: string[] = [];
+let dbReady = true;
+
+try {
+  const supabase = createSupabaseAdminClient();
+
+  let query = supabase
+    .from('inventory_units')
+    .select(
+      'id, unit_code, status, condition, warehouse, zone, bay, received_at, supplier_serial, ' +
+      'products(model_name), shipments(shipment_number, container_number), orders(id, order_number, customers(name))'
+    )
+    .order('created_at', { ascending: false });
+
+  if (statusFilter) query = query.eq('status', statusFilter);
+  if (productFilter) query = query.eq('product_id', productFilter);
+  if (shipmentFilter) query = query.eq('shipment_id', shipmentFilter);
+  if (conditionFilter) query = query.eq('condition', conditionFilter);
+  if (warehouseFilter) query = query.eq('warehouse', warehouseFilter);
+  if (search) query = query.or(`unit_code.ilike.%${search}%,supplier_serial.ilike.%${search}%`);
+
+  const [unitRows, productRows, shipmentRows, warehouseRows] = await Promise.all([
+    query.limit(300),
+    supabase.from('products').select('id, model_name').eq('unit_tracked', true).order('model_name'),
+    supabase.from('shipments').select('id, shipment_number').order('created_at', { ascending: false }).limit(100),
+    supabase.from('inventory_units').select('warehouse').not('warehouse', 'is', null),
+  ]);
+
+  units = unitRows.data ?? [];
+  products = productRows.data ?? [];
+  shipments = (shipmentRows.data ?? []).filter((s) => s.shipment_number);
+  warehouses = [...new Set((warehouseRows.data ?? []).map((r: any) => r.warehouse).filter(Boolean))].sort();
+} catch {
+  dbReady = false;
+}
+
+// search also matches model name / container — filtered client-side after
+// the DB query since those live on joined tables the .or() above can't reach.
+const filteredUnits = search
+  ? units.filter((u) => {
+      const s = search.toLowerCase();
+      return (
+        (u.unit_code ?? '').toLowerCase().includes(s) ||
+        (u.supplier_serial ?? '').toLowerCase().includes(s) ||
+        (u.products?.model_name ?? '').toLowerCase().includes(s) ||
+        (u.shipments?.container_number ?? '').toLowerCase().includes(s)
+      );
+    })
+  : units;
+
+function statusTone(status: string): string {
+  if (status === 'IN_STOCK' || status === 'DELIVERED') return 'green';
+  if (status === 'DAMAGED') return 'red';
+  if (status === 'HOLD' || status === 'RESERVED') return 'gold';
+  return 'neutral';
+}
+---
+
+<AdminLayout title="Inventory Units" parentLabel="Inventory" parentHref="/admin/inventory">
+  {!dbReady && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+      <h2>Not connected to Supabase yet</h2>
+      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+    </div>
+  )}
+
+  <div class="inv-view-toggle" role="tablist" aria-label="Inventory view">
+    <a href="/admin/inventory" class="inv-view-toggle__opt">Stock Summary</a>
+    <a href="/admin/inventory/units" class="inv-view-toggle__opt inv-view-toggle__opt--active" aria-current="page">Individual Units</a>
+  </div>
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Unit ID, serial, model, container…" value={search} />
+      <select class="admin-select" name="status">
+        <option value="">All statuses</option>
+        {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
+      </select>
+      <select class="admin-select" name="product">
+        <option value="">All models</option>
+        {products.map((p) => <option value={p.id} selected={p.id === productFilter}>{p.model_name}</option>)}
+      </select>
+      <select class="admin-select" name="shipment">
+        <option value="">All shipments</option>
+        {shipments.map((s) => <option value={s.id} selected={s.id === shipmentFilter}>{s.shipment_number}</option>)}
+      </select>
+      <select class="admin-select" name="condition">
+        <option value="">All conditions</option>
+        <option value="good" selected={conditionFilter === 'good'}>Good</option>
+        <option value="damaged" selected={conditionFilter === 'damaged'}>Damaged</option>
+        <option value="hold" selected={conditionFilter === 'hold'}>Hold</option>
+      </select>
+      <select class="admin-select" name="warehouse">
+        <option value="">All warehouses</option>
+        {warehouses.map((w) => <option value={w} selected={w === warehouseFilter}>{w}</option>)}
+      </select>
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap mobile-hide">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Unit ID</th><th>Model</th><th>Status</th><th>Condition</th><th>Shipment</th>
+            <th>Container</th><th>Warehouse</th><th>Order / Customer</th><th>Received</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredUnits.map((u) => (
+            <tr>
+              <td><a href={`/admin/inventory/units/${u.id}`}>{u.unit_code}</a></td>
+              <td>{u.products?.model_name ?? '—'}</td>
+              <td><span class={`admin-badge admin-badge--${statusTone(u.status)}`}>{u.status}</span></td>
+              <td>{u.condition ?? '—'}</td>
+              <td>{u.shipments?.shipment_number ?? '—'}</td>
+              <td>{u.shipments?.container_number ?? '—'}</td>
+              <td>{[u.warehouse, u.zone, u.bay].filter(Boolean).join(' / ') || '—'}</td>
+              <td>{u.orders ? <a href={`/admin/orders/${u.orders.id}`}>{u.orders.order_number}</a> : '—'}{u.orders?.customers?.name ? ` — ${u.orders.customers.name}` : ''}</td>
+              <td>{u.received_at ? new Date(u.received_at).toLocaleDateString() : '—'}</td>
+              <td><a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/inventory/units/${u.id}`}>View</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mobile-cards mobile-show">
+      {filteredUnits.map((u) => (
+        <a class="mobile-card" href={`/admin/inventory/units/${u.id}`}>
+          <div class="mobile-card__top">
+            <span class="mobile-card__code">{u.unit_code}</span>
+            <span class={`admin-badge admin-badge--${statusTone(u.status)}`}>{u.status}</span>
+          </div>
+          <div class="mobile-card__meta">
+            <span>{u.products?.model_name ?? '—'}</span>
+            <span class="mobile-card__meta--row">
+              <span>Condition: {u.condition ?? '—'}</span>
+              <span>{u.shipments?.shipment_number ?? '—'}</span>
+            </span>
+            <span>{[u.warehouse, u.zone, u.bay].filter(Boolean).join(' / ') || '—'}</span>
+          </div>
+        </a>
+      ))}
+    </div>
+
+    {dbReady && filteredUnits.length === 0 && units.length === 0 && !statusFilter && !productFilter && !shipmentFilter && !conditionFilter && !warehouseFilter && !search && (
+      <div class="admin-placeholder" style="text-align:left; padding: 1.25rem 1.5rem;">
+        <h2 style="margin-bottom:0.4rem;">No individual units yet</h2>
+        <p>
+          Individual units (BUX-260001, BUX-260002, …) are generated automatically the moment a
+          shipment for a unit-tracked sauna model leaves Draft status. Mark a product as
+          "Individual Unit / QR Tracking" on its <a href="/admin/products">product page</a>, then
+          place a shipment order for it — the expected units will appear here, ready to be
+          received via QR scan.
+        </p>
+      </div>
+    )}
+    {dbReady && filteredUnits.length === 0 && (units.length > 0 || statusFilter || productFilter || shipmentFilter || conditionFilter || warehouseFilter || search) && (
+      <p class="admin-empty">No units match the current filters.</p>
+    )}
+  </div>
+</AdminLayout>
+
+<style>
+  .inv-view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: -0.25rem 0 1rem;
+  }
+  .inv-view-toggle__opt {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--admin-muted);
+    text-decoration: none;
+    border-right: 1px solid var(--admin-border);
+  }
+  .inv-view-toggle__opt:last-child { border-right: none; }
+  .inv-view-toggle__opt:hover { color: var(--admin-cream); }
+  .inv-view-toggle__opt--active { color: var(--admin-gold); background: rgba(201, 166, 104, 0.1); }
+  .admin-btn--sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+
+  @media (max-width: 640px) {
+    .inv-view-toggle__opt { display: inline-flex; align-items: center; min-height: 44px; padding: 0.4rem 1rem; }
+  }
+</style>

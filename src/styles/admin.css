@@ -18,14 +18,47 @@
   flex: 1 1 auto;
 }
 
+/* ---------------------------------------------------------------------------
+   BASE FORM-CONTROL COVERAGE — the root-cause fix for white browser-default
+   inputs. The shared styles used to apply only via .admin-input/.admin-field
+   classes, so bare controls inside table-row editors (invoice line items,
+   shipment Add Models, etc.) fell outside scope. This low-specificity base
+   styles EVERY control on admin pages; the class variants below refine it.
+   admin.css never loads on the public site, so nothing leaks there. */
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
+select,
+textarea {
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--admin-cream);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 166, 104, 0.12);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none; /* never the browser's black ring */
+  border-color: var(--admin-gold);
+}
+::placeholder {
+  color: var(--admin-cream);
+  opacity: 0.4;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: #c9a668;
+}
+
 .admin-input,
 .admin-select {
   font-family: inherit;
   font-size: 0.8rem;
   color: var(--admin-cream);
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--admin-border);
-  border-radius: 3px;
+  border: 1px solid rgba(201, 166, 104, 0.12);
+  border-radius: 4px;
   padding: 0.45rem 0.65rem;
 }
 .admin-input:focus,
@@ -208,8 +241,8 @@
   font-size: 0.9rem;
   color: var(--admin-cream);
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--admin-border);
-  border-radius: 2px;
+  border: 1px solid rgba(201, 166, 104, 0.12);
+  border-radius: 4px;
   padding: 0.7rem 0.85rem;
 }
 .admin-field input:focus,
@@ -238,6 +271,36 @@
 @media (max-width: 640px) {
   .admin-form { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------------
+   Mobile/desktop dual-rendering for record lists. Pages render BOTH a table
+   and a card list from the same fetched data — no second query, no JS — and
+   these utilities toggle which one is visible per breakpoint. Used wherever
+   a wide table would otherwise force horizontal scrolling on a phone.
+   --------------------------------------------------------------------------- */
+.mobile-show { display: none; }
+@media (max-width: 640px) {
+  .mobile-hide { display: none !important; }
+  .mobile-show { display: block; }
+}
+
+.mobile-cards { display: flex; flex-direction: column; gap: 0.6rem; }
+.mobile-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.mobile-card__top { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+.mobile-card__code { font-weight: 600; color: var(--admin-cream); font-size: 0.95rem; letter-spacing: 0.02em; }
+.mobile-card__model { font-size: 0.8rem; color: var(--admin-muted); text-align: right; }
+.mobile-card__meta { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; color: var(--admin-muted); }
+.mobile-card__meta--row { flex-direction: row; justify-content: space-between; flex-wrap: wrap; }
+.mobile-card__action { width: 100%; justify-content: center; min-height: 44px; }
+.mobile-card a { color: var(--admin-gold); text-decoration: none; }
 
 .admin-bar-chart {
   display: flex;
@@ -412,6 +475,7 @@ select option:checked {
   color: #11100e;
 }
 
+select,
 .admin-select,
 .admin-field select {
   border-color: rgba(201, 166, 104, 0.12);

@@ -28,7 +28,7 @@ try {
   settings = await getSettings(supabase);
   const [customerRows, productRows, supplierRows] = await Promise.all([
     supabase.from('customers').select('id, name').order('name'),
-    supabase.from('products').select('id, model_name, supplier_id, cost').eq('is_active', true).order('model_name'),
+    supabase.from('products').select('id, model_name, supplier_id, cost, unit_tracked').eq('is_active', true).order('model_name'),
     supabase.from('suppliers').select('id, name').order('name'),
   ]);
   customers = customerRows.data ?? [];
@@ -86,7 +86,12 @@ try {
       if (insertError) {
         error = insertError.message;
       } else {
-        await reserveInventoryUnit(supabase, payload.product_id);
+        // Unit-tracked products reserve a SPECIFIC physical unit later, via
+        // the order detail page's Assign Unit action (inventory_units is the
+        // sole authority for those). The old quantity-based reserve here
+        // would otherwise double-count against that.
+        const orderedProduct = products.find((p) => p.id === payload.product_id);
+        if (!orderedProduct?.unit_tracked) await reserveInventoryUnit(supabase, payload.product_id);
         return Astro.redirect(`/admin/orders/${inserted.id}`);
       }
     }

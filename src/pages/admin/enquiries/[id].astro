@@ -1,0 +1,224 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
+
+const { id } = Astro.params;
+const STATUSES = ['New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'];
+
+let enquiry: any = null;
+let lead: any = null;
+let quote: any = null;
+let timeline: any[] = [];
+let notFound = false;
+let error: string | null = null;
+let notice: string | null = null;
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const staffId = Astro.locals.staffUser?.id ?? null;
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+
+    if (intent === 'mark_contacted') {
+      await markEnquiryContacted(supabase, id!, staffId);
+    } else if (intent === 'change_status') {
+      const status = String(form.get('status') ?? '');
+      if (STATUSES.includes(status)) await changeEnquiryStatus(supabase, id!, status, staffId);
+    } else if (intent === 'convert_to_lead') {
+      const result = await convertEnquiryToLead(supabase, id!, staffId);
+      if (!result.ok && result.reason === 'ALREADY_CONVERTED') notice = 'This enquiry was already converted to a Lead.';
+      else if (!result.ok) error = 'Could not convert to Lead: ' + result.reason;
+    } else if (intent === 'create_quote') {
+      const result = await createQuoteFromEnquiry(supabase, id!, staffId);
+      if (!result.ok && result.reason === 'ALREADY_CONVERTED') notice = 'A Quote already exists for this enquiry.';
+      else if (!result.ok) error = 'Could not create Quote: ' + result.reason;
+    } else if (intent === 'delete') {
+      const { data: current } = await supabase.from('enquiries').select('lead_id, quote_id').eq('id', id).single();
+      if (current?.lead_id || current?.quote_id) {
+        error = 'This enquiry is linked to a Lead or Quote and cannot be deleted — it must remain as the source record. Set status to Lost to close it instead.';
+      } else {
+        await supabase.from('enquiries').delete().eq('id', id);
+        return Astro.redirect('/admin/enquiries');
+      }
+    }
+  }
+
+  const { data: enquiryRow, error: enquiryError } = await supabase.from('enquiries').select('*').eq('id', id).single();
+  if (enquiryError || !enquiryRow) {
+    notFound = true;
+  } else {
+    enquiry = enquiryRow;
+    const [leadRow, quoteRow, activityRows] = await Promise.all([
+      enquiry.lead_id ? supabase.from('leads').select('id, name, status').eq('id', enquiry.lead_id).maybeSingle() : Promise.resolve({ data: null }),
+      enquiry.quote_id ? supabase.from('quotes').select('id, quote_number, status, total').eq('id', enquiry.quote_id).maybeSingle() : Promise.resolve({ data: null }),
+      supabase.from('activities').select('id, description, created_at').eq('entity_type', 'enquiry').eq('entity_id', id).order('created_at', { ascending: false }),
+    ]);
+    lead = leadRow.data;
+    quote = quoteRow.data;
+    timeline = activityRows.data ?? [];
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+---
+
+<AdminLayout title="Enquiry" subtitle={enquiry ? `Received ${new Date(enquiry.created_at).toLocaleString()}` : undefined} parentLabel="Website Enquiries" parentHref="/admin/enquiries">
+  {enquiry && <Fragment slot="title-badge"><StatusBadge status={enquiry.status} /></Fragment>}
+
+  {notFound && <p class="admin-empty">Enquiry not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--ok" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {enquiry && (
+    <div class="enq-detail">
+      <div class="enq-actions">
+        {enquiry.status === 'New' && (
+          <form method="POST" style="margin:0;">
+            <input type="hidden" name="_intent" value="mark_contacted" />
+            <button class="admin-btn admin-btn--ghost" type="submit">Mark Contacted</button>
+          </form>
+        )}
+        {enquiry.lead_id ? (
+          <a class="admin-btn admin-btn--ghost" href={`/admin/leads/${enquiry.lead_id}`}>View Lead</a>
+        ) : (
+          <form method="POST" style="margin:0;">
+            <input type="hidden" name="_intent" value="convert_to_lead" />
+            <button class="admin-btn" type="submit">Convert to Lead</button>
+          </form>
+        )}
+        {enquiry.quote_id ? (
+          <a class="admin-btn admin-btn--ghost" href={`/admin/quotes/${enquiry.quote_id}`}>View Quote</a>
+        ) : (
+          <form method="POST" style="margin:0;">
+            <input type="hidden" name="_intent" value="create_quote" />
+            <button class="admin-btn" type="submit">Create Quote</button>
+          </form>
+        )}
+        {enquiry.email && <a class="admin-btn admin-btn--ghost" href={`mailto:${enquiry.email}`}>Email Customer</a>}
+        {enquiry.phone && <a class="admin-btn admin-btn--ghost" href={`tel:${enquiry.phone}`}>Call Customer</a>}
+
+        <form method="POST" class="enq-status-form">
+          <input type="hidden" name="_intent" value="change_status" />
+          <select class="admin-select" name="status">
+            {STATUSES.map((s) => <option value={s} selected={s === enquiry.status}>{s}</option>)}
+          </select>
+          <button class="admin-btn admin-btn--ghost" type="submit">Update Status</button>
+        </form>
+
+        {!enquiry.lead_id && !enquiry.quote_id && (
+          <form method="POST" onsubmit="return confirm('Delete this enquiry? This cannot be undone.');" style="margin:0;">
+            <input type="hidden" name="_intent" value="delete" />
+            <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete</button>
+          </form>
+        )}
+      </div>
+
+      <div class="enq-grid">
+        <div class="enq-main">
+          <section class="admin-panel enq-sec">
+            <h2 class="enq-sec__h">Customer</h2>
+            <dl class="enq-kv">
+              <div><dt>Name</dt><dd>{enquiry.name || '—'}</dd></div>
+              <div><dt>Email</dt><dd>{enquiry.email || '—'}</dd></div>
+              <div><dt>Phone</dt><dd>{enquiry.phone || '—'}</dd></div>
+              <div><dt>ZIP / Postal Code</dt><dd>{enquiry.location || '—'}</dd></div>
+            </dl>
+          </section>
+
+          <section class="admin-panel enq-sec">
+            <h2 class="enq-sec__h">Request</h2>
+            <dl class="enq-kv">
+              <div><dt>Requested Sauna / Model</dt><dd>{enquiry.sauna_interest || '—'}</dd></div>
+            </dl>
+            <p class="enq-label">Customer Message</p>
+            <p class="enq-message">{enquiry.message || '—'}</p>
+          </section>
+
+          {(lead || quote) && (
+            <section class="admin-panel enq-sec">
+              <h2 class="enq-sec__h">Linked Records</h2>
+              <dl class="enq-kv">
+                {lead && <div><dt>Lead</dt><dd><a href={`/admin/leads/${lead.id}`}>{lead.name}</a> — {lead.status}</dd></div>}
+                {quote && <div><dt>Quote</dt><dd><a href={`/admin/quotes/${quote.id}`}>{quote.quote_number}</a> — {quote.status}</dd></div>}
+              </dl>
+            </section>
+          )}
+        </div>
+
+        <div class="enq-side">
+          <section class="admin-panel enq-sec">
+            <h2 class="enq-sec__h">Enquiry Information</h2>
+            <dl class="enq-kv enq-kv--1col">
+              <div><dt>Received</dt><dd>{new Date(enquiry.created_at).toLocaleString()}</dd></div>
+              <div><dt>Source</dt><dd>{enquiry.source}</dd></div>
+              <div><dt>Status</dt><dd><StatusBadge status={enquiry.status} /></dd></div>
+              {enquiry.contacted_at && <div><dt>Contacted</dt><dd>{new Date(enquiry.contacted_at).toLocaleString()}</dd></div>}
+            </dl>
+          </section>
+
+          <section class="admin-panel enq-sec">
+            <h2 class="enq-sec__h">Activity Timeline</h2>
+            <ul class="enq-timeline">
+              {timeline.map((t) => (
+                <li><span class="enq-timeline__desc">{t.description}</span><span class="enq-timeline__when">{new Date(t.created_at).toLocaleString()}</span></li>
+              ))}
+              <li class="enq-timeline__origin"><span class="enq-timeline__desc">Enquiry received</span><span class="enq-timeline__when">{new Date(enquiry.created_at).toLocaleString()}</span></li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
+
+  .enq-detail { display: flex; flex-direction: column; gap: 0.9rem; }
+  .enq-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .enq-status-form { display: flex; gap: 0.4rem; align-items: center; margin: 0; margin-left: auto; }
+
+  .enq-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 0.9rem; align-items: start; }
+  .enq-main, .enq-side { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .enq-sec { padding: 0.9rem 1.1rem; border-radius: 6px; }
+  .enq-sec__h {
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--admin-cream);
+  }
+
+  .enq-kv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem 1.25rem; margin: 0; }
+  .enq-kv--1col { grid-template-columns: 1fr; }
+  .enq-kv dt { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .enq-kv dd { margin: 0.15rem 0 0; font-size: 0.85rem; color: var(--admin-cream); }
+
+  .enq-label { margin: 0.9rem 0 0.3rem; font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .enq-message { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--admin-cream); white-space: pre-wrap; }
+
+  .enq-timeline { list-style: none; margin: 0; padding: 0; }
+  .enq-timeline li {
+    display: flex; flex-direction: column; gap: 0.1rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 0.8rem;
+  }
+  .enq-timeline li:last-child { border-bottom: none; }
+  .enq-timeline__desc { color: var(--admin-cream); }
+  .enq-timeline__when { font-size: 0.68rem; color: var(--admin-muted); }
+  .enq-timeline__origin { opacity: 0.7; }
+
+  @media (max-width: 900px) {
+    .enq-grid { grid-template-columns: 1fr; }
+    .enq-status-form { margin-left: 0; }
+  }
+</style>

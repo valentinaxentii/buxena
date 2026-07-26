@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { issueInvoiceNumber } from '../../../lib/invoice-number';
+import { generateUnitQrDataUrl } from '../../../lib/qr';
 
 const { id } = Astro.params;
 
@@ -19,6 +20,8 @@ let items: any[] = [];
 let error: string | null = null;
 let notice: string | null = null;
 let notFound = false;
+let orderAssignedUnit: { id: string; unit_code: string; product_id: string } | null = null;
+let linkedUnitMap: Record<string, { unit_code: string; qrDataUrl: string }> = {};
 
 function money(n: number | null | undefined): string {
   return `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -72,6 +75,31 @@ try {
         if (delError) error = delError.message;
         else return Astro.redirect('/admin/invoices');
       }
+    } else if (intent === 'link_unit') {
+      // Draft-only, by construction — issued invoices are immutable and this
+      // code path is unreachable for them (current.status !== 'draft' below).
+      // The unit itself is never re-assigned here — it must already belong
+      // to this invoice's order; this only records the reference on the
+      // matching line item so the document can show it.
+      if (current.status !== 'draft') {
+        error = 'Only draft invoices can be linked to a unit.';
+      } else {
+        const lineItemId = String(form.get('line_item_id') ?? '');
+        const unitId = String(form.get('unit_id') ?? '');
+        const { data: invForOrder } = await supabase.from('invoices').select('order_id').eq('id', id).single();
+        const { data: eligibleUnit } = await supabase
+          .from('inventory_units')
+          .select('id')
+          .eq('id', unitId)
+          .eq('order_id', invForOrder?.order_id ?? '')
+          .in('status', ['RESERVED', 'SOLD', 'DELIVERED'])
+          .maybeSingle();
+        if (!eligibleUnit) {
+          error = 'That unit is not assigned to this invoice\'s order — nothing was linked.';
+        } else {
+          await supabase.from('invoice_line_items').update({ assigned_unit_id: unitId }).eq('id', lineItemId).eq('invoice_id', id);
+        }
+      }
     }
   }
 
@@ -82,6 +110,28 @@ try {
   if (invoiceRes.error || !invoiceRes.data) notFound = true;
   else invoice = invoiceRes.data;
   items = itemsRes.data ?? [];
+
+  // Unit already assigned to this invoice's order (if any) — the ONLY unit
+  // ever offered for linking to a line, never an arbitrary IN_STOCK pick, so
+  // an invoice can never reference a physical unit other than the one this
+  // customer's order actually has reserved.
+  if (invoice?.order_id) {
+    const { data: orderUnit } = await supabase
+      .from('inventory_units')
+      .select('id, unit_code, product_id, public_token')
+      .eq('order_id', invoice.order_id)
+      .in('status', ['RESERVED', 'SOLD', 'DELIVERED'])
+      .maybeSingle();
+    orderAssignedUnit = orderUnit ?? null;
+  }
+
+  const linkedUnitIds = [...new Set(items.map((it) => it.assigned_unit_id).filter(Boolean))];
+  if (linkedUnitIds.length > 0) {
+    const { data: linkedRows } = await supabase.from('inventory_units').select('id, unit_code, public_token').in('id', linkedUnitIds);
+    for (const u of linkedRows ?? []) {
+      linkedUnitMap[u.id] = { unit_code: u.unit_code, qrDataUrl: await generateUnitQrDataUrl(u.public_token) };
+    }
+  }
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
@@ -107,10 +157,14 @@ const totalsMismatch = invoice && items.length > 0 && Math.abs(lineSum - storedN
 
 const isDraft = invoice?.status === 'draft';
 const isVoid = invoice?.status === 'void';
-const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
+const docTypeLabel = invoice?.document_type === 'proforma' ? 'Proforma' : 'Invoice';
+const title = docTypeLabel;
+const numberLine = invoice ? (invoice.invoice_number ?? '— unassigned (draft)') : '';
 ---
 
-<AdminLayout title={title} subtitle={invoice ? (invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice') : undefined} parentLabel="Invoices" parentHref="/admin/invoices">
+<AdminLayout title={title} subtitle={numberLine} parentLabel="Invoices" parentHref="/admin/invoices">
+  {invoice && <span slot="title-badge" class={`admin-pill ${pillClass(invoice.status)}`}>{STATUS_LABELS[invoice.status] ?? invoice.status}</span>}
+  {isDraft && <a slot="actions" class="admin-btn admin-btn--ghost" href={`/admin/invoices/${id}/edit`}>Edit Draft</a>}
   {isDraft && (
     <form slot="actions" method="POST" onsubmit="return confirm('Issue this invoice?\n\nIssuing assigns a permanent invoice number and makes the document immutable. This cannot be undone.');" style="margin:0;">
       <input type="hidden" name="_intent" value="issue" />
@@ -130,14 +184,6 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
 
   {invoice && (
     <div class={`inv-detail ${isVoid ? 'inv-detail--void' : ''}`}>
-      <div class="inv-print-head" aria-hidden="true">
-        <span class="inv-print-head__type">
-          {invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice'}
-          <span class={`admin-pill ${pillClass(invoice.status)}`} style="margin-left:0.4rem;">{STATUS_LABELS[invoice.status] ?? invoice.status}</span>
-        </span>
-        <span class="inv-print-head__num">{invoice.invoice_number ?? '— unassigned (draft)'}</span>
-        <span class="inv-print-head__gen">Generated {new Date().toISOString().slice(0, 10)} {new Date().toTimeString().slice(0, 5)}</span>
-      </div>
       {isVoid && (
         <p class="inv-void-marker">
           VOID{invoice.voided_at ? ` — ${String(invoice.voided_at).slice(0, 10)}` : ''}{invoice.void_reason ? ` — ${invoice.void_reason}` : ''}
@@ -146,10 +192,9 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
       )}
 
       <section class="admin-panel inv-sec">
-        <h2 class="inv-sec__h">Document <span class={`admin-pill ${pillClass(invoice.status)}`}>{STATUS_LABELS[invoice.status] ?? invoice.status}</span></h2>
+        <h2 class="inv-sec__h">Document</h2>
         <dl class="inv-kv">
           <div><dt>Type</dt><dd>{invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice'}</dd></div>
-          <div class="inv-kv__num"><dt>Invoice #</dt><dd>{invoice.invoice_number ?? '— unassigned (draft)'}</dd></div>
           <div><dt>Issue Date</dt><dd>{invoice.issue_date ?? '—'}</dd></div>
           <div><dt>Due Date</dt><dd>{invoice.due_date ?? '—'}</dd></div>
           <div><dt>Payment Terms</dt><dd>{invoice.payment_terms ?? '—'}</dd></div>
@@ -185,21 +230,45 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
         <h2 class="inv-sec__h">Line Items</h2>
         <div class="admin-table-wrap">
           <table class="admin-table">
-            <thead><tr><th>Type</th><th>Model Code</th><th>Description</th><th>Spec Detail</th><th>Qty</th><th>Unit Price</th><th>Line Disc.</th><th>Taxable</th><th>Line Total</th></tr></thead>
+            <thead><tr><th>Type</th><th>Model Code</th><th>Description</th><th>Spec Detail</th><th>Qty</th><th>Unit Price</th><th>Line Disc.</th><th>Taxable</th><th>Line Total</th><th class="no-print">Unit</th></tr></thead>
             <tbody>
-              {items.map((it) => (
-                <tr>
-                  <td>{String(it.line_type).replace(/_/g, ' ')}</td>
-                  <td>{it.model_code ?? '—'}</td>
-                  <td style="white-space:normal;" class={it.description === it.model_code ? 'inv-desc-dup' : ''}>{it.description}</td>
-                  <td style="white-space:normal;">{it.spec_detail ?? '—'}</td>
-                  <td>{it.quantity}</td>
-                  <td>{money(it.unit_price)}</td>
-                  <td>{Number(it.line_discount) > 0 ? money(it.line_discount) : '—'}</td>
-                  <td>{it.is_taxable ? '✓' : '—'}</td>
-                  <td>{money(it.line_total)}</td>
-                </tr>
-              ))}
+              {items.map((it) => {
+                const linked = it.assigned_unit_id ? linkedUnitMap[it.assigned_unit_id] : null;
+                const canLink = isDraft && !it.assigned_unit_id && orderAssignedUnit && it.line_type === 'product' && it.product_id === orderAssignedUnit.product_id;
+                return (
+                  <tr>
+                    <td>{String(it.line_type).replace(/_/g, ' ')}</td>
+                    <td>{it.model_code ?? '—'}</td>
+                    <td style="white-space:normal;">
+                      {it.description === it.model_code ? '' : it.description}
+                      {linked && (
+                        <div class="inv-unit-print-only">
+                          <span>Unit ID: {linked.unit_code}</span>
+                          <img src={linked.qrDataUrl} alt={`QR for ${linked.unit_code}`} width="46" height="46" />
+                        </div>
+                      )}
+                    </td>
+                    <td style="white-space:normal;">{it.spec_detail ?? '—'}</td>
+                    <td>{it.quantity}</td>
+                    <td>{money(it.unit_price)}</td>
+                    <td>{Number(it.line_discount) > 0 ? money(it.line_discount) : '—'}</td>
+                    <td>{it.is_taxable ? '✓' : '—'}</td>
+                    <td>{money(it.line_total)}</td>
+                    <td class="no-print">
+                      {linked ? (
+                        <span class="inv-unit-linked">{linked.unit_code}</span>
+                      ) : canLink ? (
+                        <form method="POST" style="margin:0;">
+                          <input type="hidden" name="_intent" value="link_unit" />
+                          <input type="hidden" name="line_item_id" value={it.id} />
+                          <input type="hidden" name="unit_id" value={orderAssignedUnit!.id} />
+                          <button class="admin-btn admin-btn--ghost admin-btn--sm" type="submit">Link Unit</button>
+                        </form>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -258,7 +327,10 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
   .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
 
-  .inv-detail { display: flex; flex-direction: column; gap: 0.9rem; }
+  /* print-only: never rendered on screen */
+  .inv-print-head { display: none; }
+
+  .inv-detail { display: flex; flex-direction: column; gap: 0.75rem; }
   .inv-detail--void > :not(.inv-void-marker) { opacity: 0.45; }
   .inv-void-marker {
     margin: 0;
@@ -273,22 +345,38 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
   }
   .inv-void-note { display: block; margin-top: 0.25rem; font-weight: 400; letter-spacing: 0; color: var(--admin-muted); font-size: 0.72rem; }
 
-  .inv-sec { padding: 0.9rem 1.1rem; border-radius: 6px; }
+  .inv-sec { padding: 0.875rem 1.1rem; border-radius: 6px; }
   .inv-sec__h {
     display: flex; align-items: center; gap: 0.6rem;
-    margin: 0 0 0.65rem;
+    margin: 0 0 0.5rem;
     font-size: 0.78rem; font-weight: 600;
     letter-spacing: 0.05em; text-transform: uppercase;
     color: var(--admin-cream);
   }
   .inv-snap-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 0.68rem; color: var(--admin-muted); }
 
-  .inv-kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem 1.25rem; margin: 0; }
+  /* Desktop: one horizontal row (Type, Payment Terms, Issue Date, Due Date,
+     Customer PO). `order` reflows the visual sequence without touching DOM
+     order, so the @media print reordering below (which targets these same
+     nth-child positions) is completely unaffected. */
+  .inv-kv { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem 1rem; margin: 0; }
+  .inv-kv > div:nth-child(1) { order: 0; } /* Type */
+  .inv-kv > div:nth-child(4) { order: 1; } /* Payment Terms */
+  .inv-kv > div:nth-child(2) { order: 2; } /* Issue Date */
+  .inv-kv > div:nth-child(3) { order: 3; } /* Due Date */
+  .inv-kv > div:nth-child(5) { order: 4; } /* Customer PO */
   .inv-kv dt { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
-  .inv-kv dd { margin: 0.15rem 0 0; font-size: 0.82rem; color: var(--admin-cream); }
+  .inv-kv dd { margin: 0.1rem 0 0; font-size: 0.82rem; color: var(--admin-cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .inv-parties-view { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
-  .inv-party-text { margin: 0; font-size: 0.82rem; line-height: 1.6; color: var(--admin-cream); }
+  .inv-parties-view { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .inv-party-text { margin: 0; font-size: 0.82rem; line-height: 1.42; color: var(--admin-cream); }
+
+  /* Issued By: one horizontal line with separators (same treatment already
+     used for print, now applied on screen too — see @media print below,
+     which is now a harmless, unchanged no-op duplicate for the print case). */
+  .inv-sec--issuer .inv-party-text span { display: inline; }
+  .inv-sec--issuer .inv-party-text br { display: none; }
+  .inv-sec--issuer .inv-party-text span:not(:last-child)::after { content: ' · '; }
 
   .inv-totals__list { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; margin: 0; }
   .inv-totals__list > div { display: flex; justify-content: flex-end; gap: 1.5rem; min-width: 22rem; }
@@ -300,45 +388,81 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
   .inv-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
   .inv-void-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
 
-  @media print {
-    /* header identity: type + number + generated, fixed top-right each sheet;
-       the global letterhead's redundant title block is hidden on this page */
-    :global(.print-letterhead__title) { display: none !important; }
-    .inv-print-head {
-      display: flex !important;
-      position: fixed;
-      top: 0.62in;
-      right: 0.6in;
-      flex-direction: column;
-      align-items: flex-end;
-      text-align: right;
-      gap: 1pt;
-    }
-    .inv-print-head__type { font-family: 'Cormorant Garamond', 'Times New Roman', serif; font-size: 17pt; font-weight: 600; color: #000 !important; }
-    .inv-print-head__num { font-size: 13pt; color: #000 !important; }
-    .inv-print-head__gen { font-size: 8.5pt; color: #444 !important; }
+  .inv-unit-linked { font-size: 0.75rem; color: var(--admin-gold); white-space: nowrap; }
+  .admin-btn--sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+  .inv-unit-print-only { display: none; }
 
-    /* number lives in the header now */
-    .inv-kv__num { display: none !important; }
-    /* DOCUMENT grid: two columns — L: Type/Issue/Terms, R: Due/PO */
-    .inv-kv { display: grid !important; grid-template-columns: 1fr 1fr !important; grid-auto-flow: column !important; grid-template-rows: repeat(3, auto) !important; }
+  @media print {
+    /* Header is now the SHARED AdminLayout letterhead (normal document flow,
+       appears once at the top of page 1 — never repeated, never overlaps
+       continuation content). It already carries the type as the title and
+       the invoice number as the subtitle; the status pill reaches it via the
+       existing title-badge slot, rendered a second time inside the print
+       letterhead — see AdminLayout.astro. No page-specific header markup or
+       fixed positioning needed here at all.
+
+       Root-cause note: the PREVIOUS version of this rule used a
+       position:fixed header repeating on every printed page. @page has no
+       top margin, and CSS fragmentation only applies .content's padding-top
+       to the FIRST page — so page 2 had no reserved top space, and the fixed
+       header overlapped whatever continuation content started there. That
+       was "Invoice/DRAFT in the wrong place on page 2." Removing the
+       repeating fixed header removes the bug at its source. */
+
+    /* .inv-detail is display:flex on screen; Chromium's print engine
+       fragments flex containers unreliably across page breaks (a real,
+       known Chromium limitation), which is the root cause of a one-item
+       invoice needing two pages at all. Force plain block flow for print,
+       replacing the flex `gap` with margins (block layout has no gap). */
+    .inv-detail { display: block !important; }
+    .inv-detail > * + * { margin-top: 3.5mm !important; }
+
+    /* Print-specific compaction — tighter than the screen density pass
+       (paper doesn't need the dark-UI breathing room), page-scoped so no
+       other printed document is affected. */
+    .inv-sec { padding: 3mm 4mm !important; }
+    .inv-sec__h { margin: 0 0 1.5mm !important; }
+    .inv-party-text { line-height: 1.32 !important; }
+
+    /* Administrative chrome that must never appear on the printed document:
+       status/error banners (their presence/absence also made page height
+       unpredictable) and the Delete/Void action controls (the void-reason
+       text input would otherwise print as an empty box). */
+    .notice,
+    .inv-actions { display: none !important; }
+
+    /* TOTALS MUST NEVER SPLIT — the direct fix for the orphaned Grand Total.
+       Same for every other logically-atomic section EXCEPT Line Items,
+       which must keep flowing/paginating naturally (excluded via
+       :not(:has(table))). Bill To/Ship To stay together as one row so one
+       side never lands on a different page than the other. */
+    .inv-sec:not(:has(table)),
+    .inv-totals,
+    .inv-parties-view,
+    .inv-void-marker {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    /* DOCUMENT: one compact row — Type, Payment Terms, Issue Date, Due Date,
+       Customer PO — same visual order as the screen density pass, reached
+       via `order` on the same nth-child positions (not a DOM reorder). */
+    .inv-kv { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; grid-auto-flow: row !important; gap: 1.5mm 4mm !important; }
     .inv-kv > div:nth-child(1) { order: 0; }
-    .inv-kv > div:nth-child(3) { order: 1; }
-    .inv-kv > div:nth-child(5) { order: 2; }
-    .inv-kv > div:nth-child(4) { order: 3; }
-    .inv-kv > div:nth-child(6) { order: 4; }
+    .inv-kv > div:nth-child(4) { order: 1; }
+    .inv-kv > div:nth-child(2) { order: 2; }
+    .inv-kv > div:nth-child(3) { order: 3; }
+    .inv-kv > div:nth-child(5) { order: 4; }
+    .inv-kv dd { white-space: nowrap !important; }
 
     /* the ≤860px responsive collapse fires at paper width — force 2-up */
-    .inv-parties-view { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6mm !important; }
+    .inv-parties-view { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 4mm !important; }
     .inv-snap-note { font-size: 7pt !important; }
 
     /* Issued By: full-width row, values run horizontally with separators */
     .inv-sec--issuer .inv-party-text span { display: inline !important; }
     .inv-sec--issuer .inv-party-text br { display: none !important; }
     .inv-sec--issuer .inv-party-text span:not(:last-child)::after { content: ' · '; }
-
-    /* duplicated description (equals model code) prints empty */
-    .inv-desc-dup { visibility: hidden !important; }
 
     /* numeric columns right-aligned; last column reaches the margin globally */
     :global(.admin-table) td:nth-child(5),
@@ -347,6 +471,63 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
     :global(.admin-table) th:nth-child(5),
     :global(.admin-table) th:nth-child(6),
     :global(.admin-table) th:nth-child(7) { text-align: right !important; }
+
+    /* --- Line items: repeating header must never sit orphaned alone at the
+       bottom of a page. `break-after: avoid` on the heading and the thead
+       means the fragmentation engine won't place a page break immediately
+       after either one; combined with each row's break-inside:avoid, the
+       heading + header + first row are pulled together as a unit and pushed
+       to the next page if they don't all fit. This is a strong Chromium hint,
+       not a hard guarantee in every pathological case, but it's exactly the
+       documented technique for "never a lonely table header." Page-scoped —
+       admin-print.css's shared thead/tr rules (used by every other printed
+       document) are untouched. */
+    .inv-sec:has(table) .inv-sec__h {
+      break-after: avoid-page !important;
+      page-break-after: avoid !important;
+    }
+    .admin-table thead {
+      break-after: avoid-page !important;
+      page-break-after: avoid !important;
+    }
+    .admin-table tr {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .admin-table th,
+    .admin-table td {
+      padding: 2.2mm 3mm !important;
+    }
+
+    /* Unit/QR: the interactive "Unit" column (Link Unit button) is a screen
+       control only. When a unit IS linked, its ID + a small QR print inline
+       under that line's description instead — matching the requested
+       "Model / Unit ID / QR" stacked layout, never a numbered column. */
+    .no-print { display: none !important; }
+    .inv-unit-print-only {
+      display: flex !important;
+      align-items: center;
+      gap: 2mm;
+      margin-top: 1mm;
+      font-size: 7.5pt;
+      color: var(--doc-secondary, #444) !important;
+    }
+    .inv-unit-print-only img { width: 9mm !important; height: 9mm !important; }
+
+    /* Shared letterhead/footer live in AdminLayout, not this component, so
+       reaching them needs :global() — gated on `body:has(.inv-detail)` (a
+       marker unique to this page) so the rule can only ever match here.
+       Every other printed document (reports, shipments, quotes, …) keeps
+       admin-print.css's un-touched values. Modest tightening only — the
+       footer stays normal document flow, nothing repositioned. */
+    body:has(.inv-detail) :global(.print-letterhead) {
+      margin-bottom: 4mm !important;
+      padding-bottom: 2mm !important;
+    }
+    body:has(.inv-detail) :global(.print-footer) {
+      margin-top: 5mm !important;
+      padding-top: 1.5mm !important;
+    }
   }
 
   @media (max-width: 860px) {

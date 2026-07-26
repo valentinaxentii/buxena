@@ -185,3 +185,48 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
     .qform__grid { grid-template-columns: 1fr; }
   }
 </style>
+
+<script>
+  /**
+   * This form submits to Netlify Forms natively (data-netlify, action=/thank-you/)
+   * and that flow is untouched. In parallel, best-effort, mirror the same
+   * submission into the admin's `enquiries` table via the existing
+   * /api/enquiries endpoint (same one the Sauna Advisor chat already uses) so
+   * Request a Quote submissions show up in /admin/enquiries. keepalive keeps
+   * the fetch alive through the page navigation Netlify Forms triggers.
+   */
+  document.querySelectorAll('form[name="quote"]').forEach((form) => {
+    form.addEventListener('submit', () => {
+      try {
+        const data = new FormData(form as HTMLFormElement);
+        const get = (key: string) => (data.get(key) || '').toString().trim();
+
+        const zip = get('zip');
+        const extras = [
+          zip && `ZIP: ${zip}`,
+          get('placement') && `Placement: ${get('placement')}`,
+          get('capacity') && `People: ${get('capacity')}`,
+          get('timeline') && `Timeline: ${get('timeline')}`,
+        ].filter(Boolean).join(' · ');
+        const message = [get('message'), extras].filter(Boolean).join('\n\n');
+
+        fetch('/api/enquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({
+            name: get('name'),
+            email: get('email'),
+            phone: get('phone'),
+            location: zip,
+            message,
+            saunaInterest: get('model'),
+            source: 'Quote Form',
+          }),
+        }).catch(() => {});
+      } catch {
+        // best-effort only — never block the Netlify submission
+      }
+    });
+  });
+</script>

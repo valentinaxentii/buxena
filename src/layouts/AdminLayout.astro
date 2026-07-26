@@ -164,6 +164,86 @@ const initials = (staffLabel ?? '')
             if ((e.target as HTMLElement).closest('a[href]')) setOpen(false);
           });
         });
+
+        // --- unsaved-work protection for every shared admin form:
+        // dirty-state beforeunload prompt + a sessionStorage stash written at
+        // submit, restored only when the reload looks like a failed save
+        // (an error notice on the page, or arrival via the login bounce).
+        {
+          const form = document.querySelector<HTMLFormElement>('form.admin-form');
+          if (form) {
+            const key = 'buxform:' + location.pathname;
+            const serialize = () => {
+              const out: Record<string, string[]> = {};
+              new FormData(form).forEach((v, k) => { (out[k] ??= []).push(String(v)); });
+              // checkbox state isn't in FormData when unchecked — capture explicitly
+              form.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name]').forEach((cb) => {
+                out['__cb__' + cb.name] = [cb.checked ? '1' : '0'];
+              });
+              return JSON.stringify(out);
+            };
+            let baseline = serialize();
+            let dirty = false;
+            form.addEventListener('input', () => { dirty = serialize() !== baseline; });
+            window.addEventListener('beforeunload', (e) => {
+              if (dirty) { e.preventDefault(); e.returnValue = ''; }
+            });
+            form.addEventListener('submit', () => {
+              try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data: serialize() })); } catch {}
+              dirty = false;
+            });
+
+            // restore after a failed save / session bounce
+            try {
+              const raw = sessionStorage.getItem(key);
+              if (raw) {
+                sessionStorage.removeItem(key);
+                const { t, data } = JSON.parse(raw);
+                const fresh = Date.now() - t < 10 * 60 * 1000;
+                const hadError = !!document.querySelector('.notice--error');
+                const fromLogin = document.referrer.includes('/login');
+                if (fresh && (hadError || fromLogin)) {
+                  const values = JSON.parse(data) as Record<string, string[]>;
+                  for (const [name, vals] of Object.entries(values)) {
+                    if (name.startsWith('__cb__')) {
+                      const cb = form.querySelector<HTMLInputElement>(`input[type="checkbox"][name="${name.slice(6)}"]`);
+                      if (cb) cb.checked = vals[0] === '1';
+                      continue;
+                    }
+                    const els = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[name="${CSS.escape(name)}"]`);
+                    els.forEach((el, i) => {
+                      if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'hidden' && el.name.endsWith('_orig[]'))) return;
+                      if (vals[i] != null) el.value = vals[i];
+                    });
+                  }
+                  form.dispatchEvent(new Event('input', { bubbles: true }));
+                  baseline = hadError ? baseline : serialize(); // after login-bounce restore, treat as dirty state to re-save
+                  dirty = serialize() !== baseline;
+                  if (fromLogin && !hadError) {
+                    const note = document.createElement('p');
+                    note.textContent = 'Your session had expired before saving — your entries were restored. Review and save again.';
+                    note.style.cssText = 'margin:0 0 1rem;padding:0.7rem 1rem;font-size:0.8rem;color:#c9a668;border:1px solid rgba(201,166,104,0.35);border-radius:3px;';
+                    form.parentElement?.insertBefore(note, form);
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+
+        // --- session keepalive: an idle-but-visible tab refreshes its session
+        // via the middleware (which rotates tokens) instead of silently dying.
+        // 10-minute interval — comfortably under the 1h token lifetime — and
+        // never fires while the tab is hidden; a focus event catches up
+        // immediately when the user returns.
+        {
+          const ping = () => {
+            if (document.visibilityState !== 'visible') return;
+            fetch('/admin/api/session-ping', { credentials: 'same-origin', redirect: 'manual' }).catch(() => {});
+          };
+          setInterval(ping, 10 * 60 * 1000);
+          window.addEventListener('focus', ping);
+        }
       </script>
       <aside class="sidebar" id="admin-sidebar">
         <a class="brand" href="/admin">
@@ -224,7 +304,7 @@ const initials = (staffLabel ?? '')
             {parentLabel && parentHref && (
               <a class="topbar__back" href={parentHref}>← {parentLabel}</a>
             )}
-            <h1>{title}</h1>
+            <h1>{title} <slot name="title-badge" /></h1>
             {subtitle && <p>{subtitle}</p>}
           </div>
           {search && (
@@ -265,11 +345,14 @@ const initials = (staffLabel ?? '')
           <div class="print-letterhead" aria-hidden="true">
             <img src="/brand/buxena-logo-compact.png" alt="" />
             <div class="print-letterhead__title">
-              <span class="print-letterhead__doc">{title}</span>
+              <span class="print-letterhead__doc">{title} <slot name="title-badge" /></span>
               {subtitle && <span class="print-letterhead__sub">{subtitle}</span>}
               <span class="print-letterhead__sub">Generated {printGeneratedAt.toISOString().slice(0, 10)} {printGeneratedAt.toTimeString().slice(0, 5)}</span>
             </div>
           </div>
+          <p class="print-form-notice" aria-hidden="true">
+            This is an editing view. To print this record, open its detail page and print from there.
+          </p>
           <slot />
           {/* print-only footer: address lines left (no company name), status right */}
           <div class="print-footer" aria-hidden="true">
@@ -332,10 +415,11 @@ const initials = (staffLabel ?? '')
     padding: 1rem 0.7rem 0.85rem;
   }
 
-  /* Lockup at 1.5x, centered; wordmark + tagline are one image so they scale
-     together. ~1.9rem bottom padding keeps ~30px clear above the first item. */
-  .brand { display: block; padding: 0.3rem 0 1.9rem; }
-  .brand img { width: 100%; max-width: 8.625rem; height: auto; display: block; margin-inline: auto; }
+  /* Lockup spans the sidebar minus 16px clear each side (sidebar has 11.2px
+     side padding; the extra 4.8px lives here). 20px above, 28px below before
+     "Dashboard". No max-width cap — width drives, height follows the ratio. */
+  .brand { display: block; padding: 4px 4.8px 28px; }
+  .brand img { width: 100%; height: auto; display: block; }
 
   .nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -343,7 +427,9 @@ const initials = (staffLabel ?? '')
     display: flex;
     align-items: center;
     gap: 11px;
-    padding: 10px 0.55rem; /* ~42px row height with the 15px label */
+    /* 8px (was 10px): trimmed so logo + 15 nav items + sign-out fit a 900px
+       viewport without sidebar scroll — per spec, nav padding gives, not the logo */
+    padding: 8px 0.55rem;
     border-left: 2px solid transparent;
     border-radius: 3px;
     font-size: 15px;

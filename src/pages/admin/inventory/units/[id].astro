@@ -1,0 +1,791 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+import { generateUnitQrDataUrl } from '../../../../lib/qr';
+import {
+  assignUnitToOrder,
+  unassignUnitFromOrder,
+  markUnitCondition,
+  recordUnitDelivery,
+  updateUnitDeliveryDetails,
+  DELIVERY_CONDITIONS,
+  recordInstallationUpdate,
+  INSTALLATION_STATUSES,
+  type InstallationStatus,
+} from '../../../../lib/inventory-units';
+
+const INSTALLATION_TYPE_OPTIONS = [
+  { value: 'DIY', label: 'DIY (Customer Self-Install)' },
+  { value: 'BUXENA', label: 'BUXENA Installation Team' },
+  { value: 'THIRD_PARTY', label: 'Third-Party Installer' },
+];
+const INSTALLATION_STATUS_LABELS: Record<string, string> = {
+  NOT_SCHEDULED: 'Not Scheduled',
+  SCHEDULED: 'Scheduled',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+};
+
+const { id } = Astro.params;
+
+let unit: any = null;
+let warranty: any = null;
+let unitDocuments: any[] = [];
+let modelDocuments: any[] = [];
+let serviceCases: any[] = [];
+let timeline: any[] = [];
+let eligibleOrders: { id: string; order_number: string }[] = [];
+let qrDataUrl = '';
+let notFound = false;
+let error: string | null = null;
+let notice: string | null = null;
+
+function statusTone(status: string): string {
+  if (status === 'IN_STOCK' || status === 'DELIVERED') return 'green';
+  if (status === 'DAMAGED') return 'red';
+  if (status === 'HOLD' || status === 'RESERVED') return 'gold';
+  return 'neutral';
+}
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function dims(d: any): string {
+  if (!d || typeof d !== 'object') return '—';
+  const { width, depth, height, unit: u } = d;
+  const parts = [width, depth, height].filter((v) => v != null && v !== '');
+  if (parts.length === 0) return '—';
+  return `${parts.join(' × ')} ${u || 'in'}`;
+}
+function fmtDate(d: string | null | undefined): string {
+  if (!d) return '—';
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  // timeZone: 'UTC' — delivery_date is a plain SQL `date` (no time), so JS
+  // parses it as UTC midnight; formatting in the server's local zone can
+  // roll the displayed day backward. Anchoring to UTC shows the real date.
+  return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+const STAGES = ['EXPECTED', 'RECEIVED', 'IN_STOCK', 'RESERVED', 'DELIVERED'];
+const STAGE_LABELS = ['Ordered', 'Received', 'In Stock', 'Reserved', 'Delivered'];
+
+try {
+  const supabase = createSupabaseAdminClient();
+  const staffId = Astro.locals.staffUser?.id ?? null;
+
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+
+    if (intent === 'reserve_for_order') {
+      const orderId = String(form.get('order_id') ?? '');
+      if (orderId) {
+        const result = await assignUnitToOrder(supabase, id!, orderId, staffId);
+        if (!result.ok) error = result.reason === 'NOT_AVAILABLE' ? 'This unit is no longer available — its status changed before the reservation went through.' : 'Could not reserve this unit.';
+        else notice = 'Unit reserved for order.';
+      }
+    } else if (intent === 'unassign_order') {
+      const result = await unassignUnitFromOrder(supabase, id!, staffId);
+      if (!result.ok) error = 'Could not unassign — the unit is no longer in a reserved state.';
+      else notice = 'Unit returned to stock.';
+    } else if (intent === 'mark_condition') {
+      const condition = String(form.get('condition') ?? '') as 'damaged' | 'hold';
+      if (condition === 'damaged' || condition === 'hold') {
+        const result = await markUnitCondition(supabase, id!, condition, staffId);
+        if (!result.ok) error = 'Could not update condition — the unit is no longer in a state this action applies to.';
+        else notice = `Unit marked ${condition === 'damaged' ? 'Damaged' : 'Hold'}.`;
+      }
+    } else if (intent === 'record_delivery' || intent === 'edit_delivery') {
+      const conditionRaw = String(form.get('delivery_condition') ?? '');
+      const deliveryInput = {
+        deliveryDate: String(form.get('delivery_date') ?? '') || null,
+        deliveredBy: String(form.get('delivered_by') ?? '').trim() || null,
+        condition: (DELIVERY_CONDITIONS as readonly string[]).includes(conditionRaw) ? conditionRaw : null,
+        acknowledged: form.get('customer_acknowledged') === 'on',
+        notes: String(form.get('delivery_notes') ?? '').trim() || null,
+      };
+
+      if (intent === 'record_delivery') {
+        const result = await recordUnitDelivery(supabase, id!, deliveryInput, staffId);
+        if (!result.ok) {
+          error = result.reason === 'NOT_RESERVED'
+            ? `This unit must be Reserved to an order before delivery can be recorded. Its current status is ${result.currentStatus}.`
+            : 'Could not record delivery — unit not found.';
+        } else {
+          notice = 'Delivery recorded.';
+        }
+      } else {
+        const result = await updateUnitDeliveryDetails(supabase, id!, deliveryInput, staffId);
+        if (!result.ok) {
+          error = result.reason === 'NOT_DELIVERED'
+            ? 'Delivery details can only be edited once a unit is Delivered.'
+            : 'Could not update delivery details — unit not found.';
+        } else {
+          notice = 'Delivery details updated.';
+        }
+      }
+    } else if (intent === 'update_installation') {
+      const statusRaw = String(form.get('installation_status') ?? '');
+      const installationStatus: InstallationStatus = (INSTALLATION_STATUSES as readonly string[]).includes(statusRaw)
+        ? (statusRaw as InstallationStatus)
+        : 'NOT_SCHEDULED';
+      const typeRaw = String(form.get('installation_type') ?? '');
+      const installationInput = {
+        installationType: ['DIY', 'BUXENA', 'THIRD_PARTY'].includes(typeRaw) ? typeRaw : null,
+        installationStatus,
+        installationDate: String(form.get('installation_date') ?? '') || null,
+        installerCompany: String(form.get('installer_company') ?? '').trim() || null,
+        electricianName: String(form.get('electrician_name') ?? '').trim() || null,
+        notes: String(form.get('installation_notes') ?? '').trim() || null,
+      };
+
+      const result = await recordInstallationUpdate(supabase, id!, installationInput, staffId);
+      if (!result.ok) {
+        error = result.reason === 'NOT_DELIVERED'
+          ? `Installation can be recorded once this unit has been delivered. Its current status is ${result.currentStatus}.`
+          : 'Could not update installation details — unit not found.';
+      } else {
+        notice = 'Installation details updated.';
+      }
+    }
+  }
+
+  const { data: row, error: rowError } = await supabase
+    .from('inventory_units')
+    .select(
+      '*, products(model_name, category, dimensions, capacity, timber_type, glass_configuration, heater_options, ' +
+      'electrical_requirements, lighting, bench_type, images, brochure_url, installation_manual_url, warranty_document_url), ' +
+      'shipments(shipment_number, po_reference, container_number, eta, suppliers(name)), ' +
+      'orders(id, order_number, status, customers(id, name, email, phone))'
+    )
+    .eq('id', id)
+    .single();
+
+  if (rowError || !row) {
+    notFound = true;
+  } else {
+    unit = row;
+    qrDataUrl = await generateUnitQrDataUrl(unit.public_token);
+
+    const [warrantyRes, docsRes, serviceRes, activityRes, ordersRes, assignedUnitOrderIdsRes] = await Promise.all([
+      supabase.from('warranties').select('*').eq('unit_id', id).maybeSingle(),
+      supabase.from('documents').select('*').or(`unit_id.eq.${id},product_id.eq.${unit.product_id}`).order('created_at', { ascending: false }),
+      supabase.from('service_cases').select('*').eq('unit_id', id).order('opened_date', { ascending: false }),
+      supabase.from('activities').select('id, description, created_at').eq('entity_type', 'inventory_unit').eq('entity_id', id).order('created_at', { ascending: false }),
+      supabase.from('orders').select('id, order_number').eq('product_id', unit.product_id).order('created_at', { ascending: false }),
+      supabase.from('inventory_units').select('order_id').not('order_id', 'is', null),
+    ]);
+
+    warranty = warrantyRes.data;
+    const docs = docsRes.data ?? [];
+    unitDocuments = docs.filter((d: any) => d.unit_id === id);
+    modelDocuments = docs.filter((d: any) => d.unit_id !== id && d.product_id === unit.product_id);
+    serviceCases = serviceRes.data ?? [];
+    timeline = activityRes.data ?? [];
+
+    const takenOrderIds = new Set((assignedUnitOrderIdsRes.data ?? []).map((r: any) => r.order_id));
+    eligibleOrders = (ordersRes.data ?? []).filter((o: any) => !takenOrderIds.has(o.id));
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+
+const stageIndex = unit ? STAGES.indexOf(unit.status === 'SOLD' ? 'RESERVED' : unit.status) : -1;
+const offPath = unit && ['DAMAGED', 'HOLD'].includes(unit.status);
+const product = unit?.products ?? {};
+const image = Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null;
+const config = [
+  { label: 'Wood Type', value: product.timber_type },
+  { label: 'Heater', value: Array.isArray(product.heater_options) ? product.heater_options.join(', ') : product.heater_options },
+  { label: 'Glass', value: product.glass_configuration },
+  { label: 'Lighting', value: product.lighting },
+  { label: 'Bench Type', value: product.bench_type },
+  { label: 'Electrical', value: product.electrical_requirements },
+].map((c) => ({ ...c, value: c.value || '—' }));
+---
+
+<AdminLayout title={unit?.unit_code ?? 'Unit'} subtitle={product.model_name} parentLabel="Inventory Units" parentHref="/admin/inventory/units">
+  {unit && <span slot="title-badge" class={`admin-badge admin-badge--${statusTone(unit.status)}`}>{unit.status}</span>}
+  {unit && <a slot="actions" class="admin-btn" href={`/admin/inventory/units/${id}/label`} target="_blank">Print QR Label</a>}
+
+  {notFound && <p class="admin-empty">Unit not found.</p>}
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--ok" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {unit && (
+    <div class="unit-detail">
+      <!-- TOP AREA -->
+      <section class="admin-panel unit-top">
+        {image && <img class="unit-top__img" src={image} alt={product.model_name} />}
+        <div class="unit-top__info">
+          <h2 class="unit-top__model">{product.model_name}</h2>
+          <dl class="unit-kv unit-kv--compact">
+            <div><dt>Category</dt><dd>{product.category || '—'}</dd></div>
+            <div><dt>Dimensions</dt><dd>{dims(product.dimensions)}</dd></div>
+            <div><dt>Capacity</dt><dd>{product.capacity || '—'}</dd></div>
+            <div><dt>Heater</dt><dd>{Array.isArray(product.heater_options) ? (product.heater_options.join(', ') || '—') : (product.heater_options || '—')}</dd></div>
+            <div><dt>Warehouse Location</dt><dd>{[unit.warehouse, unit.zone, unit.bay].filter(Boolean).join(' / ') || '—'}</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <div class="unit-grid">
+        <!-- MAIN: TABS -->
+        <div class="unit-main">
+          <div class="unit-tabs" role="tablist">
+            {['Overview', 'Configuration', 'Documents', 'History', 'Orders', 'Delivery', 'Installation', 'Warranty', 'Service'].map((t, i) => (
+              <button type="button" class={`unit-tab ${i === 0 ? 'unit-tab--active' : ''}`} data-tab={t.toLowerCase()} role="tab">{t}</button>
+            ))}
+          </div>
+
+          <div class="unit-panel" data-panel="overview">
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Configuration</h2>
+              <dl class="unit-kv">
+                {config.map((c) => <div><dt>{c.label}</dt><dd>{c.value}</dd></div>)}
+              </dl>
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Documents</h2>
+              {unitDocuments.length === 0 && modelDocuments.length === 0 && <p class="admin-empty">No documents linked yet.</p>}
+              {[...unitDocuments, ...modelDocuments].slice(0, 5).map((d) => (
+                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+              ))}
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Quick Actions</h2>
+              <div class="unit-actions">
+                <a class="admin-btn admin-btn--ghost" href={`/admin/inventory/units/${id}/label`} target="_blank">Print QR Label</a>
+                <a class="admin-btn admin-btn--ghost" href={`/admin/inventory/units/${id}/label`} target="_blank">Reprint QR</a>
+                <button class="admin-btn admin-btn--ghost" type="button" data-copy-unit={unit.unit_code}>Copy Unit ID</button>
+
+                {unit.status === 'IN_STOCK' && eligibleOrders.length > 0 && (
+                  <form method="POST" class="unit-inline-form">
+                    <input type="hidden" name="_intent" value="reserve_for_order" />
+                    <select class="admin-select" name="order_id" required>
+                      <option value="">— reserve for order —</option>
+                      {eligibleOrders.map((o) => <option value={o.id}>{o.order_number}</option>)}
+                    </select>
+                    <button class="admin-btn" type="submit">Reserve for Order</button>
+                  </form>
+                )}
+
+                {['IN_STOCK', 'RECEIVED'].includes(unit.status) && (
+                  <>
+                    <form method="POST" style="margin:0;">
+                      <input type="hidden" name="_intent" value="mark_condition" />
+                      <input type="hidden" name="condition" value="damaged" />
+                      <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Mark Damaged</button>
+                    </form>
+                    <form method="POST" style="margin:0;">
+                      <input type="hidden" name="_intent" value="mark_condition" />
+                      <input type="hidden" name="condition" value="hold" />
+                      <button class="admin-btn admin-btn--ghost" type="submit">Mark Hold</button>
+                    </form>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="configuration" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Configuration</h2>
+              <dl class="unit-kv">
+                {config.map((c) => <div><dt>{c.label}</dt><dd>{c.value}</dd></div>)}
+                <div><dt>Dimensions</dt><dd>{dims(product.dimensions)}</dd></div>
+                <div><dt>Capacity</dt><dd>{product.capacity || '—'}</dd></div>
+              </dl>
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="documents" hidden>
+            <section class="admin-panel unit-sec">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+                <h2 class="unit-sec__h" style="margin:0;">Unit Documents</h2>
+                <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Add Document</a>
+              </div>
+              {unitDocuments.length === 0 && <p class="admin-empty">No unit-specific documents yet — receiving reports, delivery documents, service records.</p>}
+              {unitDocuments.map((d) => (
+                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+              ))}
+            </section>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Model Documents — {product.model_name}</h2>
+              <p class="ship-hint" style="margin-top:-0.4rem;">Inherited from the model — not duplicated per unit.</p>
+              {product.brochure_url && <p class="unit-doc-row"><a href={product.brochure_url} target="_blank" rel="noopener">Brochure</a></p>}
+              {product.installation_manual_url && <p class="unit-doc-row"><a href={product.installation_manual_url} target="_blank" rel="noopener">Installation Manual</a></p>}
+              {product.warranty_document_url && <p class="unit-doc-row"><a href={product.warranty_document_url} target="_blank" rel="noopener">Warranty Document</a></p>}
+              {modelDocuments.map((d) => (
+                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+              ))}
+              {!product.brochure_url && !product.installation_manual_url && !product.warranty_document_url && modelDocuments.length === 0 && (
+                <p class="admin-empty">No model-level documents on file.</p>
+              )}
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="history" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">History</h2>
+              <ul class="unit-timeline">
+                {timeline.map((t) => (
+                  <li><span class="unit-timeline__desc">{t.description}</span><span class="unit-timeline__when">{new Date(t.created_at).toLocaleString()}</span></li>
+                ))}
+                <li class="unit-timeline__origin"><span class="unit-timeline__desc">Unit generated</span><span class="unit-timeline__when">{new Date(unit.created_at).toLocaleString()}</span></li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="orders" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Assigned Order</h2>
+              <dl class="unit-kv">
+                <div><dt>Order</dt><dd>{unit.orders ? <a href={`/admin/orders/${unit.orders.id}`}>{unit.orders.order_number}</a> : '—'}</dd></div>
+                <div><dt>Customer</dt><dd>{unit.orders?.customers ? <a href={`/admin/customers/${unit.orders.customers.id}`}>{unit.orders.customers.name}</a> : '—'}</dd></div>
+                <div><dt>Order Status</dt><dd>{unit.orders?.status ?? '—'}</dd></div>
+                <div><dt>Selling Status</dt><dd>{unit.status}</dd></div>
+              </dl>
+              {unit.status === 'RESERVED' && (
+                <form method="POST" style="margin-top:0.75rem;">
+                  <input type="hidden" name="_intent" value="unassign_order" />
+                  <button class="admin-btn admin-btn--ghost" type="submit">Unassign</button>
+                </form>
+              )}
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="delivery" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Delivery Status</h2>
+              <dl class="unit-kv">
+                <div><dt>Current Status</dt><dd><span class={`admin-badge admin-badge--${statusTone(unit.status)}`}>{unit.status}</span></dd></div>
+                <div><dt>Delivery Date</dt><dd>{fmtDate(unit.delivery_date)}</dd></div>
+                <div><dt>Delivered By</dt><dd>{unit.delivered_by ?? '—'}</dd></div>
+                <div><dt>Condition at Delivery</dt><dd>{unit.delivery_condition ?? '—'}</dd></div>
+                <div><dt>Customer Acknowledged</dt><dd>{unit.customer_acknowledged_at ? new Date(unit.customer_acknowledged_at).toLocaleString() : '—'}</dd></div>
+                <div><dt>Linked Order</dt><dd>{unit.orders ? <a href={`/admin/orders/${unit.orders.id}`}>{unit.orders.order_number}</a> : '—'}</dd></div>
+                <div><dt>Linked Customer</dt><dd>{unit.orders?.customers ? <a href={`/admin/customers/${unit.orders.customers.id}`}>{unit.orders.customers.name}</a> : '—'}</dd></div>
+              </dl>
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Delivery Notes</h2>
+              <p class="unit-notes">{unit.delivery_notes || '—'}</p>
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+                <h2 class="unit-sec__h" style="margin:0;">Delivery Documents</h2>
+                <div style="display:flex; gap:0.5rem;">
+                  <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&category=${encodeURIComponent('Delivery Document')}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Delivery Document</a>
+                  <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&category=${encodeURIComponent('Delivery Photo')}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Delivery Photo</a>
+                </div>
+              </div>
+              {(() => {
+                const deliveryDocs = unitDocuments.filter((d: any) => d.category === 'Delivery Document' || d.category === 'Delivery Photo');
+                return deliveryDocs.length === 0 ? (
+                  <p class="admin-empty">No delivery documents or photos linked yet.</p>
+                ) : (
+                  deliveryDocs.map((d: any) => (
+                    <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                  ))
+                );
+              })()}
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">{unit.status === 'DELIVERED' ? 'Edit Delivery Details' : 'Record Delivery'}</h2>
+
+              {unit.status === 'RESERVED' && (
+                <form method="POST" class="delivery-form">
+                  <input type="hidden" name="_intent" value="record_delivery" />
+                  <label class="delivery-field"><span>Delivery Date</span>
+                    <input class="admin-input" type="date" name="delivery_date" value={unit.delivery_date ?? new Date().toISOString().slice(0, 10)} />
+                  </label>
+                  <label class="delivery-field"><span>Delivered By</span>
+                    <input class="admin-input" type="text" name="delivered_by" placeholder="e.g. BUXENA Delivery Team" value={unit.delivered_by ?? ''} />
+                  </label>
+                  <label class="delivery-field"><span>Condition at Delivery</span>
+                    <select class="admin-select" name="delivery_condition">
+                      <option value="">— select —</option>
+                      {DELIVERY_CONDITIONS.map((c) => <option value={c} selected={c === unit.delivery_condition}>{c}</option>)}
+                    </select>
+                  </label>
+                  <label class="delivery-field delivery-field--check"><span>Customer Acknowledgement</span>
+                    <span class="delivery-check"><input type="checkbox" name="customer_acknowledged" checked={!!unit.customer_acknowledged_at} /> Customer acknowledged receipt</span>
+                  </label>
+                  <label class="delivery-field delivery-field--full"><span>Delivery Notes</span>
+                    <textarea class="admin-input delivery-textarea" name="delivery_notes">{unit.delivery_notes ?? ''}</textarea>
+                  </label>
+                  <div class="delivery-field--full">
+                    <button class="admin-btn" type="submit">Record Delivery</button>
+                  </div>
+                </form>
+              )}
+
+              {unit.status === 'DELIVERED' && (
+                <form method="POST" class="delivery-form">
+                  <input type="hidden" name="_intent" value="edit_delivery" />
+                  <label class="delivery-field"><span>Delivery Date</span>
+                    <input class="admin-input" type="date" name="delivery_date" value={unit.delivery_date ?? ''} />
+                  </label>
+                  <label class="delivery-field"><span>Delivered By</span>
+                    <input class="admin-input" type="text" name="delivered_by" value={unit.delivered_by ?? ''} />
+                  </label>
+                  <label class="delivery-field"><span>Condition at Delivery</span>
+                    <select class="admin-select" name="delivery_condition">
+                      <option value="">— select —</option>
+                      {DELIVERY_CONDITIONS.map((c) => <option value={c} selected={c === unit.delivery_condition}>{c}</option>)}
+                    </select>
+                  </label>
+                  <label class="delivery-field delivery-field--check"><span>Customer Acknowledgement</span>
+                    <span class="delivery-check"><input type="checkbox" name="customer_acknowledged" checked={!!unit.customer_acknowledged_at} /> Customer acknowledged receipt</span>
+                  </label>
+                  <label class="delivery-field delivery-field--full"><span>Delivery Notes</span>
+                    <textarea class="admin-input delivery-textarea" name="delivery_notes">{unit.delivery_notes ?? ''}</textarea>
+                  </label>
+                  <div class="delivery-field--full">
+                    <button class="admin-btn admin-btn--ghost" type="submit">Update Delivery Details</button>
+                  </div>
+                </form>
+              )}
+
+              {!['RESERVED', 'DELIVERED'].includes(unit.status) && (
+                <p class="admin-empty">
+                  This unit must be Reserved to an order before delivery can be recorded. Current status: {unit.status}.
+                </p>
+              )}
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="installation" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Installation Status</h2>
+              <dl class="unit-kv">
+                <div><dt>Current Unit Status</dt><dd><span class={`admin-badge admin-badge--${statusTone(unit.status)}`}>{unit.status}</span></dd></div>
+                <div><dt>Installation Type</dt><dd>{INSTALLATION_TYPE_OPTIONS.find((o) => o.value === unit.installation_type)?.label ?? '—'}</dd></div>
+                <div><dt>Installation Status</dt><dd>{INSTALLATION_STATUS_LABELS[unit.installation_status] ?? 'Not Scheduled'}</dd></div>
+                <div><dt>Installation Date</dt><dd>{fmtDate(unit.installation_date)}</dd></div>
+                <div><dt>Installer / Company</dt><dd>{unit.installer_company ?? '—'}</dd></div>
+                <div><dt>Electrician</dt><dd>{unit.electrician_name ?? '—'}</dd></div>
+                <div><dt>Linked Order</dt><dd>{unit.orders ? <a href={`/admin/orders/${unit.orders.id}`}>{unit.orders.order_number}</a> : '—'}</dd></div>
+                <div><dt>Linked Customer</dt><dd>{unit.orders?.customers ? <a href={`/admin/customers/${unit.orders.customers.id}`}>{unit.orders.customers.name}</a> : '—'}</dd></div>
+              </dl>
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Installation Notes</h2>
+              <p class="unit-notes">{unit.installation_notes || '—'}</p>
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+                <h2 class="unit-sec__h" style="margin:0;">Installation Documents</h2>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&category=${encodeURIComponent('Installation Document')}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Document</a>
+                  <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&category=${encodeURIComponent('Installation Photo')}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Photo</a>
+                  <a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/documents/new?unit_id=${id}&category=${encodeURIComponent('Electrical Specification')}&return_to=${encodeURIComponent(`/admin/inventory/units/${id}`)}`}>+ Electrical Spec</a>
+                </div>
+              </div>
+              {(() => {
+                const installDocs = unitDocuments.filter((d: any) => ['Installation Document', 'Installation Photo', 'Electrical Specification'].includes(d.category));
+                return installDocs.length === 0 ? (
+                  <p class="admin-empty">No installation documents or photos linked yet.</p>
+                ) : (
+                  installDocs.map((d: any) => (
+                    <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                  ))
+                );
+              })()}
+              {(product.installation_manual_url || product.electrical_requirements) && (
+                <>
+                  <p class="unit-label" style="margin-top:1rem;">Inherited from Model — {product.model_name}</p>
+                  {product.installation_manual_url && <p class="unit-doc-row"><a href={product.installation_manual_url} target="_blank" rel="noopener">Installation Manual</a></p>}
+                  {product.electrical_requirements && <p class="unit-doc-row">Electrical Requirements: {product.electrical_requirements}</p>}
+                </>
+              )}
+            </section>
+
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Update Installation</h2>
+
+              {unit.status === 'DELIVERED' ? (
+                <form method="POST" class="delivery-form">
+                  <input type="hidden" name="_intent" value="update_installation" />
+                  <label class="delivery-field"><span>Installation Type</span>
+                    <select class="admin-select" name="installation_type">
+                      <option value="">— select —</option>
+                      {INSTALLATION_TYPE_OPTIONS.map((o) => <option value={o.value} selected={o.value === unit.installation_type}>{o.label}</option>)}
+                    </select>
+                  </label>
+                  <label class="delivery-field"><span>Installation Status</span>
+                    <select class="admin-select" name="installation_status">
+                      {INSTALLATION_STATUSES.map((s) => <option value={s} selected={s === (unit.installation_status ?? 'NOT_SCHEDULED')}>{INSTALLATION_STATUS_LABELS[s]}</option>)}
+                    </select>
+                  </label>
+                  <label class="delivery-field"><span>Installation Date (actual completion date)</span>
+                    <input class="admin-input" type="date" name="installation_date" value={unit.installation_date ?? ''} />
+                  </label>
+                  <label class="delivery-field"><span>Installer / Company</span>
+                    <input class="admin-input" type="text" name="installer_company" placeholder="e.g. BUXENA Installation Team" value={unit.installer_company ?? ''} />
+                  </label>
+                  <label class="delivery-field"><span>Electrician</span>
+                    <input class="admin-input" type="text" name="electrician_name" value={unit.electrician_name ?? ''} />
+                  </label>
+                  <label class="delivery-field delivery-field--full"><span>Installation Notes</span>
+                    <textarea class="admin-input delivery-textarea" name="installation_notes">{unit.installation_notes ?? ''}</textarea>
+                  </label>
+                  <div class="delivery-field--full">
+                    <button class="admin-btn" type="submit">Save Installation</button>
+                  </div>
+                </form>
+              ) : (
+                <p class="admin-empty">
+                  Installation can be recorded once this unit has been delivered. Current status: {unit.status}.
+                </p>
+              )}
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="warranty" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Warranty</h2>
+              {warranty ? (
+                <dl class="unit-kv">
+                  <div><dt>Status</dt><dd>{warranty.status}</dd></div>
+                  <div><dt>Start Date</dt><dd>{warranty.warranty_start_date ?? '—'}</dd></div>
+                  <div><dt>End Date</dt><dd>{warranty.warranty_end_date ?? '—'}</dd></div>
+                  <div><dt>Terms Version</dt><dd>{warranty.terms_version ?? '—'}</dd></div>
+                </dl>
+              ) : (
+                <p class="admin-empty">No warranty record yet.</p>
+              )}
+              <p class="ship-hint">Warranty registration/activation is built in a later stage.</p>
+            </section>
+          </div>
+
+          <div class="unit-panel" data-panel="service" hidden>
+            <section class="admin-panel unit-sec">
+              <h2 class="unit-sec__h">Service</h2>
+              {serviceCases.length === 0 ? (
+                <p class="admin-empty">No service cases for this unit. Service case management is built in a later stage.</p>
+              ) : (
+                <ul class="unit-timeline">
+                  {serviceCases.map((s) => (
+                    <li><span class="unit-timeline__desc">{s.case_number} — {s.category ?? 'Other'} — {s.status}</span><span class="unit-timeline__when">{s.opened_date}</span></li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        </div>
+
+        <!-- RIGHT STATUS PANEL -->
+        <div class="unit-side">
+          <section class="admin-panel unit-sec unit-qr-card">
+            <img class="unit-qr-img" src={qrDataUrl} alt={`QR code for unit ${unit.unit_code}`} width="150" height="150" />
+            <p class="unit-code-display">{unit.unit_code}</p>
+            <div class="unit-qr-actions">
+              <a class="admin-btn admin-btn--ghost" href={`/admin/inventory/units/${id}/label`} target="_blank">Reprint QR</a>
+              <button class="admin-btn admin-btn--ghost" type="button" data-copy-unit={unit.unit_code}>Copy Unit ID</button>
+            </div>
+          </section>
+
+          <section class="admin-panel unit-sec">
+            <h2 class="unit-sec__h">Lifecycle</h2>
+            {offPath ? (
+              <p class="unit-offpath">⚠ Currently {unit.status} — not progressing through the normal sale path.</p>
+            ) : (
+              <ol class="unit-stepper">
+                {STAGE_LABELS.map((label, i) => (
+                  <li class={i <= stageIndex ? 'unit-stepper__done' : ''}>{label}</li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          <section class="admin-panel unit-sec">
+            <h2 class="unit-sec__h">Status Details</h2>
+            <dl class="unit-kv unit-kv--1col">
+              <div><dt>Shipment</dt><dd>{unit.shipments?.shipment_number ?? '—'}</dd></div>
+              <div><dt>Received</dt><dd>{unit.received_at ? new Date(unit.received_at).toLocaleString() : '—'}</dd></div>
+              <div><dt>Condition</dt><dd>{unit.condition ?? '—'}</dd></div>
+              <div><dt>Stock Location</dt><dd>{[unit.warehouse, unit.zone, unit.bay].filter(Boolean).join(' / ') || '—'}</dd></div>
+              <div><dt>Unit Cost</dt><dd>{money(unit.unit_cost)}</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('[data-copy-unit]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const code = btn.getAttribute('data-copy-unit');
+      if (!code) return;
+      try {
+        await navigator.clipboard.writeText(code);
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      } catch {
+        // clipboard API unavailable — no-op, the ID is already visible on screen
+      }
+    });
+  });
+
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.unit-tab');
+  const panels = document.querySelectorAll<HTMLElement>('.unit-panel');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('unit-tab--active'));
+      panels.forEach((p) => { p.hidden = true; });
+      tab.classList.add('unit-tab--active');
+      const target = document.querySelector(`.unit-panel[data-panel="${tab.dataset.tab}"]`) as HTMLElement | null;
+      if (target) target.hidden = false;
+    });
+  });
+</script>
+
+<style>
+  .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
+
+  .unit-detail { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .unit-top { display: flex; gap: 1.1rem; padding: 1rem 1.1rem; }
+  .unit-top__img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; border: 1px solid var(--admin-border); flex: 0 0 auto; }
+  .unit-top__info { flex: 1 1 auto; min-width: 0; }
+  .unit-top__model { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--admin-cream); }
+
+  .unit-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 0.9rem; align-items: start; }
+  .unit-main, .unit-side { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .unit-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; border-bottom: 1px solid var(--admin-border); padding-bottom: 0.1rem; }
+  .unit-tab {
+    background: none; border: none; cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit; font-size: 0.78rem;
+    color: var(--admin-muted);
+    border-bottom: 2px solid transparent;
+  }
+  .unit-tab:hover { color: var(--admin-cream); }
+  .unit-tab--active { color: var(--admin-gold); border-bottom-color: var(--admin-gold); }
+
+  .unit-panel { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .unit-sec { padding: 0.9rem 1.1rem; border-radius: 6px; }
+  .unit-sec__h {
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--admin-cream);
+  }
+
+  .unit-kv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem 1.25rem; margin: 0; }
+  .unit-kv--compact { grid-template-columns: repeat(3, 1fr); }
+  .unit-kv--1col { grid-template-columns: 1fr; }
+  .unit-kv dt { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .unit-kv dd { margin: 0.15rem 0 0; font-size: 0.85rem; color: var(--admin-cream); }
+
+  .unit-label { margin: 0.8rem 0 0.3rem; font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .unit-notes { margin: 0; font-size: 0.85rem; line-height: 1.5; color: var(--admin-cream); white-space: pre-wrap; }
+
+  .unit-doc-row { margin: 0.3rem 0; font-size: 0.85rem; }
+  .unit-doc-row a { color: var(--admin-gold); }
+  .unit-doc-cat { font-size: 0.7rem; color: var(--admin-muted); margin-left: 0.4rem; }
+
+  .unit-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .unit-inline-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
+  .admin-btn--sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+
+  .unit-qr-card { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .unit-qr-img { background: #fff; border-radius: 4px; padding: 8px; }
+  .unit-code-display { margin: 0.6rem 0 0; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.04em; color: var(--admin-gold); }
+  .unit-qr-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; justify-content: center; }
+
+  .unit-stepper { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+  .unit-stepper li {
+    font-size: 0.82rem; color: var(--admin-muted);
+    padding-left: 1.1rem; position: relative;
+  }
+  .unit-stepper li::before {
+    content: ''; position: absolute; left: 0; top: 0.4rem;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--admin-border);
+  }
+  .unit-stepper__done { color: var(--admin-cream); }
+  .unit-stepper__done::before { background: var(--admin-gold) !important; }
+  .unit-offpath { margin: 0; font-size: 0.85rem; color: #e6b7a0; }
+
+  .unit-timeline { list-style: none; margin: 0; padding: 0; }
+  .unit-timeline li {
+    display: flex; flex-direction: column; gap: 0.1rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 0.8rem;
+  }
+  .unit-timeline li:last-child { border-bottom: none; }
+  .unit-timeline__desc { color: var(--admin-cream); }
+  .unit-timeline__when { font-size: 0.68rem; color: var(--admin-muted); }
+  .unit-timeline__origin { opacity: 0.7; }
+
+  .ship-hint { font-size: 0.72rem; color: var(--admin-muted); margin: 0.5rem 0 0; }
+
+  .delivery-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.9rem 1.1rem; }
+  .delivery-field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .delivery-field span:first-child { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .delivery-field--full { grid-column: 1 / -1; }
+  .delivery-field--check { justify-content: flex-end; }
+  .delivery-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--admin-cream); }
+  .delivery-textarea { min-height: 5rem; resize: vertical; width: 100%; }
+
+  @media (max-width: 900px) {
+    .unit-grid { grid-template-columns: 1fr; }
+    .unit-top { flex-direction: column; }
+    /* QR / lifecycle / status-details come from the right column in markup —
+       reorder them ABOVE the tabbed main content on mobile, matching the
+       requested mobile structure (id/status/image/QR/model first, then the
+       stacked/tabbed sections), without touching the DOM or duplicating markup. */
+    .unit-side { order: -1; }
+    .unit-kv--compact { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 767.98px) {
+    /* horizontally-scrollable tab bar instead of wrapping to multiple rows —
+       9 tabs never fit a phone width, and wrapping breaks the "current tab"
+       affordance. Buttons keep their natural width and just scroll sideways. */
+    .unit-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .unit-tabs::-webkit-scrollbar { display: none; }
+    .unit-tab { flex: 0 0 auto; min-height: 44px; }
+
+    /* Quick Actions / form-submit buttons on this page specifically get the
+       44px touch target — scoped here rather than in the shared admin.css
+       .admin-btn rule, so PASS 2 pages aren't changed before their own review. */
+    .unit-actions .admin-btn,
+    .unit-actions .admin-btn--ghost,
+    .unit-actions button[type='submit'] {
+      min-height: 44px;
+    }
+    .unit-qr-actions .admin-btn,
+    .unit-qr-actions .admin-btn--ghost {
+      min-height: 44px;
+    }
+  }
+  @media (max-width: 560px) {
+    .delivery-form { grid-template-columns: 1fr; }
+    .unit-kv--compact { grid-template-columns: 1fr 1fr; }
+  }
+</style>

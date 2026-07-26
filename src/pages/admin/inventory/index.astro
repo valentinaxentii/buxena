@@ -88,6 +88,11 @@ function sortIndicator(col: string): string {
     </div>
   )}
 
+  <div class="inv-view-toggle" role="tablist" aria-label="Inventory view">
+    <a href="/admin/inventory" class="inv-view-toggle__opt inv-view-toggle__opt--active" aria-current="page">Stock Summary</a>
+    <a href="/admin/inventory/units" class="inv-view-toggle__opt">Individual Units</a>
+  </div>
+
   <div class="admin-toolbar">
     <form class="admin-toolbar__filters" method="GET">
       <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search sauna model…" value={search} />
@@ -103,7 +108,7 @@ function sortIndicator(col: string): string {
   <a slot="actions" class="admin-btn" href="/admin/inventory/new">+ Add Inventory</a>
 
   <div class="admin-panel">
-    <div class="admin-table-wrap">
+    <div class="admin-table-wrap mobile-hide">
       <table class="admin-table">
         <thead>
           <tr>
@@ -147,6 +152,58 @@ function sortIndicator(col: string): string {
         </tbody>
       </table>
     </div>
+
+    <div class="mobile-cards mobile-show">
+      {rows.map((row) => (
+        <a class="mobile-card" href={`/admin/inventory/${row.id}`}>
+          <div class="mobile-card__top">
+            <span class="mobile-card__code">{row.products?.model_name ?? '— unknown model —'}</span>
+            <span class="mobile-card__model">{row.suppliers?.name ?? '—'}</span>
+          </div>
+          <dl class="mobile-card__stats">
+            <div><dt>In Stock</dt><dd>{row.in_stock ?? 0}</dd></div>
+            <div><dt>Reserved</dt><dd>{row.reserved ?? 0}</dd></div>
+            <div><dt>Incoming</dt><dd>{row.incoming ?? 0}</dd></div>
+            <div><dt>Available</dt><dd>{row.available ?? 0}</dd></div>
+          </dl>
+          <div class="mobile-card__meta mobile-card__meta--row">
+            <span>Selling Price</span>
+            <span>{money(row.products?.selling_price)}</span>
+          </div>
+        </a>
+      ))}
+    </div>
+
     {dbReady && rows.length === 0 && <p class="admin-empty">No inventory records yet.</p>}
   </div>
 </AdminLayout>
+
+<style>
+  .mobile-card__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0; }
+  .mobile-card__stats dt { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--admin-muted); }
+  .mobile-card__stats dd { margin: 0.1rem 0 0; font-size: 0.95rem; font-weight: 600; color: var(--admin-cream); }
+</style>
+
+<style>
+  .inv-view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: -0.25rem 0 1rem;
+  }
+  .inv-view-toggle__opt {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--admin-muted);
+    text-decoration: none;
+    border-right: 1px solid var(--admin-border);
+  }
+  .inv-view-toggle__opt:last-child { border-right: none; }
+  .inv-view-toggle__opt:hover { color: var(--admin-cream); }
+  .inv-view-toggle__opt--active { color: var(--admin-gold); background: rgba(201, 166, 104, 0.1); }
+
+  @media (max-width: 640px) {
+    .inv-view-toggle__opt { display: inline-flex; align-items: center; min-height: 44px; padding: 0.4rem 1rem; }
+  }
+</style>
