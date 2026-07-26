@@ -11,13 +11,15 @@ interface Props {
   products: ModelSelectProduct[];
   value?: string | null;
   placeholder?: string;
+  /** Opt-in: unmatched text offers a "+ Create …" row (page handles the event). */
+  allowCreate?: boolean;
 }
 
-const { id, name, products, value = '', placeholder = 'Search sauna models…' } = Astro.props;
+const { id, name, products, value = '', placeholder = 'Search sauna models…', allowCreate = false } = Astro.props;
 const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? null;
 ---
 
-<div class="model-select" data-model-select>
+<div class="model-select" data-model-select data-allow-create={allowCreate ? '1' : undefined}>
   <input
     type="text"
     class="model-select__input"
@@ -86,6 +88,11 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
     color: var(--admin-gold);
     border-top: 1px solid var(--admin-border);
   }
+  .model-select__option--create {
+    color: var(--admin-gold);
+    font-weight: 500;
+    border-bottom: 1px solid var(--admin-border);
+  }
   .model-select__empty {
     padding: 0.6rem 0.85rem;
     font-size: 0.8rem;
@@ -144,7 +151,23 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
         currentMatches = matches;
         activeIndex = -1;
         menu!.innerHTML = '';
-        if (matches.length === 0) {
+
+        // Inline creation (opt-in): typed text with no EXACT match offers an
+        // explicit create row. Creation only on click — never on Enter/blur.
+        const typed = input!.value.trim();
+        const exact = products.some((p) => p.model_name.toLowerCase() === typed.toLowerCase());
+        if (wrap.dataset.allowCreate && typed && !exact) {
+          const createBtn = document.createElement('button');
+          createBtn.type = 'button';
+          createBtn.className = 'model-select__option model-select__option--create';
+          createBtn.textContent = `＋ Create "${typed}" as a new model`;
+          createBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            wrap.dispatchEvent(new CustomEvent('modelselect:create', { bubbles: true, detail: { name: typed, wrap } }));
+            close();
+          });
+          menu!.appendChild(createBtn);
+        } else if (matches.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'model-select__empty';
           empty.textContent = 'No matching sauna models.';
@@ -194,6 +217,17 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
         const matches = !q ? pool : pool.filter((p) => p.model_name.toLowerCase().includes(q));
         render(matches);
       }
+
+      // page-created product arrives here: add to the pool and select it
+      wrap.addEventListener('modelselect:addoption', ((e: CustomEvent) => {
+        const product = e.detail?.product as ModelSelectProduct | undefined;
+        if (!product) return;
+        if (!products.some((p) => p.id === product.id)) {
+          products.push(product);
+          products.sort((a, b) => a.model_name.localeCompare(b.model_name));
+        }
+        select(product);
+      }) as EventListener);
 
       input.addEventListener('focus', () => filter(input.value));
       input.addEventListener('input', () => {

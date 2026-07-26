@@ -13,7 +13,7 @@ try {
   const supabase = createSupabaseAdminClient();
   let query = supabase
     .from('products')
-    .select('id, model_name, category, selling_price, is_active, suppliers(name)')
+    .select('id, model_name, category, cost, selling_price, is_active, suppliers(name)')
     .order('model_name');
   if (search) query = query.ilike('model_name', `%${search}%`);
   const { data } = await query.limit(300);
@@ -95,7 +95,12 @@ function money(n: number | null | undefined): string {
               <td>{p.in_stock_available}</td>
               <td>{p.incoming}</td>
               <td><span class={`admin-pill admin-pill--${availabilityTone(p.availability)}`}>{p.availability}</span></td>
-              <td><span class={`admin-pill ${p.is_active ? 'admin-pill--green' : 'admin-pill--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td>
+                <span class={`admin-pill ${p.is_active ? 'admin-pill--green' : 'admin-pill--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span>
+                {(p.cost == null || p.selling_price == null) && (
+                  <span class="admin-pill admin-pill--neutral" title="Created inline — cost or selling price still missing" style="margin-left:0.3rem;">Incomplete</span>
+                )}
+              </td>
               <td><a href={`/admin/products/${p.id}`} style="font-size:0.72rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--admin-gold); text-decoration:none;">View →</a></td>
             </tr>
           ))}

@@ -55,6 +55,9 @@ export const GET: APIRoute = async ({ params, redirect }) => {
       website: settings.company_website,
       tagline: settings.pdf_tagline,
       currency: settings.currency,
+      address: settings.company_address,
+      ein: (settings as any).company_ein ?? null,
+      phone: settings.company_phone,
     },
   });
 

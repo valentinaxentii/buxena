@@ -130,6 +130,14 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
 
   {invoice && (
     <div class={`inv-detail ${isVoid ? 'inv-detail--void' : ''}`}>
+      <div class="inv-print-head" aria-hidden="true">
+        <span class="inv-print-head__type">
+          {invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice'}
+          <span class={`admin-pill ${pillClass(invoice.status)}`} style="margin-left:0.4rem;">{STATUS_LABELS[invoice.status] ?? invoice.status}</span>
+        </span>
+        <span class="inv-print-head__num">{invoice.invoice_number ?? '— unassigned (draft)'}</span>
+        <span class="inv-print-head__gen">Generated {new Date().toISOString().slice(0, 10)} {new Date().toTimeString().slice(0, 5)}</span>
+      </div>
       {isVoid && (
         <p class="inv-void-marker">
           VOID{invoice.voided_at ? ` — ${String(invoice.voided_at).slice(0, 10)}` : ''}{invoice.void_reason ? ` — ${invoice.void_reason}` : ''}
@@ -141,7 +149,7 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
         <h2 class="inv-sec__h">Document <span class={`admin-pill ${pillClass(invoice.status)}`}>{STATUS_LABELS[invoice.status] ?? invoice.status}</span></h2>
         <dl class="inv-kv">
           <div><dt>Type</dt><dd>{invoice.document_type === 'proforma' ? 'Proforma' : 'Invoice'}</dd></div>
-          <div><dt>Invoice #</dt><dd>{invoice.invoice_number ?? '— unassigned (draft)'}</dd></div>
+          <div class="inv-kv__num"><dt>Invoice #</dt><dd>{invoice.invoice_number ?? '— unassigned (draft)'}</dd></div>
           <div><dt>Issue Date</dt><dd>{invoice.issue_date ?? '—'}</dd></div>
           <div><dt>Due Date</dt><dd>{invoice.due_date ?? '—'}</dd></div>
           <div><dt>Payment Terms</dt><dd>{invoice.payment_terms ?? '—'}</dd></div>
@@ -166,7 +174,7 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
         </section>
       </div>
 
-      <section class="admin-panel inv-sec">
+      <section class="admin-panel inv-sec inv-sec--issuer">
         <h2 class="inv-sec__h">Issued By</h2>
         <p class="inv-party-text">
           {[invoice.issuer_name, invoice.issuer_address, invoice.issuer_ein ? `EIN: ${invoice.issuer_ein}` : null, invoice.issuer_email, invoice.issuer_phone].filter(Boolean).map((l) => <span>{l}<br /></span>)}
@@ -183,7 +191,7 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
                 <tr>
                   <td>{String(it.line_type).replace(/_/g, ' ')}</td>
                   <td>{it.model_code ?? '—'}</td>
-                  <td style="white-space:normal;">{it.description}</td>
+                  <td style="white-space:normal;" class={it.description === it.model_code ? 'inv-desc-dup' : ''}>{it.description}</td>
                   <td style="white-space:normal;">{it.spec_detail ?? '—'}</td>
                   <td>{it.quantity}</td>
                   <td>{money(it.unit_price)}</td>
@@ -291,6 +299,55 @@ const title = invoice ? (invoice.invoice_number ?? 'Draft Invoice') : 'Invoice';
 
   .inv-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
   .inv-void-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
+
+  @media print {
+    /* header identity: type + number + generated, fixed top-right each sheet;
+       the global letterhead's redundant title block is hidden on this page */
+    :global(.print-letterhead__title) { display: none !important; }
+    .inv-print-head {
+      display: flex !important;
+      position: fixed;
+      top: 0.62in;
+      right: 0.6in;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      gap: 1pt;
+    }
+    .inv-print-head__type { font-family: 'Cormorant Garamond', 'Times New Roman', serif; font-size: 17pt; font-weight: 600; color: #000 !important; }
+    .inv-print-head__num { font-size: 13pt; color: #000 !important; }
+    .inv-print-head__gen { font-size: 8.5pt; color: #444 !important; }
+
+    /* number lives in the header now */
+    .inv-kv__num { display: none !important; }
+    /* DOCUMENT grid: two columns — L: Type/Issue/Terms, R: Due/PO */
+    .inv-kv { display: grid !important; grid-template-columns: 1fr 1fr !important; grid-auto-flow: column !important; grid-template-rows: repeat(3, auto) !important; }
+    .inv-kv > div:nth-child(1) { order: 0; }
+    .inv-kv > div:nth-child(3) { order: 1; }
+    .inv-kv > div:nth-child(5) { order: 2; }
+    .inv-kv > div:nth-child(4) { order: 3; }
+    .inv-kv > div:nth-child(6) { order: 4; }
+
+    /* the ≤860px responsive collapse fires at paper width — force 2-up */
+    .inv-parties-view { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6mm !important; }
+    .inv-snap-note { font-size: 7pt !important; }
+
+    /* Issued By: full-width row, values run horizontally with separators */
+    .inv-sec--issuer .inv-party-text span { display: inline !important; }
+    .inv-sec--issuer .inv-party-text br { display: none !important; }
+    .inv-sec--issuer .inv-party-text span:not(:last-child)::after { content: ' · '; }
+
+    /* duplicated description (equals model code) prints empty */
+    .inv-desc-dup { visibility: hidden !important; }
+
+    /* numeric columns right-aligned; last column reaches the margin globally */
+    :global(.admin-table) td:nth-child(5),
+    :global(.admin-table) td:nth-child(6),
+    :global(.admin-table) td:nth-child(7),
+    :global(.admin-table) th:nth-child(5),
+    :global(.admin-table) th:nth-child(6),
+    :global(.admin-table) th:nth-child(7) { text-align: right !important; }
+  }
 
   @media (max-width: 860px) {
     .inv-parties-view { grid-template-columns: 1fr; }

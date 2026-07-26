@@ -141,12 +141,12 @@ try {
           {Array.from({ length: MAX_ROWS }).map((_, i) => (
             <tr class="item-row" data-row={i} style={i > 0 ? 'display:none;' : ''}>
               <td style="min-width:14rem;">
-                <ModelSelect id={`item-${i}-product`} name="item_product_id[]" products={products} />
+                <ModelSelect id={`item-${i}-product`} name="item_product_id[]" products={products} allowCreate={true} />
               </td>
-              <td><input type="number" name="item_quantity[]" class="qty" min="0" style="width:5rem;" /></td>
-              <td><input type="number" step="0.01" name="item_unit_cost[]" class="cost" style="width:7rem;" /></td>
-              <td><input type="text" name="item_heater[]" style="width:10rem;" /></td>
-              <td><input type="text" name="item_notes[]" style="width:10rem;" /></td>
+              <td><input type="number" name="item_quantity[]" class="admin-input qty" min="0" style="width:5rem;" /></td>
+              <td><input type="number" step="0.01" name="item_unit_cost[]" class="admin-input cost" style="width:7rem;" /></td>
+              <td><input type="text" name="item_heater[]" class="admin-input" style="width:10rem;" /></td>
+              <td><input type="text" name="item_notes[]" class="admin-input" style="width:10rem;" /></td>
               <td class="line-total">$0.00</td>
               <td><button type="button" class="admin-btn admin-btn--ghost remove-row">×</button></td>
             </tr>
@@ -306,4 +306,34 @@ try {
   }));
 
   recalc();
+  // Inline model creation: ModelSelect dispatches modelselect:create; we call
+  // the gated endpoint, then hand the product back for immediate selection.
+  document.addEventListener('modelselect:create', async (e) => {
+    const { name, wrap } = e.detail || {};
+    if (!name || !wrap) return;
+    const supplierSelect = document.getElementById('shipment-supplier-select');
+    try {
+      const res = await fetch('/admin/api/create-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, supplier_id: supplierSelect?.value || null }),
+      });
+      const out = await res.json();
+      if (!res.ok || out.error) throw new Error(out.error || 'Create failed');
+      wrap.dispatchEvent(new CustomEvent('modelselect:addoption', { detail: { product: out.product } }));
+      if (out.existed) {
+        const note = document.createElement('div');
+        note.textContent = `"${out.product.model_name}" already existed — selected the existing model.`;
+        note.style.cssText = 'font-size:0.72rem;color:var(--admin-gold);margin-top:0.25rem;';
+        wrap.parentElement?.appendChild(note);
+        setTimeout(() => note.remove(), 4000);
+      }
+    } catch (err) {
+      const note = document.createElement('div');
+      note.textContent = 'Could not create model: ' + (err?.message || err);
+      note.style.cssText = 'font-size:0.72rem;color:#e6b7a0;margin-top:0.25rem;';
+      wrap.parentElement?.appendChild(note);
+      setTimeout(() => note.remove(), 6000);
+    }
+  });
 </script>

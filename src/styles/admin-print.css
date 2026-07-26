@@ -14,7 +14,11 @@
      headers/footers in the print dialog. */
   @page {
     size: letter;
-    margin: 0;
+    /* top 0 suppresses Chrome/Edge's date/title header; the BOTTOM margin
+       reserves real flow space on EVERY page so content can never run under
+       the fixed footer (fixed elements print relative to the paper, into
+       this reserved band). */
+    margin: 0 0 0.95in 0;
   }
 
   * {
@@ -27,6 +31,23 @@
   body {
     background: #fff !important;
     font-family: 'Jost', system-ui, sans-serif;
+  }
+
+  /* link colouring must never leak into print — emails/values print black */
+  a,
+  a:visited,
+  a * {
+    color: var(--doc-ink, #000) !important;
+    text-decoration: none !important;
+  }
+
+  /* images print at full colour — no washout (a monochrome printer will
+     still grey them; that is the printer, not the CSS) */
+  img {
+    filter: none !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   /* on-screen-only chrome — includes the entire topbar: the printed title
@@ -51,7 +72,7 @@
   /* the print container carries the page margins (see @page note above) */
   .content {
     padding: var(--doc-margin, 0.6in) !important;
-    padding-bottom: calc(var(--doc-margin, 0.6in) + 0.5in) !important; /* clears the anchored footer */
+    padding-bottom: 0.2in !important; /* @page bottom margin reserves footer space per page */
   }
 
   /* --- header: logo IMAGE only left; title block right; bronze rule below.
@@ -97,7 +118,7 @@
   .print-footer {
     display: flex !important;
     position: fixed;
-    bottom: var(--doc-margin, 0.6in);
+    bottom: 0.35in; /* sits inside the reserved @page bottom band */
     left: var(--doc-margin, 0.6in);
     right: var(--doc-margin, 0.6in);
     justify-content: space-between;

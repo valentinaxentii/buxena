@@ -141,7 +141,6 @@ function money(n: number | null | undefined, currency?: string | null): string {
             const CURRENCIES = [
               { code: 'USD', label: 'USD (US Dollar)' },
               { code: 'EUR', label: 'EUR (Euro)' },
-              { code: 'CAD', label: 'CAD (Canadian Dollar)' },
             ];
             const stored = (supplier.currency ?? '').trim();
             const match = CURRENCIES.find((c) => c.code.toLowerCase() === stored.toLowerCase());
