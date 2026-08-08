@@ -8,30 +8,16 @@
  * landed cost). If the kit contents change, update BOTH this component and
  * the standard line in the written quote so site and paperwork agree.
  *
- * Icons are inline SVG line drawings (stroke = currentColor) — the site
- * loads no icon font, and five tiny paths cost less than one webfont.
+ * Product photos live in /public/images/accessories/ (supplier shop
+ * photography, 480px squares). alt is empty — the visible label right
+ * below each photo already names the item.
  */
-const items: { label: string; icon: string }[] = [
-  {
-    label: 'Wooden bucket and ladle',
-    icon: '<path d="M5 9h14l-1.5 10.5a1 1 0 0 1-1 .5h-9a1 1 0 0 1-1-.5L5 9Z"/><path d="M7 9a5 5 0 0 1 10 0"/><path d="M15 4l5-2"/>',
-  },
-  {
-    label: 'Thermometer and hygrometer',
-    icon: '<path d="M10 13.5V5a2 2 0 1 1 4 0v8.5a4 4 0 1 1-4 0Z"/><path d="M12 9v7"/><circle cx="12" cy="17" r="1.4"/>',
-  },
-  {
-    label: 'Sauna sand timer',
-    icon: '<path d="M7 3h10M7 21h10M8 3c0 4 3 5 3 7s-3 3-3 7M16 3c0 4-3 5-3 7s3 3 3 7"/>',
-  },
-  {
-    label: 'Two wooden headrests',
-    icon: '<path d="M4 8c2.5-2 13.5-2 16 0M4 8v2c2.5 2 13.5 2 16 0V8"/><path d="M4 15c2.5-2 13.5-2 16 0M4 15v2c2.5 2 13.5 2 16 0v-2"/>',
-  },
-  {
-    label: 'Sauna fragrance oil',
-    icon: '<path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 1 1-12 0c0-3.4 3-6.5 6-11Z"/>',
-  },
+const items: { label: string; image: string }[] = [
+  { label: 'Wooden bucket and ladle', image: '/images/accessories/kit-bucket.jpg' },
+  { label: 'Thermometer and hygrometer', image: '/images/accessories/kit-thermometer.jpg' },
+  { label: 'Sauna sand timer', image: '/images/accessories/kit-timer.jpg' },
+  { label: 'Two wooden headrests', image: '/images/accessories/kit-headrest.jpg' },
+  { label: 'Sauna fragrance oil', image: '/images/accessories/kit-fragrance.jpg' },
 ];
 ---
 
@@ -48,16 +34,7 @@ const items: { label: string; icon: string }[] = [
     <ul class="ritual__grid" role="list">
       {items.map((item) => (
         <li class="ritual__item">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            set:html={item.icon}
-          />
+          <img src={item.image} alt="" loading="lazy" decoding="async" width="480" height="480" />
           <span>{item.label}</span>
         </li>
       ))}
@@ -102,19 +79,23 @@ const items: { label: string; icon: string }[] = [
 
   .ritual__item {
     border: 1px solid var(--line);
-    padding: 1.2rem 0.9rem;
+    padding: 0.9rem 0.9rem 1.1rem;
     text-align: center;
     display: grid;
     justify-items: center;
-    gap: 0.7rem;
+    gap: 0.65rem;
     font-size: var(--t-small);
     line-height: 1.45;
+    background: #fff;
   }
 
-  .ritual__item svg {
-    width: 26px;
-    height: 26px;
-    color: var(--bronze);
+  .ritual__item img {
+    width: 100%;
+    max-width: 8.5rem;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: contain;
+    mix-blend-mode: multiply;
   }
 
   .ritual__note {
