@@ -1,0 +1,45 @@
+---
+title: "BUH-VIRU Thermowood 3.6m"
+category: "barrel"
+location: "outdoor"
+productType: "Barrel"
+series: "VIRU"
+tagline: "The long barrel — room to stretch out"
+summary: "A full-length four-person thermowood barrel with a covered terrace, for gardens with space to give it."
+order: 17
+placeholder: false
+capacity: "4 people"
+capacityMin: 4
+capacityMax: 4
+materials: ["Thermowood"]
+heroImage:
+  alt: "VIRU Thermowood 3.6m barrel sauna exterior, long profile with terrace seats"
+  note: "Hero: side profile emphasising the full 3.6m length, terrace seats visible. Supplier photography pending."
+dimensions:
+  - { label: "Length", value: "11.8 ft (360 cm)" }
+  - { label: "Diameter", value: "6.6 ft (200 cm)" }
+  - { label: "Height", value: "6.9 ft (210 cm)" }
+  - { label: "Wall thickness", value: "1.6 in (40 mm)" }
+specs:
+  - { label: "Benches", value: "Alder" }
+  - { label: "Door", value: "Brown tempered glass" }
+  - { label: "Roof", value: "Bitumen shingle" }
+  - { label: "Bands", value: "Stainless steel hoops × 4" }
+  - { label: "Heater", value: "Electric or wood-burning — confirmed with you before ordering" }
+options: ["Flat-pack kit", "Factory assembled"]
+delivery: "Preorder — lead time confirmed with your written quote."
+---
+
+The longest of the VIRU barrels gives four bathers the full-length benches
+that make the difference between sitting in a sauna and settling into one —
+lie down flat, stretch out, take the heat at your own pace. The covered
+terrace at the entrance adds a sheltered place to cool off between rounds.
+
+Despite the length, the barrel geometry keeps the air volume efficient to
+heat: the curved wall returns heat to the room and leaves no cold corners.
+Thermowood construction — heat-treated, dimensionally stable,
+weather-resistant without chemical treatment — carries it through American
+winters.
+
+Heater choice, glazing options and site placement are confirmed with you
+before ordering.
