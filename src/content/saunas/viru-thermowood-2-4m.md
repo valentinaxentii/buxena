@@ -13,8 +13,8 @@ capacityMin: 4
 capacityMax: 4
 materials: ["Thermowood"]
 heroImage:
-  alt: "VIRU Thermowood 2.4m barrel sauna exterior with covered terrace seats and glass door"
-  note: "Hero: 3/4 exterior view showing the terrace seats under the barrel overhang. Supplier photography pending."
+  src: "/images/saunas/viru-thermowood-2-4m-hero.jpg"
+  alt: "VIRU 2.4m barrel sauna on a wood deck, smoke rising from the chimney, terrace seats at the entrance"
 dimensions:
   - { label: "Length", value: "7.9 ft (240 cm)" }
   - { label: "Diameter", value: "6.6 ft (200 cm)" }

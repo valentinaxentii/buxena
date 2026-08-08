@@ -13,8 +13,8 @@ capacityMin: 2
 capacityMax: 2
 materials: ["Thermowood"]
 heroImage:
-  alt: "VIRU Vertical 2.6m standing barrel sauna, upright cylinder with glass door"
-  note: "Hero: upright cylinder in a compact patio/deck setting to communicate the footprint story. Supplier photography pending."
+  src: "/images/saunas/viru-vertical-2-6m-hero.jpg"
+  alt: "VIRU Vertical standing barrel sauna on a garden terrace beside a lounge set, full-height glass door"
 dimensions:
   - { label: "Diameter", value: "6.6 ft (200 cm)" }
   - { label: "Height", value: "8.5 ft (260 cm)" }

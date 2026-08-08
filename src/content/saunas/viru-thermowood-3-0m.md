@@ -13,8 +13,8 @@ capacityMin: 4
 capacityMax: 4
 materials: ["Thermowood"]
 heroImage:
-  alt: "VIRU Thermowood 3.0m barrel sauna exterior with wooden entrance door"
-  note: "Hero: 3/4 exterior view showing the solid wooden entrance door; interior shot of dressing room if available. Supplier photography pending."
+  src: "/images/saunas/viru-thermowood-3-0m-hero.jpg"
+  alt: "VIRU 3.0m barrel sauna on decking with smoke rising, wooden entrance door with window"
 dimensions:
   - { label: "Length", value: "9.8 ft (300 cm)" }
   - { label: "Diameter", value: "6.6 ft (200 cm)" }
