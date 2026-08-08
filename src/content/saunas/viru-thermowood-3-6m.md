@@ -26,6 +26,9 @@ specs:
   - { label: "Roof", value: "Bitumen shingle" }
   - { label: "Bands", value: "Stainless steel hoops × 4" }
   - { label: "Heater", value: "Electric or wood-burning — confirmed with you before ordering" }
+heaterOptions:
+  - "Electric: Harvia, HUUM (with app control)"
+  - "Wood-burning: Harvia, Cozy, Narvi, HUUM HIVE Wood"
 options: ["Flat-pack kit", "Factory assembled"]
 delivery: "Preorder — lead time confirmed with your written quote."
 ---
