@@ -1,20 +1,31 @@
 /**
- * Best-effort email notification for a new enquiry.
+ * Best-effort email notification for a new website enquiry.
  *
- * Sends a plain HTTP request to Resend (https://resend.com) — no SDK, no extra
- * dependency, works inside a Netlify Function. Called from /api/enquiries after
- * the row is recorded. Like the rest of that route it is BEST-EFFORT: if the
- * email provider is unconfigured or the request fails, it never throws and never
- * changes the response the visitor gets. The submission is already safely stored
- * in Supabase (and, separately, in Netlify Forms) regardless of email delivery.
+ * Sends over Zoho Mail's SMTP server using nodemailer. This runs inside the
+ * Netlify Function that serves /api/enquiries (a Node runtime — plain TCP/SSL
+ * to port 465 is allowed there). No third-party email API, no extra DNS
+ * records beyond the ones Zoho already needs to run buxena.com's mailboxes.
+ *
+ * Like the rest of that route it is BEST-EFFORT: if SMTP is unconfigured or the
+ * send fails, it logs and returns normally. It never throws and never changes
+ * the response the visitor gets — the enquiry is already safely stored in
+ * Supabase and visible in BUXENA Admin regardless of email delivery.
  *
  * Configuration (server-side env vars — set in Netlify: Site configuration →
  * Environment variables, and in .env for local testing):
- *   RESEND_API_KEY      — secret API key from resend.com. If unset, this no-ops.
- *   ENQUIRY_NOTIFY_TO   — recipient. Defaults to info@buxena.com.
- *   ENQUIRY_NOTIFY_FROM — verified sender, e.g. "BUXENA <notifications@buxena.com>".
- *                         Must be on a domain verified in Resend. If unset, no-ops.
+ *   ZOHO_SMTP_USER     — the Zoho mailbox that sends, e.g. info@buxena.com.
+ *   ZOHO_SMTP_PASSWORD — Zoho App Password (NOT the normal login password).
+ *                        Generate at Zoho → My Account → Security → App Passwords.
+ *   ENQUIRY_NOTIFY_TO  — recipient. Optional, defaults to info@buxena.com.
+ *   ZOHO_SMTP_HOST     — optional. Defaults to smtp.zoho.com. Accounts hosted in
+ *                        Zoho's EU data centre must use smtp.zoho.eu instead.
+ *   ZOHO_SMTP_PORT     — optional. Defaults to 465 (implicit SSL).
+ *
+ * If ZOHO_SMTP_USER or ZOHO_SMTP_PASSWORD is missing, email quietly no-ops so
+ * local dev and any unconfigured environment keep working exactly as before.
  */
+
+import nodemailer from 'nodemailer';
 
 export interface EnquiryEmailInput {
   name?: string | null;
@@ -27,6 +38,25 @@ export interface EnquiryEmailInput {
 }
 
 const DEFAULT_TO = 'info@buxena.com';
+const DEFAULT_HOST = 'smtp.zoho.com';
+const DEFAULT_PORT = 465;
+
+/**
+ * Config is read from the runtime environment first, falling back to the value
+ * inlined at build time. Netlify exposes its environment variables to the
+ * running Function via process.env, which means changing the SMTP password in
+ * the Netlify UI takes effect without a rebuild. `import.meta.env` is the
+ * fallback that makes `astro dev` (which loads .env into import.meta.env only)
+ * work locally. Both accessors must be written out statically — Vite can only
+ * inline `import.meta.env.SOME_NAME`, never a dynamic lookup.
+ */
+function pick(runtime: string | undefined, buildTime: unknown): string {
+  const value = runtime ?? (typeof buildTime === 'string' ? buildTime : undefined);
+  return (value ?? '').trim();
+}
+
+const procEnv: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process.env ? process.env : {};
 
 /** Minimal HTML escaping so visitor-supplied text can't break the markup. */
 function esc(value: string): string {
@@ -38,40 +68,45 @@ function esc(value: string): string {
 }
 
 export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> {
-  const apiKey = import.meta.env.RESEND_API_KEY;
-  const from = import.meta.env.ENQUIRY_NOTIFY_FROM;
-  const to = import.meta.env.ENQUIRY_NOTIFY_TO || DEFAULT_TO;
+  const user = pick(procEnv.ZOHO_SMTP_USER, import.meta.env.ZOHO_SMTP_USER);
+  const pass = pick(procEnv.ZOHO_SMTP_PASSWORD, import.meta.env.ZOHO_SMTP_PASSWORD);
+  const to = pick(procEnv.ENQUIRY_NOTIFY_TO, import.meta.env.ENQUIRY_NOTIFY_TO) || DEFAULT_TO;
+  const host = pick(procEnv.ZOHO_SMTP_HOST, import.meta.env.ZOHO_SMTP_HOST) || DEFAULT_HOST;
+  const port =
+    Number(pick(procEnv.ZOHO_SMTP_PORT, import.meta.env.ZOHO_SMTP_PORT)) || DEFAULT_PORT;
 
-  // Unconfigured — quietly skip. This keeps local dev and any environment
-  // without an email provider working exactly as before.
-  if (!apiKey || !from) {
+  // Unconfigured — quietly skip. Submissions still record to Supabase.
+  if (!user || !pass) {
     if (import.meta.env.DEV) {
-      console.info('[enquiry-email] RESEND_API_KEY/ENQUIRY_NOTIFY_FROM not set — skipping email.');
+      console.info('[enquiry-email] ZOHO_SMTP_USER/ZOHO_SMTP_PASSWORD not set — skipping email.');
     }
     return;
   }
 
-  const source = input.source || 'Website';
+  const source = input.source?.trim() || 'Website';
   const name = input.name?.trim() || 'No name given';
-
-  // Human-readable label rows — only include fields that have a value.
-  const rows: [string, string][] = [
-    ['Name', input.name?.trim() || ''],
-    ['Email', input.email?.trim() || ''],
-    ['Phone', input.phone?.trim() || ''],
-    ['Location / ZIP', input.location?.trim() || ''],
-    ['Model interest', input.saunaInterest?.trim() || ''],
-    ['Source', source],
-  ].filter(([, v]) => v) as [string, string][];
-
   const message = input.message?.trim() || '';
+
+  // Every requested field gets its own row, and stays visible even when the
+  // visitor left it blank — a missing row reads as "the form is broken", an
+  // em dash reads as "they didn't fill this in".
+  const rows: [string, string][] = [
+    ['Name', input.name?.trim() || '—'],
+    ['Email', input.email?.trim() || '—'],
+    ['Phone', input.phone?.trim() || '—'],
+    ['ZIP / Location', input.location?.trim() || '—'],
+    ['Model / request', input.saunaInterest?.trim() || '—'],
+    ['Source', source],
+  ];
 
   const textBody = [
     `New enquiry from the BUXENA website (${source}).`,
     '',
     ...rows.map(([k, v]) => `${k}: ${v}`),
     '',
-    message ? `Message:\n${message}` : 'No message provided.',
+    message ? `Message:\n${message}` : 'Message: —',
+    '',
+    'This enquiry is also saved in BUXENA Admin → Website Enquiries.',
   ].join('\n');
 
   const htmlBody = `
@@ -94,33 +129,48 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
             )}</div>`
           : '<p style="color: #6b6b6b;">No message provided.</p>'
       }
+      <p style="margin: 16px 0 0; font-size: 12px; color: #8a8a8a;">
+        Also saved in BUXENA Admin → Website Enquiries.
+      </p>
     </div>
   `.trim();
 
-  const payload: Record<string, unknown> = {
-    from,
-    to: [to],
-    subject: `New quote request — ${name}`,
-    text: textBody,
-    html: htmlBody,
-  };
+  // Zoho rejects a From address that isn't the authenticated mailbox (or one of
+  // its verified aliases), so From is derived from ZOHO_SMTP_USER rather than
+  // being separately configurable — one less setting that can silently break
+  // delivery. Only the display name is fixed text.
+  const from = `BUXENA Website <${user}>`;
 
-  // Let staff reply straight to the customer from their inbox.
-  const replyTo = input.email?.trim();
-  if (replyTo) payload.reply_to = replyTo;
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    // Port 465 is implicit SSL/TLS from the first byte. Any other port (587)
+    // starts plaintext and upgrades via STARTTLS, which nodemailer handles when
+    // `secure` is false.
+    secure: port === 465,
+    auth: { user, pass },
+    // A visitor is waiting on this request — never let a stalled SMTP
+    // connection hold the form open indefinitely.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
 
-  if (!res.ok) {
-    // Surface the failure in server logs only — never to the visitor.
-    const detail = await res.text().catch(() => '');
-    console.error(`[enquiry-email] Resend responded ${res.status}: ${detail}`);
+  try {
+    await transporter.sendMail({
+      from,
+      to,
+      subject: `New enquiry — ${name}`,
+      text: textBody,
+      html: htmlBody,
+      // Let staff reply straight to the customer from their inbox.
+      ...(input.email?.trim() ? { replyTo: input.email.trim() } : {}),
+    });
+  } catch (err) {
+    // Surface the failure in the Netlify function logs only — never to the
+    // visitor, and never as a thrown error that could mask a saved enquiry.
+    console.error('[enquiry-email] Zoho SMTP send failed:', err);
+  } finally {
+    transporter.close();
   }
 }

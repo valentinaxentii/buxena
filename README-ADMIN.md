@@ -85,14 +85,14 @@ role today — see "What's not built yet" for a real roles/permissions model).
   The File URL field takes a link to wherever the file already lives. See
   `src/pages/admin/documents/index.astro` for exactly what's needed to wire
   up real upload later.
-- **Website quote form → enquiries**: the public `/quote/` form still
-  submits via **Netlify Forms**, unchanged. Only the Sauna Advisor chat
-  writes to `enquiries` right now. Connecting the quote form too is a small
-  follow-up, but it's a real decision point: either point the form directly
-  at a new API route instead of Netlify Forms, or keep Netlify Forms and add
-  a Netlify outgoing webhook into Supabase. I didn't make that call for you.
-- **Email notifications on new leads/enquiries**: not built. Needs an email
-  provider (e.g. Resend, Postmark) and its own API key — flagged, not done.
+- **Website quote form → enquiries**: done. Every public form (quote form and
+  Sauna Advisor chat) POSTs to `/api/enquiries`, which is the single
+  submission path. Netlify Forms is no longer used.
+- **Email notifications on new enquiries**: done, over **Zoho Mail SMTP**
+  (`src/lib/send-enquiry-email.ts`). Each new enquiry emails
+  `info@buxena.com`. Needs `ZOHO_SMTP_USER` and `ZOHO_SMTP_PASSWORD` (a Zoho
+  App Password) in the Netlify environment; unset means email quietly skips
+  and enquiries still save. Notifications on *leads* are still not built.
 - **Roles/permissions**: everyone who can log in can do everything. Fine for
   "one shared login," not fine once there are several distinct staff
   accounts with different access levels.
