@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
+import { sendEnquiryEmail } from '../../lib/send-enquiry-email';
 
 export const prerender = false;
 
@@ -14,7 +15,16 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json();
-    const { name, email, phone, location, message, chatTranscript, saunaInterest, source } = body ?? {};
+    const { name, email, phone, location, message, chatTranscript, saunaInterest, source, botField } =
+      body ?? {};
+
+    // Honeypot: a real visitor never fills the hidden field. Bots that blindly
+    // complete every input do. Pretend success and drop it — don't record, don't
+    // email, don't tip off the bot. Replaces the spam filtering Netlify Forms
+    // used to provide before this became the single submission path.
+    if (botField) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
 
     if (!message && !(chatTranscript && chatTranscript.length)) {
       return new Response(JSON.stringify({ ok: false, error: 'Nothing to record.' }), { status: 400 });
@@ -41,10 +51,11 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500 });
     }
 
-    // Best-effort audit trail entry — never blocks or changes the response
-    // the visitor gets, matching this route's existing best-effort posture.
+    // Audit trail entry. Awaited (not fire-and-forget) so the serverless
+    // function doesn't freeze before the write lands, but its failure is
+    // swallowed — it must never turn a recorded enquiry into an error.
     if (inserted) {
-      supabase
+      await supabase
         .from('activities')
         .insert({
           entity_type: 'enquiry',
@@ -52,7 +63,20 @@ export const POST: APIRoute = async ({ request }) => {
           activity_type: 'note',
           description: `Enquiry received — ${source || 'Sauna Advisor'}`,
         })
-        .then(() => {});
+        .then(
+          () => {},
+          (err) => console.error('[enquiries] activity log failed:', err)
+        );
+    }
+
+    // Email notification to info@buxena.com. Awaited so the request reliably
+    // completes the send before the function returns (fire-and-forget can be
+    // killed mid-flight in serverless). Best-effort: a send failure is logged
+    // but never fails the submission — the enquiry is already safely recorded.
+    try {
+      await sendEnquiryEmail({ name, email, phone, location, message, saunaInterest, source });
+    } catch (err) {
+      console.error('[enquiries] email notify failed:', err);
     }
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 });

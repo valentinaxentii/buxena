@@ -126,19 +126,12 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
               class="qform"
               name="plan-your-sauna"
               method="POST"
-              data-netlify="true"
-              netlify-honeypot="bot-field-plan"
               action="/thank-you/"
               data-plan-review-form
             >
-              <input type="hidden" name="form-name" value="plan-your-sauna" />
               <p class="qform__hp">
                 <label>Leave this field empty <input name="bot-field-plan" tabindex="-1" autocomplete="off" /></label>
               </p>
-
-              <input type="hidden" name="answers" data-plan-field="answers" />
-              <input type="hidden" name="recommended" data-plan-field="recommended" />
-              <input type="hidden" name="submitted_at" data-plan-field="submitted_at" />
 
               <div class="qform__grid">
                 <div class="field">
@@ -305,17 +298,67 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
       }
     });
 
-    reviewForm.addEventListener('submit', () => {
-      const answersField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="answers"]')!;
-      const recommendedField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="recommended"]')!;
-      const submittedField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="submitted_at"]')!;
-      const zipField = reviewForm.querySelector<HTMLInputElement>('[data-plan-field="zip"]')!;
+    reviewForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!reviewForm.reportValidity()) return;
+
+      const data = new FormData(reviewForm);
+      const get = (key: string) => (data.get(key) || '').toString().trim();
 
       const recs = recommendSaunas(catalog, answers as unknown as PlanAnswers);
-      answersField.value = JSON.stringify(answers);
-      recommendedField.value = recs.map((r) => r.model.title).join(', ');
-      submittedField.value = new Date().toISOString();
-      if (!zipField.value) zipField.value = answers.zip;
+      const recommended = recs.map((r) => r.model.title).join(', ');
+      const zip = get('zip') || answers.zip;
+
+      // Fold the wizard answers into a readable enquiry message so staff see the
+      // full picture in the notification email and /admin/enquiries.
+      const answerLines = Object.entries(answers)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      const notes = get('message');
+      const message = [
+        notes,
+        recommended && `Shortlist: ${recommended}`,
+        answerLines && `Answers:\n${answerLines}`,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const submitBtn = reviewForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+      const originalLabel = submitBtn?.textContent ?? '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+      }
+
+      try {
+        const res = await fetch('/api/enquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: get('name'),
+            email: get('email'),
+            phone: get('phone'),
+            location: zip,
+            message,
+            saunaInterest: recommended,
+            source: 'Plan Your Sauna',
+            botField: get('bot-field-plan'),
+          }),
+        });
+
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        window.location.assign('/thank-you/');
+      } catch (err) {
+        console.error('[plan-your-sauna] submission failed:', err);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalLabel || 'Send to BUXENA';
+        }
+        alert(
+          'Sorry — something went wrong sending your request. Please try again, or email info@buxena.com directly.'
+        );
+      }
     });
 
     const saveBtn = root.querySelector<HTMLButtonElement>('[data-plan-save]')!;
