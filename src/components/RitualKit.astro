@@ -1,0 +1,129 @@
+---
+/**
+ * "The BUXENA Ritual Kit" — the included-accessories band shown on every
+ * sauna product page, between the specifications and the enquiry form.
+ *
+ * The kit is a real fulfilment promise: every sauna preorder ships with
+ * these five items (sourced from the supplier accessory list at ~€94
+ * landed cost). If the kit contents change, update BOTH this component and
+ * the standard line in the written quote so site and paperwork agree.
+ *
+ * Icons are inline SVG line drawings (stroke = currentColor) — the site
+ * loads no icon font, and five tiny paths cost less than one webfont.
+ */
+const items: { label: string; icon: string }[] = [
+  {
+    label: 'Wooden bucket and ladle',
+    icon: '<path d="M5 9h14l-1.5 10.5a1 1 0 0 1-1 .5h-9a1 1 0 0 1-1-.5L5 9Z"/><path d="M7 9a5 5 0 0 1 10 0"/><path d="M15 4l5-2"/>',
+  },
+  {
+    label: 'Thermometer and hygrometer',
+    icon: '<path d="M10 13.5V5a2 2 0 1 1 4 0v8.5a4 4 0 1 1-4 0Z"/><path d="M12 9v7"/><circle cx="12" cy="17" r="1.4"/>',
+  },
+  {
+    label: 'Sauna sand timer',
+    icon: '<path d="M7 3h10M7 21h10M8 3c0 4 3 5 3 7s-3 3-3 7M16 3c0 4-3 5-3 7s3 3 3 7"/>',
+  },
+  {
+    label: 'Two wooden headrests',
+    icon: '<path d="M4 8c2.5-2 13.5-2 16 0M4 8v2c2.5 2 13.5 2 16 0V8"/><path d="M4 15c2.5-2 13.5-2 16 0M4 15v2c2.5 2 13.5 2 16 0v-2"/>',
+  },
+  {
+    label: 'Sauna fragrance oil',
+    icon: '<path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 1 1-12 0c0-3.4 3-6.5 6-11Z"/>',
+  },
+];
+---
+
+<section class="band ritual">
+  <div class="shell">
+    <div class="ritual__rule" aria-hidden="true"></div>
+    <span class="eyebrow">Included with every preorder</span>
+    <h2 class="ritual__title">The BUXENA Ritual Kit</h2>
+    <p class="ritual__lead">
+      Every sauna leaves for your address with the ritual already packed —
+      our gift with your order.
+    </p>
+
+    <ul class="ritual__grid" role="list">
+      {items.map((item) => (
+        <li class="ritual__item">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            set:html={item.icon}
+          />
+          <span>{item.label}</span>
+        </li>
+      ))}
+    </ul>
+
+    <p class="ritual__note">
+      Included at no charge with every sauna preorder. Itemised in your
+      written quote.
+    </p>
+  </div>
+</section>
+
+<style>
+  .ritual { padding-top: 0; }
+
+  .ritual__rule {
+    border-top: 2px solid var(--ink);
+    margin-bottom: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+  }
+
+  .ritual__title {
+    font-family: var(--font-display);
+    font-size: var(--t-h2);
+    font-weight: 500;
+    margin-top: 0.5rem;
+  }
+
+  .ritual__lead {
+    color: var(--muted);
+    max-width: 46em;
+    margin-top: 0.7rem;
+  }
+
+  .ritual__grid {
+    list-style: none;
+    margin: 1.9rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .ritual__item {
+    border: 1px solid var(--line);
+    padding: 1.2rem 0.9rem;
+    text-align: center;
+    display: grid;
+    justify-items: center;
+    gap: 0.7rem;
+    font-size: var(--t-small);
+    line-height: 1.45;
+  }
+
+  .ritual__item svg {
+    width: 26px;
+    height: 26px;
+    color: var(--bronze);
+  }
+
+  .ritual__note {
+    margin-top: 1.1rem;
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .ritual__grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

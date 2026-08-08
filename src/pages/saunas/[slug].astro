@@ -4,6 +4,7 @@ import Figure from '../../components/Figure.astro';
 import QuoteForm from '../../components/QuoteForm.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import AvailabilityBadge from '../../components/AvailabilityBadge.astro';
+import RitualKit from '../../components/RitualKit.astro';
 import { categoryMap, showDev, site } from '../../data/site';
 import { getCollection, render } from 'astro:content';
 
@@ -236,6 +237,8 @@ const breadcrumbSchema = {
         )}
       </div>
     </section>
+
+    <RitualKit />
 
     <!-- Enquiry -->
     <section class="band band--birch" id="enquire">
