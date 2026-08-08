@@ -13,8 +13,8 @@ capacityMin: 6
 capacityMax: 10
 materials: ["Nordic pinewood", "Thermowood (optional)"]
 heroImage:
-  alt: "VIRU Grand 6.0m barrel sauna — full-length profile with terrace, changing room and panoramic steam room"
-  note: "Hero: long side profile that communicates the 6m scale, ideally with people or furniture for reference. Supplier photography pending."
+  src: "/images/saunas/viru-grand-6-0m-hero.jpg"
+  alt: "VIRU Grand 6.0m barrel sauna, full length with covered terrace benches and the changing-room door"
 dimensions:
   - { label: "Total length", value: "19.7 ft (600 cm)" }
   - { label: "Diameter", value: "7.1 ft (217 cm)" }

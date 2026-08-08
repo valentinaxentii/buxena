@@ -135,7 +135,7 @@ const quickQuestions = [
   }
   .chat-panel__logo { width: 2.25rem; height: 2.25rem; object-fit: contain; flex: 0 0 auto; }
   .chat-panel__id { display: grid; gap: 0.15rem; flex: 1 1 auto; min-width: 0; }
-  .chat-panel__name { font-family: var(--font-display); font-size: 1.05rem; line-height: 1.1; }
+  .chat-panel__name { font-family: var(--font-display); font-size: 0.975rem; line-height: 1.1; }
   .chat-panel__status {
     display: inline-flex;
     align-items: center;
@@ -173,9 +173,11 @@ const quickQuestions = [
 
   .chat-msg {
     max-width: 88%;
-    padding: 0.75rem 0.95rem;
-    font-size: 0.9375rem;
-    line-height: 1.55;
+    padding: 0.65rem 0.85rem;
+    /* Chat is a dense, secondary surface — it reads a step below body copy
+       so a long answer fits the panel without dominating the page. */
+    font-size: 0.875rem;
+    line-height: 1.5;
     border-radius: 10px;
   }
   .chat-msg--bot {
@@ -191,7 +193,10 @@ const quickQuestions = [
   }
   .chat-msg__cta {
     display: inline-flex;
-    margin-top: 0.75rem;
+    margin-top: 0.7rem;
+    font-size: 0.6875rem;
+    padding: 0.6rem 1rem;
+    letter-spacing: 0.09em;
   }
 
   .chat-panel__quick {
@@ -206,9 +211,9 @@ const quickQuestions = [
     background: none;
     border: 1px solid var(--buxena-border);
     color: var(--bronze-ink);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    padding: 0.45rem 0.8rem;
+    padding: 0.4rem 0.72rem;
     border-radius: 999px;
     cursor: pointer;
     transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background-color 0.3s var(--ease);
@@ -227,7 +232,7 @@ const quickQuestions = [
     flex: 1 1 auto;
     min-width: 0;
     font-family: var(--font-sans);
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     color: var(--ink);
     background: var(--linen);
     border: 1px solid var(--buxena-border);

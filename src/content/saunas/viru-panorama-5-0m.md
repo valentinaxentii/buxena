@@ -13,8 +13,8 @@ capacityMin: 4
 capacityMax: 4
 materials: ["Thermowood"]
 heroImage:
-  alt: "VIRU Panorama 5.0m barrel sauna with panoramic window across the lounge room"
-  note: "Hero: exterior 3/4 view with the panoramic window prominent, ideally at dusk with interior lit. Supplier photography pending."
+  src: "/images/saunas/viru-panorama-5-0m-hero.jpg"
+  alt: "VIRU Panorama 5.0m barrel sauna in a snowy pine forest, panoramic glass end and separate entrance door"
 dimensions:
   - { label: "Length", value: "16.4 ft (500 cm)" }
   - { label: "Width", value: "7.2 ft (220 cm)" }
