@@ -11,7 +11,7 @@ placeholder: false
 capacity: "6–10 people"
 capacityMin: 6
 capacityMax: 10
-materials: ["Nordic pinewood", "Thermowood (optional)"]
+materials: ["Nordic pinewood", "Thermowood"]
 heroImage:
   src: "/images/saunas/viru-grand-6-0m-hero.jpg"
   alt: "VIRU Grand 6.0m barrel sauna, full length with covered terrace benches and the changing-room door"

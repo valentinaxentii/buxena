@@ -134,7 +134,9 @@ const facets = [
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: clamp(0.94rem, 0.45rem + 1.5vw, 1.9rem);
-    margin-bottom: clamp(1.9rem, 1.1rem + 1.9vw, 3rem);
+    /* No bottom margin: .paths is the last child of its own band, and the
+       band's padding plus the next band's padding already set the rhythm.
+       The extra 48px here read as a hole between the cards and the filters. */
   }
   .path {
     display: grid;
@@ -158,8 +160,14 @@ const facets = [
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
-    width: 160px;
+    /* Sized to its own label, not to a fixed width — "Explore Outdoor" is a
+       character longer than "Explore Indoor" and wrapped at the old 160px.
+       justify-self keeps the button from stretching across the grid cell. */
+    justify-self: start;
+    min-width: 160px;
     height: 40px;
+    gap: 1.25rem;
+    white-space: nowrap;
     margin-top: 0.5rem;
     padding: 0 1rem;
     border: 1px solid var(--bronze);

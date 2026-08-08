@@ -11,7 +11,7 @@ placeholder: false
 capacity: "5 people"
 capacityMin: 5
 capacityMax: 5
-materials: ["Burnt wood (Shou Sugi Ban) exterior", "Grade A thermo aspen interior", "Thermo pine floor"]
+materials: ["Burnt wood", "Thermo aspen"]
 heroImage:
   src: "/images/saunas/nord-cube-240-hero.jpg"
   alt: "NORD Cube 240 outdoor sauna with mirror-glass front reflecting a mossy Nordic landscape"
@@ -25,6 +25,9 @@ dimensions:
   - { label: "Interior", value: "6.5 × 7.1 ft (197 × 215 cm)" }
   - { label: "Weight", value: "≈ 2,800 lb (1,270 kg)" }
 specs:
+  - { label: "Exterior", value: "19 mm charred burnt wood (Shou Sugi Ban)" }
+  - { label: "Interior", value: "Grade A thermo aspen, knot-free" }
+  - { label: "Floor", value: "Grade AB thermo pine" }
   - { label: "Glass front", value: "8 mm tempered, smoked or reflective tint" }
   - { label: "Benches", value: "Floating two-tier, 60 cm deep, with backrests" }
   - { label: "Lighting", value: "Ambient LED under benches; starlight ceiling" }
