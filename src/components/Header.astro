@@ -20,10 +20,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
       />
       <img
         class="wordmark__logo wordmark__logo--light"
-        src="/brand/buxena-logo-champagne.png"
+        src="/brand/buxena-logo-champagne-header.png"
         alt=""
-        width="1536"
-        height="1024"
+        width="1219"
+        height="660"
       />
     </a>
 
@@ -96,7 +96,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     max-width: var(--shell);
     margin-inline: auto;
     padding: 0 var(--gutter);
-    height: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem);
+    height: var(--hdr-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -181,7 +181,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   /* --- drawer --- */
   .drawer {
     position: fixed;
-    inset: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem) 0 auto 0;
+    inset: var(--hdr-h) 0 auto 0;
     z-index: 99;
     background: var(--linen);
     border-bottom: 1px solid var(--line);
@@ -207,6 +207,12 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     /* flex, not block — the button centres its bars in the 44px hit area */
     .burger { display: flex; }
     .hdr__cta { display: none; }
+  }
+
+  /* Matches the shorter --hdr-h set for phones in global.css: the mark has to
+     fit the reduced bar with room to breathe above and below. */
+  @media (max-width: 640px) {
+    .wordmark__logo { width: 8.25rem; }
   }
 </style>
 

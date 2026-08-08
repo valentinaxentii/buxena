@@ -49,12 +49,22 @@
   --t-label: 0.8125rem;
 
   /* --- layout ------------------------------------------------------------ */
+  /* Sticky header height. Shared so the mobile drawer, which pins itself
+     directly below the header, can never drift out of sync with it. */
+  --hdr-h: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem);
+
   --shell: 78rem;      /* standard content width  */
   --shell-narrow: 46rem;
   --gutter: clamp(1.25rem, 0.6rem + 2.8vw, 3.5rem);
   --band: clamp(2.5rem, 1.45rem + 4.4vw, 5.2rem);   /* vertical section rhythm, ~45% tighter than original */
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* A 129px sticky header held 16% of a phone screen on every page. The mark
+   still reads clearly at this size, and the space goes back to the content. */
+@media (max-width: 640px) {
+  :root { --hdr-h: 6rem; }
 }
 
 /* --- reset ---------------------------------------------------------------- */

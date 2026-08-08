@@ -232,7 +232,9 @@ const quickQuestions = [
     flex: 1 1 auto;
     min-width: 0;
     font-family: var(--font-sans);
-    font-size: 0.875rem;
+    /* 16px on touch screens: iOS Safari zooms the whole page in when a focused
+       input is smaller than that, and never zooms back out on blur. */
+    font-size: 1rem;
     color: var(--ink);
     background: var(--linen);
     border: 1px solid var(--buxena-border);
