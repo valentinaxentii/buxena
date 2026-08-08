@@ -154,7 +154,11 @@ const year = new Date().getFullYear();
     margin: 0 0 1.4rem;
   }
 
-  .ftr__cols li + li { margin-top: 0.7rem; }
+  /* Footer links sat 22px tall with 11px between them — legible, but a tight
+     target on a phone. The padding grows each link's hit area to ~35px while
+     the reduced margin keeps the column's visual rhythm close to before. */
+  .ftr__cols li + li { margin-top: 0.25rem; }
+  .ftr__cols a { display: inline-block; padding-block: 0.4rem; }
 
   .ftr a {
     text-decoration: none;

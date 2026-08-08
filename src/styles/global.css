@@ -314,8 +314,12 @@ button { font: inherit; color: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  width: 165px;
+  /* Sized to its label rather than pinned to 165px, which left the arrow
+     butted against "Plan Your Sauna" with no breathing room. */
+  min-width: 165px;
   height: 40px;
+  gap: 1.25rem;
+  white-space: nowrap;
   margin-top: 0.85rem;
   padding: 0 1rem;
   background: var(--bronze-btn);
