@@ -1,12 +1,25 @@
 ---
 import fs from 'node:fs';
+import path from 'node:path';
 import Figure from './Figure.astro';
 
 // Video takes priority over the still photograph. Drop files in
 // public/media/hero.mp4 and/or public/images/hero.jpg — no further
 // code changes needed.
-const hasVideo = fs.existsSync(new URL('../../public/media/hero.mp4', import.meta.url));
-const hasImage = fs.existsSync(new URL('../../public/images/hero.jpg', import.meta.url));
+//
+// Resolved from process.cwd(), NOT `new URL(..., import.meta.url)`. This
+// component's frontmatter script gets bundled into the SSG build output at a
+// different location than its source file, so an import.meta.url-relative
+// path silently pointed at a location with no public/ directory beside it —
+// hasVideo was always false in the real production build (Netlify and a
+// plain local `astro build` both), even though the video file was correctly
+// committed and correctly deployed as a static asset. `astro dev` never hit
+// this: the dev server runs components unbundled, straight from their
+// source location, where the relative path happened to still resolve.
+// process.cwd() is the project root in both dev and build, so it works in
+// both.
+const hasVideo = fs.existsSync(path.join(process.cwd(), 'public/media/hero.mp4'));
+const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'));
 ---
 
 <section class="hero">
