@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { sendEnquiryEmail } from '../../lib/send-enquiry-email';
+import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
 
 export const prerender = false;
@@ -81,14 +82,23 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         );
     }
 
-    // Email notification to info@buxena.com. Awaited so the request reliably
-    // completes the send before the function returns (fire-and-forget can be
-    // killed mid-flight in serverless). Best-effort: a send failure is logged
-    // but never fails the submission — the enquiry is already safely recorded.
-    try {
-      await sendEnquiryEmail({ name, email, phone, location, message, saunaInterest, source });
-    } catch (err) {
-      console.error('[enquiries] email notify failed:', err);
+    // Notifications: email to info@buxena.com, plus a Telegram message to the
+    // founders' group. Both awaited so the request reliably completes them
+    // before the function returns (fire-and-forget can be killed mid-flight in
+    // serverless), and run concurrently so the slower one does not add its
+    // latency to the faster one. allSettled, not all: each is independently
+    // best-effort, and one failing must not skip the other or fail the
+    // submission — the enquiry is already safely recorded either way.
+    const notify = { name, email, phone, location, message, saunaInterest, source };
+    const [emailResult, telegramResult] = await Promise.allSettled([
+      sendEnquiryEmail(notify),
+      sendEnquiryTelegram(notify),
+    ]);
+    if (emailResult.status === 'rejected') {
+      console.error('[enquiries] email notify failed:', emailResult.reason);
+    }
+    if (telegramResult.status === 'rejected') {
+      console.error('[enquiries] telegram notify failed:', telegramResult.reason);
     }
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 });

@@ -7,6 +7,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
 import { sendLeadEmail } from '../../../lib/send-lead-email';
+import { sendLeadTelegram } from '../../../lib/notify-telegram';
 
 const STATUSES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
 
@@ -56,24 +57,31 @@ try {
         // Best-effort notification — awaited so the serverless function doesn't
         // freeze mid-send, but a failure never blocks the redirect: the lead is
         // already saved.
-        try {
-          const modelName = payload.product_id
-            ? products.find((p) => p.id === payload.product_id)?.model_name ?? null
-            : null;
-          await sendLeadEmail({
-            name: payload.name,
-            email: payload.email,
-            phone: payload.phone,
-            state: payload.state,
-            source: payload.source,
-            modelName,
-            budget: payload.budget,
-            timeline: payload.timeline,
-            notes: payload.notes,
-            createdBy: Astro.locals.staffUser?.email ?? null,
-          });
-        } catch (err) {
-          console.error('[leads/new] email notify failed:', err);
+        const modelName = payload.product_id
+          ? products.find((p) => p.id === payload.product_id)?.model_name ?? null
+          : null;
+        const notify = {
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          state: payload.state,
+          source: payload.source,
+          modelName,
+          budget: payload.budget,
+          timeline: payload.timeline,
+          createdBy: Astro.locals.staffUser?.email ?? null,
+        };
+        // Email and Telegram are independently best-effort — allSettled so one
+        // failing never skips the other, and neither blocks the redirect.
+        const [emailResult, telegramResult] = await Promise.allSettled([
+          sendLeadEmail({ ...notify, notes: payload.notes }),
+          sendLeadTelegram(notify),
+        ]);
+        if (emailResult.status === 'rejected') {
+          console.error('[leads/new] email notify failed:', emailResult.reason);
+        }
+        if (telegramResult.status === 'rejected') {
+          console.error('[leads/new] telegram notify failed:', telegramResult.reason);
         }
         return Astro.redirect(`/admin/leads/${data.id}`);
       }
