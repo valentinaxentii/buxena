@@ -21,7 +21,7 @@ const quickQuestions = [
 <div class="chat" data-chat>
   <button class="chat-fab" type="button" data-chat-toggle aria-expanded="false" aria-controls="buxena-chat-panel">
     <img class="chat-fab__icon chat-fab__icon--white" src="/brand/buxena-logo-white.png" alt="" />
-    <img class="chat-fab__icon chat-fab__icon--gold" src="/brand/buxena-logo.png" alt="" />
+    <img class="chat-fab__icon chat-fab__icon--dark" src="/brand/buxena-logo-espresso.png" alt="" />
     <span class="sr-only">Chat with the BUXENA Sauna Advisor</span>
   </button>
 
@@ -102,11 +102,14 @@ const quickQuestions = [
   .chat-fab--on-dark { background: var(--buxena-cream); }
   .chat-fab__icon { width: 100%; height: 100%; object-fit: contain; }
 
-  /* black circle (default, over light sections) shows the white mark;
-     cream circle (over dark sections) keeps the existing gold mark */
-  .chat-fab__icon--gold { display: none; }
+  /* Black circle (default, over light sections) shows the white mark; cream
+     circle (over dark sections) shows the espresso mark. Gold on cream was
+     too low-contrast to read at 60px — the mark has to hold at button size,
+     not just look on-brand. Both files share the same canvas and content
+     box, so this is purely a colour swap. */
+  .chat-fab__icon--dark { display: none; }
   .chat-fab--on-dark .chat-fab__icon--white { display: none; }
-  .chat-fab--on-dark .chat-fab__icon--gold { display: block; }
+  .chat-fab--on-dark .chat-fab__icon--dark { display: block; }
 
   .chat-panel {
     position: fixed;
