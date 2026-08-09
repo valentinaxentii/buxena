@@ -116,7 +116,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      ~190-220px desktop. */
   .wordmark__logo {
     display: block;
-    width: clamp(9.0625rem, 8.6rem + 4.7vw, 13.75rem);
+    /* Scaled to sit inside --hdr-h with even air above and below: 132px wide
+       (71px tall) in the 96px phone bar, 176px (95px tall) in the 128px
+       desktop bar. */
+    width: clamp(8.25rem, 7.8rem + 3.2vw, 11rem);
     height: auto;
   }
 
@@ -207,12 +210,6 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     /* flex, not block — the button centres its bars in the 44px hit area */
     .burger { display: flex; }
     .hdr__cta { display: none; }
-  }
-
-  /* Matches the shorter --hdr-h set for phones in global.css: the mark has to
-     fit the reduced bar with room to breathe above and below. */
-  @media (max-width: 640px) {
-    .wordmark__logo { width: 8.25rem; }
   }
 </style>
 

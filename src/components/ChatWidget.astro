@@ -356,6 +356,9 @@ const quickQuestions = [
       if (scrim) scrim.hidden = !open;
       toggle.setAttribute('aria-expanded', String(open));
       if (open) input?.focus();
+      // Closing the chat ends the conversation — record it now rather than
+      // waiting for the visitor to leave the site.
+      else flushEnquiry();
     };
 
     toggle?.addEventListener('click', () => setOpen(panel?.hidden !== false));
@@ -378,28 +381,72 @@ const quickQuestions = [
       messages.scrollTop = messages.scrollHeight;
     };
 
-    // Best-effort lead capture: mirrors the conversation to the admin
-    // enquiries table in the background. Never awaited, never blocks the
-    // UI, and any failure (including "Supabase not configured") is silently
-    // swallowed — the canned-response chat experience is 100% unaffected
-    // either way.
+    /**
+     * Best-effort lead capture: mirrors the conversation to the admin
+     * enquiries table in the background. Never awaited, never blocks the UI,
+     * and any failure (including "Supabase not configured") is silently
+     * swallowed — the canned-response chat experience is unaffected either
+     * way.
+     *
+     * Two rules decide whether a conversation is worth recording at all:
+     *
+     * 1. Someone has to TYPE something. A quick-reply chip is a canned
+     *    question with a canned answer — pure browsing, no contact details,
+     *    no signal. Recording those filled the admin with contactless rows
+     *    and, once SMTP is live, would email info@buxena.com a message
+     *    nobody can reply to every time a visitor tapped a chip.
+     * 2. One row per conversation, not one per message. The whole transcript
+     *    (chips included, so staff see the path taken) is sent once when the
+     *    chat closes or the visitor leaves the page.
+     */
     const transcript: { role: 'user' | 'bot'; text: string }[] = [];
-    const recordEnquiry = (latestUserMessage: string) => {
-      transcript.push({ role: 'user', text: latestUserMessage });
+    let visitorTyped = false;
+    let enquirySent = false;
+
+    const flushEnquiry = () => {
+      if (enquirySent || !visitorTyped) return;
+      enquirySent = true;
+
+      const lastTyped = [...transcript].reverse().find((m) => m.role === 'user');
+      const body = JSON.stringify({
+        message: lastTyped?.text ?? '',
+        chatTranscript: transcript,
+        source: 'Sauna Advisor',
+      });
+
+      // sendBeacon survives the page being closed, which is exactly when this
+      // usually fires. keepalive fetch covers browsers without it.
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/enquiries', new Blob([body], { type: 'application/json' }));
+          return;
+        }
+      } catch {
+        // fall through to fetch
+      }
       fetch('/api/enquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: latestUserMessage,
-          chatTranscript: transcript,
-          source: 'Sauna Advisor',
-        }),
+        keepalive: true,
+        body,
       }).catch(() => {});
     };
+
+    // pagehide covers navigation, tab close and mobile Safari's bfcache,
+    // where unload never fires.
+    window.addEventListener('pagehide', flushEnquiry);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushEnquiry();
+    });
 
     const respondTo = (question: string) => {
       const key = question.trim().toLowerCase();
       const reply = RESPONSES[key] ?? FALLBACK;
+      // Recorded straight away, in order. Only the on-screen reply waits for
+      // the typing beat — pushing inside the timeout let a fast follow-up
+      // question overtake the answer, so transcripts read as every question
+      // followed by every answer. Markup is stripped so the admin shows text.
+      transcript.push({ role: 'bot', text: reply.replace(/<[^>]+>/g, '').trim() });
       window.setTimeout(() => appendMessage('bot', reply), 450);
     };
 
@@ -407,7 +454,9 @@ const quickQuestions = [
       btn.addEventListener('click', () => {
         const q = btn.dataset.chatQuestion ?? '';
         appendMessage('user', q);
-        recordEnquiry(q);
+        // Recorded in the transcript for context, but a chip on its own is
+        // not an enquiry — it does not arm the send.
+        transcript.push({ role: 'user', text: q });
         respondTo(q);
       });
     });
@@ -417,7 +466,8 @@ const quickQuestions = [
       const value = input?.value.trim();
       if (!value) return;
       appendMessage('user', value);
-      recordEnquiry(value);
+      transcript.push({ role: 'user', text: value });
+      visitorTyped = true;
       respondTo(value);
       if (input) input.value = '';
     });
