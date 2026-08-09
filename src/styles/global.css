@@ -343,6 +343,18 @@ button { font: inherit; color: inherit; }
 }
 .plan-cta:hover { background: var(--bronze-ink); }
 
+/* Breadcrumbs.
+   The .crumbs container is styled per page — five near-identical scoped
+   copies — but the size and tap area of the links themselves belong here,
+   because they have to hold on every page that renders a trail. At the
+   inherited 13px the links stood 20px tall, which is a small thing to hit
+   with a thumb. Targeting the children beats the scoped rule's inheritance
+   without having to touch all five files. */
+.crumbs { align-items: center; }
+.crumbs a,
+.crumbs span { font-size: 0.875rem; }
+.crumbs a { display: inline-block; padding-block: 0.55rem; }
+
 /* ==========================================================================
    Legal / policy pages — shared, compact typography and rhythm.
    One definition used by Privacy, Terms, Shipping, Returns, Warranty and
