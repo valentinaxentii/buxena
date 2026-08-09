@@ -197,15 +197,23 @@ const year = new Date().getFullYear();
   /* The year is the staff entrance to /admin. There is no public link to the
      login: a visible "Admin" in a consumer footer reads as unfinished and
      invites drive-by attempts, and the route is already kept out of the
-     sitemap. So this link carries no visual affordance at all — same colour,
-     no underline, even the text cursor — and is simply something you know is
-     there. It keeps an accessible name for screen readers, and the global
-     :focus-visible ring still finds it on keyboard, which is the honest
-     trade: hidden from browsing customers, not from assistive tech. */
+     sitemap. At rest it is indistinguishable from the text around it — same
+     colour, no underline — so a customer reading the footer sees a copyright
+     line and nothing else.
+     Hover is the exception: it warms to bronze and shows a pointer, purely so
+     staff get confirmation they are on the right two words. Nobody hovers a
+     copyright notice by accident, and if they do, they find a login page that
+     asks for credentials. It keeps an accessible name for screen readers and
+     the global :focus-visible ring still finds it on keyboard. */
   .ftr__staff {
     color: inherit;
     text-decoration: none;
     cursor: inherit;
+    transition: color 0.3s var(--ease);
+  }
+  .ftr__staff:hover {
+    color: var(--bronze-soft);
+    cursor: pointer;
   }
   .ftr__legal {
     display: flex;
