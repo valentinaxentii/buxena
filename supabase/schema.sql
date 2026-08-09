@@ -1198,3 +1198,25 @@ alter table products add column if not exists warranty_duration_months integer;
 -- happened" principle already used by service_cases.warranty_status_at_open
 -- above.
 alter table warranties add column if not exists duration_months_applied integer;
+
+-- ============================================================================
+-- Documents file upload (session addition) — a real Storage bucket so the
+-- Documents page can upload a file instead of only linking to one that
+-- already lives elsewhere.
+-- ============================================================================
+-- Public bucket, deliberately: object paths are random UUIDs (never derived
+-- from anything guessable), and every upload/list/edit still requires signing
+-- in to /admin. A private bucket would need either signed URLs regenerated on
+-- every page render or a stricter RLS setup — more moving parts for the same
+-- practical protection, and it would break the existing render-time assumption
+-- (document-url.ts, documents/[id].astro) that file_url is always usable
+-- directly as an href/img-src/iframe-src, exactly like a pasted external link.
+insert into storage.buckets (id, name, public)
+values ('documents', 'documents', true)
+on conflict (id) do nothing;
+
+-- Uploads and deletes go through the service-role client only (Documents
+-- pages, prerender=false), which bypasses storage RLS entirely — same trust
+-- boundary as every other table in this schema. No policies are added here
+-- because none are needed for that path; the bucket's own `public` flag is
+-- what authorizes anonymous reads via the /storage/v1/object/public/ URL.

@@ -6,6 +6,7 @@ import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
+import { sendLeadEmail } from '../../../lib/send-lead-email';
 
 const STATUSES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
 
@@ -52,6 +53,28 @@ try {
       if (insertError) {
         error = insertError.message;
       } else {
+        // Best-effort notification — awaited so the serverless function doesn't
+        // freeze mid-send, but a failure never blocks the redirect: the lead is
+        // already saved.
+        try {
+          const modelName = payload.product_id
+            ? products.find((p) => p.id === payload.product_id)?.model_name ?? null
+            : null;
+          await sendLeadEmail({
+            name: payload.name,
+            email: payload.email,
+            phone: payload.phone,
+            state: payload.state,
+            source: payload.source,
+            modelName,
+            budget: payload.budget,
+            timeline: payload.timeline,
+            notes: payload.notes,
+            createdBy: Astro.locals.staffUser?.email ?? null,
+          });
+        } catch (err) {
+          console.error('[leads/new] email notify failed:', err);
+        }
         return Astro.redirect(`/admin/leads/${data.id}`);
       }
     }

@@ -268,10 +268,19 @@ const donutStops = donutSlices
   })
   .join(', ');
 const pct = (n: number) => (donutTotal > 0 ? Math.round((n / donutTotal) * 100) : 0);
+
+// Set by the middleware when a staff-role account tries to open Settings.
+const deniedSettings = Astro.url.searchParams.get('denied') === 'settings';
 ---
 
 <AdminLayout title="Dashboard" subtitle="Business overview">
   <a slot="actions" class="admin-btn" href="/admin/quotes/new">+ New Quote</a>
+
+  {deniedSettings && (
+    <p style="margin:0 0 1rem; padding:0.75rem 1rem; font-size:0.85rem; color:#e6b7a0; background:rgba(230,130,90,0.06); border:1px solid rgba(230,130,90,0.35); border-radius:3px;">
+      Settings is limited to admin accounts. Ask an admin if something there needs changing.
+    </p>
+  )}
 
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1rem;">

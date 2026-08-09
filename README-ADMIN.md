@@ -47,8 +47,8 @@ separate password table to manage.
 4. Go to `/login` on the site and sign in with that email/password. You'll
    land on `/admin`.
 
-To add more staff later, repeat step 1 (this project uses one flat staff
-role today — see "What's not built yet" for a real roles/permissions model).
+To add more staff later, use **Settings → Staff Accounts** (`/admin/settings/staff`,
+admin-only) to send an email invite instead — see section 5.
 
 ## 4. What was built (Phase 1)
 
@@ -77,27 +77,44 @@ role today — see "What's not built yet" for a real roles/permissions model).
   screens now — see below. Nothing in `/admin/*` is a Phase 2 placeholder
   anymore.
 
-## 5. What's NOT built yet
+## 5. What's built — recent additions
 
-- **Documents file upload**: the `documents` table/UI is real (category,
-  linked customer/supplier/product/quote/order, notes), but there's no
-  in-browser upload — no Supabase Storage bucket exists in this project yet.
-  The File URL field takes a link to wherever the file already lives. See
-  `src/pages/admin/documents/index.astro` for exactly what's needed to wire
-  up real upload later.
 - **Website quote form → enquiries**: done. Every public form (quote form and
   Sauna Advisor chat) POSTs to `/api/enquiries`, which is the single
   submission path. Netlify Forms is no longer used.
-- **Email notifications on new enquiries**: done, over **Zoho Mail SMTP**
-  (`src/lib/send-enquiry-email.ts`). Each new enquiry emails
-  `info@buxena.com`. Needs `ZOHO_SMTP_USER` and `ZOHO_SMTP_PASSWORD` (a Zoho
-  App Password) in the Netlify environment; unset means email quietly skips
-  and enquiries still save. Notifications on *leads* are still not built.
-- **Roles/permissions**: everyone who can log in can do everything. Fine for
-  "one shared login," not fine once there are several distinct staff
-  accounts with different access levels.
-- **Multiple staff accounts** with per-person names/roles: the `profiles`
-  table supports it; there's no UI to manage it yet (see Settings above).
+- **Email notifications on new enquiries and new leads**: done, over **Zoho
+  Mail SMTP** (`src/lib/send-enquiry-email.ts`, `src/lib/send-lead-email.ts`,
+  sharing config/transport in `src/lib/notify-smtp.ts`). Each new enquiry and
+  each lead created in `/admin/leads/new` emails `info@buxena.com`. Needs
+  `ZOHO_SMTP_USER` and `ZOHO_SMTP_PASSWORD` (a Zoho App Password) in the
+  Netlify environment; unset means email quietly skips and the record still
+  saves. Converting an enquiry to a lead does *not* send a second email — the
+  enquiry already triggered one.
+- **Documents file upload**: real, via a Supabase Storage bucket
+  (`supabase/schema.sql` creates a **public** `documents` bucket — re-run the
+  schema if you set this up before this addition). `/admin/documents/new` and
+  the document detail page both take either an upload or a pasted link; an
+  upload always wins if both are given. Deliberately a public bucket rather
+  than signed URLs: object paths are random UUIDs, every admin page that can
+  reach the upload form already requires sign-in, and it keeps `file_url`
+  usable everywhere exactly like a pasted external link (`src/lib/document-url.ts`)
+  with no extra signing step. Max upload size is 8 MB
+  (`src/lib/document-storage.ts`) — comfortably under what a synchronous
+  Netlify Function request body allows.
+- **Roles/permissions**: `profiles.role` (`admin` | `staff`) is now enforced,
+  not just displayed. `src/middleware.ts` gates every `/admin/settings*` route
+  to `role = 'admin'` — staff accounts can use everything else (leads through
+  reports) but can't change company settings or manage other accounts. A
+  profile row that's missing or unreadable is treated as `staff` (least
+  privilege), never as a free pass.
+- **Multiple staff accounts**: `/admin/settings/staff` (admin-only) lists
+  every account, lets an admin rename/re-role them inline, and sends a real
+  Supabase email invite for new staff — nobody types or shares a password.
+  The invited person lands on `/login/reset-password` (already required to be
+  a **Redirect URL** in Supabase → Authentication → URL Configuration for the
+  password-reset flow) and sets their own password. Removing someone's access
+  entirely is still a deliberate act in the Supabase dashboard
+  (Authentication → Users), not a button here.
 
 ## 6. Security notes to review before production
 

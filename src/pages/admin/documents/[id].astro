@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { normalizeDocumentUrl, resolveDocumentHref, documentLinkLabel } from '../../../lib/document-url';
+import { uploadDocumentFile, deleteDocumentFile, MAX_UPLOAD_BYTES } from '../../../lib/document-storage';
 
 const { id } = Astro.params;
 const CATEGORIES = [
@@ -31,10 +32,13 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      const { data: doomed } = await supabase.from('documents').select('file_url').eq('id', id).single();
       await supabase.from('documents').delete().eq('id', id);
+      if (doomed?.file_url) await deleteDocumentFile(supabase, doomed.file_url);
       return Astro.redirect('/admin/documents');
     }
 
+    const uploadedFile = form.get('upload');
     const payload = {
       category: String(form.get('category') ?? ''),
       file_url: String(form.get('file_url') ?? ''),
@@ -46,13 +50,32 @@ try {
       order_id: String(form.get('order_id') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
-    const normalized = normalizeDocumentUrl(payload.file_url);
-    if (normalized.error) {
-      error = normalized.error;
+
+    const { data: before } = await supabase.from('documents').select('file_url').eq('id', id).single();
+
+    if (uploadedFile instanceof File && uploadedFile.size > 0) {
+      const result = await uploadDocumentFile(supabase, uploadedFile);
+      if ('error' in result) {
+        error = result.error;
+      } else {
+        payload.file_url = result.url;
+        if (!payload.file_name) payload.file_name = uploadedFile.name;
+      }
     } else {
-      payload.file_url = normalized.url!;
+      const normalized = normalizeDocumentUrl(payload.file_url);
+      if (normalized.error) error = normalized.error;
+      else payload.file_url = normalized.url!;
+    }
+
+    if (!error) {
       const { error: updateError } = await supabase.from('documents').update(payload).eq('id', id);
-      if (updateError) error = updateError.message;
+      if (updateError) {
+        error = updateError.message;
+      } else if (before?.file_url && before.file_url !== payload.file_url) {
+        // Best-effort — an orphaned storage object costs nothing to leave
+        // behind and must never block the save that already succeeded.
+        await deleteDocumentFile(supabase, before.file_url);
+      }
     }
   }
 
@@ -110,13 +133,21 @@ const previewIsSite =
   {doc && (
     <div class="doc-layout">
       <div class="doc-layout__form">
-      <form class="admin-form" method="POST">
+      <form class="admin-form" method="POST" enctype="multipart/form-data">
         <label class="admin-field"><span>Category *</span>
           <select name="category" required>
             {CATEGORIES.map((c) => <option value={c} selected={c === doc.category}>{c}</option>)}
           </select>
         </label>
         <label class="admin-field"><span>File Name</span><input type="text" name="file_name" value={doc.file_name ?? ''} /></label>
+
+        <label class="admin-field admin-form__full">
+          <span>Replace File (upload)</span>
+          <input type="file" name="upload" />
+          <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">
+            Max {Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))} MB. Leave empty to keep the current file/link.
+          </span>
+        </label>
         <label class="admin-field admin-form__full">
           <span>File URL or Web Link *</span>
           <input type="text" name="file_url" required value={doc.file_url} placeholder="buxena.com/specs/aura.pdf — https:// is added automatically" />

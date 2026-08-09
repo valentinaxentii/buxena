@@ -72,6 +72,7 @@ const navItems = [
 
 let staffLabel: string | null = null;
 let staffSublabel: string | null = null;
+let staffRole: string | null = null;
 let printSettings: BuxenaSettings = FALLBACK_SETTINGS;
 try {
   const staffUser = Astro.locals.staffUser;
@@ -82,12 +83,21 @@ try {
       getSettings(supabase),
     ]);
     staffLabel = profile?.full_name || staffUser.email || null;
-    staffSublabel = profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : null;
+    staffRole = profile?.role ?? null;
+    staffSublabel = staffRole ? staffRole.charAt(0).toUpperCase() + staffRole.slice(1) : null;
     printSettings = settings;
   }
 } catch {
   staffLabel = Astro.locals.staffUser?.email ?? null;
 }
+
+// Settings (business config + staff accounts) is admin-only — the middleware
+// enforces it server-side; hiding the nav item just keeps the UI honest. A
+// null role (profile row missing / lookup failed) keeps the item visible so a
+// half-configured project can still reach Settings' own setup notices.
+const visibleNavItems = navItems.filter(
+  (item) => item.href !== '/admin/settings' || staffRole === 'admin' || staffRole === null
+);
 
 const printGeneratedAt = new Date();
 
@@ -255,7 +265,7 @@ const initials = (staffLabel ?? '')
 
         <nav class="nav">
           <ul>
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <li>
                 <a
                   href={item.href}

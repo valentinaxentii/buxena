@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { normalizeDocumentUrl } from '../../../lib/document-url';
+import { uploadDocumentFile, MAX_UPLOAD_BYTES } from '../../../lib/document-storage';
 
 const CATEGORIES = [
   'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
@@ -46,6 +47,7 @@ try {
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
+    const uploadedFile = form.get('upload');
     const payload = {
       category: String(form.get('category') ?? ''),
       file_url: String(form.get('file_url') ?? ''),
@@ -59,13 +61,30 @@ try {
       notes: String(form.get('notes') ?? '') || null,
     };
     const formReturnTo = String(form.get('return_to') ?? '');
-    const normalized = normalizeDocumentUrl(payload.file_url);
-    if (!payload.category || !payload.file_url) {
-      error = 'Category and File URL are required.';
-    } else if (normalized.error) {
-      error = normalized.error;
+
+    // An uploaded file wins over a typed link — the form offers either, not
+    // both, and a file present here means the visitor used the upload control.
+    if (uploadedFile instanceof File && uploadedFile.size > 0) {
+      const result = await uploadDocumentFile(supabase, uploadedFile);
+      if ('error' in result) {
+        error = result.error;
+      } else {
+        payload.file_url = result.url;
+        if (!payload.file_name) payload.file_name = uploadedFile.name;
+      }
     } else {
-      payload.file_url = normalized.url!;
+      const normalized = normalizeDocumentUrl(payload.file_url);
+      if (normalized.error) error = normalized.error;
+      else payload.file_url = normalized.url!;
+    }
+
+    if (!error && !payload.category) {
+      error = 'Category is required.';
+    } else if (!error && !payload.file_url) {
+      error = 'Upload a file or enter a File URL.';
+    }
+
+    if (!error) {
       const { data: inserted, error: insertError } = await supabase.from('documents').insert(payload).select('id').single();
       if (insertError) error = insertError.message;
       else return Astro.redirect(formReturnTo || `/admin/documents/${inserted.id}`);
@@ -79,7 +98,7 @@ try {
 <AdminLayout title="Add Document" parentLabel="Documents" parentHref="/admin/documents">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
-  <form class="admin-form" method="POST">
+  <form class="admin-form" method="POST" enctype="multipart/form-data">
     <label class="admin-field"><span>Category *</span>
       <select name="category" required>
         <option value="">— select —</option>
@@ -87,7 +106,15 @@ try {
       </select>
     </label>
     <label class="admin-field"><span>File Name</span><input type="text" name="file_name" placeholder="e.g. ELLA H2 Installation Manual.pdf" /></label>
-    <label class="admin-field admin-form__full"><span>File URL or Web Link *</span><input type="text" name="file_url" required placeholder="buxena.com/specs/aura.pdf — https:// is added automatically" /></label>
+
+    <label class="admin-field admin-form__full">
+      <span>Upload a File</span>
+      <input type="file" name="upload" />
+      <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">
+        Max {Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))} MB. Leave empty to use a link below instead.
+      </span>
+    </label>
+    <label class="admin-field admin-form__full"><span>...or File URL / Web Link</span><input type="text" name="file_url" placeholder="buxena.com/specs/aura.pdf — https:// is added automatically" /></label>
 
     <label class="admin-field"><span>Related Customer</span>
       <select name="customer_id"><option value="">— none —</option>{customers.map((c) => <option value={c.id}>{c.name}</option>)}</select>

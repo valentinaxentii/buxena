@@ -11,8 +11,7 @@
  * the response the visitor gets — the enquiry is already safely stored in
  * Supabase and visible in BUXENA Admin regardless of email delivery.
  *
- * Configuration (server-side env vars — set in Netlify: Site configuration →
- * Environment variables, and in .env for local testing):
+ * Configuration lives in notify-smtp.ts (shared with the new-lead email):
  *   ZOHO_SMTP_USER     — the Zoho mailbox that sends, e.g. info@buxena.com.
  *   ZOHO_SMTP_PASSWORD — Zoho App Password (NOT the normal login password).
  *                        Generate at Zoho → My Account → Security → App Passwords.
@@ -25,7 +24,7 @@
  * local dev and any unconfigured environment keep working exactly as before.
  */
 
-import nodemailer from 'nodemailer';
+import { getNotifySmtpConfig, createNotifyTransport, escapeHtml as esc } from './notify-smtp';
 
 export interface EnquiryEmailInput {
   name?: string | null;
@@ -37,46 +36,11 @@ export interface EnquiryEmailInput {
   source?: string | null;
 }
 
-const DEFAULT_TO = 'info@buxena.com';
-const DEFAULT_HOST = 'smtp.zoho.com';
-const DEFAULT_PORT = 465;
-
-/**
- * Config is read from the runtime environment first, falling back to the value
- * inlined at build time. Netlify exposes its environment variables to the
- * running Function via process.env, which means changing the SMTP password in
- * the Netlify UI takes effect without a rebuild. `import.meta.env` is the
- * fallback that makes `astro dev` (which loads .env into import.meta.env only)
- * work locally. Both accessors must be written out statically — Vite can only
- * inline `import.meta.env.SOME_NAME`, never a dynamic lookup.
- */
-function pick(runtime: string | undefined, buildTime: unknown): string {
-  const value = runtime ?? (typeof buildTime === 'string' ? buildTime : undefined);
-  return (value ?? '').trim();
-}
-
-const procEnv: Record<string, string | undefined> =
-  typeof process !== 'undefined' && process.env ? process.env : {};
-
-/** Minimal HTML escaping so visitor-supplied text can't break the markup. */
-function esc(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> {
-  const user = pick(procEnv.ZOHO_SMTP_USER, import.meta.env.ZOHO_SMTP_USER);
-  const pass = pick(procEnv.ZOHO_SMTP_PASSWORD, import.meta.env.ZOHO_SMTP_PASSWORD);
-  const to = pick(procEnv.ENQUIRY_NOTIFY_TO, import.meta.env.ENQUIRY_NOTIFY_TO) || DEFAULT_TO;
-  const host = pick(procEnv.ZOHO_SMTP_HOST, import.meta.env.ZOHO_SMTP_HOST) || DEFAULT_HOST;
-  const port =
-    Number(pick(procEnv.ZOHO_SMTP_PORT, import.meta.env.ZOHO_SMTP_PORT)) || DEFAULT_PORT;
+  const config = getNotifySmtpConfig();
 
   // Unconfigured — quietly skip. Submissions still record to Supabase.
-  if (!user || !pass) {
+  if (!config) {
     if (import.meta.env.DEV) {
       console.info('[enquiry-email] ZOHO_SMTP_USER/ZOHO_SMTP_PASSWORD not set — skipping email.');
     }
@@ -135,31 +99,16 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
     </div>
   `.trim();
 
-  // Zoho rejects a From address that isn't the authenticated mailbox (or one of
-  // its verified aliases), so From is derived from ZOHO_SMTP_USER rather than
-  // being separately configurable — one less setting that can silently break
-  // delivery. Only the display name is fixed text.
-  const from = `BUXENA Website <${user}>`;
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    // Port 465 is implicit SSL/TLS from the first byte. Any other port (587)
-    // starts plaintext and upgrades via STARTTLS, which nodemailer handles when
-    // `secure` is false.
-    secure: port === 465,
-    auth: { user, pass },
-    // A visitor is waiting on this request — never let a stalled SMTP
-    // connection hold the form open indefinitely.
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
+  const transporter = createNotifyTransport(config);
 
   try {
     await transporter.sendMail({
-      from,
-      to,
+      // Zoho rejects a From address that isn't the authenticated mailbox (or one
+      // of its verified aliases), so From is derived from ZOHO_SMTP_USER rather
+      // than being separately configurable — one less setting that can silently
+      // break delivery. Only the display name is fixed text.
+      from: `BUXENA Website <${config.user}>`,
+      to: config.to,
       subject: `New enquiry — ${name}`,
       text: textBody,
       html: htmlBody,

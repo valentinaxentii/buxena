@@ -58,20 +58,6 @@ function relatedTo(row: any): string {
     </div>
   )}
 
-  <div class="admin-placeholder" style="margin-bottom: 1.5rem; text-align:left; padding: 1.25rem 1.5rem;">
-    <h2 style="margin-bottom:0.4rem;">File storage isn't configured yet</h2>
-    <p>
-      This page stores and organizes document <em>records</em> — category, what it's related to,
-      and a link to the file. There's no in-browser file upload button because no Supabase Storage
-      bucket exists in this project yet, and building an upload control against a bucket that
-      isn't there would just fail silently or fake success. For now, the <strong>File URL</strong>
-      field takes a link to wherever the file already lives (Google Drive, Dropbox, a Supabase
-      Storage public URL, etc). To add real drag-and-drop upload later: create a bucket in
-      Supabase → Storage, decide public vs. signed-URL access, then this form's File URL field
-      gets replaced with an actual upload control — that's a follow-up task, not done here.
-    </p>
-  </div>
-
   <div class="admin-toolbar">
     <form class="admin-toolbar__filters" method="GET">
       <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search file name…" value={search} />
