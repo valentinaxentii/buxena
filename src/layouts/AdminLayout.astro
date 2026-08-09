@@ -246,8 +246,11 @@ const initials = (staffLabel ?? '')
         }
       </script>
       <aside class="sidebar" id="admin-sidebar">
-        <a class="brand" href="/admin">
-          <img src="/brand/buxena-logo-champagne.png" alt="BUXENA" width="1536" height="1024" />
+        <!-- The wordmark leaves the back office for the public site. Nothing
+             is lost by not pointing it at /admin: Dashboard is the first item
+             in the nav directly below it. -->
+        <a class="brand" href="/" title="View the public site" aria-label="View the public site">
+          <img src="/brand/buxena-logo-champagne.png" alt="" width="1536" height="1024" />
         </a>
 
         <nav class="nav">
