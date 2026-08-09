@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { sendEnquiryEmail } from '../../lib/send-enquiry-email';
+import { checkRateLimit } from '../../lib/rate-limit';
 
 export const prerender = false;
 
@@ -12,7 +13,18 @@ export const prerender = false;
  * not depend on it succeeding, so a missing/unconfigured Supabase project
  * never breaks the visitor-facing chat experience.
  */
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
+  // A real visitor sends this at most once or twice per visit (one chat
+  // conversation, maybe the quote form too). 5 per 10 minutes leaves that
+  // headroom while still cutting off a script hammering the endpoint.
+  const { allowed, retryAfterSeconds } = checkRateLimit(`enquiries:${clientAddress}`, 5, 10 * 60_000);
+  if (!allowed) {
+    return new Response(JSON.stringify({ ok: false, error: 'Too many requests. Please try again shortly.' }), {
+      status: 429,
+      headers: { 'Retry-After': String(retryAfterSeconds) },
+    });
+  }
+
   try {
     const body = await request.json();
     const { name, email, phone, location, message, chatTranscript, saunaInterest, source, botField } =

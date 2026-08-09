@@ -2,6 +2,7 @@
 export const prerender = false;
 
 import { createSupabaseServerClient } from '../lib/supabase-auth';
+import { checkRateLimit } from '../lib/rate-limit';
 
 // The requested destination survives the POST via a hidden field (belt) in
 // addition to the query string (braces) — losing the query no longer dumps
@@ -28,17 +29,25 @@ if (Astro.request.method === 'POST') {
   if (!email || !password) {
     error = 'Enter both your email and password.';
   } else {
-    try {
-      const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    // Gate on attempts, not just failures — a script that gets lucky
+    // shouldn't get unlimited tries either. 10 per 10 minutes comfortably
+    // covers a real person fumbling a password a few times.
+    const { allowed, retryAfterSeconds } = checkRateLimit(`login:${Astro.clientAddress}`, 10, 10 * 60_000);
+    if (!allowed) {
+      error = `Too many sign-in attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).`;
+    } else {
+      try {
+        const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (signInError) {
-        error = 'Incorrect email or password.';
-      } else {
-        return Astro.redirect(redirectTo);
+        if (signInError) {
+          error = 'Incorrect email or password.';
+        } else {
+          return Astro.redirect(redirectTo);
+        }
+      } catch {
+        notConfigured = true;
       }
-    } catch {
-      notConfigured = true;
     }
   }
 }
