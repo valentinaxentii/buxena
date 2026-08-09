@@ -27,6 +27,14 @@ $$ language plpgsql;
 -- This *is* the "users" table: auth.users holds the credential, profiles
 -- holds everything about that person relevant to the business.
 -- ----------------------------------------------------------------------------
+-- Rows are NOT created automatically. Adding a staff member in the Supabase
+-- dashboard creates the auth user only, and AdminLayout reads full_name here
+-- to label the signed-in user — with no row it falls back to showing their raw
+-- email address in the sidebar. Run `node supabase/seed-profiles.mjs` after
+-- adding anyone.
+-- `role` is stored but not yet enforced: middleware.ts admits any authenticated
+-- user to every /admin route, which is correct while the only accounts are
+-- founders. Gating on it needs a check there too.
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
