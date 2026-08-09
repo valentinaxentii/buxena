@@ -19,9 +19,9 @@ dimensions:
   - { label: "Length", value: "9.2 ft (280 cm)" }
   - { label: "Height", value: "7.1 ft (215 cm)" }
 specs:
-  - { label: "Roof", value: "Contact us for details" }
-  - { label: "Door / glass", value: "Contact us for details" }
-  - { label: "Heater compatibility", value: "Contact us for details" }
+  - { label: "Roof", value: "Bitumen shingle" }
+  - { label: "Door / glass", value: "Tempered glass door, brown-tinted" }
+  - { label: "Heater compatibility", value: "Sold separately — compatible with wood-fired or electric heaters" }
 delivery: "Contact us for details"
 ---
 
