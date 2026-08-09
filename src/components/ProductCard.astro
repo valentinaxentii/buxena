@@ -166,4 +166,15 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     transition: border-color 0.4s var(--ease), color 0.4s var(--ease);
   }
   .pcard__quote:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* Without a mouse these two links are the only way off a card to the model
+     page or the quote form, and they measured 25px and 19px tall. The extra
+     padding goes above the label on .pcard__more so its underline stays tight
+     to the text; .pcard__quote underlines only on hover, so it can take
+     padding on both sides. Matched on pointer type so a tablet gets the
+     larger targets too, and on width so the rule is testable in a browser. */
+  @media (max-width: 640px), (hover: none) {
+    .pcard__more { padding-top: 0.7rem; }
+    .pcard__quote { padding-block: 0.7rem; }
+  }
 </style>
