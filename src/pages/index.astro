@@ -1,303 +1,128 @@
----
-import BaseLayout from '../layouts/BaseLayout.astro';
-import Hero from '../components/Hero.astro';
-import Figure from '../components/Figure.astro';
-import CollectionCard from '../components/CollectionCard.astro';
-import QuoteBand from '../components/QuoteBand.astro';
-import BuxenaMark from '../components/BuxenaMark.astro';
-import { categories } from '../data/site';
-import { getCollection } from 'astro:content';
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>BUXENA — Coming Soon</title>
+  <meta name="description" content="BUXENA website coming soon." />
+</head>
 
-const saunas = await getCollection('saunas', ({ data }) => !data.draft);
+<body>
+  <main>
+    <div class="overlay"></div>
 
-// Top-level range tiles are PLACEMENT (how people actually shop) — shape
-// (barrel/cube/cabin) is a filter on the collection page, not a category here.
-const locationCount = (loc: string) => saunas.filter((s) => s.data.location === loc).length;
-const rangeTiles = [
-  {
-    name: 'Indoor Saunas',
-    blurb: 'Rooms designed inside the home — basements, bathrooms, private suites.',
-    href: '/saunas/indoor-saunas/',
-    count: locationCount('indoor'),
-    image: '/images/collection-indoor.jpg',
-    note: 'Indoor Saunas — representative interior image, consistent treatment across both tiles.',
-  },
-  {
-    name: 'Outdoor Saunas',
-    blurb: 'Barrels, cubes and cabins for the garden, the deck or the tree line — freestanding rooms built to live outdoors.',
-    href: '/saunas/outdoor-saunas/',
-    count: locationCount('outdoor'),
-    image: '/images/collection-barrel.jpg',
-    note: 'Outdoor Saunas — representative exterior image, consistent treatment across both tiles.',
-  },
-];
+    <section>
+      <div class="steam">♨</div>
+      <div class="logo">buxena</div>
+      <div class="line"></div>
 
-const reasons = [
-  {
-    title: 'Curated European Design',
-    body: 'We select from European makers working in a tradition that treats the sauna as a room, not a novelty. A short range we know completely, rather than a catalogue we do not.',
-  },
-  {
-    title: 'Built Around Your Space',
-    body: 'Room volume, glazing, power supply and access all change what will actually work. We start with your site and specify against it, rather than pointing you at a product page.',
-  },
-  {
-    title: 'Guidance From Selection to Delivery',
-    body: 'The same person handles your enquiry, your quote and your delivery. If a model is wrong for your site, or the work needs an electrician or a permit, you hear it early.',
-  },
-  {
-    title: 'A Better Way to Bring Wellness Home',
-    body: 'Buying a sauna in the United States is harder than it should be. We are trying to make it a considered purchase rather than a leap of faith.',
-  },
-];
+      <h1>WEBSITE UNDER CONSTRUCTION</h1>
 
-const steps = [
-  { n: '01', title: 'Tell us the space', body: 'Send dimensions, photographs and a sense of how you want to use it. A rough sketch is enough to start.' },
-  { n: '02', title: 'We specify options', body: 'You get a written quote with the models that suit the site, heater sizing, and what the installation will ask of you.' },
-  { n: '03', title: 'Prepare the site', body: 'Base, power and access are agreed before anything is ordered, so delivery day holds no surprises.' },
-  { n: '04', title: 'Delivery and handover', body: 'We coordinate the freight and walk you through first heat, care and the rhythm of using it.' },
-];
----
-
-<BaseLayout title="home" overHero={true}>
-  <Hero />
-
-  <!-- Introduction -->
-  <section class="band" id="intro">
-    <div class="shell intro">
-      <div class="intro__left reveal">
-        <span class="eyebrow"><BuxenaMark /></span>
-        <h2 class="h2">
-          A sauna is a room that asks nothing of you.<br />
-          <span class="serif-italic">That is the whole idea.</span>
-        </h2>
-      </div>
-      <div class="intro__right reveal">
-        <p class="lead">
-          BUXENA brings European-designed saunas to homes across the United
-          States — outdoor cabins, indoor rooms, barrels and cubes, selected for
-          build quality rather than breadth of catalogue.
-        </p>
-        <p>
-          We are a small operation, and we prefer it that way. Every enquiry is
-          answered by someone who knows the range, has looked at your dimensions,
-          and will tell you plainly if what you have in mind will not work.
-        </p>
-        <a class="link" href="/our-story/">Our story <span class="arrow" aria-hidden="true">→</span></a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Featured collections -->
-  <section class="band band--deep">
-    <div class="shell">
-      <div class="sec-head reveal">
-        <span class="eyebrow">The Range</span>
-        <h2 class="h2 measure--tight">Two ways to add heat to a home</h2>
-      </div>
-
-      <div class="grid cols-2 reveal">
-        {rangeTiles.map((tile) => (
-          <CollectionCard
-            name={tile.name}
-            blurb={tile.blurb}
-            href={tile.href}
-            count={tile.count}
-            image={tile.image}
-            note={tile.note}
-          />
-        ))}
-      </div>
-
-      <p class="more-link reveal">
-        <a class="link" href="/saunas/">View every model <span class="arrow" aria-hidden="true">→</span></a>
+      <p class="gold">
+        SOMETHING EXTRAORDINARY IS COMING SOON.
       </p>
-      <a class="plan-cta reveal" href="/plan-your-sauna/">
-        Plan Your Sauna <span class="arrow" aria-hidden="true">→</span>
+
+      <div class="line small"></div>
+
+      <p class="text">
+        We are preparing a curated collection of European saunas,<br />
+        designed to bring wellness and timeless design to your home.
+      </p>
+
+      <a href="mailto:info@buxena.com">
+        ✉ &nbsp; info@buxena.com
       </a>
-    </div>
-  </section>
-
-  <!-- Why BUXENA -->
-  <section class="band band--ember">
-    <div class="shell">
-      <div class="sec-head reveal">
-        <span class="eyebrow">Why <BuxenaMark /></span>
-        <h2 class="h2 measure--tight">Small range. Long conversations.</h2>
-      </div>
-      <div class="grid cols-4 why reveal">
-        {reasons.map((r) => (
-          <div class="why__item">
-            <h3 class="h3 why__title">{r.title}</h3>
-            <p class="why__body">{r.body}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <!-- European design, selected for American homes -->
-  <section class="band">
-    <div class="shell split">
-      <div class="split__media reveal">
-        <Figure
-          src="/images/craftsmanship-detail.jpg"
-          alt="Close detail of timber bench edge with a shadow gap between boards, showing natural wood grain"
-          ratio="4 / 5"
-          tone="light"
-        />
-      </div>
-      <div class="split__text reveal">
-        <span class="eyebrow">European Design. Selected for American Homes.</span>
-        <h2 class="h2">We do not build them. We choose them, carefully.</h2>
-        <p class="lead">
-          BUXENA is a curator and importer, not a manufacturer. Our work is
-          selection — finding European makers whose saunas are worth putting in
-          an American home, and then standing behind that choice.
-        </p>
-        <p>
-          The sauna is a northern European invention refined over centuries in
-          places where winter is long and warmth is not decorative. That
-          inheritance produces conventions worth insisting on: benches set at the
-          height where heat actually gathers, shadow gaps that let timber move
-          with humidity, fixings kept away from skin, joinery that expects a
-          hundred cycles of hot and cold every year.
-        </p>
-        <p>
-          Those are the details we select for, because they decide whether a
-          sauna is still good in year ten. Bringing them here is the other half
-          of the job: matching a European product to American homes, American
-          electrical supply and American freight.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Wellness -->
-  <section class="band band--birch">
-    <div class="shell wellness">
-      <div class="sec-head reveal">
-        <span class="eyebrow">The Ritual</span>
-        <h2 class="h2 measure--tight">Heat, cold, rest — and then again</h2>
-        <p class="lead measure">
-          The sauna is not a machine you sit inside. It is a rhythm, and the
-          pauses are as much a part of it as the heat.
-        </p>
-      </div>
-
-      <div class="grid cols-3 reveal">
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-01-loyly.jpg" alt="Water being poured onto hot sauna stones with steam rising" ratio="3 / 4" tone="dark" />
-          <p class="ritual-shot__caption">Heat</p>
-        </div>
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-02-cooling.jpg" alt="A snow-covered cabin in a winter forest at dusk" ratio="3 / 4" tone="mid" />
-          <p class="ritual-shot__caption">Cool</p>
-        </div>
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-03-rest.jpg" alt="Quiet sauna interior with a bucket and ladle on the bench" ratio="3 / 4" tone="light" />
-          <p class="ritual-shot__caption">Rest</p>
-        </div>
-      </div>
-
-      <p class="wellness__foot reveal">
-        <a class="link" href="/wellness/">How to use a sauna well <span class="arrow" aria-hidden="true">→</span></a>
-      </p>
-    </div>
-  </section>
-
-  <!-- Process -->
-  <section class="band">
-    <div class="shell">
-      <div class="sec-head reveal">
-        <span class="eyebrow">How It Works</span>
-        <h2 class="h2 measure--tight">Four steps, in order</h2>
-      </div>
-
-      <ol class="steps reveal">
-        {steps.map((s) => (
-          <li class="step">
-            <span class="step__n">{s.n}</span>
-            <div class="step__body">
-              <h3 class="h3">{s.title}</h3>
-              <p>{s.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
-  </section>
-
-  <QuoteBand />
-</BaseLayout>
+    </section>
+  </main>
+</body>
+</html>
 
 <style>
-  /* --- intro --- */
-  .intro {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
-    align-items: start;
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #080808;
+    font-family: Arial, sans-serif;
   }
-  .intro__left .h2 { line-height: 1.14; }
 
-  /* --- collections --- */
-  .more-link { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
-
-  /* --- why --- */
-  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.3rem; }
-  .why__title { margin-bottom: 0.85rem; }
-  .why__body { font-size: var(--t-small); color: var(--muted-dark); line-height: 1.75; }
-
-  /* --- craftsmanship split --- */
-  .split {
-    display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
+  main {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
     align-items: center;
-  }
-  .split__text .h2 { margin-bottom: 1.3rem; }
-  .split__text .lead { margin-bottom: 1.15rem; }
-
-  /* --- wellness --- */
-  .wellness__foot { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
-
-  .ritual-shot :global(.fig) { overflow: hidden; }
-  .ritual-shot :global(.fig img) { transition: transform 0.8s var(--ease); }
-  .ritual-shot:hover :global(.fig img) { transform: scale(1.03); }
-  .ritual-shot__caption {
-    margin: 0.5rem 0 0;
-    font-family: var(--font-sans);
-    font-size: var(--t-small);
-    font-weight: 500;
-    color: var(--ink);
-    text-align: left;
+    justify-content: center;
+    position: relative;
+    background:
+      url('/images/collection-barrel.jpg')
+      center / cover no-repeat;
+    color: white;
   }
 
-  /* --- steps --- */
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: clamp(1.3rem, 0.45rem + 2.25vw, 2.6rem);
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.70);
   }
-  .step { padding-top: 1.3rem; border-top: 1px solid var(--line); }
-  .step__n {
-    display: block;
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    line-height: 1;
-    color: var(--bronze);
-    margin-bottom: 1.1rem;
-  }
-  .step__body .h3 { margin-bottom: 0.7rem; }
-  .step__body p { font-size: var(--t-small); color: var(--muted); line-height: 1.75; }
 
-  @media (max-width: 900px) {
-    .intro, .split { grid-template-columns: 1fr; }
-    .split__media { order: 2; }
-    .steps { grid-template-columns: repeat(2, 1fr); }
+  section {
+    position: relative;
+    z-index: 1;
+    width: 92%;
+    max-width: 1000px;
+    text-align: center;
+    padding: 45px 15px;
   }
-  @media (max-width: 560px) {
-    .steps { grid-template-columns: 1fr; }
+
+  .steam {
+    color: #c8a363;
+    font-size: 48px;
+  }
+
+  .logo {
+    color: #c8a363;
+    font-size: clamp(62px, 12vw, 105px);
+    font-weight: 300;
+    letter-spacing: 3px;
+  }
+
+  .line {
+    width: 115px;
+    height: 1px;
+    background: #c8a363;
+    margin: 35px auto;
+  }
+
+  .line.small {
+    width: 75px;
+    margin: 28px auto;
+  }
+
+  h1 {
+    font-size: clamp(22px, 4vw, 42px);
+    font-weight: 400;
+    letter-spacing: 6px;
+    margin: 0;
+  }
+
+  .gold {
+    color: #c8a363;
+    letter-spacing: 5px;
+    line-height: 1.7;
+    margin-top: 28px;
+  }
+
+  .text {
+    font-size: clamp(16px, 2.3vw, 21px);
+    line-height: 1.8;
+    letter-spacing: 1px;
+  }
+
+  a {
+    display: inline-block;
+    margin-top: 35px;
+    color: white;
+    text-decoration: none;
+    letter-spacing: 4px;
   }
 </style>
