@@ -12,9 +12,11 @@
     <div class="overlay"></div>
 
     <section>
-      <div class="steam">♨</div>
-      <div class="logo">buxena</div>
-      <div class="line"></div>
+      <img
+        class="logo-img"
+        src="/images/buxena-logo.png"
+        alt="BUXENA logo"
+      />
 
       <h1>WEBSITE UNDER CONSTRUCTION</h1>
 
@@ -22,14 +24,14 @@
         SOMETHING EXTRAORDINARY IS COMING SOON.
       </p>
 
-      <div class="line small"></div>
+      <div class="line"></div>
 
       <p class="text">
         We are preparing a curated collection of European saunas,<br />
         designed to bring wellness and timeless design to your home.
       </p>
 
-      <a href="mailto:info@buxena.com">
+      <a class="email" href="mailto:info@buxena.com">
         ✉ &nbsp; info@buxena.com
       </a>
     </section>
@@ -38,7 +40,9 @@
 </html>
 
 <style>
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
 
   body {
     margin: 0;
@@ -62,7 +66,7 @@
   .overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,.70);
+    background: rgba(0,0,0,.72);
   }
 
   section {
@@ -71,31 +75,14 @@
     width: 92%;
     max-width: 1000px;
     text-align: center;
-    padding: 45px 15px;
+    padding: 42px 15px;
   }
 
-  .steam {
-    color: #c8a363;
-    font-size: 48px;
-  }
-
-  .logo {
-    color: #c8a363;
-    font-size: clamp(62px, 12vw, 105px);
-    font-weight: 300;
-    letter-spacing: 3px;
-  }
-
-  .line {
-    width: 115px;
-    height: 1px;
-    background: #c8a363;
-    margin: 35px auto;
-  }
-
-  .line.small {
-    width: 75px;
-    margin: 28px auto;
+  .logo-img {
+    display: block;
+    width: min(640px, 90vw);
+    margin: 0 auto 28px;
+    height: auto;
   }
 
   h1 {
@@ -112,13 +99,20 @@
     margin-top: 28px;
   }
 
+  .line {
+    width: 75px;
+    height: 1px;
+    background: #c8a363;
+    margin: 28px auto;
+  }
+
   .text {
     font-size: clamp(16px, 2.3vw, 21px);
     line-height: 1.8;
     letter-spacing: 1px;
   }
 
-  a {
+  .email {
     display: inline-block;
     margin-top: 35px;
     color: white;
