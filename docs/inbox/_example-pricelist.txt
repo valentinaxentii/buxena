@@ -1,7 +1,0 @@
-# Paste a supplier price list here (one model per line, EXW anywhere on the line).
-# This example file is for testing the importer — delete or ignore in production.
-ELLA H2 ................ 1610 EUR
-UKU 160, thermo alder bench upgrade, EUR 2,180
-UKU 230 half-moon back .. €2,590
-EDA Nordic Spruce 2.5m    1870
-Some unrelated footer line with no price
