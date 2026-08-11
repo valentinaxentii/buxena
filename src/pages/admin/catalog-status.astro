@@ -18,11 +18,11 @@ import { MODEL_IDENTITY } from '../../data/model-identity';
  */
 const rows = Object.values(MODEL_IDENTITY).sort((a, b) => a.code.localeCompare(b.code));
 
-const STATUS_ORDER = ['READY', 'WAITING FOR PERMISSION', 'WAITING FOR COST', 'WAITING FOR SUPPLIER', 'HOLD'];
+const STATUS_ORDER = ['READY', 'WAITING FOR PERMISSION', 'WAITING FOR COST', 'SPECIAL ORDER', 'WAITING FOR SUPPLIER', 'HOLD'];
 const counts = STATUS_ORDER.map((s) => ({ s, n: rows.filter((r) => r.launchStatus === s).length })).filter((x) => x.n);
 
 const tone = (s: string) =>
-  s === 'READY' ? 'ok' : s === 'WAITING FOR PERMISSION' ? 'near' : s === 'HOLD' ? 'stop' : 'wait';
+  s === 'READY' ? 'ok' : s === 'WAITING FOR PERMISSION' ? 'near' : s === 'HOLD' ? 'stop' : s === 'SPECIAL ORDER' ? 'special' : 'wait';
 
 const byManufacturer = Object.entries(
   rows.reduce<Record<string, number>>((acc, r) => {
@@ -99,6 +99,7 @@ const byManufacturer = Object.entries(
   .cs-card--near { border-color: rgba(196,162,119,0.55); }
   .cs-card--wait { border-color: rgba(230,180,90,0.35); }
   .cs-card--stop { border-color: rgba(230,130,90,0.45); }
+  .cs-card--special { border-color: rgba(150,170,210,0.45); }
 
   .cs-note { font-size: 0.78rem; color: var(--admin-muted); margin: 0 0 0.75rem; }
   .cs-note code { font-size: 0.72rem; }
@@ -131,4 +132,5 @@ const byManufacturer = Object.entries(
   .cs-badge--near { color: #c4a277; }
   .cs-badge--wait { color: #d8b06a; }
   .cs-badge--stop { color: #e6b7a0; }
+  .cs-badge--special { color: #9fb4d8; }
 </style>

@@ -253,8 +253,8 @@
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
   },
   "BUH-NORD Cube 240": {
     "code": "BUH-13",
@@ -284,8 +284,8 @@
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
   },
   "BUH-EDA Thermowood 1.3m": {
     "code": "BUH-20",
@@ -424,8 +424,8 @@
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
   },
   "BUH-EDA Thermowood 3.3m": {
     "code": "BUH-25",
@@ -480,8 +480,8 @@
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
   },
   "BUH-EDA Thermo-Treated Pine 1.6m": {
     "code": "BUH-27",
@@ -676,8 +676,8 @@
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
   },
   "BUH-EDA Nordic Spruce 3.3m": {
     "code": "BUH-34",
@@ -732,8 +732,8 @@
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
   },
   "BUH-ITI Thermowood 2.3m": {
     "code": "BUH-36",
@@ -893,8 +893,8 @@
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
   },
   "BUH-VIRU Vertical 2.6m": {
     "code": "BUH-42",
@@ -953,8 +953,8 @@
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
   },
   "BUH-VIRU Grand 6.0m": {
     "code": "BUH-44",
@@ -984,7 +984,7 @@
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
     "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
+    "launchStatus": "SPECIAL ORDER",
+    "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
   }
 }

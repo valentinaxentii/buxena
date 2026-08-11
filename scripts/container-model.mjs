@@ -112,6 +112,47 @@ console.log(`   capital required (costed units only): ${money(capital)}`);
 console.log(`   revenue at market medians:            ${money(revenue)}`);
 console.log(`   gross profit:                         ${money(gp)}  |  margin ${pct(gp / revenue)}`);
 
+// --- Container fill sensitivity ------------------------------------------
+// Freight and port are per CONTAINER, so the per-unit share falls as the
+// container fills. This is the single biggest controllable cost lever.
+console.log('\n\nCONTAINER FILL SENSITIVITY');
+console.log('   How per-unit freight+port and margin move with units loaded.');
+const FILLS = [20, 22, 24, 26];
+const perContainer = COSTS.oceanFreight40HC.v + COSTS.portAndDrayage.v;
+console.log(`   (${money(perContainer)} per 40HC: ${money(COSTS.oceanFreight40HC.v)} ocean [VERIFIED] + ${money(COSTS.portAndDrayage.v)} port/drayage [ESTIMATED])\n`);
+
+const header = ['model'.padEnd(18), ...FILLS.map((f) => `${f}u`.padStart(11))].join('');
+console.log('   ' + header);
+for (const [name, m] of Object.entries(MODELS)) {
+  if (m.exw == null) continue;
+  const exwUsd = m.exw * FX.rate;
+  const base = exwUsd + exwUsd * COSTS.dutyPct.v + COSTS.heater.v;
+  const cells = FILLS.map((f) => {
+    const cost = base + perContainer / f;
+    const gp = m.marketMedian - cost - m.marketMedian * COSTS.paymentFees.v;
+    return `${pct(gp / m.marketMedian)}`.padStart(11);
+  });
+  console.log('   ' + name.replace(/^BUH-\d+ /, '').padEnd(18) + cells.join(''));
+}
+console.log('\n   (margin at each model\'s market median — higher fill, higher margin)');
+
+// Whole-container capital and return at each fill level, using the scenario mix ratio.
+console.log('\n   Whole-container view, Phase 1 mix ratio, costed units only:');
+for (const f of FILLS) {
+  const ratio = f / Object.values(SCENARIO.mix).reduce((a, b) => a + b, 0);
+  let cap = 0, rev = 0, n = 0;
+  for (const [name, qty] of Object.entries(SCENARIO.mix)) {
+    const m = MODELS[name];
+    if (m.exw == null) continue;
+    const q = Math.round(qty * ratio);
+    const exwUsd = m.exw * FX.rate;
+    const cost = exwUsd + exwUsd * COSTS.dutyPct.v + COSTS.heater.v + perContainer / f;
+    cap += cost * q; rev += m.marketMedian * q; n += q;
+  }
+  const gp = rev - cap - rev * COSTS.paymentFees.v;
+  console.log(`     ${String(f).padStart(2)} units → capital ${money(cap).padStart(9)} · revenue ${money(rev).padStart(9)} · GP ${money(gp).padStart(9)} · margin ${pct(gp / rev)}  (${n} costed)`);
+}
+
 console.log('\n\nDATA GAPS — these keep the model INCOMPLETE (cost is understated)');
 for (const [k, c] of Object.entries(COSTS)) {
   if (c.class === 'UNKNOWN') console.log(`   ${k}: ${c.note}`);
