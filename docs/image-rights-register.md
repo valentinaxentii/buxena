@@ -330,3 +330,17 @@ so none were swapped this pass — safe placeholders/graceful degradation
 remain in place everywhere, and the register stays the launch gate.
 
 *Last updated: 2026-08-10 (launch-blocker pass — replacement map added). Re-run this audit whenever new photography is added — see `public/images/README.md` for the "only use photography you own or have licensed" house rule going forward.*
+
+---
+
+## Homepage category cards — added 2026-08-11
+
+| File | Placement | Status |
+|---|---|---|
+| `images/collections/outdoor.png` | Outdoor Saunas card | **UNVERIFIED** — provenance not documented; treat as BLOCKED until licensed |
+| `images/collections/cube.png` | Cube Saunas card | 🔴 **BLOCKED — VISIBLE STOCK WATERMARK** (Dreamstime). Founder-flagged. **PREVIEW ONLY, MUST NOT REACH PRODUCTION.** Replace with a licensed clean file |
+| `images/collections/barrel.png` | Barrel Saunas card | **UNVERIFIED** — provenance not documented; treat as BLOCKED until licensed |
+| `images/collections/indoor.jpg` | Indoor Saunas card | **UNVERIFIED** — provenance not documented; also low-resolution (540×360) |
+
+`scripts/prelaunch-check.mjs` fails the board while any watermarked file is
+still referenced, so this cannot be published by accident.

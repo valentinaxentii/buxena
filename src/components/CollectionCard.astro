@@ -8,13 +8,17 @@ interface Props {
   note?: string;
   count?: number;
   image?: string;
+  /** Descriptive alt text for SEO/accessibility; falls back to the name. */
+  alt?: string;
+  /** object-position for the cover crop, e.g. "38% center". */
+  focus?: string;
 }
-const { name, blurb, href, note, count, image } = Astro.props;
+const { name, blurb, href, note, count, image, alt, focus } = Astro.props;
 ---
 
 <a class="ccard" href={href}>
   <div class="ccard__media">
-    <Figure src={image} alt={name} note={note ?? `${name} — representative collection image`} ratio="4 / 5" tone="mid" />
+    <Figure src={image} alt={alt ?? name} note={note ?? `${name} — representative collection image`} ratio="4 / 5" tone="mid" focus={focus} sizes="(max-width: 900px) 45vw, 300px" />
     <span class="ccard__slats" aria-hidden="true"></span>
   </div>
   <div class="ccard__body">

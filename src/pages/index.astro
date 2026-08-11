@@ -32,7 +32,11 @@ const chooseTiles = [
     blurb: 'Architectural backyard sauna systems',
     href: '/saunas/outdoor-saunas/',
     count: locationCount('outdoor'),
-    image: '/images/collection-barrel.jpg',
+    image: '/images/collections/outdoor.png',
+    alt: 'Outdoor sauna cabin in thermo-treated timber with a black flat roof, glass doors and a wooden hot tub on a paved terrace among pine trees',
+    // Subject sits in the lower-middle band of a square source; bias the
+    // portrait crop downward so the cabin and hot tub stay in frame.
+    focus: 'center 58%',
     note: 'Outdoor Saunas — representative exterior image.',
   },
   {
@@ -40,7 +44,12 @@ const chooseTiles = [
     blurb: 'Modern form, panoramic design',
     href: '/saunas/cube-saunas/',
     count: typeCount('Cube'),
-    image: '/images/saunas/nord-cube-200-hero.jpg',
+    image: '/images/collections/cube.png',
+    alt: 'Modern black-framed cube sauna with full-height glass walls and a warm timber interior, beside a swimming pool at dusk',
+    focus: 'center center',
+    // LICENSING: carries a stock watermark — PREVIEW ONLY, must not reach
+    // production. Tracked in docs/image-rights-register.md and guarded by
+    // scripts/prelaunch-check.mjs.
     note: 'Cube Saunas — flat-roofed panoramic form.',
   },
   {
@@ -48,7 +57,10 @@ const chooseTiles = [
     blurb: 'Traditional shape, efficient footprint',
     href: '/saunas/barrel-saunas/',
     count: typeCount('Barrel'),
-    image: '/images/saunas/eda-nordic-spruce-2-5m-hero.png',
+    image: '/images/collections/barrel.png',
+    alt: 'Cedar barrel sauna with a black shingled roof and glass door on a stone terrace, in front of a contemporary timber-clad house',
+    // The barrel sits left of centre in the source; hold the crop on it.
+    focus: '38% center',
     note: 'Barrel Saunas — traditional curved form.',
   },
   {
@@ -56,7 +68,9 @@ const chooseTiles = [
     blurb: 'Integrated wellness for the home',
     href: '/saunas/indoor-saunas/',
     count: locationCount('indoor'),
-    image: '/images/collection-indoor.jpg',
+    image: '/images/collections/indoor.jpg',
+    alt: 'Interior of a luxury indoor sauna with tiered timber benches, glass front and warm concealed lighting, with folded towels alongside',
+    focus: 'center center',
     note: 'Indoor Saunas — representative interior image.',
   },
 ];
@@ -163,6 +177,8 @@ const wellnessPillars = [
             href={tile.href}
             count={tile.count}
             image={tile.image}
+            alt={tile.alt}
+            focus={tile.focus}
             note={tile.note}
           />
         ))}
