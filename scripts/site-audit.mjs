@@ -30,13 +30,20 @@ for (const p of pub) {
   const title = (html.match(/<title>([^<]*)<\/title>/) ?? [])[1] ?? '';
   const desc = (html.match(/<meta name="description" content="([^"]*)"/) ?? [])[1] ?? '';
 
+  // A noindex page cannot compete in search, so duplicate titles and
+  // descriptions across it are not defects. Checking them anyway reports
+  // every intentionally-excluded page as an SEO problem.
+  const noindex = /content="noindex/.test(html);
+
   if (!title) issues.seo.push(`${url}: no <title>`);
+  else if (noindex) { /* not registered — an indexable page must not collide with it either */ }
   else {
     if (title.length > 60) issues.seo.push(`${url}: title ${title.length} chars (>60 may truncate)`);
     if (titles.has(title)) issues.seo.push(`${url}: DUPLICATE title with ${titles.get(title)}`);
     else titles.set(title, url);
   }
   if (!desc) issues.seo.push(`${url}: no meta description`);
+  else if (noindex) { /* see the title note above */ }
   else {
     if (desc.length > 165) issues.seo.push(`${url}: description ${desc.length} chars (>165 may truncate)`);
     if (descs.has(desc)) issues.seo.push(`${url}: DUPLICATE description with ${descs.get(desc)}`);
@@ -58,6 +65,37 @@ for (const p of pub) {
       issues.perf.push(`${url}: <img> without loading attr`);
     }
   }
+  // Interactive elements need an accessible name — an icon-only button with
+  // no text and no aria-label is invisible to a screen reader.
+  for (const m of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+    const attrs = m[1], inner = m[2];
+    const hasText = inner.replace(/<[^>]*>/g, '').trim().length > 0;
+    const hasLabel = /aria-label=|aria-labelledby=/.test(attrs);
+    if (!hasText && !hasLabel) issues.a11y.push(`${url}: <button> with no accessible name`);
+  }
+  /**
+   * Form controls need an accessible name. Three valid ways to get one:
+   * an explicit <label for=…>, an aria-label/labelledby, or being wrapped
+   * in a <label> (implicit association). Blanking the wrapping-label
+   * regions first is what makes the third case count — checking attributes
+   * alone reports every implicitly-labelled control as a defect.
+   * Honeypot fields are deliberately nameless and hidden from users, so
+   * they are skipped rather than reported.
+   */
+  const outsideLabels = html.replace(/<label\b[^>]*>[\s\S]*?<\/label>/g, '');
+  for (const m of outsideLabels.matchAll(/<(input|select|textarea)\b([^>]*)>/g)) {
+    const attrs = m[2];
+    if (/type="(hidden|submit|button)"/.test(attrs)) continue;
+    if (/tabindex="-1"/.test(attrs) || /name="bot-field/.test(attrs)) continue;
+    const id = (attrs.match(/id="([^"]*)"/) ?? [])[1];
+    const labelled = /aria-label=|aria-labelledby=/.test(attrs) || (id && html.includes(`for="${id}"`));
+    if (!labelled) issues.a11y.push(`${url}: <${m[1]}> without a label`);
+  }
+  // A full-screen overlay must be dismissible and announced.
+  for (const m of html.matchAll(/role="dialog"([^>]*)>/g)) {
+    if (!/aria-label|aria-labelledby/.test(m[1])) issues.a11y.push(`${url}: role="dialog" without a label`);
+  }
+
   // Mobile risk: fixed pixel widths in inline styles
   for (const m of html.matchAll(/style="[^"]*width:\s*(\d{4,})px/g)) {
     issues.mobile.push(`${url}: inline fixed width ${m[1]}px (overflow risk)`);

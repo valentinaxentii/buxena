@@ -26,7 +26,10 @@ const { facets } = Astro.props;
     <span class="pfilters__count" data-filter-count hidden></span>
   </button>
 
-  <div class="pfilters__panel" data-filter-panel>
+  {/* Below 900px this panel becomes a full-screen overlay, so it carries
+      dialog semantics. On desktop it is inline content and the role is
+      harmless — the script only applies focus trapping while it overlays. */}
+  <div class="pfilters__panel" data-filter-panel role="dialog" aria-modal="true" aria-label="Filter saunas" tabindex="-1">
     <div class="pfilters__head">
       <span class="pfilters__title">Filter saunas</span>
       <button class="pfilters__close" type="button" data-filter-close aria-label="Close filters">
@@ -189,15 +192,47 @@ const { facets } = Astro.props;
 
     const active: Record<string, string> = {};
 
+    /**
+     * The mobile panel is a full-screen overlay, so it needs the same
+     * keyboard contract as any dialog: Escape closes it, focus moves inside
+     * on open, and focus returns to the trigger on close. Without that a
+     * keyboard or screen-reader user can open the filters and be stranded.
+     */
+    const panel = root.querySelector<HTMLElement>('[data-filter-panel]');
+    const isOverlay = () => window.matchMedia('(max-width: 900px)').matches;
+
     const setOpen = (open: boolean) => {
       root.classList.toggle('is-open', open);
       if (scrim) scrim.hidden = !open;
       document.body.style.overflow = open ? 'hidden' : '';
+      trigger?.setAttribute('aria-expanded', String(open));
+      if (!isOverlay()) return;
+      if (open) (closeBtn ?? panel)?.focus?.();
+      else trigger?.focus();
     };
+
+    trigger?.setAttribute('aria-expanded', 'false');
     trigger?.addEventListener('click', () => setOpen(true));
     closeBtn?.addEventListener('click', () => setOpen(false));
     applyBtn?.addEventListener('click', () => setOpen(false));
     scrim?.addEventListener('click', () => setOpen(false));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && root.classList.contains('is-open')) setOpen(false);
+    });
+
+    // Keep focus inside the panel while it is an overlay.
+    panel?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab' || !root.classList.contains('is-open') || !isOverlay()) return;
+      const focusable = panel.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
 
     const applyFilters = () => {
       let shown = 0;
