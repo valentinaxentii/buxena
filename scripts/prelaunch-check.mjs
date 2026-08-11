@@ -227,16 +227,6 @@ if (devLive) {
 
 // -------------------------------------- 7b. watermarked / blocked imagery
 // Files known to carry a stock watermark must never reach production.
-// Listed explicitly so removing the file OR the reference clears the check.
-const WATERMARKED = ['/images/collections/cube.png'];
-{
-  const used = WATERMARKED.filter((w) => htmls.some((h) => readFileSync(h, 'utf8').includes(w)));
-  record('images', 'no watermarked image referenced on any page', used.length === 0,
-    used.length ?  : '');
-}
-
-// -------------------------------------- 7b. watermarked / blocked imagery
-// Files known to carry a stock watermark must never reach production.
 // Listed explicitly so removing either the file OR the reference clears it.
 {
   const WATERMARKED = ['/images/collections/cube.png'];
