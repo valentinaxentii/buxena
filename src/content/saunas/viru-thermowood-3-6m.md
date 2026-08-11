@@ -8,6 +8,8 @@ tagline: "The long barrel — room to stretch out"
 summary: "A full-length four-person thermowood barrel with a covered terrace, for gardens with space to give it."
 order: 17
 placeholder: false
+draft: true
+hold: "HOLD — SUPPLIER VERIFICATION (2026-08-11): no manufacturer identified. 360cm matches neither Baltresto (3m/4m) nor Wood Architects (300cm/400cm). Data and images preserved; restore by removing draft+hold once a supplier confirms the model."
 capacity: "4 people"
 capacityMin: 4
 capacityMax: 4

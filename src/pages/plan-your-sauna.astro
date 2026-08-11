@@ -46,7 +46,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
   <section class="band band--tight page-head">
     <div class="shell shell--narrow center">
       <span class="eyebrow">Plan Your Sauna</span>
-      <h1 class="display measure--tight">A short, guided way to the right model</h1>
+      <h1 class="display measure--tight">Find the sauna that fits your space</h1>
       <p class="lead measure">
         Answer a few questions about your space and preferences. We'll narrow
         BUXENA's range to two or three models worth a closer look — no
@@ -88,7 +88,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
             <legend class="plan__question">Where is the sauna going?</legend>
             <p class="plan__note">This helps us consider delivery and installation availability.</p>
             <label class="plan__zip-label" for="plan-zip">ZIP code</label>
-            <input class="plan__zip" type="text" id="plan-zip" inputmode="numeric" autocomplete="postal-code" data-plan-zip />
+            <input class="plan__zip" type="text" id="plan-zip" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-plan-zip />
           </fieldset>
 
           <div class="plan__nav">
@@ -105,14 +105,22 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
 
           <div class="plan-results__grid" data-plan-results-grid></div>
 
+          <div class="plan-compare" data-plan-compare hidden></div>
+
           <p class="plan-results__empty" data-plan-results-empty hidden>
             We need a little more information to recommend the right model.
-            <a class="link" href="/quote/">Request a Quote <span class="arrow" aria-hidden="true">→</span></a>
+            <a class="link" href="/quote/">Request Pricing <span class="arrow" aria-hidden="true">→</span></a>
           </p>
+
+          <div class="plan-results__next" data-plan-results-next hidden>
+            <a class="btn btn--outline" href="/quote/" data-plan-space>See It In My Space</a>
+            <button type="button" class="btn btn--outline" data-plan-compare-btn>Compare My Top 2</button>
+            <a class="btn btn--bronze" href="/quote/" data-plan-pricing>Get Project Pricing</a>
+          </div>
 
           <div class="plan-results__actions" data-plan-results-actions hidden>
             <button type="button" class="btn btn--outline" data-plan-save>Save My Shortlist</button>
-            <button type="button" class="btn btn--bronze" data-plan-review-toggle>Ask BUXENA to Review My Selection</button>
+            <button type="button" class="btn btn--outline" data-plan-review-toggle>Ask BUXENA to Review My Selection</button>
           </div>
           <p class="plan-results__saved" data-plan-saved hidden>Saved on this device.</p>
 
@@ -148,7 +156,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
                 </div>
                 <div class="field">
                   <label for="plan-review-zip">ZIP code</label>
-                  <input id="plan-review-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" data-plan-field="zip" />
+                  <input id="plan-review-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-plan-field="zip" />
                 </div>
                 <div class="field field--full">
                   <label for="plan-notes">Notes (optional)</label>
@@ -172,6 +180,8 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
 
 <script>
   import { recommendSaunas, type PlanAnswers, type CatalogModel } from '../data/planYourSauna';
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
   const root = document.querySelector<HTMLElement>('[data-plan]');
   if (root) {
@@ -189,6 +199,11 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
     const resultsGrid = root.querySelector<HTMLElement>('[data-plan-results-grid]')!;
     const resultsEmpty = root.querySelector<HTMLElement>('[data-plan-results-empty]')!;
     const resultsActions = root.querySelector<HTMLElement>('[data-plan-results-actions]')!;
+    const resultsNext = root.querySelector<HTMLElement>('[data-plan-results-next]')!;
+    const compareEl = root.querySelector<HTMLElement>('[data-plan-compare]')!;
+    const compareBtn = root.querySelector<HTMLButtonElement>('[data-plan-compare-btn]')!;
+    const spaceLink = root.querySelector<HTMLAnchorElement>('[data-plan-space]')!;
+    const pricingLink = root.querySelector<HTMLAnchorElement>('[data-plan-pricing]')!;
     const savedNote = root.querySelector<HTMLElement>('[data-plan-saved]')!;
     const reviewSection = root.querySelector<HTMLElement>('[data-plan-review]')!;
     const reviewToggle = root.querySelector<HTMLButtonElement>('[data-plan-review-toggle]')!;
@@ -213,6 +228,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
 
     let visible = visibleSteps();
     let current = 0; // index into `visible`, not a step number
+    let advisorStarted = false;
 
     const updateProgress = () => {
       progressLabel.textContent = `Step ${current + 1} of ${visible.length}`;
@@ -241,6 +257,19 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
           });
           answers[key] = btn.dataset.value ?? '';
 
+          // advisor_started marks the first real answer, not the page view —
+          // so the completion rate below is measured against people who
+          // actually engaged with the wizard.
+          if (!advisorStarted) {
+            advisorStarted = true;
+            track('advisor_started', { formType: 'sauna_advisor' });
+          }
+          track('advisor_question_answered', {
+            formType: 'sauna_advisor',
+            question: key,
+            answer: answers[key],
+          });
+
           if (key === 'location') {
             // display:flex on .plan__option outranks the [hidden] UA rule,
             // so this needs an explicit style, not the `hidden` property.
@@ -259,46 +288,167 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
 
     zipInput.addEventListener('input', () => { answers.zip = zipInput.value; });
 
+    // Customer-facing name — same rule as src/data/catalog.ts displayTitle():
+    // the BUH- SKU prefix stays internal (form values, tracking, CRM).
+    const shownName = (title: string) => title.replace(/^BUH-/i, '');
+
+    // Rank labels instead of a percentage: the recommender hard-filters on
+    // verified fields, so every returned model matches ALL the visitor's
+    // filterable answers equally — a "96% match" number would be invented
+    // precision, which the brief forbids. The why-list carries the honesty.
+    const RANK_LABELS = ['Best Match', 'Alternative', 'Another Option'];
+
+    let lastRecs: ReturnType<typeof recommendSaunas> = [];
+
     const renderResults = () => {
       const planAnswers = answers as unknown as PlanAnswers;
       const recs = recommendSaunas(catalog, planAnswers);
+      lastRecs = recs;
 
       resultsGrid.innerHTML = '';
+      compareEl.hidden = true;
       if (recs.length === 0) {
         resultsEmpty.hidden = false;
         resultsActions.hidden = true;
+        resultsNext.hidden = true;
       } else {
         resultsEmpty.hidden = true;
         resultsActions.hidden = false;
-        recs.forEach(({ model, why }) => {
+        resultsNext.hidden = false;
+        // Compare needs two models to compare.
+        compareBtn.hidden = recs.length < 2;
+        recs.forEach(({ model, why }, index) => {
           const card = document.createElement('article');
           card.className = 'plan-card';
           const dims = (model.dimensions ?? []).slice(0, 2).map((d) => `${d.label}: ${d.value}`).join(' · ');
           const material = model.materials?.[0] ?? '';
           const needsGlassHeatNote = answers.glass !== 'no-preference' || (answers.heat !== 'unsure' && answers.heat !== '');
           card.innerHTML = `
-            <a class="plan-card__media" href="/saunas/${model.slug}/">
-              <img src="${model.heroImage?.src ?? ''}" alt="${model.heroImage?.alt ?? model.title}" loading="lazy" decoding="async" />
+            <a class="plan-card__media" href="/saunas/${model.slug}/" data-plan-view="${model.slug}" data-plan-rank="${index + 1}">
+              <img src="${model.heroImage?.src ?? ''}" alt="${model.heroImage?.alt ?? shownName(model.title)}" loading="lazy" decoding="async" />
             </a>
             <div class="plan-card__body">
-              <h3 class="plan-card__title">${model.title}</h3>
+              <span class="plan-card__rank">${RANK_LABELS[index] ?? 'Option'}</span>
+              <h3 class="plan-card__title">${shownName(model.title)}</h3>
               <p class="plan-card__meta">${model.location === 'outdoor' ? 'Outdoor' : 'Indoor'} · ${model.capacity ?? 'Contact us for details'}${dims ? ' · ' + dims : ''}${material ? ' · ' + material : ''}</p>
               <p class="plan-card__why">${why.length ? 'Recommended because you selected ' + why.join(', ') + '.' : "One of BUXENA's available models."}</p>
               ${needsGlassHeatNote ? '<p class="plan-card__note">BUXENA will confirm glazing and heater compatibility for your selected model.</p>' : ''}
               <div class="plan-card__actions">
-                <a class="link" href="/saunas/${model.slug}/">View Sauna <span class="arrow" aria-hidden="true">→</span></a>
-                <a class="btn btn--bronze" href="/quote/">Request a Quote</a>
+                <a class="link" href="/saunas/${model.slug}/" data-plan-view="${model.slug}" data-plan-rank="${index + 1}">View Model <span class="arrow" aria-hidden="true">→</span></a>
+                <a class="btn btn--bronze" href="/quote/?model=${encodeURIComponent(model.title)}" data-plan-card-pricing="${encodeURIComponent(model.title)}">Request Pricing</a>
               </div>
             </div>
           `;
           resultsGrid.appendChild(card);
         });
+
+        // advisor_model_view / advisor_pricing_click on the freshly rendered cards
+        resultsGrid.querySelectorAll<HTMLAnchorElement>('[data-plan-view]').forEach((a) => {
+          a.addEventListener('click', () => {
+            track('advisor_model_view', {
+              formType: 'sauna_advisor',
+              model: a.dataset.planView,
+              rank: Number(a.dataset.planRank),
+            });
+          });
+        });
+        resultsGrid.querySelectorAll<HTMLAnchorElement>('[data-plan-card-pricing]').forEach((a) => {
+          a.addEventListener('click', () => {
+            track('advisor_pricing_click', {
+              formType: 'sauna_advisor',
+              model: decodeURIComponent(a.dataset.planCardPricing ?? ''),
+            });
+          });
+        });
+      }
+
+      track('advisor_completed', {
+        formType: 'sauna_advisor',
+        location: answers.location,
+        capacity: answers.capacity,
+        zip: answers.zip,
+        resultCount: recs.length,
+      });
+
+      // One event per recommended model, so "which models does the advisor
+      // actually surface" is answerable without re-deriving it from answers.
+      recs.forEach(({ model }, index) => {
+        track('model_recommended', {
+          formType: 'sauna_advisor',
+          model: model.title,
+          location: model.location,
+          rank: index + 1,
+        });
+      });
+
+      // The group actions carry the best match's context into their flows.
+      if (recs.length > 0) {
+        const top = recs[0].model;
+        spaceLink.href = '/see-it-in-my-space/';
+        pricingLink.href = `/quote/?model=${encodeURIComponent(top.title)}`;
       }
 
       form.hidden = true;
       resultsEl.hidden = false;
       resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
+
+    spaceLink.addEventListener('click', () => {
+      track('advisor_space_visualization_click', {
+        formType: 'sauna_advisor',
+        model: lastRecs[0]?.model.title ?? '',
+      });
+    });
+
+    pricingLink.addEventListener('click', () => {
+      track('advisor_pricing_click', {
+        formType: 'sauna_advisor',
+        model: lastRecs[0]?.model.title ?? '',
+        cta: 'get_project_pricing',
+      });
+    });
+
+    // Compare My Top 2 — a small verified-facts-only table built from the
+    // same catalog snapshot the recommendations came from. Rows render only
+    // when at least one of the two models has real data for them.
+    compareBtn.addEventListener('click', () => {
+      const [a, b] = lastRecs.map((r) => r.model);
+      if (!a || !b) return;
+
+      track('advisor_compare_click', {
+        formType: 'sauna_advisor',
+        model: a.title,
+        modelB: b.title,
+      });
+
+      const dimText = (m: typeof a) => (m.dimensions ?? []).map((d) => `${d.label}: ${d.value}`).join('; ');
+      const rows: Array<[string, string, string]> = [
+        ['Placement', a.location ?? '', b.location ?? ''],
+        ['Type', a.productType ?? '', b.productType ?? ''],
+        ['Capacity', a.capacity ?? '', b.capacity ?? ''],
+        ['Dimensions', dimText(a), dimText(b)],
+        ['Material', (a.materials ?? []).join(', '), (b.materials ?? []).join(', ')],
+      ].filter(([, va, vb]) => va || vb) as Array<[string, string, string]>;
+
+      compareEl.innerHTML = `
+        <h3 class="plan-compare__h">${shownName(a.title)} vs ${shownName(b.title)}</h3>
+        <table class="plan-compare__table">
+          <thead>
+            <tr><th scope="col"></th><th scope="col">${shownName(a.title)}</th><th scope="col">${shownName(b.title)}</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(([label, va, vb]) => `
+              <tr>
+                <th scope="row">${label}</th>
+                <td>${va || '<span class="plan-compare__tbc">Contact us for details</span>'}</td>
+                <td>${vb || '<span class="plan-compare__tbc">Contact us for details</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      compareEl.hidden = false;
+      compareEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
 
     nextBtn.addEventListener('click', () => {
       if (current < visible.length - 1) {
@@ -356,34 +506,39 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
         submitBtn.textContent = 'Sending…';
       }
 
-      try {
-        const res = await fetch('/api/enquiries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: get('name'),
-            email: get('email'),
-            phone: get('phone'),
-            location: zip,
-            message,
-            saunaInterest: recommended,
-            source: 'Plan Your Sauna',
-            botField: get('bot-field-plan'),
-          }),
-        });
-
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        window.location.assign('/thank-you/');
-      } catch (err) {
-        console.error('[plan-your-sauna] submission failed:', err);
+      const restore = () => {
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.textContent = originalLabel || 'Send to BUXENA';
         }
-        alert(
-          'Sorry — something went wrong sending your request. Please try again, or email info@buxena.com directly.'
-        );
+      };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: zip,
+        message,
+        saunaInterest: recommended,
+        source: 'Plan Your Sauna',
+        botField: get('bot-field-plan'),
+      });
+
+      if (!result.ok) {
+        console.error('[plan-your-sauna] submission failed:', result.error);
+        restore();
+        showFormStatus(reviewForm, 'error');
+        return;
       }
+
+      if (result.devMode) {
+        restore();
+        showFormStatus(reviewForm, 'dev-success');
+        return;
+      }
+
+      rememberEnquiry({ model: recs[0]?.model.title ?? '', zip, timeline: '' });
+      window.location.assign('/thank-you/');
     });
 
     const saveBtn = root.querySelector<HTMLButtonElement>('[data-plan-save]')!;
@@ -519,6 +674,33 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
   }
   .plan-results__empty { color: var(--muted); font-style: italic; }
   .plan-results__actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.75rem; }
+
+  .plan-results__next { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+
+  .plan-card__rank {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    border: 1px solid var(--bronze-soft);
+    padding: 0.3rem 0.7rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .plan-compare { margin-top: 1.75rem; border: 1px solid var(--line); padding: clamp(1.1rem, 0.8rem + 1vw, 1.75rem); overflow-x: auto; }
+  .plan-compare__h { font-family: var(--font-display); font-size: var(--t-h3); margin-bottom: 1rem; }
+  .plan-compare__table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+  .plan-compare__table th, .plan-compare__table td {
+    text-align: left;
+    padding: 0.6rem 0.9rem 0.6rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .plan-compare__table thead th { font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.75rem; }
+  .plan-compare__table tbody th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  .plan-compare__tbc { color: var(--muted); font-style: italic; }
   .plan-results__saved { margin-top: 0.75rem; font-size: var(--t-small); color: var(--muted); }
 
   .plan-review {

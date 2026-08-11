@@ -1,0 +1,20 @@
+---
+/**
+ * Fires a category_view event on load. Dropped once into each collection
+ * page so category-level ad audiences (viewed outdoor vs indoor vs barrel)
+ * can be built the day a pixel is approved — see src/lib/track.ts.
+ */
+interface Props {
+  category: string;
+}
+const { category } = Astro.props;
+---
+
+<script is:inline define:vars={{ category }}>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'category_view',
+    category,
+    landing_page: window.location.pathname,
+  });
+</script>

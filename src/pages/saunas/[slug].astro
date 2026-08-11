@@ -4,8 +4,19 @@ import Figure from '../../components/Figure.astro';
 import QuoteForm from '../../components/QuoteForm.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import AvailabilityBadge from '../../components/AvailabilityBadge.astro';
+import CheckAvailability from '../../components/CheckAvailability.astro';
+import StickySalesBar from '../../components/StickySalesBar.astro';
+import PackageBand from '../../components/PackageBand.astro';
+import QuoteBand from '../../components/QuoteBand.astro';
+import QuoteCompare from '../../components/QuoteCompare.astro';
+import NaturalWoodNote from '../../components/NaturalWoodNote.astro';
 import RitualKit from '../../components/RitualKit.astro';
-import { categoryMap, showDev, site } from '../../data/site';
+import { categoryMap, showDev, site, publicEmail } from '../../data/site';
+import { displayTitle } from '../../data/catalog';
+import { publicPrice } from '../../data/pricing';
+import { publicNameFor, codeFor, presentationPath } from '../../data/model-identity';
+import fs from 'node:fs';
+import path from 'node:path';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -18,6 +29,18 @@ export async function getStaticPaths() {
 
 const { entry } = Astro.props;
 const { data } = entry;
+
+// Public price comes from the central register (src/data/pricing.ts) — the
+// only place approved customer-facing prices live. Null (today, for every
+// model) means the page shows Request Pricing and nothing else.
+const approved = publicPrice(data.title, data.fromPrice);
+
+// Downloadable model presentation — linked only when the generated PDF
+// actually exists on disk (scripts/build-model-presentation.mjs), so a
+// missing file can never produce a broken download link.
+const presentationHref = presentationPath(entry.id);
+const hasPresentation = fs.existsSync(path.join(process.cwd(), 'public', presentationHref));
+const buxenaCode = codeFor(data.title);
 const { Content } = await render(entry);
 
 const cat = categoryMap[data.category];
@@ -86,7 +109,7 @@ const productImage = data.heroImage.src ? new URL(data.heroImage.src, Astro.site
 const productSchema = {
   '@context': 'https://schema.org',
   '@type': 'Product',
-  name: data.title,
+  name: displayTitle(data.title),
   description: data.summary,
   ...(productImage ? { image: [productImage] } : {}),
   brand: { '@type': 'Brand', name: site.name },
@@ -102,7 +125,7 @@ const breadcrumbItems = [
   {
     '@type': 'ListItem',
     position: locationLabel ? 3 : 2,
-    name: data.title,
+    name: displayTitle(data.title),
     item: new URL(`/saunas/${entry.id}/`, Astro.site).href,
   },
 ];
@@ -113,7 +136,7 @@ const breadcrumbSchema = {
 };
 ---
 
-<BaseLayout title={data.title} description={data.summary} image={data.heroImage.src}>
+<BaseLayout title={displayTitle(data.title)} description={data.summary} image={data.heroImage.src}>
   <script type="application/ld+json" set:html={JSON.stringify(productSchema)} slot="head" />
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} slot="head" />
   <article>
@@ -154,9 +177,28 @@ const breadcrumbSchema = {
           </div>
 
           <div class="prod-hero__info">
-            <h1 class="display">{data.title}</h1>
+            <h1 class="display">{displayTitle(data.title)}</h1>
             <p class="prod-hero__tag serif-italic">{data.tagline}</p>
-            <AvailabilityBadge />
+            <AvailabilityBadge status={data.availability ?? 'preorder'} />
+
+            {/* Pricing block — renders ONLY approved values from frontmatter.
+                With none set (the current state of every model) it shows
+                nothing here and the Request Pricing CTA below carries the
+                weight. See content.config.ts pricing fields. */}
+            {approved && (
+              <dl class="prod-hero__pricing">
+                {approved.fromPrice && !approved.projectPricing && (
+                  <div><dt>Sauna</dt><dd>{approved.fromPrice}</dd></div>
+                )}
+                {approved.completeFromPrice && (
+                  <div><dt>BUXENA Complete</dt><dd>{approved.completeFromPrice}</dd></div>
+                )}
+                {approved.projectPricing && (
+                  <div><dt>BUXENA Project</dt><dd>Project Pricing</dd></div>
+                )}
+                {approved.note && <p class="prod-hero__pricing-note">{approved.note}</p>}
+              </dl>
+            )}
             <p class="lead">{data.summary}</p>
 
             {heroSpecRows.length > 0 && (
@@ -170,7 +212,39 @@ const breadcrumbSchema = {
               </dl>
             )}
 
-            <a class="btn btn--bronze" href="#enquire">Request a Quote</a>
+            <a
+              class="btn btn--bronze"
+              href="#enquire"
+              data-track="pricing_request_started"
+              data-track-model={data.title}
+              data-track-category={data.category}
+              data-track-location={data.location ?? ''}
+              data-track-form-type="product_page"
+            >Request Pricing</a>
+            <p class="prod-hero__quote-note">We prepare pricing around your chosen configuration and delivery location.</p>
+
+            <CheckAvailability model={data.title} />
+
+            <div class="prod-hero__more">
+              <a
+                class="link"
+                href="#configure"
+                data-track="product_configure_click"
+                data-track-model={data.title}
+              >Configure This Sauna <span class="arrow" aria-hidden="true">→</span></a>
+              <a
+                class="link"
+                href="/see-it-in-my-space/"
+                data-track="space_flow_started"
+                data-track-model={data.title}
+                data-track-form-type="product_page"
+              >See It In My Space <span class="arrow" aria-hidden="true">→</span></a>
+              {publicEmail && (
+                <a class="link" href={`mailto:${publicEmail}?subject=${encodeURIComponent(`Question about the ${displayTitle(data.title)}`)}`}>
+                  Talk to BUXENA <span class="arrow" aria-hidden="true">→</span>
+                </a>
+              )}
+            </div>
           </div>
         </div>
 
@@ -188,7 +262,7 @@ const breadcrumbSchema = {
     <section class="band">
       <div class={`shell prod-body ${showSpecs ? "" : "prod-body--solo"}`}>
         <div class="prose">
-          <span class="eyebrow">About this model</span>
+          <span class="eyebrow">Why choose this model</span>
           <Content />
         </div>
 
@@ -218,23 +292,201 @@ const breadcrumbSchema = {
               ) : null
             )}
 
+            <h3 class="specs__sub">Downloads</h3>
+            {hasPresentation && (
+              <ul class="specs__ul">
+                <li>
+                  <a
+                    class="dl"
+                    href={presentationHref}
+                    download
+                    data-track="document_download"
+                    data-track-model={data.title}
+                    data-track-label="Model Presentation"
+                  >Download Model Presentation (PDF)</a>
+                </li>
+              </ul>
+            )}
             {hasDownloads ? (
+              <ul class="specs__ul">
+                {data.downloads!.filter((d) => d.file).map((d) => (
+                  <li>
+                    <a
+                      class="dl"
+                      href={d.file}
+                      download
+                      data-track="document_download"
+                      data-track-model={data.title}
+                      data-track-label={d.label}
+                    >{d.label}</a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
               <Fragment>
-                <h3 class="specs__sub">Downloads</h3>
-                <ul class="specs__ul">
-                  {data.downloads!.filter((d) => d.file).map((d) => (
-                    <li><a class="dl" href={d.file} download>{d.label}</a></li>
-                  ))}
-                </ul>
+                {/* Audited 2026-08-10: no real product documents exist
+                    anywhere in the repo (no PDFs, manuals or drawings) —
+                    nothing is linked until genuine, model-matched files
+                    arrive. This fallback turns the gap into a lead path. */}
+                <p class="specs__docnote">
+                  {hasPresentation
+                    ? 'Manufacturer manuals and technical drawings are being prepared for this model. Request specifications and we\'ll send the currently available project information.'
+                    : 'Technical documents are being prepared for this model. Request specifications and we\'ll send the currently available project information.'}
+                </p>
+                <a
+                  class="link specs__docreq"
+                  href="#enquire"
+                  data-track="specification_request_click"
+                  data-track-model={data.title}
+                >Request Specifications <span class="arrow" aria-hidden="true">→</span></a>
+                <a
+                  class="link specs__docreq"
+                  href="/for-trade/#trade-form"
+                  data-track="product_trade_click"
+                  data-track-model={data.title}
+                  data-track-cta="submit_project"
+                >For Trade — Submit a Project <span class="arrow" aria-hidden="true">→</span></a>
               </Fragment>
-            ) : showDev ? (
-              <Fragment>
-                <h3 class="specs__sub">Downloads</h3>
-                <p class="is-tbc">Specification sheet not yet available.</p>
-              </Fragment>
-            ) : null}
+            )}
           </aside>
         )}
+      </div>
+    </section>
+
+    <!-- Configuration & system — real options only, confirmed at quote -->
+    <section class="band band--deep" id="configure">
+      <div class="shell">
+        <div class="sec-head">
+          <span class="eyebrow">Configure This Sauna</span>
+          <h2 class="h2 measure--tight">Built up as one system</h2>
+          <p class="lead measure">
+            Sauna, heater, controls, lighting and accessories are specified
+            together against your site — every choice below is confirmed
+            with you in the written quote before anything is ordered.
+          </p>
+        </div>
+
+        <div class="config">
+          {(data.options?.length || null) && (
+            <div class="config__block">
+              <h3 class="config__h">Configuration options</h3>
+              <ul class="config__list">
+                {data.options!.map((o) => <li>{o}</li>)}
+              </ul>
+            </div>
+          )}
+          {(data.heaterOptions?.length || null) && (
+            <div class="config__block">
+              <h3 class="config__h">Heater</h3>
+              <ul class="config__list">
+                {data.heaterOptions!.map((h) => <li>{h}</li>)}
+              </ul>
+              <p class="config__note">Controls and stones are matched to the heater you choose.</p>
+            </div>
+          )}
+          {(data.features?.length || null) && (
+            <div class="config__block">
+              <h3 class="config__h">Features</h3>
+              <ul class="config__list">
+                {data.features!.map((f) => <li>{f}</li>)}
+              </ul>
+            </div>
+          )}
+          {!data.options?.length && !data.heaterOptions?.length && !data.features?.length && (
+            <p class="config__fallback">
+              Configuration choices for this model — heater, controls,
+              lighting and options — are specified with you directly.
+            </p>
+          )}
+        </div>
+
+        <div class="config__inc">
+          <div class="config__block">
+            <h3 class="config__h">What's included</h3>
+            <ul class="config__list">
+              <li>The sauna in your chosen configuration</li>
+              <li>Confirmed standard equipment for the model</li>
+              <li>Every inclusion itemised line-by-line in your written quote</li>
+            </ul>
+          </div>
+          <div class="config__block">
+            <h3 class="config__h">What's not included</h3>
+            <ul class="config__list">
+              <li>Foundation / base preparation</li>
+              <li>Electrical connection work (a licensed electrician)</li>
+              <li>Permits, where your municipality requires them</li>
+              <li>Site preparation and access equipment</li>
+            </ul>
+            <p class="config__note">
+              Nothing here should surprise you on delivery day — your quote
+              states exactly where our scope ends and your site work begins.
+            </p>
+          </div>
+        </div>
+
+        <a
+          class="btn btn--bronze config__cta"
+          href="#enquire"
+          data-track="product_configure_click"
+          data-track-model={data.title}
+          data-track-cta="configure_pricing"
+        >Configure with a Specialist</a>
+      </div>
+    </section>
+
+    <PackageBand model={data.title} />
+
+    <QuoteCompare model={data.title} />
+
+    <!-- Delivery & project guidance — cautious, no operational overclaims -->
+    <section class="band">
+      <div class="shell">
+        <div class="sec-head">
+          <span class="eyebrow">Delivery &amp; Your Site</span>
+          <h2 class="h2 measure--tight">What the project asks of your site</h2>
+        </div>
+        <div class="grid cols-4 sitecards">
+          <div class="sitecard">
+            <h3 class="config__h">Delivery</h3>
+            <p>Coordinated to your address, with route and timing agreed in advance. Your quote covers the delivery approach for your location and access.</p>
+          </div>
+          <div class="sitecard">
+            <h3 class="config__h">Site access</h3>
+            <p>Gate widths, slopes and clearances decide how the sauna arrives. We review access with you before ordering, not on delivery day.</p>
+          </div>
+          <div class="sitecard">
+            <h3 class="config__h">Foundation</h3>
+            <p>A level, load-bearing base is required. We provide guidance on what this model needs so your contractor can prepare it.</p>
+          </div>
+          <div class="sitecard">
+            <h3 class="config__h">Electrical &amp; installation</h3>
+            <p>Electrical work is completed by your licensed electrician to the model's requirements. BUXENA provides guidance, and installation coordination where available.</p>
+          </div>
+        </div>
+
+        <div class="sitefoot">
+          <p class="sitefoot__note">
+            Delivery pricing depends on your ZIP code and project — guidance
+            here is planning help, not an engineering approval. Foundation,
+            electrical, access, delivery location and installation planning
+            are each confirmed with you before ordering.
+          </p>
+          <a
+            class="btn btn--bronze"
+            href={`/quote/?model=${encodeURIComponent(data.title)}`}
+            data-track="request_pricing_click"
+            data-track-model={data.title}
+            data-track-form-type="delivery_section"
+          >Get Delivery + Project Pricing</a>
+        </div>
+      </div>
+    </section>
+
+    {/* Sets expectations about real timber before purchase. Renders only for
+        models whose verified materials include wood. */}
+    <section class="band band--tight">
+      <div class="shell">
+        <NaturalWoodNote materials={data.materials} />
       </div>
     </section>
 
@@ -245,9 +497,35 @@ const breadcrumbSchema = {
       <div class="shell shell--narrow">
         <div class="sec-head center">
           <span class="eyebrow">Enquire</span>
-          <h2 class="h2">Request a quote for the {data.title}</h2>
+          <h2 class="h2">Request pricing for the {displayTitle(data.title)}</h2>
         </div>
         <QuoteForm preselect={data.title} />
+      </div>
+    </section>
+
+    <!-- For Trade -->
+    <section class="band band--tight band--birch">
+      <div class="shell prodtrade">
+        <div>
+          <span class="eyebrow">For Trade</span>
+          <h2 class="h3">Specifying the {displayTitle(data.title)} for a project?</h2>
+        </div>
+        <div class="prodtrade__ctas">
+          <a
+            class="btn btn--outline"
+            href="/for-trade/#trade-form"
+            data-track="product_trade_click"
+            data-track-model={data.title}
+            data-track-cta="request_specifications"
+          >Request Specifications</a>
+          <a
+            class="btn btn--bronze"
+            href="/for-trade/#trade-form"
+            data-track="product_trade_click"
+            data-track-model={data.title}
+            data-track-cta="submit_project"
+          >Submit a Project</a>
+        </div>
       </div>
     </section>
 
@@ -274,6 +552,7 @@ const breadcrumbSchema = {
                 capacityMax={s.data.capacityMax}
                 materials={s.data.materials}
                 dimensions={s.data.dimensions}
+            fromPrice={s.data.fromPrice}
               />
             ))}
           </div>
@@ -281,6 +560,56 @@ const breadcrumbSchema = {
       </section>
     )}
   </article>
+
+  <QuoteBand model={data.title} heading={`Start your ${displayTitle(data.title)} project`} />
+
+  <StickySalesBar model={data.title} />
+
+  <script
+    is:inline
+    define:vars={{
+      model: data.title,
+      category: data.category,
+      location: data.location ?? '',
+      series: data.series ?? '',
+    }}
+  >
+    // product_view fires once per page load, carrying the same model context
+    // every downstream pricing/availability event on this page will carry —
+    // so a lead can be attributed back to the exact model that produced it.
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'product_view',
+      model,
+      category,
+      location,
+      series,
+      landing_page: window.location.pathname,
+    });
+
+    // product_gallery_view — once, when the thumbnail strip is first seen.
+    var gallery = document.querySelector('.prod-hero__thumbs');
+    if (gallery && 'IntersectionObserver' in window) {
+      var gio = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) {
+          window.dataLayer.push({ event: 'product_gallery_view', model: model });
+          gio.disconnect();
+        }
+      }, { threshold: 0.4 });
+      gio.observe(gallery);
+    }
+
+    // product_availability_click — opening the Check Availability disclosure
+    // is the intent signal; the submitted request has its own event.
+    var avail = document.querySelector('[data-avail-check]');
+    if (avail) {
+      avail.addEventListener('toggle', function () {
+        if (avail.open) {
+          window.dataLayer.push({ event: 'product_availability_click', model: model });
+        }
+      });
+    }
+  </script>
 </BaseLayout>
 
 <style>
@@ -325,6 +654,24 @@ const breadcrumbSchema = {
   }
   .prod-hero__info :global(.avail) { margin-bottom: 1.1rem; }
   .prod-hero__info .lead { margin-bottom: 1.5rem; }
+
+  .prod-hero__pricing { margin: 0 0 1.25rem; }
+  .prod-hero__pricing div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--t-small);
+  }
+  .prod-hero__pricing dt { color: var(--muted); margin: 0; }
+  .prod-hero__pricing dd { margin: 0; font-weight: 600; color: var(--ink); }
+  .prod-hero__pricing-note {
+    margin: 0.5rem 0 0;
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+  .prod-hero__quote-note { max-width: 29rem; margin: 0.65rem 0 1.15rem; color: var(--muted); font-size: 0.8125rem; line-height: 1.45; }
 
   .prod-hero__keyspecs { margin: 0 0 1.75rem; }
   .prod-hero__keyspecs-row {
@@ -402,6 +749,73 @@ const breadcrumbSchema = {
 
   .dl { color: var(--bronze-ink); }
 
+  .specs__docnote { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.9rem; }
+  .specs__docreq { display: inline-flex; margin: 0 1.5rem 0.6rem 0; font-size: 0.8125rem; }
+
+  .prod-hero__more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.75rem;
+    margin-top: 1.1rem;
+  }
+  .prod-hero__more .link { font-size: 0.8125rem; }
+
+  .config { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: clamp(1.25rem, 0.8rem + 1.5vw, 2.25rem); }
+  .config__h {
+    font-family: var(--font-sans);
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 0.8rem;
+  }
+  .config__list li {
+    position: relative;
+    font-size: var(--t-small);
+    line-height: 1.55;
+    padding: 0.42rem 0 0.42rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .config__list li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
+  .config__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin: 0.8rem 0 0; }
+  .config__fallback { font-size: var(--t-small); color: var(--muted); }
+
+  .config__inc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: clamp(1.25rem, 0.8rem + 1.5vw, 2.25rem);
+    margin-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+    padding-top: clamp(1.25rem, 0.9rem + 1vw, 1.9rem);
+    border-top: 1px solid var(--line);
+  }
+
+  .config__cta { margin-top: clamp(1.6rem, 1.1rem + 1.5vw, 2.5rem); }
+
+  .sitecards { align-items: stretch; }
+  .sitecard { border-top: 1px solid var(--line); padding-top: 1.1rem; }
+  .sitecard p { font-size: var(--t-small); color: var(--muted); line-height: 1.7; margin: 0; }
+
+  .sitefoot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+    margin-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+    padding-top: clamp(1.1rem, 0.8rem + 1vw, 1.75rem);
+    border-top: 1px solid var(--line);
+  }
+  .sitefoot__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin: 0; max-width: 38em; }
+
+  .prodtrade {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+  }
+  .prodtrade__ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
   @media (max-width: 900px) {
     .prod-hero__grid, .prod-body { grid-template-columns: 1fr; }
     .prod-hero__grid { align-items: start; }
@@ -414,6 +828,6 @@ const breadcrumbSchema = {
        always exactly matches the header's real height at any mobile width,
        never over- or under-shooting. Desktop is untouched — the header is
        sticky there too, but this rule only applies inside this breakpoint. */
-    #enquire { scroll-margin-top: clamp(7.5rem, 7.25rem + 3.15vw, 10.75rem); }
+    #enquire { scroll-margin-top: clamp(5.75rem, 5.4rem + 2vw, 7.5rem); }
   }
 </style>

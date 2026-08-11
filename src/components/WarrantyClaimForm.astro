@@ -1,0 +1,170 @@
+---
+/**
+ * Warranty claim intake — same architecture as every other BUXENA lead form:
+ * posts through src/lib/enquiry-client.ts to /api/enquiries, so it inherits
+ * the honeypot, rate limiting, dev-mode short-circuit (nothing leaves the
+ * machine locally), CRM capture, staff notification and the customer
+ * acknowledgment email. Nothing new is sent anywhere.
+ *
+ * Uploads follow the existing ProjectUpload convention: file METADATA only
+ * (names, types, sizes) travels with the claim until a private bucket and
+ * upload endpoint are explicitly approved. Customer damage photos are
+ * private evidence, never marketing imagery.
+ */
+import ProjectUpload from './ProjectUpload.astro';
+import { getCollection } from 'astro:content';
+
+const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<form class="wform" name="warranty-claim" novalidate>
+  <p class="wform__hp" aria-hidden="true">
+    <label>Do not fill this in <input type="text" name="bot-field" tabindex="-1" autocomplete="off" /></label>
+  </p>
+
+  <div class="wform__grid">
+    <div class="field">
+      <label for="w-name">Your name *</label>
+      <input id="w-name" name="name" type="text" required autocomplete="name" />
+    </div>
+    <div class="field">
+      <label for="w-email">Email *</label>
+      <input id="w-email" name="email" type="email" required autocomplete="email" />
+    </div>
+    <div class="field">
+      <label for="w-phone">Phone</label>
+      <input id="w-phone" name="phone" type="tel" autocomplete="tel" />
+    </div>
+    <div class="field">
+      <label for="w-order">Order number</label>
+      <input id="w-order" name="order" type="text" placeholder="If known" />
+    </div>
+    <div class="field">
+      <label for="w-model">Sauna model</label>
+      <select id="w-model" name="model">
+        <option value="">Select…</option>
+        {models.map((m) => (
+          <option value={m.data.title}>{m.data.title.replace(/^BUH-/i, '')}</option>
+        ))}
+        <option value="Other / not listed">Other / not listed</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="w-date">Purchase or delivery date</label>
+      <input id="w-date" name="purchased" type="text" placeholder="Approximate is fine" />
+    </div>
+    <div class="field">
+      <label for="w-heater">Heater model</label>
+      <input id="w-heater" name="heater" type="text" placeholder="If applicable" />
+    </div>
+    <div class="field">
+      <label for="w-contact">Preferred contact method</label>
+      <select id="w-contact" name="preferred">
+        <option value="">No preference</option>
+        <option value="Email">Email</option>
+        <option value="Phone">Phone</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="w-issue">Describe the issue *</label>
+    <textarea id="w-issue" name="issue" rows="5" required
+      placeholder="What are you seeing, where on the sauna, and when did you first notice it?"></textarea>
+  </div>
+
+  <ProjectUpload id="warranty-upload" label="Photographs or video" />
+  <p class="wform__hint">
+    Clear photographs help enormously — a wide shot showing where it is on the
+    sauna, and a close shot of the detail itself.
+  </p>
+
+  <button class="btn btn--bronze wform__submit" type="submit">Submit Warranty Claim</button>
+  <p class="wform__note">
+    We will confirm receipt by email and come back to you directly. Coverage is
+    determined by the applicable product or manufacturer warranty.
+  </p>
+</form>
+
+<style>
+  .wform { display: grid; gap: 1.25rem; max-width: 46rem; }
+  .wform__hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .wform__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  .wform__hint, .wform__note {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+  .wform__submit { justify-self: start; }
+
+  @media (max-width: 640px) {
+    .wform__grid { grid-template-columns: 1fr; }
+    .wform__submit { justify-self: stretch; justify-content: center; }
+  }
+</style>
+
+<script>
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+  import { track } from '../lib/track';
+
+  const form = document.querySelector<HTMLFormElement>('form[name="warranty-claim"]');
+  if (form) {
+    form.addEventListener('focusin', () => track('quote_started', { formType: 'warranty_claim' }), { once: true });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const data = new FormData(form);
+      const get = (k: string) => (data.get(k) || '').toString().trim();
+
+      const details = [
+        get('order') && `Order number: ${get('order')}`,
+        get('purchased') && `Purchased/delivered: ${get('purchased')}`,
+        get('heater') && `Heater model: ${get('heater')}`,
+        get('preferred') && `Preferred contact: ${get('preferred')}`,
+        get('uploadMeta') && `Attachments: ${get('uploadMeta')}`,
+      ].filter(Boolean).join('\n');
+
+      const btn = form.querySelector<HTMLButtonElement>('.wform__submit')!;
+      const label = btn.textContent ?? '';
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        message: ['Warranty claim', get('issue'), details].filter(Boolean).join('\n\n'),
+        saunaInterest: get('model'),
+        source: 'Warranty Claim',
+        botField: get('bot-field'),
+      });
+
+      btn.disabled = false;
+      btn.textContent = label || 'Submit Warranty Claim';
+
+      if (!result.ok) {
+        showFormStatus(form, 'error');
+        return;
+      }
+      track('form_success', { formType: 'warranty_claim', model: get('model') });
+
+      if (result.devMode) {
+        showFormStatus(form, 'dev-success', 'Warranty claim captured locally — nothing was sent.');
+        return;
+      }
+      rememberEnquiry({
+        model: get('model'),
+        request: 'Warranty claim',
+      });
+      window.location.href = '/thank-you/';
+    });
+  }
+</script>

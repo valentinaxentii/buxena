@@ -1,0 +1,111 @@
+---
+/**
+ * Three-way package selector rendered on every product page between the
+ * description and the enquiry form. No pricing is displayed anywhere —
+ * every card routes into the same Request Pricing conversion, carrying the
+ * chosen package in the tracking payload so the quote conversation starts
+ * with the buyer's intent already known.
+ */
+import { packages } from '../data/packages';
+
+interface Props {
+  model: string;
+}
+const { model } = Astro.props;
+---
+
+<section class="band band--deep pkg" data-pkg-band data-pkg-model={model}>
+  <div class="shell">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Three Ways to Buy</span>
+      <h2 class="h2 measure--tight">From the sauna alone to the whole project</h2>
+    </div>
+
+    <div class="grid cols-3 reveal">
+      {packages.map((pkg) => (
+        <article class={`pkg__card ${pkg.flag ? 'pkg__card--flagged' : ''}`}>
+          {pkg.flag && <span class="pkg__flag">{pkg.flag}</span>}
+          <h3 class="h3 pkg__name">{pkg.name}</h3>
+          <p class="pkg__summary">{pkg.summary}</p>
+          <ul class="pkg__list">
+            {pkg.includes.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+          {pkg.note && <p class="pkg__note">{pkg.note}</p>}
+          <a
+            class="link pkg__cta"
+            href="#enquire"
+            data-track="product_package_selected"
+            data-track-model={model}
+            data-track-package={pkg.name}
+            data-track-form-type="package_card"
+          >Request pricing <span class="arrow" aria-hidden="true">→</span></a>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .pkg__card {
+    display: flex;
+    flex-direction: column;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    padding: clamp(1.4rem, 1rem + 1.3vw, 2.1rem);
+    height: 100%;
+  }
+  .pkg__card--flagged { border-color: var(--bronze); }
+
+  .pkg__flag {
+    align-self: flex-start;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--linen);
+    background: var(--bronze-btn);
+    padding: 0.4rem 0.8rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .pkg__name { margin-bottom: 0.8rem; }
+  .pkg__summary { font-size: var(--t-small); color: var(--muted); line-height: 1.7; margin-bottom: 1.2rem; }
+
+  .pkg__list { margin-bottom: 1.2rem; }
+  .pkg__list li {
+    position: relative;
+    font-size: var(--t-small);
+    color: var(--ink);
+    line-height: 1.55;
+    padding: 0.4rem 0 0.4rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .pkg__list li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--bronze);
+  }
+
+  .pkg__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.2rem; }
+
+  .pkg__cta { margin-top: auto; align-self: flex-start; }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+
+  // product_package_view — once, when the package band first enters view.
+  const band = document.querySelector<HTMLElement>('[data-pkg-band]');
+  if (band && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        track('product_package_view', { model: band.dataset.pkgModel ?? '' });
+        io.disconnect();
+      }
+    }, { threshold: 0.25 });
+    io.observe(band);
+  }
+</script>

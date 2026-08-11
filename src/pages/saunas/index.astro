@@ -111,11 +111,15 @@ const facets = [
             capacityMax={s.data.capacityMax}
             materials={s.data.materials}
             dimensions={s.data.dimensions}
+            fromPrice={s.data.fromPrice}
           />
         ))}
       </div>
 
-      <p class="empty" data-empty hidden>Nothing matches those filters yet.</p>
+      <div class="empty" data-empty hidden>
+        <p class="empty__line">No saunas match these filters.</p>
+        <button class="btn btn--outline" type="button" data-filter-reset>Reset Filters</button>
+      </div>
     </div>
   </section>
 
@@ -184,7 +188,8 @@ const facets = [
   .path__cta .arrow { transition: transform 0.3s var(--ease); }
   .path__cta:hover .arrow { transform: translateX(2px); }
 
-  .empty { color: var(--muted); font-style: italic; padding-block: 2.25rem; }
+  .empty { padding-block: 2.25rem; display: grid; justify-items: start; gap: 1.25rem; }
+  .empty__line { margin: 0; color: var(--muted); font-style: italic; }
 
   @media (max-width: 640px) {
     .paths { grid-template-columns: 1fr; }

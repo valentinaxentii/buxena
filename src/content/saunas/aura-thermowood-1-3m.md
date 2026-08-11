@@ -8,6 +8,8 @@ tagline: "A compact two-person barrel"
 summary: "The smallest barrel in the range, built for one or two people."
 order: 180
 placeholder: false
+draft: true
+hold: "HOLD — SUPPLIER VERIFICATION (2026-08-11): no manufacturer identified. 130cm is smaller than every barrel in all four supplier ranges, and the admin product record carries NO SUPPLIER. Data and images preserved; restore by removing draft+hold once a supplier confirms the model."
 capacity: "2 people"
 capacityMin: 2
 capacityMax: 2

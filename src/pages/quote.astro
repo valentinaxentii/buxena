@@ -1,23 +1,27 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import QuoteForm from '../components/QuoteForm.astro';
+import QuoteCompare from '../components/QuoteCompare.astro';
 import { publicEmail } from '../data/site';
 
+// Claim-audited (founders' review): no automatic promise of a written
+// quote, exact heater sizing or a delivery price — those depend on the
+// project conversation. Each line states what the process genuinely covers.
 const expect = [
-  'A written quote covering the models that suit your space',
-  'Heater sizing and the electrical requirement that comes with it',
+  'Project pricing and suitable model options',
+  'Heater and control recommendations based on confirmed project requirements',
   'What the site needs — base, access, clearances',
-  'Delivery cost to your ZIP code',
+  'A delivery estimate based on your location and access',
 ];
 ---
 
 <BaseLayout
-  title="Request a Quote"
-  description="Tell us about your space and we will send a written quote with the models that fit it."
+  title="Request Pricing"
+  description="Tell us about your space and we will come back with the models that fit it and project pricing."
 >
   <section class="band band--tight page-head">
     <div class="shell">
-      <span class="eyebrow">Request a Quote</span>
+      <span class="eyebrow">Request Pricing</span>
       <h1 class="display measure--tight">Tell us about your space</h1>
       <p class="lead measure">
         The more you can tell us about where the sauna is going, the more useful
@@ -39,11 +43,15 @@ const expect = [
         <p class="quote__note">
           If a model is wrong for your site, we will tell you that too.
         </p>
+        <p class="quote__note">
+          <a class="link" href="/how-buying-works/">How buying works <span class="arrow" aria-hidden="true">→</span></a>
+        </p>
         {publicEmail && (
           <p class="quote__alt">
             Prefer email? <a href={`mailto:${publicEmail}`}>{publicEmail}</a>
           </p>
         )}
+        <QuoteCompare variant="compact" />
       </aside>
     </div>
   </section>

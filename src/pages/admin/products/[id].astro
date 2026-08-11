@@ -61,6 +61,38 @@ try {
 }
 
 const dims = product?.dimensions ?? {};
+const images: string[] = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
+const supplierName = suppliers.find((s) => s.id === product?.supplier_id)?.name ?? 'No supplier';
+// IMAGE RIGHTS: per docs/image-rights-register.md, no product photography
+// currently has documented public-use permission (only /brand/ assets are
+// approved). The internal badge reflects that until the register says
+// otherwise for a given file.
+const rightsApproved = (src: string) => src.startsWith('/brand/');
+// A linked supplier is useful, but it is not the same as a verified supplier
+// model mapping. That relationship belongs in supplier_products and is kept
+// separate so a legacy product row can never masquerade as a sales-ready SKU.
+let supplierMappingVerified = false;
+let pricingStatus: string | null = null;
+try {
+  const supabase = createSupabaseAdminClient();
+  const [{ data: mapping }, { data: worksheet, error: worksheetError }] = await Promise.all([
+    supabase.from('supplier_products').select('product_id').eq('product_id', id).limit(1).maybeSingle(),
+    supabase.from('product_pricing').select('status').eq('product_id', id).maybeSingle(),
+  ]);
+  supplierMappingVerified = Boolean(mapping);
+  if (!worksheetError) pricingStatus = worksheet?.status ?? null;
+} catch {
+  // The pricing/mapping tables are optional during the staged rollout. The
+  // product editor remains usable if either has not been enabled yet.
+}
+const hasVerifiedImage = images.some((src) => rightsApproved(src));
+const salesFlags = [
+  { label: supplierMappingVerified ? 'Supplier model mapping recorded' : 'Supplier model mapping needs review', good: supplierMappingVerified },
+  { label: pricingStatus === 'Approved' ? 'Public price approved' : `Pricing ${pricingStatus ?? 'worksheet'} needs review`, good: pricingStatus === 'Approved' },
+  { label: hasVerifiedImage ? 'Approved product image on file' : 'Product image rights need approval', good: hasVerifiedImage },
+  { label: Number(product?.stock_quantity ?? 0) > 0 ? 'Legacy stock value present — verify before selling as in-stock' : 'No verified inventory recorded', good: false },
+];
+
 ---
 
 <AdminLayout title={product ? product.model_name : 'Product'} parentLabel="Products" parentHref="/admin/products">
@@ -68,7 +100,18 @@ const dims = product?.dimensions ?? {};
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
 
   {product && (
-    <>
+    <div class="pd">
+    <div class="pd__left">
+      <section class="pd__readiness" aria-label="Sales readiness">
+        <div>
+          <p class="pd__eyebrow">Sales readiness</p>
+          <h2>{salesFlags.every((flag) => flag.good) ? 'Ready for sales' : 'Needs review before sales claims'}</h2>
+        </div>
+        <ul>
+          {salesFlags.map((flag) => <li class={flag.good ? 'is-good' : 'is-review'}>{flag.label}</li>)}
+        </ul>
+        <a class="admin-btn" href={`/admin/products/${id}/pricing`}>Open pricing worksheet</a>
+      </section>
       <form class="admin-form" method="POST">
         <label class="admin-field"><span>Model Name *</span><input type="text" name="model_name" value={product.model_name} required /></label>
         <label class="admin-field">
@@ -86,8 +129,12 @@ const dims = product?.dimensions ?? {};
           </select>
         </label>
 
-        <label class="admin-field"><span>EXW / Product Cost</span><input type="number" step="0.01" name="cost" value={product.cost ?? ''} /></label>
-        <label class="admin-field"><span>Selling Price</span><input type="number" step="0.01" name="selling_price" value={product.selling_price ?? ''} /></label>
+        <div class="pd__legacy admin-form__full">
+          <strong>Legacy values — internal only</strong>
+          <p>These older fields do not set a customer price and must not be treated as verified supplier pricing. Use the pricing worksheet above for the review and approval process.</p>
+        </div>
+        <label class="admin-field"><span>Legacy product cost (not source-verified)</span><input type="number" step="0.01" name="cost" value={product.cost ?? ''} /></label>
+        <label class="admin-field"><span>Legacy selling value (not public price)</span><input type="number" step="0.01" name="selling_price" value={product.selling_price ?? ''} /></label>
 
         <label class="admin-field"><span>Width (in)</span><input type="number" step="0.1" name="width" value={dims.width ?? ''} /></label>
         <label class="admin-field"><span>Depth (in)</span><input type="number" step="0.1" name="depth" value={dims.depth ?? ''} /></label>
@@ -116,10 +163,165 @@ const dims = product?.dimensions ?? {};
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Product</button>
       </form>
-    </>
+    </div>
+
+    <aside class="pd__right">
+      <div class="pd__imgpanel">
+        <dl class="pd__imghead">
+          <div><dt>Model</dt><dd>{product.model_name}</dd></div>
+          <div><dt>Supplier</dt><dd>{supplierName}</dd></div>
+        </dl>
+        {images.length > 0 ? (
+          <>
+            {!rightsApproved(images[0]) && <p class="pd__rights">IMAGE RIGHTS NOT APPROVED</p>}
+            <button type="button" class="pd__big" data-pd-big aria-label="Open full-screen preview">
+              <img src={images[0]} alt={product.model_name} data-pd-main />
+            </button>
+            {images.length > 1 && (
+              <div class="pd__thumbs">
+                {images.map((src, i) => (
+                  <button type="button" class={`pd__thumb ${i === 0 ? 'is-on' : ''}`} data-pd-thumb={src} aria-label={`Image ${i + 1}`}>
+                    <img src={src} alt="" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div class="pd__noimg">
+            <span>NO IMAGE</span>
+            <p>No verified image is linked to this product yet.</p>
+          </div>
+        )}
+      </div>
+    </aside>
+
+    <!-- full-screen preview -->
+    <div class="pdlb" data-pdlb hidden>
+      <div class="pdlb__backdrop" data-pdlb-close></div>
+      <figure class="pdlb__box" role="dialog" aria-modal="true" aria-label="Product image preview">
+        <button class="pdlb__x" type="button" data-pdlb-close aria-label="Close preview">×</button>
+        {images.length > 1 && <button class="pdlb__nav pdlb__nav--prev" type="button" data-pdlb-prev aria-label="Previous image">‹</button>}
+        <img class="pdlb__img" data-pdlb-img src="" alt={product.model_name} />
+        {images.length > 1 && <button class="pdlb__nav pdlb__nav--next" type="button" data-pdlb-next aria-label="Next image">›</button>}
+        <figcaption class="pdlb__cap"><strong>{product.model_name}</strong><span>{supplierName}</span></figcaption>
+      </figure>
+    </div>
+
+    <script type="application/json" id="pd-images" set:html={JSON.stringify(images)} />
+    </div>
   )}
 </AdminLayout>
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+
+  /* Two columns on desktop: fields left, large sticky image right (~40%).
+     Declared inside a min-width query as well as the base rule so nothing
+     later in the cascade can collapse the desktop layout — the image panel
+     must never fall below the form on a desktop screen. */
+  .pd { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr); gap: 1.75rem; align-items: start; }
+  @media (min-width: 981px) {
+    .pd { grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr); }
+    .pd__right { position: sticky; top: 1rem; }
+  }
+  .pd__readiness { margin-bottom: 1.25rem; padding: 1rem 1.15rem; border: 1px solid rgba(201, 166, 104, 0.25); border-radius: 4px; background: rgba(201, 166, 104, 0.045); }
+  .pd__readiness > div { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+  .pd__readiness h2 { margin: 0; font-size: 0.95rem; color: var(--admin-cream); }
+  .pd__eyebrow { margin: 0 0 0.25rem; color: var(--admin-gold); font-size: 0.62rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .pd__readiness ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.5rem 1rem; margin: 0.85rem 0; padding: 0; list-style: none; font-size: 0.75rem; color: var(--admin-muted); }
+  .pd__readiness li { display: flex; gap: 0.45rem; align-items: start; }
+  .pd__readiness li::before { content: '•'; font-size: 1rem; line-height: 0.75rem; }
+  .pd__readiness li.is-good::before { color: #9ac895; }
+  .pd__readiness li.is-review::before { color: #ecc987; }
+  .pd__readiness .admin-btn { display: inline-flex; }
+  .pd__legacy { padding: 0.75rem 0.85rem; border-left: 2px solid rgba(236, 201, 135, 0.65); background: rgba(236, 201, 135, 0.055); color: var(--admin-muted); }
+  .pd__legacy strong { color: #ecc987; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .pd__legacy p { margin: 0.35rem 0 0; font-size: 0.76rem; line-height: 1.45; }
+
+  .pd__imgpanel { border: 1px solid rgba(201, 166, 104, 0.18); border-radius: 4px; background: #181613; padding: 1rem; }
+  .pd__imghead { margin: 0 0 0.8rem; font-size: 0.82rem; display: grid; gap: 0.25rem; }
+  .pd__imghead div { display: flex; gap: 0.6rem; align-items: baseline; }
+  .pd__imghead dt { color: var(--admin-muted); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; min-width: 4.2rem; margin: 0; }
+  .pd__imghead dd { margin: 0; color: var(--admin-gold); font-weight: 600; }
+
+  .pd__rights {
+    margin: 0 0 0.6rem; padding: 0.35rem 0.6rem;
+    font-size: 0.62rem; letter-spacing: 0.1em; font-weight: 600;
+    color: #ecc987; background: rgba(236, 201, 135, 0.08);
+    border: 1px solid rgba(236, 201, 135, 0.35); border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* Transparent stage: no boxed background behind the sauna — the cutout
+     (or photo) sits directly on the dark admin ground, full sauna always
+     visible via object-fit: contain. */
+  .pd__big { display: block; width: 100%; padding: 0.25rem; border: none; background: transparent; border-radius: 3px; overflow: hidden; cursor: zoom-in; }
+  .pd__big img { display: block; width: 100%; height: auto; max-height: 30rem; object-fit: contain; filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45)); }
+  .pd__big:hover img { filter: drop-shadow(0 14px 32px rgba(201, 166, 104, 0.25)); }
+
+  .pd__thumbs { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.7rem; }
+  .pd__thumb { width: 3.4rem; height: 3.4rem; padding: 0; overflow: hidden; border: 1px solid rgba(201, 166, 104, 0.2); border-radius: 3px; background: #201d19; cursor: pointer; }
+  .pd__thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pd__thumb.is-on { border-color: var(--admin-gold); }
+
+  .pd__noimg { display: grid; place-items: center; gap: 0.4rem; min-height: 16rem; text-align: center; border: 1px dashed rgba(201, 166, 104, 0.25); border-radius: 3px; padding: 1.5rem; }
+  .pd__noimg span { font-size: 0.8rem; letter-spacing: 0.18em; color: var(--admin-muted); }
+  .pd__noimg p { margin: 0; font-size: 0.75rem; color: var(--admin-muted); max-width: 16rem; }
+
+  .pdlb { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; }
+  .pdlb[hidden] { display: none; }
+  .pdlb__backdrop { position: absolute; inset: 0; background: rgba(10, 9, 7, 0.85); }
+  .pdlb__box { position: relative; margin: 0; max-width: min(64rem, 94vw); }
+  .pdlb__img { max-width: 100%; max-height: 80vh; object-fit: contain; border: 1px solid rgba(201, 166, 104, 0.25); border-radius: 3px; background: #14120f; }
+  .pdlb__cap { display: flex; gap: 1rem; padding: 0.6rem 0.2rem; font-size: 0.85rem; color: var(--admin-cream); }
+  .pdlb__cap strong { color: var(--admin-gold); }
+  .pdlb__cap span { color: var(--admin-muted); }
+  .pdlb__x { position: absolute; top: -0.6rem; right: -0.6rem; z-index: 2; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--admin-gold); color: #14120f; border: none; font-size: 1.3rem; cursor: pointer; }
+  .pdlb__nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 2.4rem; height: 3.2rem; border: none; border-radius: 3px; background: rgba(20, 18, 15, 0.75); color: var(--admin-gold); font-size: 1.8rem; cursor: pointer; }
+  .pdlb__nav--prev { left: 0.4rem; }
+  .pdlb__nav--next { right: 0.4rem; }
+
+  /* Mobile/tablet: image panel moves ABOVE the fields. */
+  @media (max-width: 980px) {
+    .pd { grid-template-columns: 1fr; }
+    .pd__right { position: static; order: -1; }
+  }
 </style>
+
+<script>
+  const wrap = document.getElementById('pd-images');
+  if (wrap) {
+    const images: string[] = JSON.parse(wrap.textContent ?? '[]');
+    const main = document.querySelector<HTMLImageElement>('[data-pd-main]');
+    const big = document.querySelector<HTMLElement>('[data-pd-big]');
+    const lb = document.querySelector<HTMLElement>('[data-pdlb]')!;
+    const lbImg = lb?.querySelector<HTMLImageElement>('[data-pdlb-img]');
+    let index = 0;
+
+    const setMain = (src: string) => {
+      if (!main) return;
+      main.src = src;
+      index = Math.max(0, images.indexOf(src));
+      document.querySelectorAll<HTMLElement>('[data-pd-thumb]').forEach((t) =>
+        t.classList.toggle('is-on', t.dataset.pdThumb === src)
+      );
+    };
+
+    document.querySelectorAll<HTMLElement>('[data-pd-thumb]').forEach((t) =>
+      t.addEventListener('click', () => setMain(t.dataset.pdThumb!))
+    );
+
+    const show = () => { if (lbImg) lbImg.src = images[index] ?? ''; };
+    big?.addEventListener('click', () => { if (!images.length) return; show(); lb.hidden = false; });
+    lb?.querySelectorAll('[data-pdlb-close]').forEach((el) => el.addEventListener('click', () => { lb.hidden = true; }));
+    lb?.querySelector('[data-pdlb-prev]')?.addEventListener('click', () => { index = (index - 1 + images.length) % images.length; show(); setMain(images[index]); });
+    lb?.querySelector('[data-pdlb-next]')?.addEventListener('click', () => { index = (index + 1) % images.length; show(); setMain(images[index]); });
+    document.addEventListener('keydown', (e) => {
+      if (lb.hidden) return;
+      if (e.key === 'Escape') lb.hidden = true;
+      if (e.key === 'ArrowLeft' && images.length > 1) { index = (index - 1 + images.length) % images.length; show(); }
+      if (e.key === 'ArrowRight' && images.length > 1) { index = (index + 1) % images.length; show(); }
+    });
+  }
+</script>

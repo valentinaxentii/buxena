@@ -1,17 +1,20 @@
 ---
 /**
- * "The BUXENA Ritual Kit" — the included-accessories band shown on every
- * sauna product page, between the specifications and the enquiry form.
+ * "The BUXENA Ritual Kit" — the accessories band shown on every sauna
+ * product page, between the specifications and the enquiry form.
  *
- * The kit is a real fulfilment promise: every sauna preorder ships with
- * these five items (sourced from the supplier accessory list at ~€94
- * landed cost). If the kit contents change, update BOTH this component and
- * the standard line in the written quote so site and paperwork agree.
+ * COMMERCIAL STATUS (founders' review, 2026-08-10): the exact inclusion
+ * policy is AWAITING CONFIRMATION. Until the policy is confirmed, this
+ * band presents the kit as a package component confirmed in the written
+ * quote — NOT as an unconditional "included free with every sauna"
+ * promise. Do not restore inclusion language without founder sign-off.
  *
- * Product photos live in /public/images/accessories/ (supplier shop
- * photography, 480px squares). alt is empty — the visible label right
- * below each photo already names the item.
+ * IMAGE RIGHTS: the five photos are supplier shop photography with no
+ * documented license — BLOCKED / REPLACE in docs/image-rights-register.md.
+ * Local preview only.
  */
+import { webpSrcset } from '../lib/optimized-image';
+
 const items: { label: string; image: string }[] = [
   { label: 'Wooden bucket and ladle', image: '/images/accessories/kit-bucket.jpg' },
   { label: 'Thermometer and hygrometer', image: '/images/accessories/kit-thermometer.jpg' },
@@ -24,17 +27,22 @@ const items: { label: string; image: string }[] = [
 <section class="band ritual">
   <div class="shell">
     <div class="ritual__rule" aria-hidden="true"></div>
-    <span class="eyebrow">Included with every preorder</span>
+    <span class="eyebrow">The Ritual, Ready</span>
     <h2 class="ritual__title">The BUXENA Ritual Kit</h2>
     <p class="ritual__lead">
-      Every sauna leaves for your address with the ritual already packed —
-      our gift with your order.
+      The essentials of the sauna ritual, specified alongside your package
+      — so the first heat is a complete experience, not a shopping list.
     </p>
 
     <ul class="ritual__grid" role="list">
       {items.map((item) => (
         <li class="ritual__item">
-          <img src={item.image} alt="" loading="lazy" decoding="async" width="480" height="480" />
+          <picture>
+            {webpSrcset(item.image) && (
+              <source type="image/webp" srcset={webpSrcset(item.image)} sizes="(max-width: 700px) 40vw, 200px" />
+            )}
+            <img src={item.image} alt="" loading="lazy" decoding="async" width="480" height="480" />
+          </picture>
           <span>{item.label}</span>
         </li>
       ))}

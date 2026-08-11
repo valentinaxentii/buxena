@@ -2,17 +2,25 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Thank you" description="Your request has been received." noindex={true}>
+<BaseLayout title="Your project is started" description="Your request has been received." noindex={true}>
   <section class="band ty">
     <div class="shell shell--narrow center">
-      <h1 class="display">Request received</h1>
+      <h1 class="display">Your project is started</h1>
       <p class="lead">
-        Thank you. We have your enquiry and will come back to you with options
-        and a written quote.
+        Thank you. A BUXENA specialist will review your enquiry and come
+        back to you directly.
       </p>
+
+      <!-- Filled client-side from the summary the submitting form stored;
+           stays hidden when no summary exists (direct visits, cleared
+           storage) so the page never shows empty rows. -->
+      <dl class="ty__summary" data-ty-summary hidden></dl>
+
       <div class="ty__actions">
-        <a class="btn btn--solid" href="/saunas/">Back to the saunas</a>
-        <a class="btn btn--outline" href="/wellness/">Read about the ritual</a>
+        <a class="btn btn--bronze" href="/start-your-project/">Upload Photos / Plans</a>
+        <a class="btn btn--outline" href="/consultation/">Book a Consultation</a>
+        <a class="btn btn--outline" href="/compare/">Compare Models</a>
+        <a class="btn btn--outline" href="/saunas/">Explore Recommended Saunas</a>
       </div>
     </div>
   </section>
@@ -21,5 +29,66 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <style>
   .ty { padding-block: clamp(4.5rem, 3rem + 7.5vw, 9rem); }
   .ty .lead { margin: 1.3rem auto 0; max-width: 34em; }
-  .ty__actions { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 2.25rem; }
+
+  .ty__summary {
+    max-width: 26rem;
+    margin: 2rem auto 0;
+    text-align: left;
+    border-top: 2px solid var(--ink);
+    padding-top: 0.5rem;
+  }
+  .ty__summary :global(div) {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--t-small);
+  }
+  .ty__summary :global(dt) { color: var(--muted); margin: 0; }
+  .ty__summary :global(dd) { margin: 0; text-align: right; }
+
+  .ty__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 2.25rem; }
+
+  @media (max-width: 560px) {
+    .ty__actions { flex-direction: column; align-items: stretch; }
+    .ty__actions .btn { justify-content: center; }
+  }
 </style>
+
+<script>
+  // Render the enquiry summary stored by the submitting form (see
+  // src/lib/enquiry-client.ts). Display-only, non-sensitive fields; cleared
+  // after render so a later unrelated visit doesn't resurrect stale data.
+  const el = document.querySelector<HTMLElement>('[data-ty-summary]');
+  try {
+    const raw = sessionStorage.getItem('buxena:lastEnquiry');
+    if (el && raw) {
+      const summary = JSON.parse(raw) as Record<string, string>;
+      const LABELS: Record<string, string> = {
+        model: 'Model',
+        zip: 'ZIP code',
+        timeline: 'Timeline',
+        projectType: 'Project type',
+      };
+      const rows = Object.entries(summary)
+        .filter(([k, v]) => LABELS[k] && v)
+        .map(([k, v]) => {
+          const div = document.createElement('div');
+          const dt = document.createElement('dt');
+          dt.textContent = LABELS[k];
+          const dd = document.createElement('dd');
+          dd.textContent = k === 'model' ? v.replace(/^BUH-/i, '') : v;
+          div.append(dt, dd);
+          return div;
+        });
+      if (rows.length > 0) {
+        el.append(...rows);
+        el.hidden = false;
+      }
+      sessionStorage.removeItem('buxena:lastEnquiry');
+    }
+  } catch {
+    /* storage unavailable — generic page is fine */
+  }
+</script>

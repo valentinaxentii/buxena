@@ -6,6 +6,7 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
+import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-templates';
 
 const { id } = Astro.params;
 const STATUSES = ['New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'];
@@ -67,6 +68,19 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+
+// Suggested first response — a draft for the founder to review and edit.
+// Built server-side from the enquiry's own fields; nothing sends by itself.
+const reply = enquiry
+  ? buildEnquiryReply({
+      name: enquiry.name,
+      phone: enquiry.phone,
+      location: enquiry.location,
+      saunaInterest: enquiry.sauna_interest,
+      source: enquiry.source,
+    })
+  : null;
+const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, reply) : null;
 ---
 
 <AdminLayout title="Enquiry" subtitle={enquiry ? `Received ${new Date(enquiry.created_at).toLocaleString()}` : undefined} parentLabel="Website Enquiries" parentHref="/admin/enquiries">
@@ -101,7 +115,7 @@ try {
             <button class="admin-btn" type="submit">Create Quote</button>
           </form>
         )}
-        {enquiry.email && <a class="admin-btn admin-btn--ghost" href={`mailto:${enquiry.email}`}>Email Customer</a>}
+        {enquiry.email && <a class="admin-btn admin-btn--ghost" href={replyMailto ?? `mailto:${enquiry.email}`}>Email Customer</a>}
         {enquiry.phone && <a class="admin-btn admin-btn--ghost" href={`tel:${enquiry.phone}`}>Call Customer</a>}
 
         <form method="POST" class="enq-status-form">
@@ -140,6 +154,21 @@ try {
             <p class="enq-label">Customer Message</p>
             <p class="enq-message">{enquiry.message || '—'}</p>
           </section>
+
+          {reply && (
+            <section class="admin-panel enq-sec">
+              <h2 class="enq-sec__h">Suggested Reply <span class="enq-reply__tpl">{reply.templateName}</span></h2>
+              <p class="enq-label" style="margin-top:0;">Subject</p>
+              <p class="enq-reply__subject">{reply.subject}</p>
+              <p class="enq-label">Draft — review and personalize before sending</p>
+              <textarea class="enq-reply__body" data-reply-body readonly rows={reply.body.split('\n').length + 1}>{reply.body}</textarea>
+              <div class="enq-reply__actions">
+                <button class="admin-btn admin-btn--ghost" type="button" data-copy-reply>Copy Reply</button>
+                {replyMailto && <a class="admin-btn" href={replyMailto}>Open in Email App</a>}
+              </div>
+              <p class="enq-reply__note">Opens as a draft in your own mail app — nothing is ever sent automatically.</p>
+            </section>
+          )}
 
           {(lead || quote) && (
             <section class="admin-panel enq-sec">
@@ -217,8 +246,52 @@ try {
   .enq-timeline__when { font-size: 0.68rem; color: var(--admin-muted); }
   .enq-timeline__origin { opacity: 0.7; }
 
+  .enq-reply__tpl {
+    margin-left: 0.5rem;
+    font-size: 0.6rem; font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--admin-muted);
+    text-transform: none;
+  }
+  .enq-reply__subject { margin: 0; font-size: 0.85rem; color: var(--admin-cream); }
+  .enq-reply__body {
+    width: 100%;
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--admin-cream);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    resize: vertical;
+  }
+  .enq-reply__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.6rem; }
+  .enq-reply__note { margin: 0.55rem 0 0; font-size: 0.68rem; color: var(--admin-muted); }
+
   @media (max-width: 900px) {
     .enq-grid { grid-template-columns: 1fr; }
     .enq-status-form { margin-left: 0; }
   }
 </style>
+
+<script>
+  // Copy the suggested reply to the clipboard. Read-only convenience —
+  // the founder pastes, edits and sends from their own mail app.
+  const btn = document.querySelector<HTMLButtonElement>('[data-copy-reply]');
+  const body = document.querySelector<HTMLTextAreaElement>('[data-reply-body]');
+  if (btn && body) {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(body.value);
+      } catch {
+        body.select();
+        document.execCommand('copy');
+      }
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = original; }, 1600);
+    });
+  }
+</script>

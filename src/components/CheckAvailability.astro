@@ -1,0 +1,171 @@
+---
+/**
+ * Check Availability — the lowest-friction conversion on a product page.
+ * Three fields, model pre-filled, submits through the same /api/enquiries
+ * path as everything else (Supabase record + email + Telegram). Rendered as
+ * a disclosure so it costs no vertical space until a buyer opens it.
+ */
+import { displayTitle } from '../data/catalog';
+
+interface Props {
+  /** Full internal title (BUH-…) — kept in the hidden form value/CRM; display is stripped. */
+  model: string;
+}
+const { model } = Astro.props;
+const shownName = displayTitle(model);
+const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+---
+
+<details class="avail-check" data-avail-check>
+  <summary class="avail-check__summary">
+    Check Availability
+    <span class="avail-check__chev" aria-hidden="true">▾</span>
+  </summary>
+
+  <form class="avail-check__form" data-avail-form>
+    <p class="avail-check__hp">
+      <label>Leave this field empty <input name="bot-field-avail" tabindex="-1" autocomplete="off" /></label>
+    </p>
+
+    <input type="hidden" name="model" value={model} />
+
+    <div class="avail-check__fields">
+      <div class="avail-check__field">
+        <label for={`avail-name-${idSlug}`}>Name <span aria-hidden="true">*</span></label>
+        <input id={`avail-name-${idSlug}`} name="name" type="text" required autocomplete="name" />
+      </div>
+      <div class="avail-check__field">
+        <label for={`avail-email-${idSlug}`}>Email <span aria-hidden="true">*</span></label>
+        <input id={`avail-email-${idSlug}`} name="email" type="email" required autocomplete="email" />
+      </div>
+      <div class="avail-check__field">
+        <label for={`avail-zip-${idSlug}`}>ZIP code</label>
+        <input id={`avail-zip-${idSlug}`} name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" />
+      </div>
+    </div>
+
+    <button class="btn btn--bronze avail-check__submit" type="submit">Check Availability</button>
+    <p class="avail-check__note" data-avail-note hidden>
+      Thank you — we'll confirm availability for the {shownName} by email shortly.
+    </p>
+  </form>
+</details>
+
+<style>
+  .avail-check {
+    border: 1px solid var(--line);
+    margin-top: 0.9rem;
+  }
+
+  .avail-check__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    cursor: pointer;
+    list-style: none;
+    padding: 0.85rem 1.15rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    transition: color 0.35s var(--ease);
+  }
+  .avail-check__summary::-webkit-details-marker { display: none; }
+  .avail-check__summary:hover { color: var(--ink); }
+
+  .avail-check__chev { transition: transform 0.35s var(--ease); }
+  .avail-check[open] .avail-check__chev { transform: rotate(180deg); }
+
+  .avail-check__form { padding: 0.35rem 1.15rem 1.25rem; }
+
+  .avail-check__hp { position: absolute; left: -9999px; }
+
+  .avail-check__fields { display: grid; gap: 0.9rem; }
+
+  .avail-check__field { display: grid; gap: 0.4rem; }
+  .avail-check__field label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .avail-check__field label span { color: var(--bronze-ink); font-weight: 700; }
+
+  .avail-check__field input {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.55rem 0;
+    width: 100%;
+    border-radius: 0;
+    transition: border-color 0.4s var(--ease);
+  }
+  .avail-check__field input:hover { border-color: var(--muted); }
+  .avail-check__field input:focus { border-color: var(--bronze); }
+
+  .avail-check__submit { margin-top: 1.1rem; padding: 0.87rem 1.73rem; font-size: 0.78rem; }
+
+  .avail-check__note { font-size: var(--t-small); color: var(--bronze-ink); margin: 0.9rem 0 0; }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus } from '../lib/enquiry-client';
+
+  document.querySelectorAll<HTMLFormElement>('[data-avail-form]').forEach((form) => {
+    const note = form.querySelector<HTMLElement>('[data-avail-note]')!;
+    const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const data = new FormData(form);
+      const get = (key: string) => (data.get(key) || '').toString().trim();
+      const model = get('model');
+      const zip = get('zip');
+
+      const originalLabel = submitBtn.textContent ?? '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        location: zip,
+        message: `Availability request for ${model}${zip ? ` — ZIP ${zip}` : ''}`,
+        saunaInterest: model,
+        source: 'Check Availability',
+        botField: get('bot-field-avail'),
+      });
+
+      if (!result.ok) {
+        console.error('[availability] submission failed:', result.error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel || 'Check Availability';
+        showFormStatus(form, 'error');
+        return;
+      }
+
+      track('availability_request', { formType: 'check_availability', model, zip });
+
+      if (result.devMode) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel || 'Check Availability';
+        showFormStatus(form, 'dev-success');
+        return;
+      }
+
+      form.querySelectorAll('input, button').forEach((el) => ((el as HTMLInputElement).disabled = true));
+      note.hidden = false;
+      submitBtn.textContent = 'Sent';
+    });
+  });
+</script>

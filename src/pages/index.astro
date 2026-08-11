@@ -1,122 +1,676 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width" />
-  <title>BUXENA — Coming Soon</title>
-  <meta name="description" content="BUXENA website coming soon." />
-</head>
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import Figure from '../components/Figure.astro';
+import CollectionCard from '../components/CollectionCard.astro';
+import ProductCard from '../components/ProductCard.astro';
+import QuoteBand from '../components/QuoteBand.astro';
+import BuxenaMark from '../components/BuxenaMark.astro';
+import { packages } from '../data/packages';
+import { getCollection } from 'astro:content';
 
-<body>
-  <main>
-    <div class="overlay"></div>
+const saunas = await getCollection('saunas', ({ data }) => !data.draft);
 
-    <section>
-      <img
-        class="logo-img"
-        src="/brand/buxena-logo-transparent.png"
-        alt="BUXENA logo"
-      />
+const locationCount = (loc: string) => saunas.filter((s) => s.data.location === loc).length;
+const typeCount = (type: string) => saunas.filter((s) => s.data.productType === type).length;
 
-      <h1>WEBSITE UNDER CONSTRUCTION</h1>
+// The slim trust strip directly under the hero — four claims, each backed
+// by what BUXENA actually does today.
+const trustItems = [
+  'European Design',
+  'U.S. Project Support',
+  'Complete Sauna Packages',
+  'Delivery Coordination',
+];
 
-      <p class="gold">
-        SOMETHING EXTRAORDINARY IS COMING SOON.
+// IMAGE RIGHTS: all four tile images below are BLOCKED / REPLACE in
+// docs/image-rights-register.md (§"Homepage placements") — kept in the
+// local preview for visual review only, per the founders' instruction.
+const chooseTiles = [
+  {
+    name: 'Outdoor Saunas',
+    blurb: 'Architectural backyard sauna systems',
+    href: '/saunas/outdoor-saunas/',
+    count: locationCount('outdoor'),
+    image: '/images/collection-barrel.jpg',
+    note: 'Outdoor Saunas — representative exterior image.',
+  },
+  {
+    name: 'Cube Saunas',
+    blurb: 'Modern form, panoramic design',
+    href: '/saunas/cube-saunas/',
+    count: typeCount('Cube'),
+    image: '/images/saunas/nord-cube-200-hero.jpg',
+    note: 'Cube Saunas — flat-roofed panoramic form.',
+  },
+  {
+    name: 'Barrel Saunas',
+    blurb: 'Traditional shape, efficient footprint',
+    href: '/saunas/barrel-saunas/',
+    count: typeCount('Barrel'),
+    image: '/images/saunas/eda-nordic-spruce-2-5m-hero.png',
+    note: 'Barrel Saunas — traditional curved form.',
+  },
+  {
+    name: 'Indoor Saunas',
+    blurb: 'Integrated wellness for the home',
+    href: '/saunas/indoor-saunas/',
+    count: locationCount('indoor'),
+    image: '/images/collection-indoor.jpg',
+    note: 'Indoor Saunas — representative interior image.',
+  },
+];
+
+// WHY BUXENA — scannable, four short benefit blocks. BUXENA curates and
+// imports; it is never described as a manufacturer.
+const reasons = [
+  {
+    title: 'Curated in Europe',
+    body: 'Every model is selected from established European sauna makers and specified for American homes.',
+  },
+  {
+    title: 'Configured for Your Project',
+    body: 'Heater, controls and options are matched to your room, power supply and site — before you order.',
+  },
+  {
+    title: 'Delivered in the U.S.',
+    body: 'Freight, customs and inland delivery coordinated to your address.',
+  },
+  {
+    title: 'Project Support',
+    body: 'One point of contact from selection through delivery, with site, electrical and installation guidance.',
+  },
+];
+
+// Featured models — real, verified content only, chosen to avoid the
+// imagery groups most clearly sourced from suppliers (VIRU, NORD).
+const FEATURED_SLUGS = ['ella-h2', 'illi-h2', 'uku-160', 'uku-230'];
+const featured = FEATURED_SLUGS.map((slug) => saunas.find((s) => s.id === slug)).filter(
+  (s): s is NonNullable<typeof s> => Boolean(s)
+);
+
+// HOW IT WORKS — buyer-focused, no operational overclaims: no permit or
+// electrical-approval promises, no nationwide-installation promise.
+const steps = [
+  { n: '01', title: 'Show us your space', body: 'Send dimensions, photographs, plans or even a rough sketch. That is enough to start.' },
+  { n: '02', title: 'We match your sauna', body: 'We identify suitable models and configure the heater, controls and options around your project.' },
+  { n: '03', title: 'Confirm the project', body: 'Review site access, foundation, electrical requirements, delivery and project pricing before the order is finalized.' },
+  { n: '04', title: 'Delivery & completion', body: 'We coordinate delivery and provide the information needed to move the project through installation and first use.' },
+];
+
+// Wellness ecosystem — SAUNA is the real product category; COLD and REST
+// are editorial/future categories and are labelled as such. No health
+// claims anywhere in this section.
+const wellnessPillars = [
+  { key: 'sauna', label: 'Sauna', line: 'The core heat experience.', tag: 'The BUXENA range', href: '/saunas/' },
+  { key: 'cold', label: 'Cold', line: 'The contrast that completes the heat.', tag: 'Editorial — future category' },
+  { key: 'rest', label: 'Rest', line: 'The space between heat and cold.', tag: 'Editorial' },
+];
+---
+
+<BaseLayout title="home" overHero={true}>
+  <Hero />
+
+  <!-- Trust / value strip -->
+  <section class="band--ember trust reveal" id="intro">
+    <div class="shell">
+      <ul class="trust__list reveal" data-reveal-stagger>
+        {trustItems.map((item) => (
+          <li class="trust__item">
+            <span class="slats" aria-hidden="true"></span>
+            <span class="trust__label">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- Brand statement — compact, supports the journey without interrupting it -->
+  <section class="band band--tight intro-band">
+    <div class="shell intro">
+      <div class="intro__left reveal" data-reveal-stagger>
+        <span class="eyebrow"><BuxenaMark /></span>
+        <h2 class="h2">
+          A sauna is a space that asks nothing of you.<br />
+          <span class="serif-italic">That is the whole idea.</span>
+        </h2>
+      </div>
+      <div class="intro__right reveal" data-reveal-stagger>
+        <p class="lead">
+          Every project is reviewed by someone who understands the models,
+          site requirements, heater options and delivery process. We help
+          you choose the right sauna — and avoid costly mistakes before you
+          order.
+        </p>
+        <a class="link" href="/our-story/">Our story <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Choose Your Sauna -->
+  <section class="band band--deep">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Choose Your Sauna</span>
+        <h2 class="h2 measure--tight">Choose the sauna that fits your space</h2>
+      </div>
+
+      <div class="grid cols-4 reveal" data-reveal-stagger>
+        {chooseTiles.map((tile) => (
+          <CollectionCard
+            name={tile.name}
+            blurb={tile.blurb}
+            href={tile.href}
+            count={tile.count}
+            image={tile.image}
+            note={tile.note}
+          />
+        ))}
+      </div>
+
+      <p class="more-link reveal">
+        <a class="link" href="/saunas/">View every model <span class="arrow" aria-hidden="true">→</span></a>
       </p>
+    </div>
+  </section>
 
-      <div class="line"></div>
+  <!-- Why BUXENA -->
+  <section class="band band--ember">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Why <BuxenaMark /></span>
+        <h2 class="h2 measure--tight">Why buy through BUXENA</h2>
+      </div>
+      <div class="grid cols-4 why reveal" data-reveal-stagger>
+        {reasons.map((r) => (
+          <div class="why__item">
+            <span class="slats" aria-hidden="true"></span>
+            <h3 class="h3 why__title">{r.title}</h3>
+            <p class="why__body">{r.body}</p>
+          </div>
+        ))}
+      </div>
+      <div class="why__ctas reveal">
+        <a
+          class="btn btn--bronze"
+          href="/start-your-project/"
+          data-track="upload_project_click"
+          data-track-form-type="why_buxena"
+        >Start Your Project</a>
+        <a
+          class="btn btn--outline"
+          href="/quote/"
+          data-track="request_pricing_click"
+          data-track-form-type="why_buxena"
+        >Request Pricing</a>
+      </div>
+    </div>
+  </section>
 
-      <p class="text">
-        We are preparing a curated collection of European saunas,<br />
-        designed to bring wellness and timeless design to your home.
-      </p>
-
-      <a class="email" href="mailto:info@buxena.com">
-        ✉ &nbsp; info@buxena.com
-      </a>
+  <!-- Featured Saunas -->
+  {featured.length > 0 && (
+    <section class="band">
+      <div class="shell">
+        <div class="sec-head reveal">
+          <span class="eyebrow">Featured Saunas</span>
+          <h2 class="h2 measure--tight">Start with the models we recommend</h2>
+          <p class="lead measure">
+            The models we recommend for the most common home and outdoor
+            projects.
+          </p>
+        </div>
+        <div class="grid cols-4 reveal" data-reveal-stagger>
+          {featured.map((s) => (
+            <ProductCard
+              slug={s.id}
+              title={s.data.title}
+              tagline={s.data.tagline}
+              category={s.data.category}
+              placeholder={s.data.placeholder}
+              image={s.data.heroImage}
+              location={s.data.location}
+              productType={s.data.productType}
+              series={s.data.series}
+              capacity={s.data.capacity}
+              capacityMin={s.data.capacityMin}
+              capacityMax={s.data.capacityMax}
+              materials={s.data.materials}
+              dimensions={s.data.dimensions}
+            fromPrice={s.data.fromPrice}
+            />
+          ))}
+        </div>
+      </div>
     </section>
-  </main>
-</body>
-</html>
+  )}
+
+  <!-- BUXENA Complete — package comparison -->
+  <!-- (The former "Not sure which sauna fits" decision strip was removed
+       2026-08-11: its three CTAs all exist elsewhere on the page — Find My
+       Sauna in the hero and Advisor band, See It In My Space on the Advisor
+       journey, Upload My Project in Why-BUXENA and the final CTA band —
+       and the duplication lengthened the page without adding a new action.) -->
+  <section class="band" data-package-section>
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">BUXENA Complete</span>
+        <h2 class="h2 measure--tight">One sauna. One properly matched system.</h2>
+        <p class="lead measure">
+          A complete sauna requires more than the room itself. We coordinate
+          the sauna, heater, controls, stones, lighting and essential
+          components as one project — so you do not have to source and match
+          everything separately.
+        </p>
+      </div>
+
+      <div class="pkgs reveal" data-reveal-stagger>
+        {packages.map((pkg) => (
+          <article class={`pkgs__card ${pkg.id === 'complete' ? 'pkgs__card--hero' : ''}`}>
+            {pkg.flag && <span class="pkgs__flag">{pkg.flag}</span>}
+            <h3 class="h3 pkgs__name">{pkg.name}</h3>
+            {pkg.fromPrice && <p class="pkgs__price">{pkg.fromPrice}</p>}
+            <p class="pkgs__summary">{pkg.summary}</p>
+            <ul class="pkgs__list">
+              {pkg.includes.map((item) => (
+                <li>{item}</li>
+              ))}
+            </ul>
+            {pkg.note && <p class="pkgs__note">{pkg.note}</p>}
+            <a
+              class={pkg.id === 'complete' ? 'btn btn--bronze pkgs__cta' : 'link pkgs__cta'}
+              href={`/quote/?package=${encodeURIComponent(pkg.name)}`}
+              data-track="package_selected"
+              data-track-package={pkg.name}
+              data-track-form-type="homepage_packages"
+            >
+              {pkg.id === 'complete' ? 'Build My Package' : (
+                <Fragment>Request pricing <span class="arrow" aria-hidden="true">→</span></Fragment>
+              )}
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <div class="pkgs__foot reveal">
+        <p class="pkgs__confidence">
+          Not sure which heater or controls your sauna needs? We specify the
+          package around the actual model and project requirements.
+        </p>
+        <div class="pkgs__foot-ctas">
+          <a
+            class="btn btn--bronze"
+            href="/quote/?package=BUXENA%20Complete"
+            data-track="build_package_click"
+            data-track-package="BUXENA Complete"
+            data-track-form-type="homepage_packages"
+          >Build My Package</a>
+          <a
+            class="btn btn--outline"
+            href="/start-your-project/"
+            data-track="project_pricing_click"
+            data-track-package="BUXENA Project"
+            data-track-form-type="homepage_packages"
+          >Request Project Pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="band band--deep" data-how-section>
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">How It Works</span>
+        <h2 class="h2 measure--tight">Four steps, in order</h2>
+      </div>
+
+      <ol class="steps reveal" data-reveal-stagger>
+        {steps.map((s) => (
+          <li class="step">
+            <span class="step__n">{s.n}</span>
+            <div class="step__body">
+              <h3 class="h3">{s.title}</h3>
+              <p>{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <p class="more-link reveal">
+        <a class="link" href="/how-buying-works/">See how buying works, start to finish <span class="arrow" aria-hidden="true">→</span></a>
+      </p>
+
+      <!-- (The "Ready to start?" CTA trio was removed 2026-08-11 — the same
+           three actions live in the hero, Why-BUXENA and the final CTA band;
+           the steps now flow straight to the Advisor. The buying-process
+           link above stays: it is the one action unique to this section.) -->
+    </div>
+  </section>
+
+  <!-- Sauna Advisor -->
+  <section class="band band--ember advisor">
+    <div class="shell advisor__grid">
+      <div class="reveal reveal--left">
+        <span class="eyebrow">Sauna Advisor</span>
+        <h2 class="h2 measure--tight">Find the sauna that fits your space.</h2>
+        <p class="lead">
+          Answer a few questions about your space, budget and priorities.
+          We'll shortlist up to three models worth a closer look — no
+          pressure, no commitment, no email required to see your results.
+        </p>
+        <a class="btn btn--bronze" href="/plan-your-sauna/">Start the Sauna Advisor</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- For Trade -->
+  <section class="band band--deep trade">
+    <div class="shell trade__grid">
+      <div class="reveal reveal--right">
+        <span class="eyebrow">For Architects, Builders &amp; Hospitality</span>
+        <h2 class="h2 measure--tight">Specify BUXENA for your next project.</h2>
+        <p class="lead measure">
+          Product specifications, project consultation, heater and control
+          selection support, and delivery coordination — for residential,
+          development and hospitality projects.
+        </p>
+        <div class="trade__ctas">
+          <a class="btn btn--bronze" href="/for-trade/#trade-form">Submit a Project</a>
+          <a class="link" href="/for-trade/">For Trade <span class="arrow" aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Wellness -->
+  <section class="band band--birch">
+    <div class="shell wellness">
+      <div class="sec-head reveal">
+        <span class="eyebrow">The Ritual</span>
+        <h2 class="h2 measure--tight">Heat, cold, rest — and then again</h2>
+        <p class="lead measure">
+          The sauna is not a machine you sit inside. It is a rhythm, and the
+          pauses are as much a part of it as the heat.
+          <span class="wellness__transition">Build the ritual around your sauna.</span>
+        </p>
+      </div>
+
+      <div class="grid cols-3 reveal" data-reveal-stagger>
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-01-loyly.jpg" alt="Water being poured onto hot sauna stones with steam rising" ratio="3 / 4" tone="dark" />
+          <p class="ritual-shot__caption">{wellnessPillars[0].label}</p>
+          <p class="ritual-shot__line">{wellnessPillars[0].line}</p>
+          <a class="ritual-shot__tag ritual-shot__tag--link" href={wellnessPillars[0].href}>{wellnessPillars[0].tag}</a>
+        </div>
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-02-cooling.jpg" alt="A snow-covered cabin in a winter forest at dusk" ratio="3 / 4" tone="mid" />
+          <p class="ritual-shot__caption">{wellnessPillars[1].label}</p>
+          <p class="ritual-shot__line">{wellnessPillars[1].line}</p>
+          <span class="ritual-shot__tag">{wellnessPillars[1].tag}</span>
+        </div>
+        <div class="ritual-shot">
+          <Figure src="/images/ritual-03-rest.jpg" alt="Quiet sauna interior with a bucket and ladle on the bench" ratio="3 / 4" tone="light" />
+          <p class="ritual-shot__caption">{wellnessPillars[2].label}</p>
+          <p class="ritual-shot__line">{wellnessPillars[2].line}</p>
+          <span class="ritual-shot__tag">{wellnessPillars[2].tag}</span>
+        </div>
+      </div>
+
+      <div class="wellness__foot reveal">
+        <a class="btn btn--outline" href="/wellness/">Explore Wellness</a>
+        <a class="link" href="/plan-your-sauna/">Find My Sauna <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <QuoteBand />
+
+  <script>
+    import { track } from '../lib/track';
+
+    // Section-view events, fired once each when the section first enters
+    // the viewport. Cheap: two observers that disconnect after firing.
+    const sections: Array<[string, 'package_view' | 'how_it_works_view']> = [
+      ['[data-package-section]', 'package_view'],
+      ['[data-how-section]', 'how_it_works_view'],
+    ];
+    if ('IntersectionObserver' in window) {
+      for (const [selector, event] of sections) {
+        const el = document.querySelector(selector);
+        if (!el) continue;
+        const io = new IntersectionObserver(([entry]) => {
+          if (entry.isIntersecting) {
+            track(event, {});
+            io.disconnect();
+          }
+        }, { threshold: 0.2 });
+        io.observe(el);
+      }
+    }
+  </script>
+</BaseLayout>
 
 <style>
-  * {
-    box-sizing: border-box;
+  /* --- trust strip --- */
+  .trust {
+    background: var(--ember);
+    color: var(--linen);
+    border-top: 1px solid var(--line-dark);
+    padding-block: clamp(1.1rem, 0.85rem + 0.9vw, 1.7rem);
+  }
+  .trust__list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem 2rem;
+  }
+  .trust__item { display: flex; align-items: center; gap: 0.9rem; }
+  .trust__item .slats { color: var(--bronze-soft); flex: 0 0 auto; height: 1.1rem; width: 2rem; }
+  .trust__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-dark);
   }
 
-  body {
-    margin: 0;
-    background: #080808;
-    font-family: Arial, sans-serif;
-  }
-
-  main {
-    min-height: 100vh;
-    min-height: 100svh;
-    display: flex;
+  /* --- intro (compact) --- */
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 0.4rem + 3vw, 3.5rem);
     align-items: center;
-    justify-content: center;
-    position: relative;
-    background:
-      url('/images/collection-barrel.jpg')
-      center / cover no-repeat;
-    color: white;
   }
+  .intro__left .h2 { line-height: 1.14; font-size: clamp(1.6rem, 1.2rem + 1.8vw, 2.6rem); }
 
-  .overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,.72);
-  }
-
-  section {
-    position: relative;
-    z-index: 1;
-    width: 92%;
-    max-width: 1000px;
-    text-align: center;
-    padding: 42px 15px;
-  }
-
-  .logo-img {
-    display: block;
-    width: min(640px, 90vw);
-    margin: 0 auto 28px;
-    height: auto;
-  }
-
-  h1 {
-    font-size: clamp(22px, 4vw, 42px);
-    font-weight: 400;
-    letter-spacing: 6px;
-    margin: 0;
-  }
-
-  .gold {
-    color: #c8a363;
-    letter-spacing: 5px;
-    line-height: 1.7;
-    margin-top: 28px;
-  }
-
-  .line {
-    width: 75px;
-    height: 1px;
-    background: #c8a363;
-    margin: 28px auto;
-  }
-
-  .text {
-    font-size: clamp(16px, 2.3vw, 21px);
-    line-height: 1.8;
-    letter-spacing: 1px;
-  }
-
-  .email {
+  /* The italic second line follows the headline by a beat — it sits inside
+     the h2 (one stagger child), so it carries its own delayed transition
+     keyed off the parent's is-in. */
+  .intro__left .serif-italic {
     display: inline-block;
-    margin-top: 35px;
-    color: white;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.8s var(--ease) 0.5s, transform 0.8s var(--ease) 0.5s;
+  }
+  .intro__left.is-in .serif-italic { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .intro__left .serif-italic { opacity: 1; transform: none; transition: none; }
+  }
+  .intro__right .link { margin-top: 0.9rem; }
+
+  /* --- choose your sauna --- */
+  .more-link { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
+
+  /* --- why --- */
+  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.1rem; }
+  .why__title { margin-bottom: 0.7rem; }
+  .why__body { font-size: 1rem; color: var(--muted-dark); line-height: 1.65; }
+  .why__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: clamp(1.9rem, 1.2rem + 2vw, 3rem);
+  }
+
+  /* Homepage rhythm: sections sit ~12% closer than the site default so the
+     journey reads as one continuous scroll (global --band elsewhere is
+     untouched; this rule is scoped to this page's sections only). */
+  .band { padding-block: calc(var(--band) * 0.88); }
+
+  /* --- packages --- */
+  .pkgs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(0.9rem, 0.5rem + 1.2vw, 1.5rem);
+    align-items: stretch;
+  }
+  .pkgs__card {
+    display: flex;
+    flex-direction: column;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    padding: clamp(1.4rem, 1rem + 1.3vw, 2.1rem);
+  }
+  /* BUXENA Complete dominates: bronze frame, deeper ground, no size tricks */
+  .pkgs__card--hero {
+    background: var(--linen-deep);
+    border: 2px solid var(--bronze);
+  }
+  .pkgs__flag {
+    align-self: flex-start;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--bronze-btn);
+    padding: 0.4rem 0.8rem;
+    margin-bottom: 1.1rem;
+  }
+  .pkgs__name { margin-bottom: 0.5rem; }
+  .pkgs__price { font-size: var(--t-small); color: var(--bronze-ink); font-weight: 600; margin-bottom: 0.6rem; }
+  .pkgs__summary { font-size: var(--t-small); color: var(--muted); line-height: 1.65; margin-bottom: 1.1rem; }
+  .pkgs__list { margin-bottom: 1.1rem; }
+  .pkgs__list li {
+    position: relative;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    padding: 0.38rem 0 0.38rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .pkgs__list li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
+  .pkgs__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.1rem; }
+  .pkgs__cta { margin-top: auto; align-self: flex-start; }
+
+  .pkgs__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+    margin-top: clamp(1.6rem, 1rem + 1.6vw, 2.5rem);
+  }
+  .pkgs__confidence { font-size: var(--t-small); color: var(--muted); max-width: 34em; margin: 0; }
+  .pkgs__foot-ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+  /* --- steps --- */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(1.3rem, 0.45rem + 2.25vw, 2.6rem);
+  }
+  .step { padding-top: 1.3rem; border-top: 1px solid var(--line); }
+  .step__n {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    line-height: 1;
+    color: var(--bronze);
+    margin-bottom: 1.1rem;
+  }
+  .step__body .h3 { margin-bottom: 0.7rem; }
+  .step__body p { font-size: var(--t-small); color: var(--muted); line-height: 1.75; }
+
+  /* --- advisor / trade bands --- */
+  .advisor__grid, .trade__grid { max-width: 44rem; }
+  .advisor .lead, .trade .lead { margin: 1.2rem 0 1.75rem; }
+  .trade__ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.75rem; }
+
+  /* --- wellness --- */
+  .wellness__transition {
+    display: block;
+    margin-top: 0.7rem;
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--ink);
+  }
+  .wellness__foot {
+    margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.75rem;
+  }
+
+  .ritual-shot :global(.fig) { overflow: hidden; }
+
+  /* Large-format imagery settles from a gentle over-scale as its row
+     reveals — the frame never moves, so there is zero layout shift. */
+  .ritual-shot :global(.fig img) {
+    transform: scale(1.06);
+    transition: transform 1.6s var(--ease);
+  }
+  .reveal.is-in .ritual-shot :global(.fig img) { transform: none; }
+
+  /* Numbered steps arrive 01 → 04 in sequence rather than together. */
+  .steps.is-in .step:nth-child(1) { transition-delay: 0s; }
+  .steps.is-in .step:nth-child(2) { transition-delay: 0.18s; }
+  .steps.is-in .step:nth-child(3) { transition-delay: 0.36s; }
+  .steps.is-in .step:nth-child(4) { transition-delay: 0.54s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ritual-shot :global(.fig img) { transform: none; transition: none; }
+    .steps.is-in .step { transition-delay: 0s; }
+  }
+  .ritual-shot :global(.fig img) { transition: transform 0.8s var(--ease); }
+  .ritual-shot:hover :global(.fig img) { transform: scale(1.03); }
+  .ritual-shot__caption {
+    margin: 0.7rem 0 0.15rem;
+    font-family: var(--font-sans);
+    font-size: var(--t-small);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .ritual-shot__line { margin: 0 0 0.35rem; font-size: var(--t-small); color: var(--muted); }
+  .ritual-shot__tag {
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0.85;
     text-decoration: none;
-    letter-spacing: 4px;
+  }
+  .ritual-shot__tag--link { color: var(--bronze-ink); opacity: 1; }
+  .ritual-shot__tag--link:hover { color: var(--ink); text-decoration: underline; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ritual-shot :global(.fig img) { transition: none; }
+    .ritual-shot:hover :global(.fig img) { transform: none; }
+  }
+
+  @media (max-width: 900px) {
+    .intro { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .trust__list { grid-template-columns: repeat(2, 1fr); }
+    /* Mobile: BUXENA Complete first and emphasized — source order is
+       Sauna → Complete → Project on desktop (center dominance); on one
+       column the recommended package must lead. */
+    .pkgs { grid-template-columns: 1fr; }
+    .pkgs__card--hero { order: -1; }
+  }
+  @media (max-width: 560px) {
+    .steps { grid-template-columns: 1fr; }
+    .trust__list { grid-template-columns: 1fr 1fr; gap: 0.8rem 1.25rem; }
   }
 </style>

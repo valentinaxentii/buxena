@@ -1,0 +1,735 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+/**
+ * SEE IT IN MY SPACE — sales MVP.
+ *
+ * INTERNAL HONESTY NOTES (do not soften these when editing):
+ * - Matching is RULE-BASED against verified catalog fields (location,
+ *   productType, capacityMax, dimensions). There is no AI, no computer
+ *   vision, no measurement of the customer's property — and the UI never
+ *   claims otherwise. Photos are collected as project context for the human
+ *   specialist review.
+ * - PHOTO PRIVACY: photos never leave the visitor's browser in this MVP.
+ *   The existing Supabase "documents" bucket is PUBLIC, so customer project
+ *   photos must not be uploaded there. Until a PRIVATE bucket + rate-limited
+ *   upload endpoint is approved (a production-infrastructure decision), the
+ *   flow records how many photos the customer prepared and BUXENA requests
+ *   them by email reply. Customer uploads are never marketing imagery.
+ */
+const models = await getCollection('saunas', ({ data }) => !data.draft);
+
+const catalog = models.map((m) => ({
+  slug: m.id,
+  title: m.data.title,
+  tagline: m.data.tagline,
+  location: m.data.location,
+  productType: m.data.productType,
+  capacity: m.data.capacity,
+  capacityMin: m.data.capacityMin,
+  capacityMax: m.data.capacityMax,
+  materials: m.data.materials,
+  dimensions: m.data.dimensions,
+  heroImage: m.data.heroImage,
+  order: m.data.order,
+}));
+
+const TOTAL_STEPS = 5;
+---
+
+<BaseLayout
+  title="See It In My Space"
+  description="Show BUXENA your backyard, patio or room and answer a few questions — we'll match the saunas that fit your space and project."
+>
+  <section class="band band--tight page-head">
+    <div class="shell shell--narrow center">
+      <span class="eyebrow">See It In My Space</span>
+      <h1 class="display measure--tight">Show us the space. We'll match the sauna.</h1>
+      <p class="lead measure">
+        Add photos of your backyard, patio, pool area or room, answer a few
+        questions, and see the models that fit — no email needed to see your
+        matches.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell shell--narrow">
+      <div class="space" data-space>
+        <div class="space__progress">
+          <span data-space-progress-label>Step 1 of {TOTAL_STEPS}</span>
+          <span class="space__bar"><span class="space__bar-fill" data-space-progress-fill></span></span>
+        </div>
+
+        <form data-space-form>
+          <!-- STEP 1 — Upload your space -->
+          <fieldset class="space__step" data-space-step="1">
+            <legend class="space__q">Show us your space</legend>
+            <p class="space__note">
+              Backyard, patio, pool area, indoor room — or a site plan or
+              drawing if you have one. Photos stay on your device for now;
+              we'll ask for them by email when we review your project.
+              You can also skip this step.
+            </p>
+            <label class="space__upload">
+              <input type="file" accept="image/*,.pdf" multiple capture="environment" data-space-files />
+              <span class="space__upload-cta">Add photos or plans</span>
+              <span class="space__upload-hint">Camera, photo library or files</span>
+            </label>
+            <ul class="space__thumbs" data-space-thumbs></ul>
+          </fieldset>
+
+          <!-- STEP 2 — Project basics -->
+          <fieldset class="space__step" data-space-step="2" hidden>
+            <legend class="space__q">The basics</legend>
+            <div class="space__options" role="group" aria-label="Indoor or outdoor" data-space-choice="location">
+              <button type="button" class="space__opt" data-value="outdoor" aria-pressed="false">Outdoor</button>
+              <button type="button" class="space__opt" data-value="indoor" aria-pressed="false">Indoor</button>
+              <button type="button" class="space__opt" data-value="unsure" aria-pressed="false">Not sure</button>
+            </div>
+            <div class="space__fields">
+              <div class="space__field">
+                <label for="space-zip">ZIP code</label>
+                <input id="space-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-space-input="zip" />
+              </div>
+              <div class="space__field">
+                <label for="space-size">Approximate available space</label>
+                <input id="space-size" type="text" placeholder={'e.g. 10 × 12 ft corner of the yard'} data-space-input="spaceSize" />
+              </div>
+              <div class="space__field">
+                <label for="space-capacity">How many people?</label>
+                <select id="space-capacity" data-space-input="capacity">
+                  <option value="">Not sure</option>
+                  <option value="1-2">1–2</option>
+                  <option value="3-4">3–4</option>
+                  <option value="5-6">5–6</option>
+                  <option value="7+">7 or more</option>
+                </select>
+              </div>
+              <div class="space__field">
+                <label for="space-timeline">Timeline</label>
+                <select id="space-timeline" data-space-input="timeline">
+                  <option value="">Not set</option>
+                  <option value="asap">As soon as possible</option>
+                  <option value="1-3-months">1–3 months</option>
+                  <option value="3-6-months">3–6 months</option>
+                  <option value="researching">Still researching</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- STEP 3 — Style -->
+          <fieldset class="space__step" data-space-step="3" hidden>
+            <legend class="space__q">Which style speaks to you?</legend>
+            <div class="space__options" role="group" aria-label="Style" data-space-choice="style">
+              <button type="button" class="space__opt" data-value="cube" aria-pressed="false">Cube</button>
+              <button type="button" class="space__opt" data-value="barrel" aria-pressed="false">Barrel</button>
+              <button type="button" class="space__opt" data-value="architectural" aria-pressed="false">Architectural</button>
+              <button type="button" class="space__opt" data-value="indoor" aria-pressed="false">Indoor</button>
+              <button type="button" class="space__opt" data-value="unsure" aria-pressed="false">Not sure</button>
+            </div>
+          </fieldset>
+
+          <!-- STEP 4 — Priorities -->
+          <fieldset class="space__step" data-space-step="4" hidden>
+            <legend class="space__q">What matters most? Pick any.</legend>
+            <p class="space__note">
+              Glass, controls and finish preferences are reviewed by a BUXENA
+              specialist against the exact model — they don't limit your
+              matches below.
+            </p>
+            <div class="space__options space__options--multi" role="group" aria-label="Priorities" data-space-multi="priorities">
+              <button type="button" class="space__opt" data-value="panoramic-glass" aria-pressed="false">Panoramic glass</button>
+              <button type="button" class="space__opt" data-value="compact-footprint" aria-pressed="false">Compact footprint</button>
+              <button type="button" class="space__opt" data-value="larger-capacity" aria-pressed="false">Larger capacity</button>
+              <button type="button" class="space__opt" data-value="traditional-look" aria-pressed="false">Traditional look</button>
+              <button type="button" class="space__opt" data-value="modern-look" aria-pressed="false">Modern look</button>
+              <button type="button" class="space__opt" data-value="connected-controls" aria-pressed="false">Connected controls</button>
+              <button type="button" class="space__opt" data-value="value" aria-pressed="false">Value</button>
+              <button type="button" class="space__opt" data-value="premium-finish" aria-pressed="false">Premium finish</button>
+            </div>
+          </fieldset>
+
+          <div class="space__nav">
+            <button type="button" class="btn btn--outline" data-space-back disabled>Back</button>
+            <button type="button" class="btn btn--bronze" data-space-next>Continue</button>
+          </div>
+        </form>
+
+        <!-- STEP 5 — Matches -->
+        <div class="space-results" data-space-results hidden>
+          <div class="sec-head">
+            <span class="eyebrow">Your Matches</span>
+            <h2 class="h2 measure--tight">Saunas that fit your space</h2>
+          </div>
+
+          <div class="space-results__grid" data-space-results-grid></div>
+
+          <p class="space-results__empty" data-space-results-empty hidden>
+            Nothing in the current range matches all of those answers — a
+            specialist can look at your space directly.
+            <a class="link" href="/start-your-project/">Upload My Project <span class="arrow" aria-hidden="true">→</span></a>
+          </p>
+
+          <div class="space-results__next" data-space-results-next hidden>
+            <button type="button" class="btn btn--outline" data-space-compare>Compare My Top 2</button>
+            <button type="button" class="btn btn--bronze" data-space-open-capture data-capture-reason="pricing">Request Project Pricing</button>
+            <button type="button" class="btn btn--outline" data-space-open-capture data-capture-reason="specialist">Talk to BUXENA</button>
+          </div>
+
+          <div class="space-compare" data-space-compare-panel hidden></div>
+
+          <!-- Contact capture — only after matches are shown, only on demand -->
+          <div class="space-capture" data-space-capture hidden>
+            <h3 class="h3" data-space-capture-title>Get project pricing</h3>
+            <p class="space__note">
+              We'll review your space, answers and matches, and come back to
+              you directly. If you prepared photos, we'll ask for them in our
+              reply — they're never shared publicly.
+            </p>
+            <form class="space-capture__form" data-space-capture-form>
+              <p class="space__hp"><label>Leave this field empty <input name="bot-field-space" tabindex="-1" autocomplete="off" /></label></p>
+              <div class="space__fields">
+                <div class="space__field">
+                  <label for="sc-name">Name <span aria-hidden="true">*</span></label>
+                  <input id="sc-name" name="name" type="text" required autocomplete="name" />
+                </div>
+                <div class="space__field">
+                  <label for="sc-email">Email <span aria-hidden="true">*</span></label>
+                  <input id="sc-email" name="email" type="email" required autocomplete="email" />
+                </div>
+                <div class="space__field">
+                  <label for="sc-phone">Phone</label>
+                  <input id="sc-phone" name="phone" type="tel" autocomplete="tel" />
+                </div>
+                <div class="space__field">
+                  <label for="sc-model">Model</label>
+                  <select id="sc-model" name="model" data-space-capture-model></select>
+                </div>
+              </div>
+              <button class="btn btn--bronze space-capture__submit" type="submit">Send to BUXENA</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script type="application/json" id="space-catalog" set:html={JSON.stringify(catalog)} />
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .space__progress {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .space__bar { flex: 1; height: 2px; background: var(--line); }
+  .space__bar-fill { display: block; height: 100%; width: 20%; background: var(--bronze); transition: width 0.4s var(--ease); }
+
+  .space__step { border: none; margin: 0; padding: 0; }
+  .space__q { font-family: var(--font-display); font-size: var(--t-h3); padding: 0; margin-bottom: 0.9rem; }
+  .space__note { font-size: var(--t-small); color: var(--muted); margin-bottom: 1.4rem; max-width: 44em; }
+
+  .space__hp { position: absolute; left: -9999px; }
+
+  .space__upload {
+    display: grid;
+    justify-items: center;
+    gap: 0.4rem;
+    border: 1.5px dashed var(--bronze-soft);
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+  }
+  .space__upload:hover { border-color: var(--bronze); background: var(--linen-deep); }
+  .space__upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .space__upload-cta {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+  }
+  .space__upload-hint { font-size: 0.8125rem; color: var(--muted); }
+
+  .space__thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+  .space__thumbs li { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--birch); }
+  .space__thumbs img { width: 100%; height: 100%; object-fit: cover; }
+  .space__thumbs .space__thumb-doc {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.3rem;
+    text-align: center;
+  }
+
+  .space__options { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.4rem; }
+  .space__opt {
+    border: 1px solid var(--line);
+    background: transparent;
+    padding: 0.75rem 1.2rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease), color 0.25s var(--ease);
+  }
+  .space__opt:hover { border-color: var(--bronze); }
+  .space__opt.is-on { background: var(--ember); border-color: var(--ember); color: var(--linen); }
+
+  .space__fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.1rem 1.5rem; }
+  .space__field { display: grid; gap: 0.45rem; }
+  .space__field label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .space__field label span { color: var(--bronze-ink); }
+  .space__field input, .space__field select {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.6rem 0;
+    border-radius: 0;
+    width: 100%;
+    transition: border-color 0.3s var(--ease);
+  }
+  .space__field select { appearance: none; cursor: pointer; }
+  .space__field input:focus, .space__field select:focus { border-color: var(--bronze); }
+
+  .space__nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; }
+
+  .space-results__grid { display: grid; gap: 1.25rem; }
+
+  .space-card {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+    gap: 1.25rem;
+    border: 1px solid var(--line);
+    padding: 1.1rem;
+    align-items: center;
+  }
+  .space-card__media { display: block; background: var(--linen-deep); }
+  .space-card__media img { width: 100%; height: auto; max-height: 12rem; object-fit: contain; }
+  .space-card__rank {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    border: 1px solid var(--bronze-soft);
+    padding: 0.3rem 0.7rem;
+    margin-bottom: 0.6rem;
+  }
+  .space-card__title { font-family: var(--font-display); font-size: var(--t-h3); margin: 0 0 0.4rem; }
+  .space-card__meta { font-size: 0.875rem; color: var(--bronze-ink); margin: 0 0 0.5rem; }
+  .space-card__why { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.8rem; }
+  .space-card__actions { display: flex; flex-wrap: wrap; gap: 0.6rem 1.5rem; align-items: center; }
+
+  .space-results__next { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+  .space-results__empty { color: var(--muted); font-style: italic; }
+
+  .space-compare { margin-top: 1.75rem; border: 1px solid var(--line); padding: 1.25rem; overflow-x: auto; }
+  .space-compare :global(table) { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+  .space-compare :global(th), .space-compare :global(td) {
+    text-align: left; padding: 0.55rem 0.9rem 0.55rem 0; border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+
+  .space-capture { margin-top: 2rem; border-top: 2px solid var(--ink); padding-top: 1.5rem; }
+  .space-capture__submit { margin-top: 1.4rem; }
+
+  @media (max-width: 640px) {
+    .space__fields { grid-template-columns: 1fr; }
+    .space-card { grid-template-columns: 1fr; }
+    .space-results__next { flex-direction: column; align-items: stretch; }
+    .space-results__next .btn { justify-content: center; }
+  }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+
+  interface SpaceModel {
+    slug: string; title: string; tagline: string;
+    location?: string; productType?: string;
+    capacity?: string; capacityMin?: number; capacityMax?: number;
+    materials?: string[]; dimensions?: { label: string; value: string }[];
+    heroImage?: { src?: string; alt: string }; order: number;
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-space]');
+  if (root) {
+    const catalog: SpaceModel[] = JSON.parse(document.getElementById('space-catalog')?.textContent ?? '[]');
+    const shownName = (t: string) => t.replace(/^BUH-/i, '');
+
+    const form = root.querySelector<HTMLFormElement>('[data-space-form]')!;
+    const steps = Array.from(root.querySelectorAll<HTMLElement>('[data-space-step]'));
+    const backBtn = root.querySelector<HTMLButtonElement>('[data-space-back]')!;
+    const nextBtn = root.querySelector<HTMLButtonElement>('[data-space-next]')!;
+    const progressLabel = root.querySelector<HTMLElement>('[data-space-progress-label]')!;
+    const progressFill = root.querySelector<HTMLElement>('[data-space-progress-fill]')!;
+    const filesInput = root.querySelector<HTMLInputElement>('[data-space-files]')!;
+    const thumbs = root.querySelector<HTMLElement>('[data-space-thumbs]')!;
+    const results = root.querySelector<HTMLElement>('[data-space-results]')!;
+    const resultsGrid = root.querySelector<HTMLElement>('[data-space-results-grid]')!;
+    const resultsEmpty = root.querySelector<HTMLElement>('[data-space-results-empty]')!;
+    const resultsNext = root.querySelector<HTMLElement>('[data-space-results-next]')!;
+    const compareBtn = root.querySelector<HTMLButtonElement>('[data-space-compare]')!;
+    const comparePanel = root.querySelector<HTMLElement>('[data-space-compare-panel]')!;
+    const capture = root.querySelector<HTMLElement>('[data-space-capture]')!;
+    const captureTitle = root.querySelector<HTMLElement>('[data-space-capture-title]')!;
+    const captureForm = root.querySelector<HTMLFormElement>('[data-space-capture-form]')!;
+    const captureModel = root.querySelector<HTMLSelectElement>('[data-space-capture-model]')!;
+
+    const TOTAL = 5;
+    let current = 0; // 0-based index into steps (results are "step 5")
+    let started = false;
+    let captureReason = 'pricing';
+
+    const answers: Record<string, string> = {
+      location: '', zip: '', spaceSize: '', capacity: '', timeline: '', style: '',
+    };
+    const priorities = new Set<string>();
+    // Photos stay client-side (see the privacy note in frontmatter) —
+    // only the count travels with the enquiry.
+    let photoCount = 0;
+
+    const startOnce = () => {
+      if (started) return;
+      started = true;
+      track('space_flow_started', { formType: 'see_it_in_my_space' });
+    };
+
+    const updateProgress = (step: number) => {
+      progressLabel.textContent = `Step ${step} of ${TOTAL}`;
+      progressFill.style.width = `${(step / TOTAL) * 100}%`;
+    };
+
+    const showStep = () => {
+      steps.forEach((el, i) => { el.hidden = i !== current; });
+      backBtn.disabled = current === 0;
+      nextBtn.textContent = current === steps.length - 1 ? 'See My Matches' : 'Continue';
+      updateProgress(current + 1);
+    };
+
+    // Photo selection — local previews only, nothing transmitted.
+    filesInput.addEventListener('change', () => {
+      startOnce();
+      thumbs.innerHTML = '';
+      const files = Array.from(filesInput.files ?? []);
+      photoCount = files.length;
+      files.slice(0, 12).forEach((file) => {
+        const li = document.createElement('li');
+        if (file.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.alt = '';
+          img.src = URL.createObjectURL(file);
+          li.appendChild(img);
+        } else {
+          li.innerHTML = `<span class="space__thumb-doc">${file.name.split('.').pop() ?? 'file'}</span>`;
+        }
+        thumbs.appendChild(li);
+      });
+      if (photoCount > 0) {
+        track('space_photo_uploaded', { formType: 'see_it_in_my_space', photoCount });
+      }
+    });
+
+    // Single-select groups
+    root.querySelectorAll<HTMLElement>('[data-space-choice]').forEach((group) => {
+      const key = group.dataset.spaceChoice!;
+      group.querySelectorAll<HTMLButtonElement>('.space__opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          startOnce();
+          group.querySelectorAll<HTMLButtonElement>('.space__opt').forEach((b) => {
+            b.classList.toggle('is-on', b === btn);
+            b.setAttribute('aria-pressed', String(b === btn));
+          });
+          answers[key] = btn.dataset.value ?? '';
+        });
+      });
+    });
+
+    // Multi-select priorities
+    root.querySelectorAll<HTMLElement>('[data-space-multi]').forEach((group) => {
+      group.querySelectorAll<HTMLButtonElement>('.space__opt').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          startOnce();
+          const value = btn.dataset.value!;
+          const on = !priorities.has(value);
+          priorities[on ? 'add' : 'delete'](value);
+          btn.classList.toggle('is-on', on);
+          btn.setAttribute('aria-pressed', String(on));
+        });
+      });
+    });
+
+    root.querySelectorAll<HTMLInputElement>('[data-space-input]').forEach((input) => {
+      input.addEventListener('input', () => {
+        startOnce();
+        answers[input.dataset.spaceInput!] = input.value;
+      });
+    });
+
+    /**
+     * RULE-BASED matching over verified fields only.
+     * Hard filters: location, style→productType, capacity (models with
+     * unverified capacity are excluded when a capacity was chosen, never
+     * guessed). Priorities reorder using real fields where the data
+     * supports it; the rest are recorded for the specialist, not scored.
+     */
+    const CAP_MIN: Record<string, number> = { '1-2': 1, '3-4': 3, '5-6': 5, '7+': 7 };
+
+    const match = (): { model: SpaceModel; why: string[] }[] => {
+      const minSeats = CAP_MIN[answers.capacity] ?? 0;
+
+      let candidates = catalog.filter((m) => {
+        if (answers.location === 'outdoor' && m.location !== 'outdoor') return false;
+        if (answers.location === 'indoor' && m.location !== 'indoor') return false;
+        if (answers.style === 'cube' && m.productType !== 'Cube') return false;
+        if (answers.style === 'barrel' && m.productType !== 'Barrel') return false;
+        if (answers.style === 'indoor' && m.location !== 'indoor') return false;
+        if (answers.style === 'architectural' && !['Cube', 'Oval'].includes(m.productType ?? '')) return false;
+        if (minSeats > 0) {
+          if (m.capacityMax == null) return false;
+          if (m.capacityMax < minSeats) return false;
+        }
+        return true;
+      });
+
+      const score = (m: SpaceModel) => {
+        let s = 0;
+        if (priorities.has('compact-footprint') && (m.capacityMax ?? 99) <= 3) s += 2;
+        if (priorities.has('larger-capacity')) s += (m.capacityMax ?? 0) / 2;
+        if (priorities.has('traditional-look') && m.productType === 'Barrel') s += 2;
+        if (priorities.has('modern-look') && ['Cube', 'Oval'].includes(m.productType ?? '')) s += 2;
+        return s;
+      };
+
+      candidates = candidates.sort((a, b) => {
+        const d = score(b) - score(a);
+        if (d !== 0) return d;
+        return (a.order ?? 999) - (b.order ?? 999);
+      });
+
+      return candidates.slice(0, 3).map((model) => {
+        const why: string[] = [];
+        if (answers.location && answers.location !== 'unsure') why.push(`${answers.location} placement`);
+        if (minSeats > 0) why.push(`seating for ${answers.capacity} people`);
+        if (answers.style && answers.style !== 'unsure') why.push(`your ${answers.style} style choice`);
+        if (priorities.has('traditional-look') && model.productType === 'Barrel') why.push('the traditional barrel form');
+        if (priorities.has('modern-look') && ['Cube', 'Oval'].includes(model.productType ?? '')) why.push('a modern silhouette');
+        if (priorities.has('compact-footprint') && (model.capacityMax ?? 99) <= 3) why.push('a compact footprint');
+        if (priorities.has('larger-capacity') && (model.capacityMax ?? 0) >= 5) why.push('room for a bigger group');
+        return { model, why };
+      });
+    };
+
+    const RANKS = ['Best Match', 'Alternative', 'Another Option'];
+    let matches: { model: SpaceModel; why: string[] }[] = [];
+
+    const renderResults = () => {
+      matches = match();
+      resultsGrid.innerHTML = '';
+      comparePanel.hidden = true;
+      capture.hidden = true;
+
+      track('space_flow_completed', {
+        formType: 'see_it_in_my_space',
+        location: answers.location,
+        style: answers.style,
+        capacity: answers.capacity,
+        zip: answers.zip,
+        photoCount,
+        priorities: [...priorities].join(','),
+        resultCount: matches.length,
+      });
+
+      if (matches.length === 0) {
+        resultsEmpty.hidden = false;
+        resultsNext.hidden = true;
+      } else {
+        resultsEmpty.hidden = true;
+        resultsNext.hidden = false;
+        compareBtn.hidden = matches.length < 2;
+
+        matches.forEach(({ model, why }, i) => {
+          track('space_model_recommended', {
+            formType: 'see_it_in_my_space',
+            model: model.title,
+            rank: i + 1,
+          });
+          const dims = (model.dimensions ?? []).slice(0, 2).map((d) => `${d.label}: ${d.value}`).join(' · ');
+          const card = document.createElement('article');
+          card.className = 'space-card';
+          card.innerHTML = `
+            <a class="space-card__media" href="/saunas/${model.slug}/">
+              <img src="${model.heroImage?.src ?? ''}" alt="${model.heroImage?.alt ?? shownName(model.title)}" loading="lazy" decoding="async" />
+            </a>
+            <div>
+              <span class="space-card__rank">${RANKS[i] ?? 'Option'}</span>
+              <h3 class="space-card__title">${shownName(model.title)}</h3>
+              <p class="space-card__meta">${model.location === 'outdoor' ? 'Outdoor' : 'Indoor'}${model.capacity ? ' · ' + model.capacity : ''}${dims ? ' · ' + dims : ''}</p>
+              <p class="space-card__why">${why.length ? 'Matched on ' + why.join(', ') + '.' : 'A current BUXENA model that fits your criteria.'}</p>
+              <div class="space-card__actions">
+                <a class="link" href="/saunas/${model.slug}/">View Model <span class="arrow" aria-hidden="true">→</span></a>
+              </div>
+            </div>
+          `;
+          resultsGrid.appendChild(card);
+        });
+
+        // capture form model options — matched models first, full title values
+        captureModel.innerHTML = matches
+          .map(({ model }, i) => `<option value="${model.title}"${i === 0 ? ' selected' : ''}>${shownName(model.title)}${i === 0 ? ' (best match)' : ''}</option>`)
+          .join('') + '<option value="">Undecided</option>';
+      }
+
+      form.hidden = true;
+      root.querySelector<HTMLElement>('.space__progress')!.hidden = true;
+      results.hidden = false;
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    nextBtn.addEventListener('click', () => {
+      startOnce();
+      if (current < steps.length - 1) {
+        current += 1;
+        showStep();
+      } else {
+        renderResults();
+      }
+    });
+
+    backBtn.addEventListener('click', () => {
+      if (current > 0) {
+        current -= 1;
+        showStep();
+      }
+    });
+
+    compareBtn.addEventListener('click', () => {
+      const [a, b] = matches.map((m) => m.model);
+      if (!a || !b) return;
+      const dimText = (m: SpaceModel) => (m.dimensions ?? []).map((d) => `${d.label}: ${d.value}`).join('; ');
+      const rows = [
+        ['Placement', a.location ?? '', b.location ?? ''],
+        ['Type', a.productType ?? '', b.productType ?? ''],
+        ['Capacity', a.capacity ?? '', b.capacity ?? ''],
+        ['Dimensions', dimText(a), dimText(b)],
+        ['Material', (a.materials ?? []).join(', '), (b.materials ?? []).join(', ')],
+      ].filter(([, va, vb]) => va || vb);
+      comparePanel.innerHTML = `
+        <table>
+          <thead><tr><th></th><th>${shownName(a.title)}</th><th>${shownName(b.title)}</th></tr></thead>
+          <tbody>${rows.map(([l, va, vb]) => `<tr><th scope="row">${l}</th><td>${va || '—'}</td><td>${vb || '—'}</td></tr>`).join('')}</tbody>
+        </table>`;
+      comparePanel.hidden = false;
+    });
+
+    // Contact capture — opened only by explicit intent, after matches.
+    root.querySelectorAll<HTMLButtonElement>('[data-space-open-capture]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        captureReason = btn.dataset.captureReason ?? 'pricing';
+        captureTitle.textContent = captureReason === 'specialist' ? 'Talk to a BUXENA specialist' : 'Get project pricing';
+        track(captureReason === 'specialist' ? 'space_specialist_click' : 'space_pricing_click', {
+          formType: 'see_it_in_my_space',
+          model: matches[0]?.model.title ?? '',
+        });
+        capture.hidden = false;
+        capture.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        capture.querySelector<HTMLInputElement>('input[name="name"]')?.focus();
+      });
+    });
+
+    captureForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!captureForm.reportValidity()) return;
+      const data = new FormData(captureForm);
+      const get = (k: string) => (data.get(k) || '').toString().trim();
+
+      const context = [
+        `SEE IT IN MY SPACE — ${captureReason === 'specialist' ? 'specialist request' : 'project pricing request'}`,
+        answers.location && `Placement: ${answers.location}`,
+        answers.zip && `ZIP: ${answers.zip}`,
+        answers.spaceSize && `Available space: ${answers.spaceSize}`,
+        answers.capacity && `People: ${answers.capacity}`,
+        answers.timeline && `Timeline: ${answers.timeline}`,
+        answers.style && `Style: ${answers.style}`,
+        priorities.size > 0 && `Priorities: ${[...priorities].join(', ')}`,
+        photoCount > 0 && `Customer prepared ${photoCount} photo(s)/plan(s) — request by email reply (kept on their device; PRIVATE project data, never marketing imagery)`,
+        matches.length > 0 && `Matches shown: ${matches.map((m) => m.model.title).join(', ')}`,
+      ].filter(Boolean).join('\n');
+
+      const submitBtn = captureForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      const restore = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send to BUXENA';
+      };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: answers.zip,
+        message: context,
+        saunaInterest: get('model'),
+        source: 'See It In My Space',
+        botField: get('bot-field-space'),
+      });
+
+      if (!result.ok) {
+        console.error('[space] submission failed:', result.error);
+        restore();
+        showFormStatus(captureForm, 'error');
+        return;
+      }
+
+      if (result.devMode) {
+        restore();
+        showFormStatus(captureForm, 'dev-success');
+        return;
+      }
+
+      rememberEnquiry({
+        model: get('model'),
+        zip: answers.zip,
+        timeline: answers.timeline,
+        projectType: answers.location ? `${answers.location} sauna project` : '',
+      });
+      window.location.assign('/thank-you/');
+    });
+
+    showStep();
+  }
+</script>

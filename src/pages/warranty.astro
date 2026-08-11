@@ -1,6 +1,40 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import LegalContact from '../components/LegalContact.astro';
+import WarrantyClaimForm from '../components/WarrantyClaimForm.astro';
+
+/**
+ * WARRANTY COVERAGE — NEUTRAL BY DESIGN.
+ * BUXENA is a retailer/importer; durations and terms belong to each
+ * manufacturer and NONE are verified in this repository yet. Every row below
+ * therefore states WHAT is covered and defers the TERMS to the applicable
+ * product/manufacturer warranty. Do not add periods, percentages or
+ * exclusions here without a verified supplier document.
+ */
+const coverage = [
+  { item: 'Sauna structure', note: 'The cabin, frame, walls, benches and structural timber components.' },
+  { item: 'Workmanship', note: 'Manufacturing and assembly of the sauna as supplied.' },
+  { item: 'Heater', note: 'Covered by the heater manufacturer’s own warranty.' },
+  { item: 'Controls', note: 'Control units and switching, per the component manufacturer.' },
+  { item: 'Lighting / electrical', note: 'Lighting kits and electrical components, per the component manufacturer.' },
+  { item: 'Accessories', note: 'Buckets, ladles, headrests, thermometers and similar items.' },
+];
+
+const naturalPoints = [
+  'Natural grain and color variation',
+  'Gradual color changes and weathering',
+  'Minor checking or small surface cracks',
+  'Minor movement or settling',
+  'Occasional natural resin',
+  'Slight shade differences between wooden components',
+];
+
+const inspectionSteps = [
+  { n: '01', title: 'Inspect packaging and shipment', body: 'Look over the crate, pallet and wrapping before anything is moved inside or unpacked.' },
+  { n: '02', title: 'Check components against the documentation', body: 'Compare what arrived against the delivery paperwork supplied with your order.' },
+  { n: '03', title: 'Photograph any visible damage', body: 'Take photographs before installation begins — damage is far easier to resolve when it is documented on arrival.' },
+  { n: '04', title: 'Contact BUXENA promptly', body: 'Tell us straight away if anything appears damaged or missing, and we will take it from there.' },
+];
 
 // WORKING BUSINESS DRAFT — NOT A SUBSTITUTE FOR LEGAL REVIEW.
 // Have this reviewed by a US-licensed attorney before relying on it
@@ -19,25 +53,198 @@ const sections = [
 ---
 
 <BaseLayout
-  title="Warranty"
-  description="How manufacturer warranties work on BUXENA sauna products, and how BUXENA helps with claims."
+  title="Warranty &amp; Ownership"
+  description="Support that continues after delivery — how coverage works on BUXENA saunas, how natural wood behaves, what to check on arrival, and how to start a warranty claim."
 >
   <section class="band band--tight page-head">
-    <div class="shell legal">
-      <span class="eyebrow">Warranty</span>
-      <h1 class="display measure--tight">Warranty Policy</h1>
-      <p class="legal__updated">Last Updated: July 2026</p>
+    <div class="shell">
+      <span class="eyebrow">Warranty &amp; Ownership</span>
+      <h1 class="display measure--tight">Support that continues after delivery.</h1>
       <p class="lead measure">
-        BUXENA is a retailer and importer, not a manufacturer. The products
-        we sell are covered by the warranty of the manufacturer that built
-        them, and terms vary by product. This page explains how that works
-        and how we help if you need to make a claim.
+        A sauna is a long-lived thing. BUXENA helps you understand what your
+        product covers, how the manufacturer’s warranty applies, how to care
+        for real wood, what to check the day it arrives — and exactly what to
+        do if something does not look right.
       </p>
+      <div class="wrx__herocta">
+        <a class="btn btn--bronze" href="#claim">Start a Warranty Claim</a>
+        <a class="link" href="#natural-wood">Natural wood &amp; materials <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- WARRANTY AT A GLANCE -->
+  <section class="band band--tight">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">At a Glance</span>
+        <h2 class="h2 measure--tight">What is covered</h2>
+        <p class="lead measure">
+          BUXENA is a retailer and importer, not a manufacturer. Each product
+          carries the warranty of the manufacturer that built it, so terms
+          vary by product, component and model.
+        </p>
+      </div>
+      <ul class="wrx__cov reveal" data-reveal-stagger role="list">
+        {coverage.map((c) => (
+          <li class="wrx__covitem">
+            <h3 class="wrx__covh">{c.item}</h3>
+            <p class="wrx__covnote">{c.note}</p>
+            <p class="wrx__covterm">See applicable manufacturer warranty</p>
+          </li>
+        ))}
+      </ul>
+      <p class="wrx__covfoot reveal">
+        We confirm the coverage that applies to your specific model and
+        components in writing with your quote, before you order.
+      </p>
+    </div>
+  </section>
+
+  <!-- NATURAL WOOD & MATERIALS -->
+  <section class="band band--deep wrx__wood" id="natural-wood">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Natural Wood &amp; Materials</span>
+        <h2 class="h2 measure--tight">Natural wood changes. That’s part of the material.</h2>
+      </div>
+      <div class="wrx__woodlead reveal">
+        <p class="lead">
+          Every BUXENA sauna is made with real wood. Unlike synthetic
+          materials, wood naturally responds to heat, humidity, sunlight,
+          weather and seasonal changes.
+        </p>
+        <p>
+          Over time, you may notice variations in color and grain, weathering,
+          minor movement or settling, small surface checks or cracks, slight
+          changes in shape, or occasional natural resin.
+        </p>
+        <p class="wrx__woodemph">
+          These changes are part of the character and behavior of natural wood
+          and do not necessarily indicate a manufacturing defect.
+        </p>
+      </div>
+
+      <div class="wrx__cards reveal" data-reveal-stagger>
+        <article class="wrx__card">
+          <span class="wrx__cardtag">Natural / usually normal</span>
+          <ul class="wrx__list" role="list">
+            {naturalPoints.map((p) => <li>{p}</li>)}
+          </ul>
+        </article>
+
+        <article class="wrx__card">
+          <span class="wrx__cardtag">Maintenance matters</span>
+          <p class="wrx__cardp">
+            How long timber keeps its condition depends on how the sauna is
+            installed and looked after — correct installation, adequate
+            ventilation, sensible moisture management, regular cleaning, and
+            exterior treatment where the model calls for it.
+          </p>
+          <p class="wrx__cardp">
+            Follow the care instructions supplied with your model. Where a
+            manufacturer requires specific maintenance, keeping to it matters
+            for any future claim.
+          </p>
+        </article>
+
+        <article class="wrx__card wrx__card--ask">
+          <span class="wrx__cardtag">Not sure? Ask BUXENA.</span>
+          <p class="wrx__cardp">
+            If you’re unsure about a change in your sauna, send us
+            photographs. We’ll help determine whether what you’re seeing is a
+            natural characteristic of the material, a maintenance issue, or
+            something that should be reviewed under warranty.
+          </p>
+          <a class="btn btn--bronze wrx__cardcta" href="#claim">Start a Warranty Claim</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- DELIVERY INSPECTION -->
+  <section class="band">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">On Arrival</span>
+        <h2 class="h2 measure--tight">Inspect your sauna when it arrives.</h2>
+        <p class="lead measure">
+          Ten minutes on delivery day prevents almost every avoidable problem
+          later.
+        </p>
+      </div>
+      <ol class="wrx__steps reveal" data-reveal-stagger>
+        {inspectionSteps.map((s) => (
+          <li class="wrx__step">
+            <span class="wrx__stepn">{s.n}</span>
+            <div>
+              <h3 class="h3 wrx__steph">{s.title}</h3>
+              <p class="wrx__stepb">{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- RESIDENTIAL VS COMMERCIAL -->
+  <section class="band band--tight band--birch">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Use &amp; Application</span>
+        <h2 class="h2 measure--tight">Residential and commercial projects differ</h2>
+      </div>
+      <div class="wrx__use reveal" data-reveal-stagger>
+        <article class="wrx__usecard">
+          <h3 class="h3">Residential use</h3>
+          <p>
+            A sauna installed in a private home, used by the household. This is
+            the application most manufacturer warranties are written around.
+          </p>
+        </article>
+        <article class="wrx__usecard">
+          <h3 class="h3">Commercial / hospitality projects</h3>
+          <p>
+            Hotels, spas, gyms, rentals, multi-unit developments and any shared
+            or public setting. Usage intensity is far higher, and manufacturers
+            commonly treat this differently.
+          </p>
+          <p>
+            Warranty terms vary according to product, manufacturer and intended
+            application. Commercial customers should confirm project-specific
+            coverage with us in writing before ordering.
+          </p>
+          <a class="link" href="/for-trade/">For trade &amp; projects <span class="arrow" aria-hidden="true">→</span></a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLAIM -->
+  <section class="band band--birch" id="claim">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Warranty Claim</span>
+        <h2 class="h2 measure--tight">Start a warranty claim</h2>
+        <p class="lead measure">
+          Tell us what you are seeing and send photographs. A BUXENA specialist
+          reviews every claim and comes back to you directly.
+        </p>
+      </div>
+      <div class="reveal"><WarrantyClaimForm /></div>
+    </div>
+  </section>
+
+  <section class="band band--tight page-head">
+    <div class="shell legal">
+      <span class="eyebrow">Policy Detail</span>
+      <h2 class="h2 measure--tight">Warranty Policy</h2>
+      <p class="legal__updated">Last Updated: July 2026</p>
       <LegalContact />
     </div>
   </section>
 
-  <section class="band">
+  <section class="band band--tight">
     <div class="shell legal">
       <nav class="legal__toc" aria-label="Table of contents">
         <ol>
@@ -138,3 +345,133 @@ const sections = [
     </div>
   </section>
 </BaseLayout>
+
+<style>
+  .wrx__herocta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem 1.75rem;
+    margin-top: 1.9rem;
+  }
+
+  /* --- coverage at a glance --- */
+  .wrx__cov {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin: 0;
+    padding: 0;
+  }
+  .wrx__covitem {
+    list-style: none;
+    background: var(--linen);
+    padding: 1.25rem 1.35rem 1.4rem;
+    display: grid;
+    gap: 0.45rem;
+    align-content: start;
+  }
+  .wrx__covh {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    font-weight: 500;
+  }
+  .wrx__covnote { margin: 0; font-size: var(--t-small); color: var(--muted); line-height: 1.65; }
+  .wrx__covterm {
+    margin: 0.15rem 0 0;
+    font-size: 0.6875rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+  }
+  .wrx__covfoot { margin: 1.5rem 0 0; font-size: var(--t-small); color: var(--muted); max-width: 46em; }
+
+  /* --- natural wood --- */
+  .wrx__woodlead { max-width: 44em; display: grid; gap: 1rem; }
+  .wrx__woodlead p { margin: 0; }
+  .wrx__woodemph { color: var(--linen); font-family: var(--font-display); font-size: 1.15rem; line-height: 1.6; }
+
+  .wrx__cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-top: clamp(2rem, 1.4rem + 2vw, 3rem);
+  }
+  .wrx__card {
+    border: 1px solid var(--line-dark);
+    padding: 1.5rem 1.5rem 1.65rem;
+    display: grid;
+    gap: 0.85rem;
+    align-content: start;
+  }
+  .wrx__card--ask { background: rgba(196, 162, 119, 0.07); border-color: var(--bronze); }
+  .wrx__cardtag {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bronze-soft);
+  }
+  .wrx__cardp { margin: 0; font-size: var(--t-small); line-height: 1.75; color: var(--muted-dark); }
+  .wrx__cardcta { justify-self: start; margin-top: 0.35rem; }
+  .wrx__list { display: grid; gap: 0.5rem; margin: 0; padding: 0; }
+  .wrx__list li {
+    list-style: none;
+    position: relative;
+    padding-left: 1.35rem;
+    font-size: var(--t-small);
+    line-height: 1.6;
+    color: var(--muted-dark);
+  }
+  .wrx__list li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
+
+  /* --- delivery inspection --- */
+  .wrx__steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(1.3rem, 0.8rem + 1.6vw, 2.4rem);
+    margin: 0;
+    padding: 0;
+  }
+  .wrx__step { list-style: none; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+  .wrx__stepn {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--bronze);
+    margin-bottom: 0.9rem;
+  }
+  .wrx__steph { margin: 0 0 0.5rem; }
+  .wrx__stepb { margin: 0; font-size: var(--t-small); color: var(--muted); line-height: 1.7; }
+
+  /* --- residential vs commercial --- */
+  .wrx__use { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+  .wrx__usecard {
+    border: 1px solid var(--line);
+    padding: 1.5rem 1.6rem;
+    display: grid;
+    gap: 0.8rem;
+    align-content: start;
+    background: var(--linen);
+  }
+  .wrx__usecard h3 { margin: 0; }
+  .wrx__usecard p { margin: 0; font-size: var(--t-small); color: var(--muted); line-height: 1.75; }
+  .wrx__usecard .link { justify-self: start; font-size: var(--t-small); }
+
+  @media (max-width: 900px) {
+    .wrx__cov { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wrx__cards { grid-template-columns: 1fr; }
+    .wrx__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wrx__use { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .wrx__cov { grid-template-columns: 1fr; }
+    .wrx__steps { grid-template-columns: 1fr; }
+    .wrx__herocta { flex-direction: column; align-items: stretch; }
+    .wrx__herocta .btn { justify-content: center; }
+  }
+</style>

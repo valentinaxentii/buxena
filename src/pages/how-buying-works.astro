@@ -1,0 +1,141 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+/**
+ * How Buying Works — the commercial journey from shortlist to installed
+ * sauna, in seven scannable steps.
+ *
+ * CLAIM RULES (audited): no deposit percentages, payment terms, delivery
+ * timelines, availability, warranty promises or installation promises.
+ * Payment details arrive with the written quote; delivery is coordinated,
+ * not scheduled here; site requirements are informational and separate
+ * from installation scope, which is per-project.
+ */
+const steps = [
+  {
+    n: '01',
+    title: 'Choose or shortlist your sauna',
+    body: 'Browse the range, let the Sauna Advisor shortlist models for your space, or compare two saunas side by side.',
+  },
+  {
+    n: '02',
+    title: 'Request pricing',
+    body: 'Tell us about your project — or send us another quote you have received and we will help you compare it item by item.',
+  },
+  {
+    n: '03',
+    title: 'We review your project',
+    body: 'A BUXENA specialist checks your space, access, power and heater fit before anything is priced.',
+  },
+  {
+    n: '04',
+    title: 'Your written quote',
+    body: 'Itemized so you can see exactly what is included — the sauna, the matched heater and components, and delivery as its own line.',
+  },
+  {
+    n: '05',
+    title: 'Order confirmation',
+    body: 'You confirm your order in writing, with payment details provided alongside your quote. Nothing is ordered until you confirm.',
+  },
+  {
+    n: '06',
+    title: 'Delivery coordination',
+    body: 'We coordinate delivery with you directly and confirm site access before anything ships.',
+  },
+  {
+    n: '07',
+    title: 'Site & installation',
+    body: 'We provide your site requirements — base, electrical, clearances — and the installation itself is scoped around your project.',
+  },
+];
+---
+
+<BaseLayout
+  title="How Buying Works"
+  description="From shortlist to installed sauna: how buying through BUXENA works — project review, an itemized written quote, order confirmation and coordinated delivery."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">The Process</span>
+      <h1 class="display measure--tight">How buying works</h1>
+      <p class="lead measure">
+        Seven steps, in order — so you know exactly what happens from the
+        first look to the first heat.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell shell--narrow">
+      <ol class="steps reveal" data-reveal-stagger>
+        {steps.map((s) => (
+          <li class="step">
+            <span class="step__n">{s.n}</span>
+            <div class="step__body">
+              <h2 class="h3">{s.title}</h2>
+              <p>{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <div class="hbw__ctas reveal">
+        <a
+          class="btn btn--bronze"
+          href="/quote/"
+          data-track="request_pricing_click"
+          data-track-form-type="how_buying_works"
+        >Request Pricing</a>
+        <a
+          class="btn btn--outline"
+          href="/start-your-project/"
+          data-track="upload_project_click"
+          data-track-form-type="how_buying_works"
+        >Start Your Project</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
+
+  /* Same numbered-step vocabulary as the homepage How It Works band. */
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: clamp(1.6rem, 1rem + 1.5vw, 2.4rem);
+  }
+  .step {
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 1rem 1.5rem;
+    align-items: start;
+  }
+  .step__n {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    line-height: 1;
+    color: var(--bronze);
+  }
+  .step__body .h3 { margin: 0 0 0.55rem; }
+  .step__body p { margin: 0; color: var(--muted); }
+
+  .hbw__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: clamp(2.25rem, 1.5rem + 2vw, 3.5rem);
+  }
+
+  @media (max-width: 560px) {
+    .step { grid-template-columns: 1fr; gap: 0.5rem; }
+    .hbw__ctas { flex-direction: column; align-items: stretch; }
+    .hbw__ctas .btn { justify-content: center; }
+  }
+</style>

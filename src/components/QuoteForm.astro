@@ -1,6 +1,8 @@
 ---
 import { categories } from '../data/site';
+import { displayTitle } from '../data/catalog';
 import { getCollection } from 'astro:content';
+import ProjectUpload from './ProjectUpload.astro';
 
 interface Props {
   /** Pre-selects a model when the form is embedded on a product page. */
@@ -15,11 +17,13 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 ---
 
 <!--
-  Submits through /api/enquiries (the same endpoint the Sauna Advisor uses),
-  which records the enquiry to Supabase (visible in /admin/enquiries) and emails
-  info@buxena.com. The script below intercepts submit, POSTs the JSON, then
-  redirects to /thank-you/. `bot-field` is an invisible honeypot the server
-  checks to drop spam.
+  PROGRESSIVE QUALIFICATION (founders' direction):
+  Step 1 captures the lead with seven fields and GET MY PRICING — the
+  enquiry is submitted the moment step 1 succeeds, so an abandoned step 2
+  never loses the lead. Step 2 then collects optional project detail and
+  sends it as a follow-up note attached to the same email address.
+  Both submissions go through /api/enquiries (Supabase + email + Telegram
+  in production; safe local test mode in dev — see src/lib/enquiry-client.ts).
 -->
 <form
   class={`qform ${compact ? 'qform--compact' : ''}`}
@@ -31,93 +35,159 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
     <label>Leave this field empty <input name="bot-field" tabindex="-1" autocomplete="off" /></label>
   </p>
 
-  <div class="qform__grid">
-    <div class="field">
-      <label for="q-name">Name <span aria-hidden="true">*</span></label>
-      <input id="q-name" name="name" type="text" required autocomplete="name" />
+  <!-- STEP 1 — lead capture -->
+  <fieldset class="qform__step" data-quote-step="capture">
+    <div class="qform__grid">
+      <div class="field">
+        <label for="q-name">Name <span aria-hidden="true">*</span></label>
+        <input id="q-name" name="name" type="text" required autocomplete="name" />
+      </div>
+
+      <div class="field">
+        <label for="q-email">Email <span aria-hidden="true">*</span></label>
+        <input id="q-email" name="email" type="email" required autocomplete="email" />
+      </div>
+
+      <div class="field">
+        <label for="q-phone">Phone</label>
+        <input id="q-phone" name="phone" type="tel" autocomplete="tel" />
+      </div>
+
+      <div class="field">
+        <label for="q-zip">ZIP code <span aria-hidden="true">*</span></label>
+        <input id="q-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4, e.g. 06010 or 06010-1234)" />
+        <span class="field__hint">Delivery depends on where the sauna is going.</span>
+      </div>
+
+      <div class="field">
+        <label for="q-placement">Indoor or outdoor?</label>
+        <select id="q-placement" name="placement">
+          <option value="">No preference yet</option>
+          <option value="outdoor">Outdoor</option>
+          <option value="indoor">Indoor</option>
+          <option value="unsure">Not sure</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="q-model">Model, if known</label>
+        <select id="q-model" name="model">
+          <option value="">Undecided — please advise</option>
+          {categories.map((c) => (
+            <option value={c.name} selected={preselect === c.name}>{c.name}</option>
+          ))}
+          {saunas.length > 0 && (
+            <optgroup label="Specific models">
+              {/* value keeps the full internal title (BUH-…) so CRM/admin model
+                  matching stays consistent; the label is the customer name. */}
+              {saunas.map((s) => (
+                <option value={s.data.title} selected={preselect === s.data.title}>{displayTitle(s.data.title)}</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="q-timeline">Timeline</label>
+        <select id="q-timeline" name="timeline">
+          <option value="">Not set</option>
+          <option value="asap">As soon as possible</option>
+          <option value="1-3-months">1–3 months</option>
+          <option value="3-6-months">3–6 months</option>
+          <option value="researching">Still researching</option>
+        </select>
+      </div>
     </div>
 
-    <div class="field">
-      <label for="q-email">Email <span aria-hidden="true">*</span></label>
-      <input id="q-email" name="email" type="email" required autocomplete="email" />
+    <div class="qform__foot">
+      <button class="btn btn--bronze" type="submit">Get My Pricing</button>
+      <p class="qform__note">We use your details to answer this enquiry. Nothing else.</p>
     </div>
+  </fieldset>
 
-    <div class="field">
-      <label for="q-phone">Phone</label>
-      <input id="q-phone" name="phone" type="tel" autocomplete="tel" />
-    </div>
-
-    <div class="field">
-      <label for="q-zip">ZIP code <span aria-hidden="true">*</span></label>
-      <input id="q-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" />
-      <span class="field__hint">Delivery cost depends on where the sauna is going.</span>
-    </div>
-
-    <div class="field">
-      <label for="q-placement">Placement</label>
-      <select id="q-placement" name="placement">
-        <option value="">No preference yet</option>
-        <option value="outdoor">Outdoor</option>
-        <option value="indoor">Indoor</option>
-        <option value="unsure">Not sure</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="q-model">Model or collection of interest</label>
-      <select id="q-model" name="model">
-        <option value="">Undecided — please advise</option>
-        {categories.map((c) => (
-          <option value={c.name} selected={preselect === c.name}>{c.name}</option>
-        ))}
-        {saunas.length > 0 && (
-          <optgroup label="Specific models">
-            {saunas.map((s) => (
-              <option value={s.data.title} selected={preselect === s.data.title}>{s.data.title}</option>
-            ))}
-          </optgroup>
-        )}
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="q-people">People it should seat</label>
-      <select id="q-people" name="capacity">
-        <option value="">Not sure</option>
-        <option value="1-2">1–2</option>
-        <option value="3-4">3–4</option>
-        <option value="5-6">5–6</option>
-        <option value="7+">7 or more</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="q-timeline">Timeline</label>
-      <select id="q-timeline" name="timeline">
-        <option value="">Not set</option>
-        <option value="asap">As soon as possible</option>
-        <option value="1-3-months">1–3 months</option>
-        <option value="3-6-months">3–6 months</option>
-        <option value="researching">Still researching</option>
-      </select>
-    </div>
-
-    <div class="field field--full">
-      <label for="q-message">Tell us about the space</label>
-      <textarea id="q-message" name="message" rows="5" placeholder="Dimensions, access, what the surroundings look like, anything you already know you want."></textarea>
-    </div>
-  </div>
-
-  <div class="qform__foot">
-    <button class="btn btn--bronze" type="submit">Send request</button>
-    <p class="qform__note">
-      We use your details to answer this enquiry. Nothing else.
+  <!-- STEP 2 — optional qualification, shown after the lead is captured -->
+  <fieldset class="qform__step qform__detail" data-quote-step="detail" hidden>
+    <p class="qform__captured" data-quote-captured>
+      <strong>Your pricing request is in.</strong> Two more minutes of detail
+      helps us quote the right system first time — or skip and we'll ask as
+      we go.
     </p>
-  </div>
+
+    <div class="qform__grid">
+      <div class="field">
+        <label for="q-capacity">People it should seat</label>
+        <select id="q-capacity" name="capacity">
+          <option value="">Not sure</option>
+          <option value="1-2">1–2</option>
+          <option value="3-4">3–4</option>
+          <option value="5-6">5–6</option>
+          <option value="7+">7 or more</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="q-budget">Budget range</label>
+        <select id="q-budget" name="budget">
+          <option value="">Prefer not to say yet</option>
+          <option value="under-10k">Under $10,000</option>
+          <option value="10-20k">$10,000 – $20,000</option>
+          <option value="20-35k">$20,000 – $35,000</option>
+          <option value="35k-plus">$35,000+</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="q-foundation">Foundation / base</label>
+        <select id="q-foundation" name="foundation">
+          <option value="">Not sure yet</option>
+          <option value="exists">Already in place</option>
+          <option value="planned">Planned</option>
+          <option value="need-guidance">Need guidance</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="q-electrical">Electrical</label>
+        <select id="q-electrical" name="electrical">
+          <option value="">Not sure yet</option>
+          <option value="available">Power available at site</option>
+          <option value="planned">Electrician planned</option>
+          <option value="need-guidance">Need guidance</option>
+        </select>
+      </div>
+
+      <div class="field field--full">
+        <label for="q-message">The space, access and anything else</label>
+        <textarea id="q-message" name="message" rows="4" placeholder="Dimensions, access route, what the surroundings look like."></textarea>
+      </div>
+
+      <div class="field field--full">
+        <ProjectUpload id="quote-files" label="Photos or plans (optional)" />
+      </div>
+    </div>
+
+    <div class="qform__foot">
+      <button class="btn btn--bronze" type="button" data-quote-details-send>Add Project Details</button>
+      <button class="btn btn--ghost qform__skip" type="button" data-quote-skip>Skip for now →</button>
+    </div>
+  </fieldset>
 </form>
 
 <style>
   .qform__hp { position: absolute; left: -9999px; }
+
+  .qform__step { border: none; margin: 0; padding: 0; }
+
+  .qform__captured {
+    font-size: var(--t-small);
+    color: var(--muted);
+    border-left: 3px solid var(--bronze);
+    background: var(--linen-deep);
+    padding: 0.9rem 1.2rem;
+    margin: 0 0 1.5rem;
+  }
+  .qform__captured strong { color: var(--ink); font-weight: 600; }
 
   .qform__grid {
     display: grid;
@@ -177,6 +247,8 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
     gap: 1.25rem 2rem;
   }
   .qform__note { font-size: var(--t-small); color: var(--muted); margin: 0; }
+  .qform__skip { color: var(--bronze-ink); letter-spacing: 0.08em; }
+  .qform__skip:hover { color: var(--ink); }
 
   @media (max-width: 640px) {
     .qform__grid { grid-template-columns: 1fr; }
@@ -184,70 +256,161 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 </style>
 
 <script>
-  /**
-   * The single submission path: intercept submit, POST the enquiry as JSON to
-   * /api/enquiries (records to Supabase + emails info@buxena.com), then send the
-   * visitor to /thank-you/. The await matters — we only redirect once the server
-   * has accepted the enquiry, so a failed request keeps the visitor on the form
-   * with their data intact rather than silently losing it.
-   */
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+
+  // ?model= pre-selects; ?package= is carried into the submission.
+  // ?intent=compare marks the lead as a quote-comparison request (arrived
+  // via the "Compare My Quote" CTA) — same form, same pipeline, only the
+  // free-text source value differs so admin/CRM can see why they came.
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlModel = urlParams.get('model');
+  const urlPackage = urlParams.get('package');
+  const isCompare = urlParams.get('intent') === 'compare';
+  if (urlModel) {
+    document.querySelectorAll<HTMLSelectElement>('form[name="quote"] select[name="model"]').forEach((sel) => {
+      if ([...sel.options].some((o) => o.value === urlModel)) sel.value = urlModel;
+    });
+  }
+
   document.querySelectorAll('form[name="quote"]').forEach((formEl) => {
     const form = formEl as HTMLFormElement;
-    const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const captureStep = form.querySelector<HTMLElement>('[data-quote-step="capture"]')!;
+    const detailStep = form.querySelector<HTMLElement>('[data-quote-step="detail"]')!;
+    const captureBtn = captureStep.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    const detailsBtn = form.querySelector<HTMLButtonElement>('[data-quote-details-send]')!;
+    const skipBtn = form.querySelector<HTMLButtonElement>('[data-quote-skip]')!;
 
+    const get = (key: string) => {
+      const data = new FormData(form);
+      return (data.get(key) || '').toString().trim();
+    };
+
+    let capturedEmail = '';
+    let capturedModel = '';
+    let wasDevMode = false;
+
+    form.addEventListener(
+      'focusin',
+      () => track('quote_started', { formType: 'quote_form' }),
+      { once: true }
+    );
+
+    // STEP 1 — capture the lead immediately.
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      // Let the browser enforce required fields / email format first.
       if (!form.reportValidity()) return;
-
-      const data = new FormData(form);
-      const get = (key: string) => (data.get(key) || '').toString().trim();
 
       const zip = get('zip');
       const extras = [
         zip && `ZIP: ${zip}`,
         get('placement') && `Placement: ${get('placement')}`,
-        get('capacity') && `People: ${get('capacity')}`,
         get('timeline') && `Timeline: ${get('timeline')}`,
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      const message = [get('message'), extras].filter(Boolean).join('\n\n');
+        urlPackage && `Package interest: ${urlPackage}`,
+      ].filter(Boolean).join(' · ');
 
-      const originalLabel = submitBtn?.textContent ?? '';
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending…';
+      const originalLabel = captureBtn.textContent ?? '';
+      captureBtn.disabled = true;
+      captureBtn.textContent = 'Sending…';
+      const restore = () => {
+        captureBtn.disabled = false;
+        captureBtn.textContent = originalLabel || 'Get My Pricing';
+      };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: zip,
+        message: [isCompare ? 'Pricing request (has another quote to compare)' : 'Pricing request', extras]
+          .filter(Boolean)
+          .join('\n\n'),
+        saunaInterest: get('model'),
+        source: isCompare ? 'Quote Comparison' : 'Quote Form',
+        botField: get('bot-field'),
+      });
+
+      if (!result.ok) {
+        console.error('[quote] capture failed:', result.error);
+        restore();
+        showFormStatus(form, 'error');
+        return;
       }
 
-      try {
-        const res = await fetch('/api/enquiries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: get('name'),
-            email: get('email'),
-            phone: get('phone'),
-            location: zip,
-            message,
-            saunaInterest: get('model'),
-            source: 'Quote Form',
-            botField: get('bot-field'),
-          }),
-        });
+      track('quote_submitted', {
+        formType: 'quote_form',
+        model: get('model'),
+        zip,
+        location: get('placement'),
+        timeline: get('timeline'),
+        ...(urlPackage ? { package: urlPackage } : {}),
+      });
+      track('pricing_request_submitted', { formType: 'quote_form', model: get('model'), zip });
 
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        window.location.assign('/thank-you/');
-      } catch (err) {
-        console.error('[quote] submission failed:', err);
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalLabel || 'Send request';
-        }
-        alert(
-          'Sorry — something went wrong sending your request. Please try again, or email info@buxena.com directly.'
-        );
-      }
+      capturedEmail = get('email');
+      capturedModel = get('model');
+      wasDevMode = Boolean(result.devMode);
+
+      // Lead is captured — progressive step appears, capture step collapses.
+      restore();
+      form.querySelector('.form-status')?.remove();
+      captureStep.hidden = true;
+      detailStep.hidden = false;
+      if (wasDevMode) showFormStatus(form, 'dev-success');
+      detailStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+
+    const finish = () => {
+      rememberEnquiry({
+        model: capturedModel,
+        zip: get('zip'),
+        timeline: get('timeline'),
+        projectType: get('placement'),
+      });
+      if (!wasDevMode) window.location.assign('/thank-you/');
+    };
+
+    // STEP 2 — optional detail, sent as a follow-up note.
+    detailsBtn.addEventListener('click', async () => {
+      const details = [
+        `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,
+        get('capacity') && `People: ${get('capacity')}`,
+        get('budget') && `Budget: ${get('budget')}`,
+        get('foundation') && `Foundation: ${get('foundation')}`,
+        get('electrical') && `Electrical: ${get('electrical')}`,
+        get('message') && `Space/access: ${get('message')}`,
+        get('uploadMeta'),
+      ].filter(Boolean).join('\n');
+
+      const originalLabel = detailsBtn.textContent ?? '';
+      detailsBtn.disabled = true;
+      detailsBtn.textContent = 'Sending…';
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: capturedEmail,
+        phone: get('phone'),
+        location: get('zip'),
+        message: details,
+        saunaInterest: capturedModel,
+        source: 'Quote Form — details',
+        botField: get('bot-field'),
+      });
+
+      detailsBtn.disabled = false;
+      detailsBtn.textContent = originalLabel || 'Add Project Details';
+
+      if (!result.ok) {
+        showFormStatus(form, 'error');
+        return;
+      }
+      if (result.devMode) {
+        showFormStatus(form, 'dev-success', 'Follow-up details captured too.');
+        return;
+      }
+      finish();
+    });
+
+    skipBtn.addEventListener('click', finish);
   });
 </script>

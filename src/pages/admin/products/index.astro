@@ -7,73 +7,66 @@ import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 
 const search = (Astro.url.searchParams.get('q') ?? '').trim();
 const view = Astro.url.searchParams.get('view') === 'pricing' ? 'pricing' : 'list';
+const supplierFilter = (Astro.url.searchParams.get('supplier') ?? '').trim();
 
 let products: any[] = [];
 let dbReady = true;
 let pricingError: string | null = null;
 let pricingNotice: string | null = null;
-// on a failed save, the user's submitted values re-render instead of the DB's
-let submittedPricing: Map<string, { cost: string; selling: string }> | null = null;
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
+let pricingTableMissing = false;
+let pricingByProduct = new Map<string, any>();
 
 try {
   const supabase = createSupabaseAdminClient();
 
-  // ---- Pricing save: writes ONLY products.cost and products.selling_price,
-  // and only for rows whose values actually changed ----
+  // ---- "Use as Approved Price": the ONLY write this tab performs. It sets
+  // the approved public From price + margin on the model's worksheet and
+  // marks it Approved. The database trigger keeps the previous version in
+  // the price history automatically. Never touches products.cost/selling.
   if (Astro.request.method === 'POST' && view === 'pricing') {
     const form = await Astro.request.formData();
-    const ids = form.getAll('row_id[]').map(String);
-    const costs = form.getAll('row_cost[]').map(String);
-    const sellings = form.getAll('row_selling[]').map(String);
-    const origCosts = form.getAll('row_cost_orig[]').map(String);
-    const origSellings = form.getAll('row_selling_orig[]').map(String);
+    const productId = String(form.get('product_id') ?? '');
+    const price = Number(String(form.get('approved_price') ?? ''));
+    const margin = String(form.get('margin_used') ?? '').trim();
 
-    submittedPricing = new Map(ids.map((id, i) => [id, { cost: costs[i] ?? '', selling: sellings[i] ?? '' }]));
-
-    // empty = NULL (unknown), never zero; negatives and non-numbers rejected
-    const parse = (raw: string): number | null | 'invalid' => {
-      const v = raw.trim();
-      if (v === '') return null;
-      const n = Number(v);
-      if (!Number.isFinite(n) || n < 0) return 'invalid';
-      return r2(n);
-    };
-
-    let invalid = 0;
-    let written = 0;
-    const updates: { id: string; cost: number | null; selling_price: number | null }[] = [];
-    ids.forEach((id, i) => {
-      const cost = parse(costs[i] ?? '');
-      const selling = parse(sellings[i] ?? '');
-      if (cost === 'invalid' || selling === 'invalid') { invalid++; return; }
-      const changed = (costs[i] ?? '').trim() !== (origCosts[i] ?? '').trim()
-        || (sellings[i] ?? '').trim() !== (origSellings[i] ?? '').trim();
-      if (changed) updates.push({ id, cost, selling_price: selling });
-    });
-
-    if (invalid > 0) {
-      pricingError = `${invalid} row${invalid === 1 ? ' has' : 's have'} an invalid value — numbers must be non-negative. Nothing was saved.`;
+    if (!productId || !Number.isFinite(price) || price <= 0) {
+      pricingError = 'That price could not be approved — it was missing or not a valid number.';
     } else {
-      for (const u of updates) {
-        const { error } = await supabase.from('products').update({ cost: u.cost, selling_price: u.selling_price }).eq('id', u.id);
-        if (error) { pricingError = `Save failed: ${error.message}. Your edits are still on screen.`; break; }
-        written++;
-      }
-      if (!pricingError) {
-        return Astro.redirect(`/admin/products?view=pricing&saved=${written}`);
+      const row: Record<string, unknown> = {
+        product_id: productId,
+        approved_from_price: Math.round(price),
+        status: 'Approved',
+      };
+      const m = Number(margin);
+      if (margin !== '' && Number.isFinite(m) && m >= 0 && m < 95) row.target_margin_pct = m;
+
+      const { error } = await supabase.from('product_pricing').upsert(row, { onConflict: 'product_id' });
+      if (error) {
+        if (/relation .* does not exist|42P01/i.test(error.message)) pricingTableMissing = true;
+        else pricingError = `Could not approve: ${error.message}`;
+      } else {
+        return Astro.redirect(`/admin/products?view=pricing&approved=1${supplierFilter ? `&supplier=${encodeURIComponent(supplierFilter)}` : ''}`);
       }
     }
   }
 
   let query = supabase
     .from('products')
-    .select('id, model_name, category, cost, selling_price, is_active, suppliers(name)')
+    .select('id, model_name, category, cost, selling_price, is_active, images, suppliers(name)')
     .order('model_name');
   if (search && view === 'list') query = query.ilike('model_name', `%${search}%`);
   const { data } = await query.limit(300);
   const raw = data ?? [];
+
+  // Pricing worksheets (missing table = feature not enabled yet, not an error)
+  const { data: pricingData, error: pricingReadError } = await supabase
+    .from('product_pricing')
+    .select('product_id, exw_eur, sauna_landed_cost, complete_landed_cost, target_margin_pct, approved_from_price, project_pricing, status, updated_at');
+  if (pricingReadError) {
+    if (/relation .* does not exist|42P01/i.test(pricingReadError.message)) pricingTableMissing = true;
+  } else {
+    pricingByProduct = new Map((pricingData ?? []).map((r: any) => [r.product_id, r]));
+  }
 
   const ids = raw.map((p: any) => p.id);
   const { data: invData } = ids.length
@@ -91,14 +84,32 @@ try {
   products = raw.map((p: any) => {
     const inv = invByProduct.get(p.id) ?? { available: 0, incoming: 0 };
     const availability = inv.available > 0 ? 'In Stock' : inv.incoming > 0 ? 'In Transit' : 'Preorder';
-    return { ...p, in_stock_available: inv.available, incoming: inv.incoming, availability };
+    return {
+      ...p,
+      supplier_name: p.suppliers?.name ?? '',
+      images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
+      in_stock_available: inv.available,
+      incoming: inv.incoming,
+      availability,
+      pricing: pricingByProduct.get(p.id) ?? null,
+    };
   });
 } catch {
   dbReady = false;
 }
 
-const savedCount = Astro.url.searchParams.get('saved');
-if (savedCount != null && !pricingNotice) pricingNotice = `${savedCount} row${savedCount === '1' ? '' : 's'} saved.`;
+if (Astro.url.searchParams.get('approved') === '1' && !pricingNotice) {
+  pricingNotice = 'Approved. That price is now the official public "From" price for this model (previous version kept in its history).';
+}
+
+// Supplier sections — built from whatever suppliers actually exist, so
+// CAPRA / BALTRESTO / WOOD ARCHITECTS and any future supplier appear
+// automatically. Costs are stored per model and never combined or averaged
+// across suppliers.
+const supplierNames = [...new Set(products.map((p) => p.supplier_name).filter(Boolean))].sort() as string[];
+const pricingProducts = supplierFilter
+  ? products.filter((p) => p.supplier_name === supplierFilter)
+  : products;
 
 const totalModels = products.length;
 const inStockCount = products.filter((p) => p.availability === 'In Stock').length;
@@ -110,22 +121,25 @@ function availabilityTone(a: string): string {
   if (a === 'In Transit') return 'amber';
   return 'neutral';
 }
-function money(n: number | null | undefined): string {
-  return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+const money0 = (n: number | null | undefined) =>
+  n == null ? '—' : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const money2 = (n: number | null | undefined) =>
+  n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+/** Customer-facing price: ONLY an Approved worksheet may produce one. */
+function publicPrice(p: any): string {
+  const pr = p.pricing;
+  if (!pr || pr.status !== 'Approved') return '—';
+  if (pr.project_pricing) return 'Project Pricing';
+  if (pr.approved_from_price != null) return `From ${money0(pr.approved_from_price)}`;
+  return '—';
 }
 
-// pricing view rows: submitted values win after a failed save
-const pricingRows = products.map((p) => {
-  const sub = submittedPricing?.get(p.id);
-  return {
-    id: p.id,
-    model_name: p.model_name,
-    cost: sub ? sub.cost : (p.cost == null ? '' : String(p.cost)),
-    selling: sub ? sub.selling : (p.selling_price == null ? '' : String(p.selling_price)),
-    origCost: p.cost == null ? '' : String(p.cost),
-    origSelling: p.selling_price == null ? '' : String(p.selling_price),
-  };
-});
+function statusTone(s: string | undefined): string {
+  if (s === 'Approved') return 'green';
+  if (s === 'Needs Review') return 'amber';
+  return 'neutral';
+}
 ---
 
 <AdminLayout title="Products" subtitle="The BUXENA catalog — every sauna model BUXENA sells." parentLabel="Dashboard" parentHref="/admin">
@@ -162,25 +176,36 @@ const pricingRows = products.map((p) => {
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
-              <tr><th>Model</th><th>Category</th><th>Supplier</th><th>Selling Price</th><th>In Stock</th><th>Incoming</th><th>Availability</th><th>Status</th><th></th></tr>
+              <tr><th></th><th>Model</th><th>Category</th><th>Supplier</th><th>Selling Price</th><th>In Stock</th><th>Incoming</th><th>Availability</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {products.map((p) => (
                 <tr>
+                  <td class="thumb-cell">
+                    {p.images.length > 0 ? (
+                      <button
+                        type="button"
+                        class="thumb"
+                        data-lightbox={JSON.stringify(p.images)}
+                        data-lightbox-name={p.model_name}
+                        data-lightbox-supplier={p.supplier_name || 'No supplier linked'}
+                        aria-label={`View images of ${p.model_name}`}
+                      >
+                        <img src={p.images[0]} alt="" loading="lazy" />
+                      </button>
+                    ) : (
+                      <span class="thumb thumb--empty" title="No image on file for this product">No image</span>
+                    )}
+                  </td>
                   <td><a href={`/admin/products/${p.id}`}>{p.model_name}</a></td>
                   <td>{p.category || '—'}</td>
-                  <td>{p.suppliers?.name || '—'}</td>
-                  <td>{money(p.selling_price)}</td>
+                  <td>{p.supplier_name || '—'}</td>
+                  <td>{publicPrice(p)}</td>
                   <td>{p.in_stock_available}</td>
                   <td>{p.incoming}</td>
                   <td><span class={`admin-pill admin-pill--${availabilityTone(p.availability)}`}>{p.availability}</span></td>
-                  <td>
-                    <span class={`admin-pill ${p.is_active ? 'admin-pill--green' : 'admin-pill--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span>
-                    {(p.cost == null || p.selling_price == null) && (
-                      <span class="admin-pill admin-pill--neutral" title="Created inline — cost or selling price still missing" style="margin-left:0.3rem;">Incomplete</span>
-                    )}
-                  </td>
-                  <td><a href={`/admin/products/${p.id}`} style="font-size:0.72rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--admin-gold); text-decoration:none;">View →</a></td>
+                  <td><span class={`admin-pill ${p.is_active ? 'admin-pill--green' : 'admin-pill--neutral'}`}>{p.is_active ? 'Active' : 'Inactive'}</span></td>
+                  <td><a href={`/admin/products/${p.id}`} class="rowlink">View →</a></td>
                 </tr>
               ))}
             </tbody>
@@ -190,6 +215,11 @@ const pricingRows = products.map((p) => {
           <p class="admin-empty">{search ? 'No products found.' : 'No products yet.'}</p>
         )}
       </div>
+      <p class="pr-caption">
+        Selling Price shows only the <strong>approved public price</strong> from each model's pricing worksheet
+        ("From $…" or "Project Pricing"). A dash means no price has been approved yet — internal draft numbers
+        are never shown here or on the website.
+      </p>
     </>
   )}
 
@@ -198,58 +228,124 @@ const pricingRows = products.map((p) => {
       {pricingError && <p class="notice notice--error" style="margin-bottom:1rem;">{pricingError}</p>}
       {pricingNotice && <p class="notice notice--ok" style="margin-bottom:1rem;">{pricingNotice}</p>}
 
-      <form method="POST" action="/admin/products?view=pricing" id="pricing-form">
-        <div class="pr-bulk">
-          <label class="pr-bulk__field">
-            <span>Bulk markup %</span>
-            <input class="admin-input" type="number" step="0.1" min="0" id="bulk-markup" placeholder="e.g. 40" />
-          </label>
-          <button class="admin-btn admin-btn--ghost" type="button" id="apply-markup">Apply to all</button>
-          <span class="pr-bulk__note" id="bulk-note"></span>
-          <button class="admin-btn" type="submit" style="margin-left:auto;">Save changes</button>
+      {pricingTableMissing ? (
+        <div class="admin-placeholder">
+          <h2>Pricing storage is not enabled yet</h2>
+          <p>
+            The pricing control center needs its two new database tables (a
+            worksheet per model, plus automatic price history). The prepared,
+            safe script is ready in <code>supabase/pricing-schema.sql</code> —
+            it only adds new tables and touches nothing that exists. Ask
+            Claude for the one-step instruction when you're ready.
+          </p>
         </div>
-
-        <div class="admin-panel">
-          <div class="admin-table-wrap">
-            <table class="admin-table pr-table" id="pricing-table">
-              <thead>
-                <tr><th>Model</th><th class="num">Cost</th><th class="num">Selling</th><th class="num">Margin</th><th class="num">%</th></tr>
-              </thead>
-              <tbody>
-                {pricingRows.map((r) => (
-                  <tr class="pr-row" data-id={r.id}>
-                    <td class="pr-model">{r.model_name}</td>
-                    <td class="num">
-                      <input type="hidden" name="row_id[]" value={r.id} />
-                      <input type="hidden" name="row_cost_orig[]" value={r.origCost} />
-                      <input type="hidden" name="row_selling_orig[]" value={r.origSelling} />
-                      <input class="admin-input pr-cost" type="number" step="0.01" min="0" name="row_cost[]" value={r.cost} data-orig={r.origCost} />
-                    </td>
-                    <td class="num"><input class="admin-input pr-selling" type="number" step="0.01" min="0" name="row_selling[]" value={r.selling} data-orig={r.origSelling} /></td>
-                    <td class="num pr-margin">—</td>
-                    <td class="num pr-pct">—</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr class="pr-totals">
-                  <td id="pr-count">{pricingRows.length} products</td>
-                  <td></td>
-                  <td></td>
-                  <td class="num" id="pr-total-margin">—</td>
-                  <td class="num" id="pr-blended">—</td>
-                </tr>
-              </tfoot>
-            </table>
+      ) : (
+        <>
+          <div class="sup-filter">
+            <a class={supplierFilter === '' ? 'is-active' : ''} href="/admin/products?view=pricing">All Suppliers</a>
+            {supplierNames.map((s) => (
+              <a class={supplierFilter === s ? 'is-active' : ''} href={`/admin/products?view=pricing&supplier=${encodeURIComponent(s)}`}>{s}</a>
+            ))}
           </div>
-        </div>
-        <p class="pr-excluded" id="pr-excluded" hidden></p>
-        <p class="pr-caption">
-          Margin here is planning only — cost is the product's list cost, not the landed cost from a shipment. Actual margin per order is in the Margin report.
-        </p>
-      </form>
+
+          <div class="admin-panel">
+            <div class="admin-table-wrap">
+              <table class="admin-table pc-table">
+                <thead>
+                  <tr>
+                    <th></th><th>Model</th><th>Supplier</th><th>Status</th>
+                    <th class="num">Landed Cost</th><th>Margin</th><th class="num">Selling Price</th>
+                    <th class="num">Gross Profit</th><th class="num">Markup</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pricingProducts.map((p) => {
+                    const pr = p.pricing;
+                    const landed = pr?.sauna_landed_cost ?? null;
+                    return (
+                      <tr class="pc-row" data-landed={landed ?? ''} data-model={p.model_name}>
+                        <td class="thumb-cell">
+                          {p.images.length > 0 ? (
+                            <button type="button" class="thumb" data-lightbox={JSON.stringify(p.images)} data-lightbox-name={p.model_name} data-lightbox-supplier={p.supplier_name || 'No supplier linked'} aria-label={`View images of ${p.model_name}`}>
+                              <img src={p.images[0]} alt="" loading="lazy" />
+                            </button>
+                          ) : (
+                            <span class="thumb thumb--empty" title="No image on file">No image</span>
+                          )}
+                        </td>
+                        <td><a href={`/admin/products/${p.id}/pricing`}>{p.model_name}</a></td>
+                        <td>{p.supplier_name || '—'}</td>
+                        <td><span class={`admin-pill admin-pill--${statusTone(pr?.status)}`}>{pr?.status ?? 'No worksheet'}</span></td>
+                        <td class="num pc-landed">{landed == null ? '—' : money2(landed)}</td>
+                        <td>
+                          {landed == null ? (
+                            <span class="pc-hint">Add costs in the worksheet first</span>
+                          ) : (
+                            <span class="pc-marginwrap">
+                              <select class="admin-input pc-margin" aria-label={`Margin for ${p.model_name}`}>
+                                <option value="">— %</option>
+                                {[35, 40, 45, 50, 55, 60].map((m) => (
+                                  <option value={m} selected={pr?.target_margin_pct === m}>{m}%</option>
+                                ))}
+                                <option value="custom">Custom…</option>
+                              </select>
+                              <input class="admin-input pc-custom" type="number" min="0" max="94" step="0.5" placeholder="%" hidden aria-label="Custom margin percent" />
+                            </span>
+                          )}
+                        </td>
+                        <td class="num">
+                          <input class="admin-input pc-price" type="number" min="0" step="1"
+                            value={pr?.approved_from_price ?? ''}
+                            disabled={landed == null}
+                            aria-label={`Selling price for ${p.model_name}`} />
+                        </td>
+                        <td class="num pc-gp">—</td>
+                        <td class="num pc-markup">—</td>
+                        <td class="pc-actions">
+                          <form method="POST" action={`/admin/products?view=pricing${supplierFilter ? `&supplier=${encodeURIComponent(supplierFilter)}` : ''}`} class="pc-approve-form">
+                            <input type="hidden" name="product_id" value={p.id} />
+                            <input type="hidden" name="approved_price" value="" />
+                            <input type="hidden" name="margin_used" value="" />
+                            <button class="admin-btn admin-btn--ghost pc-approve" type="submit" disabled={landed == null}>Use as Approved Price</button>
+                          </form>
+                          <a class="rowlink" href={`/admin/products/${p.id}/pricing`}>Worksheet →</a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {pricingProducts.length === 0 && (
+              <p class="admin-empty">No products{supplierFilter ? ` for ${supplierFilter}` : ''} yet.</p>
+            )}
+          </div>
+          <p class="pr-caption">
+            <strong>Selling Price = Landed Cost ÷ (1 − Margin%).</strong> Pick a margin to calculate the price, or type a
+            price to see the margin it produces. Nothing becomes public until you click <strong>Use as Approved Price</strong>
+            and confirm. Each supplier's costs stay completely separate — nothing is combined or averaged.
+            Landed costs come from each model's worksheet (click the model name).
+          </p>
+        </>
+      )}
     </>
   )}
+
+  <!-- Image preview overlay (shared by both tabs) -->
+  <div class="lb" data-lb hidden>
+    <div class="lb__backdrop" data-lb-close></div>
+    <figure class="lb__box" role="dialog" aria-modal="true" aria-label="Product image preview">
+      <button class="lb__x" type="button" data-lb-close aria-label="Close preview">×</button>
+      <button class="lb__nav lb__nav--prev" type="button" data-lb-prev aria-label="Previous image">‹</button>
+      <img class="lb__img" data-lb-img src="" alt="" />
+      <button class="lb__nav lb__nav--next" type="button" data-lb-next aria-label="Next image">›</button>
+      <figcaption class="lb__cap">
+        <strong data-lb-name></strong>
+        <span data-lb-supplier></span>
+        <span class="lb__count" data-lb-count></span>
+      </figcaption>
+    </figure>
+  </div>
 </AdminLayout>
 
 <style>
@@ -265,134 +361,202 @@ const pricingRows = products.map((p) => {
     border: 1px solid rgba(201, 166, 104, 0.14);
     border-radius: 5px;
   }
-  .pr-switch a {
-    padding: 0.4rem 0.9rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    letter-spacing: 0.04em;
-    color: var(--admin-muted);
-    text-decoration: none;
-  }
+  .pr-switch a { padding: 0.4rem 0.9rem; border-radius: 3px; font-size: 0.75rem; letter-spacing: 0.04em; color: var(--admin-muted); text-decoration: none; }
   .pr-switch a.is-active { background: rgba(201, 166, 104, 0.14); color: var(--admin-gold); }
   .pr-switch a:hover:not(.is-active) { color: var(--admin-cream); }
 
-  .pr-bulk {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+  .sup-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+  .sup-filter a {
+    padding: 0.35rem 0.8rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    text-decoration: none;
+    border: 1px solid rgba(201, 166, 104, 0.18);
+    border-radius: 3px;
   }
-  .pr-bulk__field { display: flex; flex-direction: column; gap: 0.3rem; }
-  .pr-bulk__field span { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--admin-muted); }
-  .pr-bulk__field input { width: 7rem; }
-  .pr-bulk__note { font-size: 0.75rem; color: var(--admin-gold); }
+  .sup-filter a.is-active { color: var(--admin-gold); border-color: var(--admin-gold); background: rgba(201, 166, 104, 0.1); }
 
-  .pr-table td, .pr-table th { border-bottom: 1px solid rgba(201, 166, 104, 0.12); }
-  .pr-table .num { text-align: right; }
-  .pr-table td { padding-top: 0.35rem; padding-bottom: 0.35rem; } /* ~38px rows */
-  .pr-table input[type='number'] { width: 7.5rem; text-align: right; }
-  .pr-model { white-space: normal; }
-  .pr-margin { color: var(--admin-gold); font-variant-numeric: tabular-nums; }
-  .pr-pct { font-variant-numeric: tabular-nums; }
-  .pr-pct--green { color: #97c459; }
-  .pr-pct--amber { color: #ef9f27; }
-  .pr-pct--red { color: #d98a66; }
-  .pr-dash { color: var(--admin-muted); }
-  .pr-row.is-dirty td:first-child { box-shadow: inset 3px 0 0 var(--admin-gold); }
-  .pr-totals td { font-weight: 600; border-top: 1px solid rgba(201, 166, 104, 0.3); }
-  .pr-excluded { margin: 0.5rem 0 0; font-size: 0.72rem; color: var(--admin-muted); }
-  .pr-caption { margin: 0.9rem 0 0; font-size: 0.75rem; color: var(--admin-muted); }
+  .thumb-cell { width: 3.6rem; }
+  .thumb {
+    display: grid;
+    place-items: center;
+    width: 3rem;   /* 48px — inside the asked 45–55px range */
+    height: 3rem;
+    padding: 0;
+    overflow: hidden;
+    background: #201d19;
+    border: 1px solid rgba(201, 166, 104, 0.18);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb:hover { transform: scale(1.6); border-color: var(--admin-gold); position: relative; z-index: 5; }
+  .thumb--empty { cursor: default; font-size: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--admin-muted); text-align: center; line-height: 1.2; }
+  .thumb--empty:hover { transform: none; border-color: rgba(201, 166, 104, 0.18); }
+
+  .rowlink { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--admin-gold); text-decoration: none; white-space: nowrap; }
+
+  .pc-table td, .pc-table th { border-bottom: 1px solid rgba(201, 166, 104, 0.12); }
+  .pc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pc-table td { padding-top: 0.35rem; padding-bottom: 0.35rem; }
+  .pc-margin { width: 6.2rem; }
+  .pc-custom { width: 4.2rem; margin-left: 0.3rem; text-align: right; }
+  .pc-price { width: 7.2rem; text-align: right; }
+  .pc-gp { color: var(--admin-gold); }
+  .pc-hint { font-size: 0.68rem; color: var(--admin-muted); }
+  .pc-actions { white-space: nowrap; }
+  .pc-approve-form { display: inline; margin-right: 0.6rem; }
+  .pc-approve:disabled { opacity: 0.45; cursor: default; }
+
+  .pr-caption { margin: 0.9rem 0 0; font-size: 0.75rem; color: var(--admin-muted); max-width: 60rem; }
+
+  /* ---- image preview overlay ---- */
+  .lb { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; }
+  .lb[hidden] { display: none; }
+  .lb__backdrop { position: absolute; inset: 0; background: rgba(10, 9, 7, 0.82); }
+  .lb__box { position: relative; margin: 0; max-width: min(60rem, 92vw); max-height: 88vh; display: grid; }
+  .lb__img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #14120f; border: 1px solid rgba(201, 166, 104, 0.25); border-radius: 3px; }
+  .lb__cap { display: flex; gap: 1rem; align-items: baseline; padding: 0.7rem 0.2rem; color: var(--admin-cream); font-size: 0.85rem; }
+  .lb__cap strong { color: var(--admin-gold); }
+  .lb__cap span { color: var(--admin-muted); }
+  .lb__count { margin-left: auto; }
+  .lb__x {
+    position: absolute; top: -0.6rem; right: -0.6rem; z-index: 2;
+    width: 2.2rem; height: 2.2rem; border-radius: 50%;
+    background: var(--admin-gold); color: #14120f; border: none;
+    font-size: 1.3rem; line-height: 1; cursor: pointer;
+  }
+  .lb__nav {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+    width: 2.4rem; height: 3.2rem; border: none; border-radius: 3px;
+    background: rgba(20, 18, 15, 0.75); color: var(--admin-gold);
+    font-size: 1.8rem; line-height: 1; cursor: pointer;
+  }
+  .lb__nav--prev { left: 0.4rem; }
+  .lb__nav--next { right: 0.4rem; }
+  .lb__nav[hidden] { display: none; }
 </style>
 
 <script>
-  const table = document.getElementById('pricing-table');
-  if (table) {
-    const form = document.getElementById('pricing-form') as HTMLFormElement;
-    const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const rows = [...table.querySelectorAll<HTMLTableRowElement>('.pr-row')];
-    let dirty = false;
+  // ==========================================================================
+  // Image preview overlay — click a thumbnail to enlarge; arrows move through
+  // a model's images; X, backdrop click or Escape closes.
+  // ==========================================================================
+  const lb = document.querySelector<HTMLElement>('[data-lb]');
+  if (lb) {
+    const img = lb.querySelector<HTMLImageElement>('[data-lb-img]')!;
+    const nameEl = lb.querySelector<HTMLElement>('[data-lb-name]')!;
+    const supEl = lb.querySelector<HTMLElement>('[data-lb-supplier]')!;
+    const countEl = lb.querySelector<HTMLElement>('[data-lb-count]')!;
+    const prev = lb.querySelector<HTMLButtonElement>('[data-lb-prev]')!;
+    const next = lb.querySelector<HTMLButtonElement>('[data-lb-next]')!;
+    let images: string[] = [];
+    let index = 0;
 
-    function rowValues(row: HTMLTableRowElement) {
-      const costRaw = (row.querySelector('.pr-cost') as HTMLInputElement).value.trim();
-      const sellRaw = (row.querySelector('.pr-selling') as HTMLInputElement).value.trim();
-      const cost = costRaw === '' ? null : Number(costRaw);
-      const sell = sellRaw === '' ? null : Number(sellRaw);
-      return { cost, sell };
-    }
+    const show = () => {
+      img.src = images[index] ?? '';
+      countEl.textContent = images.length > 1 ? `${index + 1} / ${images.length}` : '';
+      prev.hidden = next.hidden = images.length < 2;
+    };
+    const open = (btn: HTMLElement) => {
+      try { images = JSON.parse(btn.dataset.lightbox ?? '[]'); } catch { images = []; }
+      if (!images.length) return;
+      index = 0;
+      nameEl.textContent = btn.dataset.lightboxName ?? '';
+      supEl.textContent = btn.dataset.lightboxSupplier ?? '';
+      show();
+      lb.hidden = false;
+    };
+    const close = () => { lb.hidden = true; img.src = ''; };
 
-    function recalc() {
-      let totalMargin = 0;
-      let totalSelling = 0;
-      let excluded = 0;
-      dirty = false;
-
-      for (const row of rows) {
-        const costEl = row.querySelector('.pr-cost') as HTMLInputElement;
-        const sellEl = row.querySelector('.pr-selling') as HTMLInputElement;
-        const marginEl = row.querySelector('.pr-margin') as HTMLElement;
-        const pctEl = row.querySelector('.pr-pct') as HTMLElement;
-        const { cost, sell } = rowValues(row);
-
-        const rowDirty = costEl.value.trim() !== (costEl.dataset.orig ?? '') || sellEl.value.trim() !== (sellEl.dataset.orig ?? '');
-        row.classList.toggle('is-dirty', rowDirty);
-        if (rowDirty) dirty = true;
-
-        // unknown (null) OR zero cost/selling: em-dash — never 0, never 100%
-        if (cost == null || sell == null || cost === 0 || sell === 0 || !Number.isFinite(cost) || !Number.isFinite(sell)) {
-          marginEl.textContent = '—';
-          marginEl.classList.add('pr-dash');
-          pctEl.textContent = '—';
-          pctEl.className = 'num pr-pct pr-dash';
-          excluded++;
-          continue;
-        }
-        const margin = sell - cost;
-        const pct = ((sell - cost) / sell) * 100;
-        marginEl.textContent = fmt(margin);
-        marginEl.classList.remove('pr-dash');
-        pctEl.textContent = `${pct.toFixed(1)}%`;
-        pctEl.className = 'num pr-pct ' + (pct >= 30 ? 'pr-pct--green' : pct >= 15 ? 'pr-pct--amber' : 'pr-pct--red');
-        totalMargin += margin;
-        totalSelling += sell;
-      }
-
-      document.getElementById('pr-total-margin')!.textContent = totalSelling > 0 ? fmt(totalMargin) : '—';
-      // blended = total margin / total selling — NOT an average of the % column
-      document.getElementById('pr-blended')!.textContent = totalSelling > 0 ? `${((totalMargin / totalSelling) * 100).toFixed(1)}%` : '—';
-      const exNote = document.getElementById('pr-excluded')!;
-      if (excluded > 0) {
-        exNote.hidden = false;
-        exNote.textContent = `${excluded} row${excluded === 1 ? '' : 's'} excluded from totals (missing or zero cost/selling price).`;
-      } else exNote.hidden = true;
-    }
-
-    form.addEventListener('input', recalc);
-    recalc();
-
-    // bulk markup: on-screen only; NULL-cost rows skipped, never zeroed
-    document.getElementById('apply-markup')?.addEventListener('click', () => {
-      const pctRaw = (document.getElementById('bulk-markup') as HTMLInputElement).value.trim();
-      const pct = Number(pctRaw);
-      const note = document.getElementById('bulk-note')!;
-      if (pctRaw === '' || !Number.isFinite(pct) || pct < 0) { note.textContent = 'Enter a non-negative markup percentage first.'; return; }
-      if (!confirm(`Apply ${pct}% markup to every row with a cost?\n\nThis overwrites the on-screen selling prices (nothing is saved until you click Save changes).`)) return;
-      let applied = 0, skipped = 0;
-      for (const row of rows) {
-        const { cost } = rowValues(row);
-        const sellEl = row.querySelector('.pr-selling') as HTMLInputElement;
-        if (cost == null || !Number.isFinite(cost)) { skipped++; continue; }
-        sellEl.value = (Math.round(cost * (1 + pct / 100) * 100) / 100).toFixed(2);
-        applied++;
-      }
-      note.textContent = `Applied to ${applied} row${applied === 1 ? '' : 's'}${skipped ? ` — ${skipped} skipped (no cost)` : ''}. Review, then Save changes.`;
-      recalc();
+    document.querySelectorAll<HTMLElement>('[data-lightbox]').forEach((btn) =>
+      btn.addEventListener('click', () => open(btn))
+    );
+    lb.querySelectorAll('[data-lb-close]').forEach((el) => el.addEventListener('click', close));
+    prev.addEventListener('click', () => { index = (index - 1 + images.length) % images.length; show(); });
+    next.addEventListener('click', () => { index = (index + 1) % images.length; show(); });
+    document.addEventListener('keydown', (e) => {
+      if (lb.hidden) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft' && images.length > 1) { index = (index - 1 + images.length) % images.length; show(); }
+      if (e.key === 'ArrowRight' && images.length > 1) { index = (index + 1) % images.length; show(); }
     });
-
-    // unsaved-changes guard
-    window.addEventListener('beforeunload', (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ''; }
-    });
-    form.addEventListener('submit', () => { dirty = false; });
   }
+
+  // ==========================================================================
+  // Margin pricing — per row:
+  //   pick a margin  → Selling Price = Landed ÷ (1 − margin%)   [auto]
+  //   type a price   → margin, gross profit and markup derived  [reverse]
+  // Nothing is saved or published until "Use as Approved Price" + confirm.
+  // ==========================================================================
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+
+  document.querySelectorAll<HTMLTableRowElement>('.pc-row').forEach((row) => {
+    const landedRaw = row.dataset.landed ?? '';
+    const landed = landedRaw === '' ? null : Number(landedRaw);
+    if (landed == null || !Number.isFinite(landed) || landed <= 0) return;
+
+    const marginSel = row.querySelector<HTMLSelectElement>('.pc-margin')!;
+    const customIn = row.querySelector<HTMLInputElement>('.pc-custom')!;
+    const priceIn = row.querySelector<HTMLInputElement>('.pc-price')!;
+    const gpEl = row.querySelector<HTMLElement>('.pc-gp')!;
+    const markupEl = row.querySelector<HTMLElement>('.pc-markup')!;
+    const form = row.querySelector<HTMLFormElement>('.pc-approve-form')!;
+    const hidPrice = form.querySelector<HTMLInputElement>('[name="approved_price"]')!;
+    const hidMargin = form.querySelector<HTMLInputElement>('[name="margin_used"]')!;
+
+    const currentMargin = (): number | null => {
+      const sel = marginSel.value;
+      if (sel === 'custom') {
+        const c = Number(customIn.value);
+        return Number.isFinite(c) && c >= 0 && c < 95 ? c : null;
+      }
+      if (sel === '') return null;
+      return Number(sel);
+    };
+
+    // derived numbers from whatever price is currently in the box
+    const showDerived = () => {
+      const price = Number(priceIn.value);
+      if (!Number.isFinite(price) || price <= 0) {
+        gpEl.textContent = '—';
+        markupEl.textContent = '—';
+        hidPrice.value = '';
+        return;
+      }
+      const gp = price - landed;
+      const gm = (gp / price) * 100;
+      const markup = (gp / landed) * 100;
+      gpEl.textContent = `${fmt(gp)} (${gm.toFixed(1)}%)`;
+      markupEl.textContent = `${markup.toFixed(1)}%`;
+      hidPrice.value = String(Math.round(price));
+      hidMargin.value = gm.toFixed(1);
+    };
+
+    // margin chosen → price computed: price = landed / (1 − m)
+    const applyMargin = () => {
+      const m = currentMargin();
+      customIn.hidden = marginSel.value !== 'custom';
+      if (m == null) return;
+      priceIn.value = String(Math.round(landed / (1 - m / 100)));
+      showDerived();
+    };
+
+    marginSel.addEventListener('change', applyMargin);
+    customIn.addEventListener('input', applyMargin);
+    // price typed by hand → margin derived from it ("Calculate Margin From Price")
+    priceIn.addEventListener('input', () => { marginSel.value = ''; customIn.hidden = true; showDerived(); });
+
+    form.addEventListener('submit', (e) => {
+      const price = Number(hidPrice.value);
+      if (!Number.isFinite(price) || price <= 0) { e.preventDefault(); return; }
+      const model = row.dataset.model ?? 'this model';
+      if (!confirm(`Approve ${fmt(price)} as the public From price for ${model}?`)) e.preventDefault();
+    });
+
+    showDerived();
+  });
 </script>

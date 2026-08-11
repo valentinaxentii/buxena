@@ -32,6 +32,14 @@ const saunas = defineCollection({
     order: z.number().default(100),
     draft: z.boolean().default(false),
 
+    /**
+     * INTERNAL ONLY — never rendered to customers.
+     * Records WHY a model is withheld from the catalog, so a `draft: true`
+     * is never mistaken for unfinished content. Set alongside draft: true.
+     * Current use: models whose manufacturer cannot be verified.
+     */
+    hold: z.string().optional(),
+
     // Set to false only once every fact on the page has been verified.
     placeholder: z.boolean().default(true),
 
@@ -49,6 +57,39 @@ const saunas = defineCollection({
       .array(z.object({ label: z.string(), file: z.string().optional(), note: z.string().optional() }))
       .optional(),
 
+    // --- Pricing architecture (founders: BUXENA WILL show prices) --------
+    // All optional and ALL EMPTY until real, approved numbers exist.
+    // The UI renders each line only when its field has a value, and shows
+    // "Request Pricing" wherever a number is absent — so approved prices
+    // can be inserted per model with a one-line frontmatter change and no
+    // code work. Never populate from guesses.
+    /**
+     * PER-MODEL WARRANTY — architecture ready, ALL EMPTY until verified.
+     * Each field takes the manufacturer's own stated term for THIS model
+     * (e.g. "5 years structural, per Capra"). Where a field is absent the
+     * site says "See applicable manufacturer warranty" instead — which is
+     * the current state of every model. NEVER populate from assumption,
+     * from another model, or from a competitor's published terms.
+     */
+    warranty: z
+      .object({
+        structural: z.string().optional(),
+        workmanship: z.string().optional(),
+        heater: z.string().optional(),
+        controls: z.string().optional(),
+        electrical: z.string().optional(),
+        accessories: z.string().optional(),
+        source: z.string().optional(),   // the supplier document the terms came from
+      })
+      .optional(),
+
+    msrp: z.string().optional(),                 // internal reference, not auto-displayed
+    fromPrice: z.string().optional(),            // "From $18,900" — sauna alone
+    completeFromPrice: z.string().optional(),    // "Complete packages from $23,400"
+    projectPricing: z.boolean().default(false),  // true → "Project Pricing" label
+    deliveryEstimate: z.string().optional(),     // location-based wording, only if approved
+    availability: z.enum(['in-stock', 'in-transit', 'preorder']).optional(),
+
     // --- Catalog facets (sourced from supplier product data) ---
     location: z.enum(['outdoor', 'indoor']).optional(),
     productType: z.string().optional(),   // e.g. "Barrel", "Cube"
@@ -60,4 +101,36 @@ const saunas = defineCollection({
   }),
 });
 
-export const collections = { saunas };
+/**
+ * TRUST ARCHITECTURE — reviews & real projects.
+ * Schemas only: BOTH collections are intentionally EMPTY. No fake
+ * testimonials, no fake projects, ever. When a real review or a completed
+ * customer project (with written photo permission) exists, add a markdown
+ * file and the surfaces that consume these collections can start rendering.
+ */
+const reviews = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/reviews' }),
+  schema: z.object({
+    customerName: z.string(),          // first name / initial only, e.g. "Sarah K."
+    cityState: z.string().optional(),  // "Fairfield, CT"
+    product: z.string().optional(),    // internal model title (BUH-…)
+    date: z.string(),                  // ISO date of the review
+    verifiedPurchase: z.boolean().default(false),
+    photoPermission: z.boolean().default(false), // written permission for any project photo
+    rating: z.number().min(1).max(5).optional(),
+  }),
+});
+
+const projects = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/projects' }),
+  schema: z.object({
+    title: z.string(),
+    model: z.string(),                 // internal model title (BUH-…)
+    location: z.string().optional(),   // "Hudson Valley, NY"
+    images: z.array(z.object({ src: z.string(), alt: z.string() })).default([]),
+    permissionStatus: z.enum(['granted-written', 'pending', 'none']).default('none'),
+    date: z.string().optional(),
+  }),
+});
+
+export const collections = { saunas, reviews, projects };

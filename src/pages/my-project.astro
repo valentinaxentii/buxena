@@ -1,0 +1,237 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { displayTitle } from '../data/catalog';
+import { getCollection } from 'astro:content';
+
+/**
+ * MY BUXENA PROJECT — private project board MVP.
+ *
+ * Deliberately LOCAL-ONLY: everything renders from this browser's own
+ * localStorage (advisor shortlist, readiness answers). Nothing is stored
+ * server-side, nothing is public, no account system is added. When a real
+ * customer-portal decision is made, this page is the UI to wire to it.
+ *
+ * PROJECT READINESS: statuses come from the customer's own answers only —
+ * READY here means "you've told us this is handled", never a BUXENA
+ * engineering approval. The copy says so on the page.
+ */
+const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+const catalog = models.map((m) => ({
+  slug: m.id,
+  title: m.data.title,
+  display: displayTitle(m.data.title),
+}));
+
+const READINESS = [
+  { key: 'sauna', label: 'Sauna selected' },
+  { key: 'space', label: 'Space confirmed' },
+  { key: 'foundation', label: 'Foundation / base' },
+  { key: 'electrical', label: 'Electrical' },
+  { key: 'access', label: 'Site access' },
+  { key: 'delivery', label: 'Delivery review' },
+  { key: 'heater', label: 'Heater & controls confirmed' },
+  { key: 'installation', label: 'Installation planning' },
+];
+---
+
+<BaseLayout title="My BUXENA Project" description="Your private BUXENA project summary — selected sauna, readiness and next steps." noindex={true}>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">My BUXENA Project</span>
+      <h1 class="display measure--tight">Your project, in one place</h1>
+      <p class="lead measure">
+        Everything here lives privately in your own browser — your
+        shortlist, your answers, your progress. Nothing is published.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell proj">
+      <div class="proj__main">
+        <div class="proj__block">
+          <h2 class="h3">Selected sauna</h2>
+          <p class="proj__model" data-proj-model>No model selected yet.</p>
+          <p class="proj__alts" data-proj-alts hidden></p>
+          <div class="proj__modelctas" data-proj-modelctas hidden></div>
+          <p class="proj__hint" data-proj-nomodel>
+            Run the <a href="/plan-your-sauna/">Sauna Advisor</a> or
+            <a href="/see-it-in-my-space/">See It In My Space</a> and your
+            matches appear here automatically.
+          </p>
+        </div>
+
+        <div class="proj__block">
+          <h2 class="h3">Project readiness</h2>
+          <p class="proj__disclaimer">
+            Based on what you've confirmed — a planning aid, not a site
+            approval. BUXENA reviews everything with you before ordering.
+          </p>
+          <ul class="proj__ready" data-proj-ready>
+            {READINESS.map((r) => (
+              <li class="proj__ready-row" data-ready-key={r.key}>
+                <span class="proj__ready-label">{r.label}</span>
+                <select class="proj__ready-status" data-ready-select aria-label={`Status: ${r.label}`}>
+                  <option value="not-provided">Not yet provided</option>
+                  <option value="needs-confirmation">Needs confirmation</option>
+                  <option value="ready">Ready</option>
+                </select>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div class="proj__block">
+          <h2 class="h3">Next best action</h2>
+          <p class="proj__next" data-proj-next></p>
+        </div>
+      </div>
+
+      <aside class="proj__side">
+        <h2 class="h3">Move it forward</h2>
+        <div class="proj__ctas">
+          <a class="btn btn--bronze" data-proj-pricing href="/quote/">Request Pricing</a>
+          <a class="btn btn--outline" href="/consultation/">Talk to BUXENA</a>
+          <a class="btn btn--outline" data-proj-compare href="/compare/">Compare Models</a>
+          <a class="btn btn--outline" href="/start-your-project/">Upload More Information</a>
+        </div>
+      </aside>
+    </div>
+  </section>
+</BaseLayout>
+
+<script type="application/json" id="proj-catalog" set:html={JSON.stringify(catalog)} />
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .proj {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: clamp(1.9rem, 0.75rem + 3vw, 4rem);
+    align-items: start;
+  }
+  .proj__block { border-top: 1px solid var(--line); padding-top: 1.25rem; margin-bottom: 2rem; }
+  .proj__model { font-family: var(--font-display); font-size: var(--t-h3); margin: 0.6rem 0 0.4rem; }
+  .proj__alts { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.8rem; }
+  .proj__modelctas { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.6rem; }
+  .proj__hint { font-size: var(--t-small); color: var(--muted); }
+  .proj__hint a { color: var(--bronze-ink); }
+
+  .proj__disclaimer { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin: 0.4rem 0 1rem; }
+
+  .proj__ready { display: grid; }
+  .proj__ready-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .proj__ready-label { font-size: var(--t-small); }
+  .proj__ready-status {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .proj__ready-row[data-status='ready'] .proj__ready-status { border-color: var(--bronze); color: var(--bronze-ink); }
+  .proj__ready-row[data-status='needs-confirmation'] .proj__ready-status { border-color: var(--bronze-soft); }
+
+  .proj__next { font-size: var(--t-lead); font-family: var(--font-display); font-style: italic; }
+
+  .proj__side { border: 1px solid var(--line); padding: clamp(1.25rem, 1rem + 1vw, 1.9rem); }
+  .proj__ctas { display: grid; gap: 0.6rem; margin-top: 1rem; }
+  .proj__ctas .btn { justify-content: center; }
+
+  @media (max-width: 900px) {
+    .proj { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  const catalog: { slug: string; title: string; display: string }[] = JSON.parse(
+    document.getElementById('proj-catalog')?.textContent ?? '[]'
+  );
+  const bySlug = new Map(catalog.map((m) => [m.slug, m]));
+
+  const modelEl = document.querySelector<HTMLElement>('[data-proj-model]')!;
+  const altsEl = document.querySelector<HTMLElement>('[data-proj-alts]')!;
+  const modelCtas = document.querySelector<HTMLElement>('[data-proj-modelctas]')!;
+  const noModel = document.querySelector<HTMLElement>('[data-proj-nomodel]')!;
+  const nextEl = document.querySelector<HTMLElement>('[data-proj-next]')!;
+  const pricingCta = document.querySelector<HTMLAnchorElement>('[data-proj-pricing]')!;
+  const compareCta = document.querySelector<HTMLAnchorElement>('[data-proj-compare]')!;
+
+  // ---- selected sauna, from the advisor's saved shortlist -----------------
+  let selected: { slug: string; title: string; display: string } | undefined;
+  let alternatives: string[] = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem('buxena-plan-your-sauna') ?? 'null');
+    const slugs: string[] = saved?.recommended ?? [];
+    const found = slugs.map((s) => bySlug.get(s)).filter(Boolean) as typeof catalog;
+    if (found.length) {
+      selected = found[0];
+      alternatives = found.slice(1).map((m) => m.display);
+    }
+  } catch { /* no saved shortlist */ }
+
+  if (selected) {
+    modelEl.textContent = selected.display;
+    noModel.hidden = true;
+    if (alternatives.length) {
+      altsEl.textContent = `Alternatives from your shortlist: ${alternatives.join(', ')}`;
+      altsEl.hidden = false;
+    }
+    modelCtas.innerHTML = `<a class="link" href="/saunas/${selected.slug}/">View Model <span aria-hidden="true">→</span></a>`;
+    modelCtas.hidden = false;
+    pricingCta.href = `/quote/?model=${encodeURIComponent(selected.title)}`;
+    compareCta.href = `/compare/?a=${encodeURIComponent(selected.slug)}`;
+  }
+
+  // ---- readiness state, persisted locally ---------------------------------
+  const KEY = 'buxena-project-readiness';
+  let readiness: Record<string, string> = {};
+  try { readiness = JSON.parse(localStorage.getItem(KEY) ?? '{}'); } catch { readiness = {}; }
+  if (selected && !readiness.sauna) readiness.sauna = 'ready';
+
+  const rows = document.querySelectorAll<HTMLElement>('[data-ready-key]');
+
+  const NEXT_ACTIONS: Record<string, string> = {
+    sauna: 'Run the Sauna Advisor or browse the range to choose your model.',
+    space: 'Upload a photo of your space so we can see what fits.',
+    foundation: 'Confirm your foundation plan — or ask BUXENA what the model needs.',
+    electrical: 'Talk to your electrician about the model’s requirement — we’ll supply the details.',
+    access: 'Check gate widths and the delivery route, then tell us what you found.',
+    delivery: 'Request a delivery review for your ZIP code.',
+    heater: 'Request pricing — heater and controls are confirmed in your quote.',
+    installation: 'Request project pricing to plan installation coordination.',
+  };
+
+  const updateNext = () => {
+    const firstGap = [...rows].find((r) => (readiness[r.dataset.readyKey!] ?? 'not-provided') !== 'ready');
+    nextEl.textContent = firstGap
+      ? NEXT_ACTIONS[firstGap.dataset.readyKey!] ?? 'Request project pricing.'
+      : 'Everything you can confirm is confirmed — request project pricing and BUXENA takes it from here.';
+  };
+
+  rows.forEach((row) => {
+    const key = row.dataset.readyKey!;
+    const select = row.querySelector<HTMLSelectElement>('[data-ready-select]')!;
+    select.value = readiness[key] ?? 'not-provided';
+    row.dataset.status = select.value;
+    select.addEventListener('change', () => {
+      readiness[key] = select.value;
+      row.dataset.status = select.value;
+      try { localStorage.setItem(KEY, JSON.stringify(readiness)); } catch { /* private browsing */ }
+      updateNext();
+    });
+  });
+  updateNext();
+</script>

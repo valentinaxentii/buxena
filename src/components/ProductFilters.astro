@@ -234,5 +234,20 @@ const { facets } = Astro.props;
         applyFilters();
       });
     });
+
+    // "Reset Filters" (e.g. in the no-results state): every group back to
+    // All, grid restored. Lives outside the component's own markup so the
+    // page can place it beside its empty message.
+    document.querySelectorAll<HTMLButtonElement>('[data-filter-reset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        Object.keys(active).forEach((k) => { active[k] = ''; });
+        chips.forEach((c) => {
+          const on = (c.dataset.value ?? '') === '';
+          c.classList.toggle('is-on', on);
+          c.setAttribute('aria-pressed', String(on));
+        });
+        applyFilters();
+      });
+    });
   }
 </script>

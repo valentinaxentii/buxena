@@ -8,6 +8,8 @@ tagline: "The compact barrel, built in thermowood"
 summary: "A short-length barrel sauna for tighter gardens and side yards."
 order: 10
 placeholder: false
+draft: true
+hold: "HOLD — SUPPLIER VERIFICATION (2026-08-11): no manufacturer identified. 230cm matches no SKU across any of the four suppliers in the master workbook. Capacity also unverified. Data and images preserved; restore by removing draft+hold once a supplier confirms the model."
 materials: ["Thermowood"]
 heroImage:
   src: "/images/saunas/iti-thermowood-2-3m-hero.png"

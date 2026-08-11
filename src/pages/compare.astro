@@ -1,0 +1,290 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { displayTitle } from '../data/catalog';
+import { displayFromPrice } from '../data/pricing';
+import { getCollection } from 'astro:content';
+
+/**
+ * Smart product comparison — pick any two models, see verified facts side
+ * by side plus buyer-oriented guidance DERIVED from those facts (capacity,
+ * footprint, form, placement). Nothing editorialized beyond what the data
+ * supports; where both models are equal on a dimension, no "better for"
+ * claim is made. Personalized "BUXENA recommends" appears only when the
+ * visitor arrived from the Advisor/Space flow with a saved shortlist.
+ */
+const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
+  (a, b) => a.data.order - b.data.order
+);
+
+const catalog = models.map((m) => ({
+  slug: m.id,
+  title: m.data.title,
+  tagline: m.data.tagline,
+  location: m.data.location,
+  productType: m.data.productType,
+  capacity: m.data.capacity,
+  capacityMin: m.data.capacityMin,
+  capacityMax: m.data.capacityMax,
+  materials: m.data.materials,
+  dimensions: m.data.dimensions,
+  specs: m.data.specs,
+  heaterOptions: m.data.heaterOptions,
+  heroImage: m.data.heroImage,
+  // Central register only — never raw frontmatter (see src/data/pricing.ts).
+  fromPrice: displayFromPrice(m.data.title, m.data.fromPrice) ?? undefined,
+  availability: m.data.availability,
+}));
+---
+
+<BaseLayout
+  title="Compare Saunas"
+  description="Compare any two BUXENA saunas side by side — verified dimensions, capacity, materials and options, with guidance on which fits which project."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Compare</span>
+      <h1 class="display measure--tight">Two saunas, side by side</h1>
+      <p class="lead measure">
+        Pick any two models. Verified facts first, then what those facts
+        mean for your project.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell">
+      <div class="cmp__pickers">
+        <div class="field">
+          <label for="cmp-a">Model A</label>
+          <select id="cmp-a" data-cmp-a>
+            <option value="">Select…</option>
+            {catalog.map((m) => (
+              <option value={m.slug}>{displayTitle(m.title)}</option>
+            ))}
+          </select>
+        </div>
+        <span class="cmp__vs" aria-hidden="true">vs</span>
+        <div class="field">
+          <label for="cmp-b">Model B</label>
+          <select id="cmp-b" data-cmp-b>
+            <option value="">Select…</option>
+            {catalog.map((m) => (
+              <option value={m.slug}>{displayTitle(m.title)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <p class="cmp__reco" data-cmp-reco hidden></p>
+
+      <div class="cmp__result" data-cmp-result hidden>
+        <div class="cmp__guidance" data-cmp-guidance></div>
+        <div class="cmp__tablewrap"><table class="cmp__table" data-cmp-table></table></div>
+        <div class="cmp__ctas" data-cmp-ctas></div>
+      </div>
+
+      <p class="cmp__empty" data-cmp-empty>Select two models above to compare them.</p>
+    </div>
+  </section>
+</BaseLayout>
+
+<script type="application/json" id="cmp-catalog" set:html={JSON.stringify(catalog)} />
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .cmp__pickers {
+    display: flex;
+    align-items: end;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.75rem;
+  }
+  .cmp__pickers .field { display: grid; gap: 0.5rem; min-width: 16rem; flex: 1; max-width: 24rem; }
+  .cmp__pickers label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .cmp__pickers select {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.6rem 0;
+    border-radius: 0;
+    appearance: none;
+    cursor: pointer;
+  }
+  .cmp__pickers select:focus { border-color: var(--bronze); }
+  .cmp__vs { font-family: var(--font-display); font-style: italic; font-size: 1.4rem; color: var(--bronze-ink); padding-bottom: 0.6rem; }
+
+  .cmp__reco {
+    font-size: var(--t-small);
+    color: var(--bronze-ink);
+    border-left: 3px solid var(--bronze);
+    background: var(--linen-deep);
+    padding: 0.8rem 1.1rem;
+    margin: 0 0 1.5rem;
+  }
+
+  .cmp__guidance { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-bottom: 1.75rem; }
+  .cmp__choose {
+    border: 1px solid var(--line);
+    padding: 1.15rem 1.3rem;
+  }
+  .cmp__choose h2 { font-family: var(--font-display); font-size: var(--t-h3); margin: 0 0 0.5rem; }
+  .cmp__choose ul { display: grid; gap: 0.3rem; }
+  .cmp__choose li { font-size: var(--t-small); color: var(--muted); position: relative; padding-left: 1.3rem; }
+  .cmp__choose li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
+
+  .cmp__tablewrap { overflow-x: auto; }
+  .cmp__table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+  .cmp__table :global(th), .cmp__table :global(td) {
+    text-align: left;
+    padding: 0.65rem 1rem 0.65rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .cmp__table :global(thead th) {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+  .cmp__table :global(tbody th) { color: var(--muted); font-weight: 500; white-space: nowrap; }
+
+  .cmp__ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+
+  .cmp__empty { color: var(--muted); font-style: italic; }
+
+  @media (max-width: 700px) {
+    .cmp__guidance { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+
+  interface CmpModel {
+    slug: string; title: string; tagline: string;
+    location?: string; productType?: string;
+    capacity?: string; capacityMin?: number; capacityMax?: number;
+    materials?: string[]; dimensions?: { label: string; value: string }[];
+    specs?: { label: string; value: string }[];
+    heaterOptions?: string[]; fromPrice?: string; availability?: string;
+    heroImage?: { src?: string; alt: string };
+  }
+
+  const catalog: CmpModel[] = JSON.parse(document.getElementById('cmp-catalog')?.textContent ?? '[]');
+  const bySlug = new Map(catalog.map((m) => [m.slug, m]));
+  const shownName = (t: string) => t.replace(/^BUH-/i, '');
+
+  const selA = document.querySelector<HTMLSelectElement>('[data-cmp-a]')!;
+  const selB = document.querySelector<HTMLSelectElement>('[data-cmp-b]')!;
+  const result = document.querySelector<HTMLElement>('[data-cmp-result]')!;
+  const empty = document.querySelector<HTMLElement>('[data-cmp-empty]')!;
+  const guidance = document.querySelector<HTMLElement>('[data-cmp-guidance]')!;
+  const table = document.querySelector<HTMLElement>('[data-cmp-table]')!;
+  const ctas = document.querySelector<HTMLElement>('[data-cmp-ctas]')!;
+  const reco = document.querySelector<HTMLElement>('[data-cmp-reco]')!;
+
+  // Personalized note only when a real Advisor shortlist exists locally.
+  try {
+    const saved = JSON.parse(localStorage.getItem('buxena-plan-your-sauna') ?? 'null');
+    const first: string | undefined = saved?.recommended?.[0];
+    if (first && bySlug.has(first)) {
+      reco.textContent = `Based on your Sauna Advisor answers, BUXENA's best match for your project was the ${shownName(bySlug.get(first)!.title)} — pre-selected below.`;
+      reco.hidden = false;
+      selA.value = first;
+      if (saved?.recommended?.[1] && bySlug.has(saved.recommended[1])) selB.value = saved.recommended[1];
+    }
+  } catch { /* no saved context — generic compare */ }
+
+  // ?a=slug&b=slug deep links (advisor/space flows can link here directly)
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get('a') && bySlug.has(qs.get('a')!)) selA.value = qs.get('a')!;
+  if (qs.get('b') && bySlug.has(qs.get('b')!)) selB.value = qs.get('b')!;
+
+  /** Buyer guidance derived strictly from verified fields. */
+  const chooseIf = (m: CmpModel, other: CmpModel): string[] => {
+    const points: string[] = [];
+    const cap = m.capacityMax ?? 0;
+    const oCap = other.capacityMax ?? 0;
+    if (cap && oCap && cap > oCap) points.push(`You need room for more people (up to ${cap} vs ${oCap})`);
+    if (cap && oCap && cap < oCap) points.push(`A smaller group and a tighter footprint suit your space`);
+    if (m.location !== other.location && m.location) points.push(`Your project is ${m.location}`);
+    if (m.productType !== other.productType && m.productType) {
+      if (m.productType === 'Barrel') points.push('You want the traditional barrel form');
+      if (m.productType === 'Cube') points.push('You want a modern, architectural silhouette');
+      if (m.productType === 'Oval') points.push('You want a rounded room that fits inside the home');
+    }
+    const mat = m.materials?.[0];
+    if (mat && mat !== other.materials?.[0]) points.push(`You prefer ${mat.toLowerCase()}`);
+    return points.length ? points : ['Both models fit similar projects — the site visit detail decides it'];
+  };
+
+  const render = () => {
+    const a = bySlug.get(selA.value);
+    const b = bySlug.get(selB.value);
+    if (!a || !b || a === b) {
+      result.hidden = true;
+      empty.hidden = false;
+      return;
+    }
+
+    track('compare_view', { model: a.title, modelB: b.title });
+
+    guidance.innerHTML = [a, b]
+      .map((m, i) => {
+        const other = i === 0 ? b : a;
+        return `
+        <div class="cmp__choose">
+          <h2>Choose the ${shownName(m.title)} if…</h2>
+          <ul>${chooseIf(m, other).map((p) => `<li>${p}</li>`).join('')}</ul>
+        </div>`;
+      })
+      .join('');
+
+    const dimText = (m: CmpModel) => (m.dimensions ?? []).map((d) => `${d.label}: ${d.value}`).join('<br>');
+    const specText = (m: CmpModel) => (m.specs ?? []).slice(0, 6).map((s) => `${s.label}: ${s.value}`).join('<br>');
+    const rows: Array<[string, string, string]> = [
+      ['Placement', a.location ?? '', b.location ?? ''],
+      ['Type', a.productType ?? '', b.productType ?? ''],
+      ['Capacity', a.capacity ?? '', b.capacity ?? ''],
+      ['Dimensions', dimText(a), dimText(b)],
+      ['Material', (a.materials ?? []).join(', '), (b.materials ?? []).join(', ')],
+      ['Heater options', (a.heaterOptions ?? []).join('<br>'), (b.heaterOptions ?? []).join('<br>')],
+      ['Key specifications', specText(a), specText(b)],
+      ['Price', a.fromPrice ?? '', b.fromPrice ?? ''],
+    ].filter(([, va, vb]) => va || vb) as Array<[string, string, string]>;
+
+    table.innerHTML = `
+      <thead><tr><th></th><th>${shownName(a.title)}</th><th>${shownName(b.title)}</th></tr></thead>
+      <tbody>${rows
+        .map(
+          ([l, va, vb]) =>
+            `<tr><th scope="row">${l}</th><td>${va || '<em>Request pricing</em>'}</td><td>${vb || '<em>Request pricing</em>'}</td></tr>`
+        )
+        .join('')}</tbody>`;
+
+    ctas.innerHTML = `
+      <a class="btn btn--bronze" data-cmp-price href="/quote/?model=${encodeURIComponent(a.title)}">Request Pricing — ${shownName(a.title)}</a>
+      <a class="btn btn--outline" data-cmp-price href="/quote/?model=${encodeURIComponent(b.title)}">Request Pricing — ${shownName(b.title)}</a>
+      <a class="btn btn--outline" href="/see-it-in-my-space/">See In My Space</a>
+      <a class="btn btn--outline" href="/quote/?package=BUXENA%20Complete">Build Package</a>
+    `;
+    ctas.querySelectorAll<HTMLAnchorElement>('[data-cmp-price]').forEach((el) =>
+      el.addEventListener('click', () => track('compare_pricing_click', { model: el.href }))
+    );
+
+    result.hidden = false;
+    empty.hidden = true;
+  };
+
+  selA.addEventListener('change', render);
+  selB.addEventListener('change', render);
+  render();
+</script>

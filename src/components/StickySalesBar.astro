@@ -1,0 +1,136 @@
+---
+/**
+ * Product-page sticky conversion bar.
+ * Desktop: [MODEL] | availability note | Request Pricing — slides in once
+ * the visitor scrolls past the hero's own CTA, retreats while the enquiry
+ * form or the footer is on screen. Mobile: same triggers, button full-width.
+ * Pure CSS + IntersectionObservers; under reduced-motion it simply
+ * appears/disappears without the slide.
+ */
+import { displayTitle } from '../data/catalog';
+
+interface Props {
+  /** Full internal title (BUH-…) — tracking keeps it; the visible label is stripped. */
+  model: string;
+  /** Anchor the CTA scrolls to — the enquiry form section. */
+  target?: string;
+}
+const { model, target = '#enquire' } = Astro.props;
+const shownName = displayTitle(model);
+---
+
+<div class="salesbar" data-salesbar hidden>
+  <div class="salesbar__inner">
+    <span class="salesbar__model">{shownName}</span>
+    <span class="salesbar__note">Pricing &amp; availability on request</span>
+    <a
+      class="btn btn--bronze salesbar__cta"
+      href={target}
+      data-track="pricing_request_started"
+      data-track-model={model}
+      data-track-form-type="sticky_bar"
+    >Request Pricing</a>
+  </div>
+</div>
+
+<style>
+  .salesbar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 90; /* under the chat fab (300) and header (100) */
+    background: var(--ember);
+    color: var(--linen);
+    border-top: 1px solid var(--line-dark);
+    /* Keep the CTA clear of the iPhone home-indicator gesture zone. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateY(100%);
+    transition: transform 0.5s var(--ease);
+  }
+  .salesbar.is-shown { transform: none; }
+  .salesbar[hidden] { display: none; }
+
+  .salesbar__inner {
+    max-width: var(--shell);
+    margin-inline: auto;
+    padding: 0.7rem var(--gutter);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .salesbar__model {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .salesbar__note {
+    font-size: var(--t-small);
+    color: var(--muted-dark);
+    margin-right: auto;
+  }
+
+  .salesbar__cta { padding: 0.75rem 1.5rem; font-size: 0.75rem; white-space: nowrap; }
+
+  @media (max-width: 700px) {
+    .salesbar__model, .salesbar__note { display: none; }
+    .salesbar__inner { padding: 0.6rem var(--gutter); }
+    .salesbar__cta { flex: 1; justify-content: center; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .salesbar { transition: none; }
+  }
+</style>
+
+<script>
+  const bar = document.querySelector<HTMLElement>('[data-salesbar]');
+  // The product hero's own Request Pricing button — once it scrolls out of
+  // view the sticky bar takes over; while it's visible the bar stays away
+  // so there is never a duplicate CTA on screen.
+  const heroCta = document.querySelector<HTMLElement>('.prod-hero__info .btn');
+  // The enquiry form itself — when it's on screen the bar retreats; a CTA
+  // pointing at a form the visitor is already looking at is noise.
+  const enquire = document.querySelector<HTMLElement>('#enquire');
+  // The footer too — otherwise the bar permanently covers the last footer
+  // row (legal links) once the visitor reaches the end of the page.
+  const footer = document.querySelector<HTMLElement>('footer');
+
+  if (bar && heroCta) {
+    bar.hidden = false;
+
+    let pastHero = false;
+    let atForm = false;
+    let atFooter = false;
+    const apply = () => {
+      const on = pastHero && !atForm && !atFooter;
+      bar.classList.toggle('is-shown', on);
+      // Lets the chat launcher (ChatWidget.astro) ride above the bar while
+      // it is visible, so neither control ever covers the other.
+      document.documentElement.classList.toggle('has-salesbar', on);
+    };
+
+    new IntersectionObserver(([entry]) => {
+      pastHero = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+      apply();
+    }).observe(heroCta);
+
+    if (enquire) {
+      new IntersectionObserver(([entry]) => {
+        atForm = entry.isIntersecting;
+        apply();
+      }, { threshold: 0.15 }).observe(enquire);
+    }
+
+    if (footer) {
+      new IntersectionObserver(([entry]) => {
+        atFooter = entry.isIntersecting;
+        apply();
+      }).observe(footer);
+    }
+  }
+</script>

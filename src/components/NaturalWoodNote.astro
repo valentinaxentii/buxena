@@ -1,0 +1,66 @@
+---
+/**
+ * "Made from real wood" — the short, calm expectation-setting note shown on
+ * timber sauna product pages, linking to the full explanation on the
+ * Warranty & Ownership page.
+ *
+ * WHY IT EXISTS: natural wood moves, checks, weathers and occasionally
+ * resins. Saying so BEFORE purchase prevents the most common and most
+ * avoidable post-delivery dispute. It is deliberately small — it informs,
+ * it does not alarm, and it never appears on models with no timber in their
+ * verified materials list.
+ *
+ * CLAIM SAFETY: states material behaviour only. No warranty terms, periods,
+ * exclusions or promises — those belong to the manufacturer and are not
+ * invented anywhere in this project.
+ */
+interface Props {
+  /** Verified materials from the model's own content file. */
+  materials?: string[];
+}
+const { materials = [] } = Astro.props;
+
+// Only render for models whose verified materials actually include timber.
+const TIMBER = /pine|spruce|thermowood|thermo|aspen|alder|cedar|wood|timber/i;
+const isTimber = materials.some((m) => TIMBER.test(m));
+---
+
+{isTimber && (
+  <aside class="nwood reveal" aria-labelledby="nwood-h">
+    <h2 class="nwood__h" id="nwood-h">Made from real wood.</h2>
+    <p class="nwood__p">
+      Natural wood responds to heat, humidity, weather and time. Variations in
+      grain and color, minor checking, movement, weathering and occasional
+      resin can occur naturally and do not necessarily indicate a defect.
+    </p>
+    <a class="link nwood__link" href="/warranty/#natural-wood">
+      Learn about natural wood &amp; warranty <span class="arrow" aria-hidden="true">→</span>
+    </a>
+  </aside>
+)}
+
+<style>
+  .nwood {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: clamp(1.15rem, 0.9rem + 1vw, 1.6rem) 0;
+    margin-block: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+    display: grid;
+    gap: 0.55rem;
+    max-width: 46rem;
+  }
+  .nwood__h {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .nwood__p {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.7;
+    color: var(--muted);
+  }
+  .nwood__link { justify-self: start; font-size: var(--t-small); }
+</style>

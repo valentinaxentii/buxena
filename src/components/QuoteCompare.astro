@@ -1,0 +1,152 @@
+---
+/**
+ * "Compare Your Sauna Quote" — conversion section teaching buyers to
+ * compare complete packages, not base cabin prices, and inviting them to
+ * bring any other quote to BUXENA for an item-by-item comparison.
+ *
+ * CLAIM RULES (audited): names no competitor, invents no pricing, implies
+ * nothing about anyone hiding fees — it only says prices vary by what is
+ * included, which is the plain truth. Shows no prices of any kind.
+ *
+ * Two renderings:
+ *  - full (default): product-page band with headline, checklist and CTAs.
+ *    "Compare My Quote" enters the EXISTING quote flow with
+ *    ?intent=compare, which QuoteForm turns into source "Quote Comparison"
+ *    (a value in the enquiries free-text source field — no schema change).
+ *  - compact: sidebar block for the quote page — checklist + one line, no
+ *    buttons (the visitor is already beside the form).
+ */
+interface Props {
+  /** Full internal model title (BUH-…) for prefill + tracking. */
+  model?: string;
+  variant?: 'full' | 'compact';
+}
+const { model, variant = 'full' } = Astro.props;
+
+const ITEMS = [
+  'Sauna cabin',
+  'Heater',
+  'Controls',
+  'Sauna stones',
+  'Lighting',
+  'Delivery',
+  'Installation / site requirements',
+  'Optional upgrades',
+];
+
+const compareHref = `/quote/?intent=compare${model ? `&model=${encodeURIComponent(model)}` : ''}`;
+---
+
+{
+  variant === 'full' ? (
+    <section class="band qcmp">
+      <div class="shell">
+        <div class="sec-head reveal">
+          <span class="eyebrow">Compare with confidence</span>
+          <h2 class="h2 measure--tight">Know what your quote includes.</h2>
+          <p class="lead measure">
+            Sauna prices can vary depending on what is included. We’ll help you
+            compare the complete package — not just the base cabin price.
+          </p>
+        </div>
+
+        <ul class="qcmp__list reveal" role="list" data-reveal-stagger>
+          {ITEMS.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+
+        <div class="qcmp__cta reveal">
+          <p class="qcmp__ask">
+            <strong>Have another sauna quote?</strong> Send it to BUXENA and
+            we’ll help you compare it item by item.
+          </p>
+          <div class="qcmp__actions">
+            <a
+              class="btn btn--bronze"
+              href={compareHref}
+              data-track="pricing_request_started"
+              data-track-form-type="quote_compare"
+              data-track-model={model ?? ''}
+            >Compare My Quote</a>
+            <a
+              class="btn btn--outline"
+              href="#enquire"
+              data-track="pricing_request_started"
+              data-track-form-type="compare_section"
+              data-track-model={model ?? ''}
+            >Request BUXENA Pricing</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  ) : (
+    <div class="qcmp qcmp--compact">
+      <h2 class="qcmp__ch">Know what your quote includes</h2>
+      <p class="qcmp__cp">
+        Sauna prices can vary depending on what is included. A complete
+        comparison covers:
+      </p>
+      <ul class="qcmp__list qcmp__list--compact" role="list">
+        {ITEMS.map((item) => (
+          <li>{item}</li>
+        ))}
+      </ul>
+      <p class="qcmp__cp">
+        <strong>Have another sauna quote?</strong> Mention it in your message —
+        we’ll help you compare it item by item.
+      </p>
+    </div>
+  )
+}
+
+<style>
+  .qcmp__list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem 2.5rem;
+    max-width: 34rem;
+    margin: 0;
+    padding: 0;
+  }
+  .qcmp__list li {
+    list-style: none;
+    position: relative;
+    padding-left: 1.35rem;
+    font-size: var(--t-small);
+    color: var(--muted);
+  }
+  .qcmp__list li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--bronze);
+  }
+
+  .qcmp__cta {
+    margin-top: 2.25rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1.75rem;
+  }
+  .qcmp__ask { margin: 0 0 1.1rem; max-width: 44em; }
+  .qcmp__ask strong { font-weight: 600; }
+  .qcmp__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+  /* Compact sidebar rendering (quote page) */
+  .qcmp--compact { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1.5rem; }
+  .qcmp__ch {
+    margin: 0 0 0.6rem;
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    font-weight: 500;
+  }
+  .qcmp__cp { margin: 0 0 0.8rem; font-size: var(--t-small); color: var(--muted); }
+  .qcmp__cp strong { color: var(--ink); font-weight: 600; }
+  .qcmp__list--compact { grid-template-columns: 1fr; gap: 0.35rem; margin: 0 0 1rem; }
+
+  @media (max-width: 560px) {
+    .qcmp__list { grid-template-columns: 1fr; }
+    .qcmp__actions { flex-direction: column; align-items: stretch; }
+    .qcmp__actions .btn { justify-content: center; }
+  }
+</style>

@@ -15,16 +15,22 @@ materials: ["Extra dried pine"]
 heroImage:
   src: "/images/saunas/illi-h2-hero.png"
   alt: "ILLI H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
+gallery:
+  - src: "/images/supplier-capra/illi-h2-outdoor-spruce.png"
+    alt: "ILLI H2 outdoor spruce configuration — transparent render"
 dimensions:
-  - { label: "Width", value: "6.2 ft (190 cm)" }
-  - { label: "Length", value: "3.7 ft (113 cm)" }
-  - { label: "Height", value: "6.9 ft (210 cm)" }
+  - { label: "External (D × W × H)", value: "51.2 × 76.8 × 89.0 in (1300 × 1950 × 2260 mm)" }
+  - { label: "Internal (D × W × H)", value: "43.5 × 73.0 × 80.7 in (1104 × 1855 × 2049 mm)" }
 specs:
-  - { label: "Glass", value: "Full tempered, bronze-tinted glass front" }
-  - { label: "Operating temperature", value: "158–212°F (70–100°C)" }
-  - { label: "Configuration", value: "Contact us for details on the H1/H2 layout difference" }
-  - { label: "Heater compatibility", value: "Contact us for details" }
-delivery: "Contact us for details"
+  - { label: "Front wall", value: "Tempered 8 mm glass" }
+  - { label: "Glass door", value: "Tempered, with handle — 192 × 59 cm" }
+  - { label: "Wall construction", value: "42 mm staves, 28 mm back wall" }
+  - { label: "Heater", value: "Electric only, 6–7 kW — wood-burning not compatible" }
+  - { label: "Placement", value: "Indoor (specially dried pine) or outdoor (thermo pine, black shingle roof)" }
+heaterOptions:
+  - "Electric 6–7 kW (confirmed range for this model — wood-burning not compatible)"
+options: ["Painted exterior (main parts or fully painted)", "Ergonomic backrest", "LED lighting kit (Wi-Fi switch optional)", "150-width variant available (2–4 people, 7–9 kW heater)"]
+delivery: "Flat-pack kit — packing and delivery confirmed with your written quote"
 ---
 
 The second configuration in the ILLI line, at the same footprint as H1 —

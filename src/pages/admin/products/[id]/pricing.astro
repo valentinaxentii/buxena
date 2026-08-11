@@ -1,0 +1,359 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import '../../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
+
+/**
+ * PRICING WORKSHEET — one per sauna model. The internal control center for
+ * that model's costs and public price.
+ *
+ * Rules enforced here and in the display layer:
+ *  - Only a worksheet with status APPROVED may feed a public price.
+ *  - Missing inputs are flagged, never guessed, never treated as zero in
+ *    the flags (the landed-cost math uses only the numbers that exist).
+ *  - Every save keeps the previous version in the history table
+ *    automatically (database trigger).
+ *  - Costs are per model, per supplier — never combined across suppliers.
+ */
+
+const { id } = Astro.params;
+const supabase = createSupabaseAdminClient();
+
+let notice: string | null = null;
+let errorMsg: string | null = null;
+let pricingTableMissing = false;
+
+// Numeric form fields that map 1:1 to columns (generated columns excluded).
+const NUM_FIELDS = [
+  'exw_eur', 'fx_rate', 'duty_pct', 'ocean_freight', 'port_handling',
+  'inland_trucking', 'other_import', 'heater_cost', 'controls_cost',
+  'stones_cost', 'lighting_cost', 'accessories_cost', 'target_markup_pct',
+  'target_margin_pct', 'recommended_retail', 'approved_from_price',
+  'min_selling_price',
+] as const;
+const TEXT_FIELDS = ['supplier_model', 'heater_model', 'source_document', 'notes'] as const;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const row: Record<string, unknown> = { product_id: id };
+
+  let invalid = 0;
+  for (const f of NUM_FIELDS) {
+    const raw = String(form.get(f) ?? '').trim();
+    if (raw === '') { row[f] = null; continue; }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) { invalid++; continue; }
+    row[f] = n;
+  }
+  for (const f of TEXT_FIELDS) {
+    const raw = String(form.get(f) ?? '').trim();
+    row[f] = raw === '' ? null : raw;
+  }
+  const status = String(form.get('status') ?? 'Draft');
+  row.status = ['Draft', 'Needs Review', 'Approved'].includes(status) ? status : 'Draft';
+  row.project_pricing = form.get('project_pricing') === 'on';
+
+  if (invalid > 0) {
+    errorMsg = `${invalid} field(s) had a negative or non-numeric value and were not accepted. Nothing was saved — fix them and save again.`;
+  } else {
+    const { error } = await supabase.from('product_pricing').upsert(row, { onConflict: 'product_id' });
+    if (error) {
+      if (/relation .* does not exist|42P01/i.test(error.message)) pricingTableMissing = true;
+      else errorMsg = `Save failed: ${error.message}`;
+    } else {
+      return Astro.redirect(`/admin/products/${id}/pricing?saved=1`);
+    }
+  }
+}
+
+if (Astro.url.searchParams.get('saved') === '1') notice = 'Worksheet saved. The previous version was kept in the history below.';
+
+const { data: product } = await supabase
+  .from('products')
+  .select('id, model_name, category, suppliers(name)')
+  .eq('id', id)
+  .maybeSingle();
+
+let pricing: any = null;
+let history: any[] = [];
+let supplierSource: any = null;
+if (product) {
+  const { data, error } = await supabase.from('product_pricing').select('*').eq('product_id', id).maybeSingle();
+  if (error && /relation .* does not exist|42P01/i.test(error.message)) pricingTableMissing = true;
+  else pricing = data;
+
+  if (!pricingTableMissing) {
+    const { data: hist } = await supabase
+      .from('product_pricing_history')
+      .select('snapshot, changed_at')
+      .eq('product_id', id)
+      .order('changed_at', { ascending: false })
+      .limit(20);
+    history = hist ?? [];
+  }
+
+  // Supplier source records are deliberately separate from this worksheet.
+  // Seeing both values side-by-side prevents an internal planning figure from
+  // silently replacing a supplier's actual dated price list.
+  const { data: source } = await supabase
+    .from('supplier_products')
+    .select('supplier_model_code, unit_cost, currency, last_price_update, notes')
+    .eq('product_id', id)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  supplierSource = source;
+}
+
+const p = pricing ?? {};
+const v = (k: string) => (p[k] == null ? '' : String(p[k]));
+const supplierName = (product as any)?.suppliers?.name ?? 'No supplier linked';
+const sourceIsEur = supplierSource?.currency?.toUpperCase() === 'EUR';
+const sourceCost = supplierSource?.unit_cost == null ? null : Number(supplierSource.unit_cost);
+const sourceConflict = sourceIsEur && sourceCost != null && p.exw_eur != null && Math.abs(Number(p.exw_eur) - sourceCost) > 0.005;
+
+// Missing critical inputs — flagged, never guessed.
+const missing: string[] = [];
+if (p.exw_eur == null) missing.push('Supplier EXW (EUR)');
+if (p.fx_rate == null) missing.push('FX rate');
+if (p.duty_pct == null) missing.push('Duty %');
+if (p.ocean_freight == null) missing.push('Ocean freight allocation');
+if (p.heater_cost == null) missing.push('Heater cost');
+
+const money = (n: number | null | undefined) =>
+  n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+const histDate = (d: string) => new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+---
+
+<AdminLayout
+  title={`Pricing — ${product?.model_name ?? 'Unknown model'}`}
+  subtitle={`Supplier: ${supplierName}. Internal worksheet — nothing here is public until status is Approved.`}
+  parentLabel="Pricing"
+  parentHref="/admin/products?view=pricing"
+>
+  {!product && <div class="admin-placeholder"><h2>Product not found</h2><p><a href="/admin/products?view=pricing">Back to Pricing</a></p></div>}
+
+  {product && pricingTableMissing && (
+    <div class="admin-placeholder">
+      <h2>Pricing storage is not enabled yet</h2>
+      <p>
+        The pricing worksheet needs its two new database tables. The prepared,
+        safe script is in <code>supabase/pricing-schema.sql</code> — it adds new
+        tables only and touches nothing that exists. Ask Claude for the
+        one-step instruction when you're ready to enable it.
+      </p>
+    </div>
+  )}
+
+  {product && !pricingTableMissing && (
+    <>
+      {notice && <p class="ws-notice ws-notice--ok">{notice}</p>}
+      {errorMsg && <p class="ws-notice ws-notice--err">{errorMsg}</p>}
+
+      {missing.length > 0 && (
+        <p class="ws-notice ws-notice--warn">
+          <strong>Missing information (never guessed):</strong> {missing.join(' · ')}
+        </p>
+      )}
+
+      {supplierSource && (
+        <section class={`ws-source ${sourceConflict ? 'ws-source--conflict' : ''}`} aria-label="Supplier source record">
+          <div>
+            <p class="ws__h">Supplier source record</p>
+            <p><strong>{supplierSource.supplier_model_code ?? 'Model code not recorded'}</strong>{supplierSource.last_price_update ? ` · dated ${supplierSource.last_price_update}` : ''}</p>
+            {supplierSource.notes && <p class="ws-source__note">{supplierSource.notes}</p>}
+          </div>
+          <p class="ws-source__cost">{sourceCost == null ? 'Cost not recorded' : `${supplierSource.currency ?? ''} ${sourceCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</p>
+        </section>
+      )}
+
+      {sourceConflict && (
+        <p class="ws-notice ws-notice--err">
+          <strong>PRICE SOURCE CONFLICT — REVIEW REQUIRED:</strong> this worksheet says EUR {Number(p.exw_eur).toLocaleString('en-US', { minimumFractionDigits: 2 })}; the dated supplier source record says EUR {sourceCost!.toLocaleString('en-US', { minimumFractionDigits: 2 })}. Neither value was changed.
+        </p>
+      )}
+
+      <form method="POST" class="ws">
+        <section class="admin-panel ws__sec">
+          <h2 class="ws__h">Supplier cost — {supplierName}</h2>
+          <div class="ws__grid">
+            <label>Supplier model name<input class="admin-input" name="supplier_model" value={v('supplier_model')} /></label>
+            <label>EXW price (EUR)<input class="admin-input ws-n" name="exw_eur" type="number" step="0.01" min="0" value={v('exw_eur')} /></label>
+            <label>FX rate (EUR→USD)<input class="admin-input ws-n" name="fx_rate" type="number" step="0.0001" min="0" value={v('fx_rate')} /></label>
+            <label>EXW price (USD) — automatic<output class="ws-calc" data-calc="exw_usd">{money(p.exw_usd)}</output></label>
+          </div>
+        </section>
+
+        <section class="admin-panel ws__sec">
+          <h2 class="ws__h">Landed cost</h2>
+          <div class="ws__grid">
+            <label>Duty / tariff %<input class="admin-input ws-n" name="duty_pct" type="number" step="0.001" min="0" value={v('duty_pct')} /></label>
+            <label>Duty amount — automatic<output class="ws-calc" data-calc="duty_amount">{money(p.duty_amount)}</output></label>
+            <label>Ocean freight allocation<input class="admin-input ws-n" name="ocean_freight" type="number" step="0.01" min="0" value={v('ocean_freight')} /></label>
+            <label>Port / handling allocation<input class="admin-input ws-n" name="port_handling" type="number" step="0.01" min="0" value={v('port_handling')} /></label>
+            <label>Inland trucking allocation<input class="admin-input ws-n" name="inland_trucking" type="number" step="0.01" min="0" value={v('inland_trucking')} /></label>
+            <label>Other import cost<input class="admin-input ws-n" name="other_import" type="number" step="0.01" min="0" value={v('other_import')} /></label>
+            <label class="ws__total">Sauna landed cost — automatic<output class="ws-calc" data-calc="sauna_landed">{money(p.sauna_landed_cost)}</output></label>
+          </div>
+        </section>
+
+        <section class="admin-panel ws__sec">
+          <h2 class="ws__h">BUXENA Complete components</h2>
+          <div class="ws__grid">
+            <label>Heater model<input class="admin-input" name="heater_model" value={v('heater_model')} /></label>
+            <label>Heater cost<input class="admin-input ws-n" name="heater_cost" type="number" step="0.01" min="0" value={v('heater_cost')} /></label>
+            <label>Controls cost<input class="admin-input ws-n" name="controls_cost" type="number" step="0.01" min="0" value={v('controls_cost')} /></label>
+            <label>Stones cost<input class="admin-input ws-n" name="stones_cost" type="number" step="0.01" min="0" value={v('stones_cost')} /></label>
+            <label>Lighting cost<input class="admin-input ws-n" name="lighting_cost" type="number" step="0.01" min="0" value={v('lighting_cost')} /></label>
+            <label>Accessories cost<input class="admin-input ws-n" name="accessories_cost" type="number" step="0.01" min="0" value={v('accessories_cost')} /></label>
+            <label class="ws__total">Complete package landed cost — automatic<output class="ws-calc" data-calc="complete_landed">{money(p.complete_landed_cost)}</output></label>
+          </div>
+        </section>
+
+        <section class="admin-panel ws__sec">
+          <h2 class="ws__h">Retail</h2>
+          <div class="ws__grid">
+            <label>Target markup %<input class="admin-input ws-n" name="target_markup_pct" type="number" step="0.1" min="0" value={v('target_markup_pct')} /></label>
+            <label>Target gross margin %<input class="admin-input ws-n" name="target_margin_pct" type="number" step="0.1" min="0" max="95" value={v('target_margin_pct')} /></label>
+            <label>Calculated retail (sauna) — automatic<output class="ws-calc" data-calc="calc_retail">—</output></label>
+            <label>Calculated retail (Complete) — automatic<output class="ws-calc" data-calc="calc_retail_complete">—</output></label>
+            <label>Recommended retail price<input class="admin-input ws-n" name="recommended_retail" type="number" step="1" min="0" value={v('recommended_retail')} /></label>
+            <label class="ws__approved">Approved Public "From" price<input class="admin-input ws-n" name="approved_from_price" type="number" step="1" min="0" value={v('approved_from_price')} /></label>
+            <label class="ws__check"><input type="checkbox" name="project_pricing" checked={p.project_pricing} /> Show "Project Pricing" publicly instead of a fixed From price</label>
+            <label>Minimum selling price / discount floor<input class="admin-input ws-n" name="min_selling_price" type="number" step="1" min="0" value={v('min_selling_price')} /></label>
+            <label>Gross profit $ (approved vs sauna landed) — automatic<output class="ws-calc" data-calc="gp">—</output></label>
+            <label>Gross margin % — automatic<output class="ws-calc" data-calc="gm">—</output></label>
+          </div>
+        </section>
+
+        <section class="admin-panel ws__sec">
+          <h2 class="ws__h">Status</h2>
+          <div class="ws__grid">
+            <label>Worksheet status
+              <select class="admin-input" name="status">
+                {['Draft', 'Needs Review', 'Approved'].map((s) => (
+                  <option value={s} selected={(p.status ?? 'Draft') === s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label>Source document (pricelist name / date)<input class="admin-input" name="source_document" value={v('source_document')} /></label>
+            <label class="ws__full">Notes<textarea class="admin-input" name="notes" rows="3">{v('notes')}</textarea></label>
+          </div>
+          <p class="ws__rule">
+            Only <strong>Approved</strong> feeds the customer-facing price.
+            Draft and Needs Review are never published, no matter what numbers
+            they contain.
+          </p>
+          <button class="admin-btn" type="submit">Save worksheet</button>
+        </section>
+      </form>
+
+      <section class="admin-panel ws__sec">
+        <h2 class="ws__h">Price history</h2>
+        {history.length === 0 ? (
+          <p class="admin-empty">No previous versions yet — history is kept automatically from the first change onward.</p>
+        ) : (
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Saved</th><th>Status</th><th class="num">EXW EUR</th><th class="num">Sauna landed</th><th class="num">Approved From</th></tr></thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr>
+                    <td>{histDate(h.changed_at)}</td>
+                    <td>{h.snapshot.status}</td>
+                    <td class="num">{h.snapshot.exw_eur ?? '—'}</td>
+                    <td class="num">{money(h.snapshot.sauna_landed_cost)}</td>
+                    <td class="num">{h.snapshot.project_pricing ? 'Project Pricing' : money(h.snapshot.approved_from_price)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .ws-notice { padding: 0.85rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; border-radius: 2px; }
+  .ws-notice--ok { color: #a9cfa4; background: rgba(143,191,138,0.06); border: 1px solid rgba(143,191,138,0.35); }
+  .ws-notice--err { color: #e6b7a0; background: rgba(230,130,90,0.06); border: 1px solid rgba(230,130,90,0.35); }
+  .ws-notice--warn { color: #ecc987; background: rgba(236,201,135,0.06); border: 1px solid rgba(236,201,135,0.35); }
+  .ws-source { display: flex; justify-content: space-between; gap: 1rem; align-items: start; padding: 0.9rem 1rem; margin-bottom: 1rem; border: 1px solid rgba(201,166,104,0.26); border-radius: 3px; background: rgba(201,166,104,0.04); }
+  .ws-source--conflict { border-color: rgba(230,130,90,0.5); background: rgba(230,130,90,0.055); }
+  .ws-source .ws__h { margin-bottom: 0.3rem; }
+  .ws-source p { margin: 0; font-size: 0.8rem; color: var(--admin-cream); }
+  .ws-source__note { max-width: 48rem; margin-top: 0.35rem !important; color: var(--admin-muted) !important; font-size: 0.72rem !important; line-height: 1.4; }
+  .ws-source__cost { white-space: nowrap; color: var(--admin-gold) !important; font-variant-numeric: tabular-nums; }
+
+  .ws__sec { padding: 1.25rem 1.4rem; margin-bottom: 1.25rem; }
+  .ws__h { margin: 0 0 1rem; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--admin-gold); }
+  .ws__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.9rem 1.4rem; }
+  .ws__grid label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--admin-muted); }
+  .ws__grid textarea { text-transform: none; letter-spacing: normal; }
+  .ws__full { grid-column: 1 / -1; }
+  .ws-calc { padding: 0.55rem 0.2rem; font-size: 0.95rem; color: var(--admin-cream); font-variant-numeric: tabular-nums; border-bottom: 1px dashed rgba(201,166,104,0.3); }
+  .ws__total .ws-calc { color: var(--admin-gold); font-weight: 600; }
+  .ws__approved input { border-color: var(--admin-gold); }
+  .ws__check { flex-direction: row !important; align-items: center; gap: 0.5rem !important; text-transform: none !important; letter-spacing: normal !important; font-size: 0.8rem !important; }
+  .ws__rule { margin: 1rem 0; font-size: 0.78rem; color: var(--admin-muted); }
+  .num { text-align: right; }
+</style>
+
+<script>
+  // Live mirror of the database's automatic calculations, so the owner sees
+  // results while typing, before saving. Formulas match pricing-schema.sql.
+  const g = (n: string) => document.querySelector<HTMLInputElement>(`[name="${n}"]`);
+  const out = (n: string) => document.querySelector<HTMLElement>(`[data-calc="${n}"]`);
+  const num = (el: HTMLInputElement | null) => {
+    const raw = (el?.value ?? '').trim();
+    if (raw === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const money = (n: number | null) =>
+    n == null ? '—' : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  function recalc() {
+    const exwEur = num(g('exw_eur'));
+    const fx = num(g('fx_rate'));
+    const exwUsd = exwEur != null && fx != null ? exwEur * fx : null;
+    out('exw_usd')!.textContent = money(exwUsd);
+
+    const dutyPct = num(g('duty_pct'));
+    const duty = exwUsd != null && dutyPct != null ? (exwUsd * dutyPct) / 100 : null;
+    out('duty_amount')!.textContent = money(duty);
+
+    const parts = [exwUsd, duty, num(g('ocean_freight')), num(g('port_handling')), num(g('inland_trucking')), num(g('other_import'))];
+    const saunaLanded = exwUsd == null ? null : parts.reduce((a: number, x) => a + (x ?? 0), 0);
+    out('sauna_landed')!.textContent = money(saunaLanded);
+
+    const comps = [num(g('heater_cost')), num(g('controls_cost')), num(g('stones_cost')), num(g('lighting_cost')), num(g('accessories_cost'))];
+    const completeLanded = saunaLanded == null ? null : saunaLanded + comps.reduce((a: number, x) => a + (x ?? 0), 0);
+    out('complete_landed')!.textContent = money(completeLanded);
+
+    const markup = num(g('target_markup_pct'));
+    const margin = num(g('target_margin_pct'));
+    const retail = saunaLanded == null ? null
+      : margin != null && margin < 95 ? saunaLanded / (1 - margin / 100)
+      : markup != null ? saunaLanded * (1 + markup / 100)
+      : null;
+    out('calc_retail')!.textContent = money(retail);
+    const retailC = completeLanded == null ? null
+      : margin != null && margin < 95 ? completeLanded / (1 - margin / 100)
+      : markup != null ? completeLanded * (1 + markup / 100)
+      : null;
+    out('calc_retail_complete')!.textContent = money(retailC);
+
+    const approved = num(g('approved_from_price'));
+    const gp = approved != null && saunaLanded != null ? approved - saunaLanded : null;
+    out('gp')!.textContent = money(gp);
+    out('gm')!.textContent = gp != null && approved ? `${((gp / approved) * 100).toFixed(1)}%` : '—';
+  }
+
+  document.querySelector('form.ws')?.addEventListener('input', recalc);
+  recalc();
+</script>

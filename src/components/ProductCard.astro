@@ -1,7 +1,8 @@
 ---
 import Figure from './Figure.astro';
 import { showDev } from '../data/site';
-import { capacityBuckets } from '../data/catalog';
+import { capacityBuckets, displayTitle } from '../data/catalog';
+import { displayFromPrice } from '../data/pricing';
 
 interface Props {
   slug: string;
@@ -18,10 +19,13 @@ interface Props {
   capacityMax?: number;
   materials?: string[];
   dimensions?: { label: string; value: string }[];
+  /** Approved display price ("From $18,900"). Absent → card shows Request Pricing only. */
+  fromPrice?: string;
 }
 const {
   slug, title, tagline, category, placeholder = true, image,
   location, productType, series, capacity, capacityMin, capacityMax, materials, dimensions,
+  fromPrice,
 } = Astro.props;
 const primaryDimension = dimensions?.[0]?.value;
 const specLine = [productType, primaryDimension, capacity, materials?.[0]]
@@ -55,14 +59,26 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
       {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
     </div>
     <div class="pcard__body">
-      <h3 class="pcard__title">{title}</h3>
+      <h3 class="pcard__title">{displayTitle(title)}</h3>
       {specLine && <p class="pcard__specs">{specLine}</p>}
       <p class="pcard__tag">{tagline}</p>
+      {/* Central pricing register decides; frontmatter is only a legacy
+          fallback. Null today for every model → no price is rendered. */}
+      {displayFromPrice(title, fromPrice) && (
+        <p class="pcard__price">{displayFromPrice(title, fromPrice)}</p>
+      )}
     </div>
   </a>
   <div class="pcard__actions">
-    <a class="pcard__more" href={`/saunas/${slug}/`}>Explore Model</a>
-    <a class="pcard__quote" href="/quote/">Request a Quote</a>
+    <a class="pcard__more" href={`/saunas/${slug}/`}>View Model <span class="pcard__arrow" aria-hidden="true">→</span></a>
+    <a
+      class="pcard__quote"
+      href={`/quote/?model=${encodeURIComponent(title)}`}
+      data-track="pricing_request_started"
+      data-track-model={title}
+      data-track-category={category}
+      data-track-form-type="product_card"
+    >Request Pricing</a>
   </div>
 </article>
 
@@ -76,6 +92,12 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     display: flex;
     flex-direction: column;
     height: 100%;
+    transition: transform 0.7s var(--ease);
+  }
+  /* Desktop-only card lift — restrained, no shadow theatrics. Hover is
+     inert on touch devices, so mobile stays simple and fast. */
+  @media (hover: hover) {
+    .pcard:hover { transform: translateY(-5px); }
   }
 
   .pcard__link {
@@ -131,6 +153,14 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     margin-bottom: 1rem;
   }
 
+  .pcard__price {
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: -0.4rem 0 1rem;
+  }
+
   .pcard__actions {
     display: flex;
     flex-wrap: wrap;
@@ -153,6 +183,16 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     transition: border-color 0.4s var(--ease);
   }
   .pcard:hover .pcard__more { border-bottom-color: var(--ink); }
+
+  .pcard__arrow { display: inline-block; transition: transform 0.4s var(--ease); }
+  .pcard:hover .pcard__arrow { transform: translateX(4px); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pcard, .pcard__media :global(.fig), .pcard__arrow { transition: none; }
+    .pcard:hover,
+    .pcard__link:hover .pcard__media :global(.fig),
+    .pcard:hover .pcard__arrow { transform: none; }
+  }
 
   .pcard__quote {
     font-family: 'Manrope', var(--font-sans);

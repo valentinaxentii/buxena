@@ -15,16 +15,25 @@ materials: ["Extra dried pine"]
 heroImage:
   src: "/images/saunas/ella-h2-hero.png"
   alt: "ELLA H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
+gallery:
+  - src: "/images/supplier-capra/ella-h2-indoor-cutout.png"
+    alt: "ELLA H2 indoor sauna — transparent product render"
+  - src: "/images/supplier-capra/ella-h2-interior.jpg"
+    alt: "ELLA H2 interior — benches and heater guard"
 dimensions:
-  - { label: "Width", value: "6.2 ft (190 cm)" }
-  - { label: "Length", value: "3.7 ft (113 cm)" }
-  - { label: "Height", value: "6.9 ft (210 cm)" }
+  - { label: "External (D × W × H)", value: "51.2 × 53.1 × 89.0 in (1300 × 1350 × 2260 mm)" }
+  - { label: "Internal (D × W × H)", value: "41.7 × 49.2 × 80.7 in (1060 × 1250 × 2050 mm)" }
 specs:
-  - { label: "Glass", value: "Full tempered, bronze-tinted glass front" }
-  - { label: "Operating temperature", value: "158–212°F (70–100°C)" }
-  - { label: "Configuration", value: "Contact us for details on the H1/H2 layout difference" }
-  - { label: "Heater compatibility", value: "Contact us for details" }
-delivery: "Contact us for details"
+  - { label: "Front wall", value: "Tempered 8 mm glass" }
+  - { label: "Glass door", value: "Tempered, with handle — 192 × 59 cm" }
+  - { label: "Wall construction", value: "42 mm staves, 28 mm back wall" }
+  - { label: "Heater", value: "Electric only, 3.5–4.5 kW — wood-burning not compatible" }
+  - { label: "Placement", value: "Indoor (specially dried pine) or outdoor (thermo pine, black shingle roof)" }
+  - { label: "Shipping weight", value: "595 lb (270 kg) flat-pack" }
+heaterOptions:
+  - "Electric 3.5–4.5 kW (confirmed range for this model — wood-burning not compatible)"
+options: ["Painted exterior (main parts or fully painted)", "Ergonomic backrest", "LED lighting kit (Wi-Fi switch optional)", "150-width variant available (5–6 kW heater)"]
+delivery: "Flat-pack kit — packing and delivery confirmed with your written quote"
 ---
 
 The second configuration in the ELLA line, at the same footprint as H1 — a

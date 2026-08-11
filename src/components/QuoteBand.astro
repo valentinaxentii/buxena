@@ -1,22 +1,85 @@
 ---
+/**
+ * Final conversion band, shared across the site.
+ * One primary action (project pricing), two quieter alternates. Fires
+ * final_cta_view once when scrolled into view, and each action carries its
+ * CTA source; model/package context is added by pages that have it via the
+ * `model` prop (appended to the pricing link's query).
+ */
 interface Props {
   heading?: string;
   body?: string;
+  /** Full internal model title, when the surrounding page is about one model. */
+  model?: string;
 }
 const {
-  heading = 'Tell us about your space',
-  body = 'Send us the room, the deck or the corner of the garden you have in mind. We will come back with options that fit it, and a written quote.',
+  heading = 'Start Your Project',
+  body = "Tell us about your space, timeline and what you're considering. We'll help narrow the right sauna, system and next step.",
+  model,
 } = Astro.props;
+
+const pricingHref = model ? `/quote/?model=${encodeURIComponent(model)}` : '/quote/';
 ---
 
-<section class="band band--ember qband">
+<section class="band band--ember qband" data-final-cta>
   <div class="shell shell--narrow center">
     <h2 class="h2">{heading}</h2>
     <p class="lead qband__body">{body}</p>
-    <a class="btn btn--bronze" href="/quote/">Request a Quote</a>
+    <div class="qband__actions">
+      <a
+        class="btn btn--bronze"
+        href={pricingHref}
+        data-track="final_pricing_click"
+        data-track-form-type="final_cta"
+        data-track-model={model ?? ''}
+      >Request Project Pricing</a>
+      <a
+        class="btn btn--outline"
+        href="/start-your-project/"
+        data-track="final_upload_project_click"
+        data-track-form-type="final_cta"
+      >Upload My Project</a>
+    </div>
+    <a
+      class="link qband__tertiary"
+      href="/plan-your-sauna/"
+      data-track="final_advisor_click"
+      data-track-form-type="final_cta"
+    >Find My Sauna <span class="arrow" aria-hidden="true">→</span></a>
   </div>
 </section>
 
 <style>
-  .qband__body { margin: 1.5rem auto 2.5rem; max-width: 40em; }
+  .qband__body { margin: 1.5rem auto 2.25rem; max-width: 40em; }
+
+  .qband__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .qband__tertiary { color: var(--bronze-soft); }
+
+  @media (max-width: 560px) {
+    .qband__actions { flex-direction: column; align-items: stretch; }
+    .qband__actions .btn { justify-content: center; }
+  }
 </style>
+
+<script>
+  import { track } from '../lib/track';
+
+  // final_cta_view — once, when the band first enters the viewport.
+  const band = document.querySelector('[data-final-cta]');
+  if (band && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        track('final_cta_view', {});
+        io.disconnect();
+      }
+    }, { threshold: 0.3 });
+    io.observe(band);
+  }
+</script>

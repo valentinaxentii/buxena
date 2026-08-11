@@ -1,0 +1,209 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { displayTitle } from '../data/catalog';
+import { getCollection } from 'astro:content';
+
+/**
+ * BOOK A SAUNA CONSULTATION — MVP.
+ * No paid scheduling service is integrated (none exists in the project and
+ * adding one is a spend decision). This is a structured scheduling REQUEST:
+ * BUXENA replies to confirm the time. Submissions carry source
+ * "Consultation Request" for separate CRM handling.
+ */
+const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+
+const types = [
+  { value: 'Sauna Selection', blurb: 'Which model actually fits your space, people and site.' },
+  { value: 'Project Review', blurb: 'Your plans, photos and site walked through end to end.' },
+  { value: 'Site & Delivery', blurb: 'Access, foundation and delivery approach for your address.' },
+  { value: 'Architect / Builder Consultation', blurb: 'Specification support for trade projects.' },
+];
+---
+
+<BaseLayout
+  title="Book a Sauna Consultation"
+  description="Book a consultation with a BUXENA sauna specialist — model selection, project review, site and delivery, or trade specification support."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Book a Consultation</span>
+      <h1 class="display measure--tight">Talk it through with a specialist</h1>
+      <p class="lead measure">
+        Choose the conversation you need. Tell us when suits you, and we'll
+        confirm the time by email.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell consult">
+      <div class="consult__types">
+        {types.map((t) => (
+          <div class="consult__type">
+            <h2 class="h3">{t.value}</h2>
+            <p>{t.blurb}</p>
+          </div>
+        ))}
+      </div>
+
+      <form class="cform" data-consult-form>
+        <p class="cform__hp"><label>Leave this field empty <input name="bot-field-consult" tabindex="-1" autocomplete="off" /></label></p>
+
+        <div class="cform__grid">
+          <div class="field">
+            <label for="c-name">Name <span aria-hidden="true">*</span></label>
+            <input id="c-name" name="name" type="text" required autocomplete="name" />
+          </div>
+          <div class="field">
+            <label for="c-email">Email <span aria-hidden="true">*</span></label>
+            <input id="c-email" name="email" type="email" required autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="c-phone">Phone</label>
+            <input id="c-phone" name="phone" type="tel" autocomplete="tel" />
+          </div>
+          <div class="field">
+            <label for="c-zip">ZIP code</label>
+            <input id="c-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" />
+          </div>
+          <div class="field">
+            <label for="c-type">Consultation type <span aria-hidden="true">*</span></label>
+            <select id="c-type" name="consultType" required>
+              <option value="">Select…</option>
+              {types.map((t) => (
+                <option value={t.value}>{t.value}</option>
+              ))}
+            </select>
+          </div>
+          <div class="field">
+            <label for="c-when">Preferred day / time</label>
+            <input id="c-when" name="preferredTime" type="text" placeholder="e.g. weekday evenings, Sat morning" />
+          </div>
+          <div class="field field--full">
+            <label for="c-model">Model or project, if known</label>
+            <select id="c-model" name="model">
+              <option value="">Not yet decided</option>
+              {saunas.map((s) => (
+                <option value={s.data.title}>{displayTitle(s.data.title)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn--bronze cform__submit" type="submit">Request My Consultation</button>
+      </form>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .consult {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
+    align-items: start;
+  }
+
+  .consult__types { display: grid; gap: 1.4rem; }
+  .consult__type { border-top: 1px solid var(--line); padding-top: 1rem; }
+  .consult__type p { font-size: var(--t-small); color: var(--muted); margin: 0.4rem 0 0; }
+
+  .cform__hp { position: absolute; left: -9999px; }
+  .cform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.1rem 1.5rem; }
+
+  .field { display: grid; gap: 0.5rem; }
+  .field--full { grid-column: 1 / -1; }
+  .field label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .field label span { color: var(--bronze-ink); }
+  .field input, .field select {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.6rem 0;
+    border-radius: 0;
+    width: 100%;
+    transition: border-color 0.3s var(--ease);
+  }
+  .field select { appearance: none; cursor: pointer; }
+  .field input:focus, .field select:focus { border-color: var(--bronze); }
+
+  .cform__submit { margin-top: 1.7rem; }
+
+  @media (max-width: 900px) {
+    .consult { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .cform__grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+
+  const form = document.querySelector<HTMLFormElement>('[data-consult-form]');
+  if (form) {
+    form.addEventListener(
+      'focusin',
+      () => track('consultation_request_started', { formType: 'consultation' }),
+      { once: true }
+    );
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const data = new FormData(form);
+      const get = (k: string) => (data.get(k) || '').toString().trim();
+
+      const message = [
+        `CONSULTATION REQUEST — ${get('consultType')}`,
+        get('zip') && `ZIP: ${get('zip')}`,
+        get('preferredTime') && `Preferred time: ${get('preferredTime')}`,
+        get('model') && `Model/project: ${get('model')}`,
+      ].filter(Boolean).join('\n');
+
+      const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      const original = submitBtn.textContent ?? '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      const restore = () => { submitBtn.disabled = false; submitBtn.textContent = original; };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: get('zip'),
+        message,
+        saunaInterest: get('model'),
+        source: 'Consultation Request',
+        botField: get('bot-field-consult'),
+      });
+
+      if (!result.ok) { restore(); showFormStatus(form, 'error'); return; }
+
+      track('consultation_request_submitted', {
+        formType: 'consultation',
+        consultType: get('consultType'),
+        model: get('model'),
+      });
+
+      if (result.devMode) { restore(); showFormStatus(form, 'dev-success'); return; }
+
+      rememberEnquiry({ model: get('model'), zip: get('zip'), timeline: get('preferredTime'), projectType: get('consultType') });
+      window.location.assign('/thank-you/');
+    });
+  }
+</script>

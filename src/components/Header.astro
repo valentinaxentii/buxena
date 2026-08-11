@@ -11,13 +11,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
 <header class={`hdr ${overHero ? 'hdr--over' : ''}`} data-header>
   <div class="hdr__inner">
     <a class="wordmark" href="/" aria-label={`${site.name} home`}>
-      <img
-        class="wordmark__logo wordmark__logo--dark"
-        src="/brand/buxena-logo-transparent.png"
-        alt=""
-        width="700"
-        height="379"
-      />
+      {/* Solid-header logo: the approved artwork rendered through a CSS
+          mask so it takes the exact CTA brown (--bronze-btn) — one primary
+          brand color across logo and button, artwork untouched. */}
+      <span class="wordmark__logo wordmark__logo--dark wordmark__mark" aria-hidden="true"></span>
       <img
         class="wordmark__logo wordmark__logo--light"
         src="/brand/buxena-logo-champagne-header.png"
@@ -40,7 +37,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     </nav>
 
     <div class="hdr__end">
-      <a class="btn btn--bronze hdr__cta" href="/quote/">Request a Quote</a>
+      <a class="btn hdr__cta" href="/quote/">Request Pricing</a>
       <button class="burger" type="button" aria-expanded="false" aria-controls="mobile-nav" data-burger>
         <span class="sr-only">Open menu</span>
         <span class="burger__bar" aria-hidden="true"></span>
@@ -58,7 +55,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
       ))}
     </ul>
   </nav>
-  <a class="btn btn--bronze drawer__cta" href="/quote/">Request a Quote</a>
+  <a class="btn btn--bronze drawer__cta" href="/quote/">Request Pricing</a>
 </div>
 
 <style>
@@ -66,8 +63,14 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     position: sticky;
     top: 0;
     z-index: 100;
+    /* Quiet entrance on first paint — settled before the hero headline
+       arrives, so the eye lands top-down in order. */
+    animation: hdr-in 0.8s var(--ease) both;
     background: var(--linen);
-    border-bottom: 1px solid var(--line);
+    /* A warmer, finer rule than the old --line grey-tan: a whisper of
+       bronze mixed into the page ground. No shadow — the line alone
+       separates the bar from the page. */
+    border-bottom: 1px solid color-mix(in srgb, var(--bronze) 26%, var(--linen));
     transition: background-color 0.5s var(--ease), border-color 0.5s var(--ease),
       color 0.5s var(--ease);
   }
@@ -100,7 +103,15 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 2rem;
+    gap: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+    transition: height 0.35s var(--ease);
+  }
+
+  /* Once scrolled, the bar quietly compacts a further ~10% on desktop.
+     Mobile keeps the full height so the drawer (pinned at --hdr-h) never
+     drifts out from under the bar. */
+  @media (min-width: 1001px) {
+    .hdr.is-stuck .hdr__inner { height: calc(var(--hdr-h) * 0.9); }
   }
 
   .wordmark {
@@ -116,11 +127,30 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      ~190-220px desktop. */
   .wordmark__logo {
     display: block;
-    /* Scaled to sit inside --hdr-h with even air above and below: 132px wide
-       (71px tall) in the 96px phone bar, 176px (95px tall) in the 128px
-       desktop bar. */
-    width: clamp(8.25rem, 7.8rem + 3.2vw, 11rem);
+    /* Slightly smaller than the last pass — prominent but no longer the
+       loudest thing in the bar. Width-only sizing: height follows the
+       intrinsic ratio, the mark never distorts, the tagline in the lockup
+       stays legible at ~100px+ width. */
+    width: clamp(6.25rem, 6rem + 1.5vw, 7.75rem);
     height: auto;
+  }
+
+  /* Masked brown rendering of the approved lockup (700×379 intrinsic).
+     background-color IS the logo color — the same --bronze-btn as the CTA,
+     so header brand color reads as one deliberate choice. The tagline in
+     the lockup takes the same brown, staying in-family per the founders'
+     direction. */
+  .wordmark__mark {
+    aspect-ratio: 700 / 379;
+    background-color: var(--bronze-btn);
+    -webkit-mask-image: url('/brand/buxena-logo-transparent.png');
+    mask-image: url('/brand/buxena-logo-transparent.png');
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
   }
 
   /* dark (colored) logo by default — solid header on light backgrounds */
@@ -130,27 +160,83 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   .hdr--over:not(.is-stuck) .wordmark__logo--dark { display: none; }
   .hdr--over:not(.is-stuck) .wordmark__logo--light { display: block; }
 
+  /* The menu reads as a designed cluster, not links spread across the bar:
+     tighter gaps, and the whole nav hugs the right side next to the CTA. */
   .hdr__nav ul {
     display: flex;
-    gap: clamp(1.4rem, 0.6rem + 1.9vw, 2.75rem);
+    gap: clamp(1.05rem, 0.4rem + 1.3vw, 1.8rem);
   }
 
+  /* Quiet-luxury nav type: weight 500 at 13px, restrained 0.12em tracking
+     (wide enough to feel considered, no further), full-strength ink. The
+     underline is a 1px line that grows from the left on hover instead of
+     popping in — drawn as a scaling gradient, not a border. */
   .hdr__nav a {
-    font-size: 0.9375rem;
-    font-weight: 300;
-    letter-spacing: 0.14em;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    line-height: 1;
     text-transform: uppercase;
     text-decoration: none;
-    padding-block: 0.4rem;
-    border-bottom: 1px solid transparent;
-    transition: border-color 0.35s var(--ease), opacity 0.35s var(--ease);
-    opacity: 0.92;
+    padding-block: 0.5rem;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: left bottom;
+    background-size: 0% 1px;
+    transition: background-size 0.25s var(--ease), opacity 0.25s var(--ease);
+    opacity: 0.88;
   }
-  .hdr__nav a:hover { opacity: 1; border-bottom-color: currentColor; }
-  .hdr__nav a[aria-current='page'] { opacity: 1; border-bottom-color: var(--bronze); }
+  .hdr__nav a:hover { opacity: 1; background-size: 100% 1px; }
+  .hdr__nav a[aria-current='page'] {
+    opacity: 1;
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--bronze) 75%, transparent),
+      color-mix(in srgb, var(--bronze) 75%, transparent)
+    );
+    background-size: 100% 1px;
+  }
 
   .hdr__end { display: flex; align-items: center; gap: 1rem; }
-  .hdr__cta { padding: 0.85rem 1.5rem; }
+
+  /* The CTA: a slim 44px bar in BUXENA brown with a white label and a
+     near-square 3px corner — warm, architectural, matched to the logo's
+     palette rather than a black block. --bronze-btn (#8f6e42) is the
+     brand's established solid-button brown, contrast-checked at 4.69:1
+     with white. Hover lightens one step to --bronze (#9c7a4a) in ~220ms —
+     one quiet move, no bounce, no shadow. */
+  .hdr__cta {
+    height: 2.75rem;
+    padding: 0 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+    background: var(--bronze-btn);
+    color: #fff;
+    border: 1px solid var(--bronze-btn);
+    border-radius: 3px;
+    transition: background-color 0.22s var(--ease), color 0.22s var(--ease),
+      border-color 0.22s var(--ease);
+  }
+  .hdr__cta:hover {
+    background: var(--bronze);
+    border-color: var(--bronze);
+    color: #fff;
+  }
+
+  /* Over the dark hero the same warm brown holds — it reads clearly on the
+     video and keeps the CTA one consistent color everywhere. */
+  .hdr--over:not(.is-stuck) .hdr__cta {
+    background: var(--bronze-btn);
+    color: #fff;
+    border-color: var(--bronze-btn);
+  }
+  .hdr--over:not(.is-stuck) .hdr__cta:hover {
+    background: var(--bronze);
+    border-color: var(--bronze);
+  }
 
   .burger {
     display: none;
@@ -211,6 +297,15 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     .burger { display: flex; }
     .hdr__cta { display: none; }
   }
+
+  @keyframes hdr-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hdr { animation: none; }
+  }
 </style>
 
 <script>
@@ -218,7 +313,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   const burger = document.querySelector<HTMLButtonElement>('[data-burger]');
   const drawer = document.querySelector<HTMLElement>('[data-drawer]');
 
-  if (header?.classList.contains('hdr--over')) {
+  // is-stuck drives two things: the transparent→solid swap on over-hero
+  // pages, and the subtle desktop height compaction on every page — so the
+  // listener attaches unconditionally now, not only when .hdr--over.
+  if (header) {
     const onScroll = () => header.classList.toggle('is-stuck', window.scrollY > 40);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });

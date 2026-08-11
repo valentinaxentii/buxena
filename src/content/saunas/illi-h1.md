@@ -16,15 +16,19 @@ heroImage:
   src: "/images/saunas/illi-h1-hero.png"
   alt: "ILLI H1 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 dimensions:
-  - { label: "Width", value: "6.2 ft (190 cm)" }
-  - { label: "Length", value: "3.7 ft (113 cm)" }
-  - { label: "Height", value: "6.9 ft (210 cm)" }
+  - { label: "External (D × W × H)", value: "44.5 × 76.8 × 82.7 in (1130 × 1950 × 2100 mm)" }
+  - { label: "Internal (D × W × H)", value: "36.6 × 72.8 × 73.6 in (930 × 1850 × 1870 mm)" }
 specs:
-  - { label: "Glass", value: "Full tempered, bronze-tinted glass front" }
-  - { label: "Operating temperature", value: "158–212°F (70–100°C)" }
-  - { label: "Configuration", value: "Contact us for details on the H1/H2 layout difference" }
-  - { label: "Heater compatibility", value: "Contact us for details" }
-delivery: "Contact us for details"
+  - { label: "Front wall", value: "Tempered 8 mm glass" }
+  - { label: "Glass door", value: "Tempered, with handle — 169 × 59 cm" }
+  - { label: "Wall construction", value: "42 mm staves, 28 mm back wall" }
+  - { label: "Heater", value: "Electric only, 5–6 kW — wood-burning not compatible" }
+  - { label: "Placement", value: "Indoor (specially dried pine) or outdoor (thermo pine, black shingle roof)" }
+  - { label: "Shipping weight", value: "838 lb (380 kg) flat-pack" }
+heaterOptions:
+  - "Electric 5–6 kW (confirmed range for this model — wood-burning not compatible)"
+options: ["Painted exterior (main parts or fully painted)", "Ergonomic backrest", "LED lighting kit (Wi-Fi switch optional)"]
+delivery: "Flat-pack kit — packing and delivery confirmed with your written quote"
 ---
 
 Sized for two to three, ILLI suits a household that wants room for a

@@ -7,3 +7,6 @@ dist/
 npm-debug.log*
 .netlify/
 .claude/
+
+# npm cache created by tooling — never commit
+.codex-npm-cache/

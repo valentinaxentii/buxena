@@ -463,6 +463,13 @@ create table if not exists activities (
 );
 create index if not exists idx_activities_entity on activities (entity_type, entity_id);
 
+-- Website enquiries have their own CRM timeline entries. This is kept in the
+-- same audit table as leads and quotes so campaign attribution and follow-up
+-- history are visible in one place. Safe to re-run against an existing DB.
+alter table activities drop constraint if exists activities_entity_type_check;
+alter table activities add constraint activities_entity_type_check
+  check (entity_type in ('lead', 'customer', 'quote', 'order', 'enquiry'));
+
 -- ----------------------------------------------------------------------------
 -- settings — single-row business configuration (2026-07-24 session addition).
 -- `id` is pinned to 1 and checked, so there is always exactly one row: an

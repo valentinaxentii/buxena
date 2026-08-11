@@ -1,30 +1,71 @@
 ---
 import fs from 'node:fs';
 import path from 'node:path';
-import Figure from './Figure.astro';
+import { webpSrcset } from '../lib/optimized-image';
 
-// Video takes priority over the still photograph. Drop files in
-// public/media/hero.mp4 and/or public/images/hero.jpg — no further
-// code changes needed.
-//
-// Resolved from process.cwd(), NOT `new URL(..., import.meta.url)`. This
-// component's frontmatter script gets bundled into the SSG build output at a
-// different location than its source file, so an import.meta.url-relative
-// path silently pointed at a location with no public/ directory beside it —
-// hasVideo was always false in the real production build (Netlify and a
-// plain local `astro build` both), even though the video file was correctly
-// committed and correctly deployed as a static asset. `astro dev` never hit
-// this: the dev server runs components unbundled, straight from their
-// source location, where the relative path happened to still resolve.
-// process.cwd() is the project root in both dev and build, so it works in
-// both.
-const hasVideo = fs.existsSync(path.join(process.cwd(), 'public/media/hero.mp4'));
-const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'));
+/**
+ * HERO MEDIA — RIGHTS GATE (founders' order, 2026-08-10).
+ *
+ * public/media/hero.mp4 is BLOCKED / REPLACE in
+ * docs/image-rights-register.md: origin undocumented, owner unknown, no
+ * commercial license on record. Per the founders' explicit instruction the
+ * hero no longer renders it, in dev or in production. The file itself is
+ * kept on disk untouched in case its rights are later documented.
+ *
+ * The hero now renders a BUXENA-generated CONCEPT VISUAL: a pure-CSS
+ * warm-light scene (ember dusk gradient, glowing "interior light", the
+ * brand slat motif, slow cinematic drift). It is authored in this file by
+ * BUXENA, so its rights are unambiguous. It is a mood/concept treatment —
+ * it depicts no product and must never be captioned as a real BUXENA
+ * installation.
+ *
+ * TO RESTORE REAL FOOTAGE: once a licensed/owned hero video or photo
+ * exists, register it as APPROVED in docs/image-rights-register.md, drop
+ * it at public/media/hero.mp4 (or public/images/hero.jpg) and flip
+ * RIGHTS_CLEARED to true. Everything else — parallax, steam, scrim,
+ * reduced-motion — works identically over real footage.
+ */
+const RIGHTS_CLEARED = false;
+
+/**
+ * APPROVED HERO IMAGE — buxena-hero-v2.jpg (final file delivered by the
+ * founder 2026-08-11; supersedes the .png filename originally reserved).
+ * BUXENA commissioned/generated concept visual, approved by the founders
+ * (2026-08-10) and registered in docs/image-rights-register.md. Composed
+ * with dark negative space LEFT (for the headline) and the sauna RIGHT.
+ * Rendered automatically as soon as the file exists at
+ * public/media/buxena-hero-v2.jpg; if it is removed the CSS concept scene
+ * below stands in.
+ */
+const HERO_IMAGE = 'buxena-hero-v2.jpg';
+
+// process.cwd(), not import.meta.url — the bundled build output relocates
+// this file, and a module-relative path silently missed public/ in real
+// production builds (dev never hit it, running unbundled from source).
+const hasApprovedHero = fs.existsSync(path.join(process.cwd(), 'public/media', HERO_IMAGE));
+const hasVideo = RIGHTS_CLEARED && fs.existsSync(path.join(process.cwd(), 'public/media/hero.mp4'));
+const hasImage = RIGHTS_CLEARED && fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'));
+
+// WebP variants (scripts/optimize-images.mjs) — null until generated,
+// in which case the plain <img> ships the original exactly as before.
+const heroSrcset = hasApprovedHero ? webpSrcset(`/media/${HERO_IMAGE}`) : null;
+const imageSrcset = hasImage ? webpSrcset('/images/hero.jpg') : null;
 ---
 
-<section class="hero">
-  <div class="hero__media" aria-hidden="false">
-    {hasVideo ? (
+<section class="hero" data-hero>
+  <div class="hero__media" data-hero-media aria-hidden="false">
+    {hasApprovedHero ? (
+      <picture>
+        {heroSrcset && <source type="image/webp" srcset={heroSrcset} sizes="100vw" />}
+        <img
+          class="hero__img"
+          src={`/media/${HERO_IMAGE}`}
+          alt=""
+          fetchpriority="high"
+          decoding="async"
+        />
+      </picture>
+    ) : hasVideo ? (
       <video
         class="hero__video"
         src="/media/hero.mp4"
@@ -34,28 +75,42 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
         loop
         playsinline
       />
+    ) : hasImage ? (
+      <picture>
+        {imageSrcset && <source type="image/webp" srcset={imageSrcset} sizes="100vw" />}
+        <img
+          class="hero__video"
+          src="/images/hero.jpg"
+          alt=""
+          fetchpriority="high"
+          decoding="async"
+        />
+      </picture>
     ) : (
-      <Figure
-        src={hasImage ? '/images/hero.jpg' : undefined}
-        alt="A modern sauna at dusk, warm light spilling from a panoramic window"
-        note="HERO — cinematic wide shot: contemporary cube sauna at blue hour, warm interior light through full-height glazing, natural landscape beyond. Shot horizontally, generous headroom for the wordmark."
-        ratio="16 / 9"
-        tone="dark"
-        priority={true}
-      />
+      <div class="hero__concept" aria-hidden="true">
+        <div class="hero__concept-glow"></div>
+        <div class="hero__concept-slats"></div>
+      </div>
     )}
+    <div class="hero__steam" aria-hidden="true"></div>
     <div class="hero__scrim"></div>
   </div>
 
   <div class="hero__content">
     <div class="shell">
-      <h1 class="hero__headline">Your Sauna.<br class="hero__break" /> Your Space.<br class="hero__break" /> Your Ritual.</h1>
+      <h1 class="hero__headline">Where Wellness Starts</h1>
       <p class="hero__lede">
-        European sauna design, selected for the American home.
+        European-crafted saunas, thoughtfully selected for your space and
+        supported from selection through delivery.
       </p>
       <div class="hero__actions">
         <a class="btn btn--bronze" href="/saunas/">Explore Saunas</a>
-        <a class="btn btn--outline" href="/quote/">Request a Quote</a>
+        <a
+          class="btn btn--outline"
+          href="/plan-your-sauna/"
+          data-track="find_my_sauna_click"
+          data-track-form-type="hero"
+        >Find Your Sauna</a>
       </div>
     </div>
   </div>
@@ -68,7 +123,10 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
 <style>
   .hero {
     position: relative;
-    min-height: clamp(34rem, 92svh, 56rem);
+    /* Full-viewport cinematic hero (founder direction 2026-08-11). The
+       fixed min-height still means media can never cause layout shift —
+       the box exists at full size before anything decodes. */
+    min-height: max(34rem, 100svh);
     display: grid;
     align-items: end;
     background: var(--ember);
@@ -76,25 +134,221 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
     overflow: hidden;
   }
 
-  .hero__media { position: absolute; inset: 0; }
-  .hero__media :global(.fig) { width: 100%; height: 100%; aspect-ratio: auto; }
+  /* Media sits taller than the viewport and is nudged up on load — the
+     overscan the scroll-parallax script needs so it can translate the
+     layer without ever exposing an edge underneath. */
+  .hero__media {
+    position: absolute;
+    /* 10% overscan above the hero — headroom for the 3× parallax travel
+       so the shifted layer can never expose an edge. */
+    inset: -10% 0 0 0;
+    height: 110%;
+    will-change: transform;
+    /* Gives the camera cycle's fractional rotate3d real depth — the
+       difference between "image zooming" and "camera moving". */
+    perspective: 1200px;
+  }
   .hero__video { display: block; width: 100%; height: 100%; object-fit: cover; }
 
+  /* The approved hero image. Desktop shows the full composition (dark
+     negative space left, sauna right); a very slow scale adds the
+     cinematic movement the brief asks for, on top of the scroll parallax
+     the media layer already has. Mobile biases the crop toward the sauna
+     (right) so the luminous subject stays in frame beside the stacked
+     text. */
+  .hero__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    /* Cinematic open: a clearly visible settle from over-scale in the
+       first 1.4s, handing off into the 75-second camera cycle below. The
+       settle ends at scale(1.02) — exactly the cycle's first frame — so
+       the handoff is invisible. */
+    animation:
+      hero-settle 1.4s var(--ease) both,
+      hero-camera 75s ease-in-out 1.4s infinite;
+    transform-origin: 68% 55%;
+  }
+
+  @keyframes hero-settle {
+    0% { transform: scale(1.1); }
+    100% { transform: scale(1.02); }
+  }
+
+  /* 75s seamless camera path (founder spec 2026-08-11): slow push-in, a
+     drift across the landscape toward the sauna, gentle vertical
+     movement, and a whisper of 3D rotation so it reads as a camera shot
+     rather than a zooming still. First and last frames are identical —
+     the loop restart is undetectable. Base scale never drops below 1.02,
+     so no pan can expose an image edge. */
+  /* Amplitudes at 3× (founder direction 2026-08-11) — same 75s duration,
+     same waypoints, same easing. Every waypoint keeps the sauna (at ~68%
+     of frame width) in view, and each frame's scale margin exceeds its
+     pan distance, so no edge can ever show:
+       28%: scale 1.155 → 7.75%/side margin vs 4.2% pan ✓
+       52%: scale 1.095 → 4.75%/side margin vs 2.1% pan ✓
+       78%: scale 1.17  → 8.5%/side margin  vs 2.1% pan ✓  */
+  @keyframes hero-camera {
+    0%   { transform: scale(1.02) translate3d(0%, 0%, 0) rotate3d(0, 1, 0, 0deg); }
+    28%  { transform: scale(1.155) translate3d(-4.2%, -1.5%, 0) rotate3d(0, 1, 0, 1.2deg); }
+    52%  { transform: scale(1.095) translate3d(-2.1%, 1.5%, 0) rotate3d(0.3, 1, 0, 0.75deg); }
+    78%  { transform: scale(1.17) translate3d(2.1%, -0.9%, 0) rotate3d(0, 1, 0, -1.05deg); }
+    100% { transform: scale(1.02) translate3d(0%, 0%, 0) rotate3d(0, 1, 0, 0deg); }
+  }
+
+  /* Phones: scale amplitude at the full 3×, pan capped at ~2.5× — the
+     mobile crop is already tight on the sauna, and full-strength panning
+     would push it toward the frame edge. */
+  @media (max-width: 700px) {
+    .hero__img {
+      animation:
+        hero-settle 1.4s var(--ease) both,
+        hero-camera-m 75s ease-in-out 1.4s infinite;
+    }
+    @keyframes hero-camera-m {
+      0%   { transform: scale(1.02) translate3d(0%, 0%, 0); }
+      28%  { transform: scale(1.095) translate3d(-1.75%, -0.6%, 0); }
+      52%  { transform: scale(1.065) translate3d(-0.9%, 0.6%, 0); }
+      78%  { transform: scale(1.11) translate3d(0.9%, -0.4%, 0); }
+      100% { transform: scale(1.02) translate3d(0%, 0%, 0); }
+    }
+  }
+
+  @media (max-width: 700px) {
+    .hero__img { object-position: 72% center; }
+  }
+
+  /* --- BUXENA concept visual (temporary, rights-safe) ---------------------
+     A dusk scene built from the brand palette alone: deep ember sky, a low
+     warm glow standing in for lit sauna glazing, the slat motif as cladding.
+     The whole scene drifts through a slow ~36s scale/pan — the cinematic
+     movement the real footage will inherit — under the same steam, scrim
+     and scroll-parallax layers. Costs no network bytes and no decode time. */
+  .hero__concept {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    /* Same cinematic settle-in as the real footage will get. */
+    animation: hero-settle 1.4s var(--ease) both;
+    background:
+      radial-gradient(120% 85% at 50% 108%, #4a3520 0%, #33271a 34%, transparent 68%),
+      linear-gradient(to bottom, #14110e 0%, var(--ember) 46%, #241c13 100%);
+  }
+
+  .hero__concept-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(34% 26% at 30% 74%, rgba(196, 162, 119, 0.42), transparent 70%),
+      radial-gradient(20% 16% at 66% 80%, rgba(156, 122, 74, 0.3), transparent 70%);
+    animation: concept-drift 36s var(--ease) infinite alternate;
+    transform-origin: 40% 80%;
+  }
+
+  .hero__concept-slats {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(196, 162, 119, 0.07) 0 1px,
+      transparent 1px 14px
+    );
+    mask-image: radial-gradient(90% 70% at 45% 75%, black 30%, transparent 85%);
+    animation: concept-drift 36s var(--ease) infinite alternate-reverse;
+  }
+
+  @keyframes concept-drift {
+    0% { transform: scale(1) translateX(0); }
+    100% { transform: scale(1.07) translateX(-1.5%); }
+  }
+
+  .hero__concept-tag {
+    position: absolute;
+    top: calc(var(--hdr-h) + 1rem);
+    right: 1rem;
+    z-index: 2;
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bronze-soft);
+    border: 1px solid color-mix(in srgb, var(--bronze-soft) 45%, transparent);
+    padding: 0.4rem 0.75rem;
+    background: rgba(20, 18, 16, 0.55);
+  }
+
+  /* Restrained heat-haze atmosphere — two soft, slow-drifting glows, well
+     under the scrim so they read as warmth in the light rather than a
+     visible effect. Screen blend keeps them additive-only, never darkening
+     the frame. Skipped entirely under reduced-motion below. */
+  .hero__steam {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.35;
+    background:
+      radial-gradient(38% 30% at 28% 78%, rgba(196, 162, 119, 0.5), transparent 70%),
+      radial-gradient(30% 24% at 68% 88%, rgba(196, 162, 119, 0.38), transparent 70%);
+    background-repeat: no-repeat;
+    animation: steam-drift 22s ease-in-out infinite alternate;
+  }
+
+  @keyframes steam-drift {
+    0% { transform: translate(-1.5%, 1.5%) scale(1); }
+    100% { transform: translate(2%, -2%) scale(1.08); }
+  }
+
+  /* Legibility scrim, biased LEFT where the headline sits — the sauna on
+     the right keeps its warmth and luminosity. A soft bottom fade under it
+     grounds the CTA row without darkening the upper image. */
   .hero__scrim {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to top,
-      rgba(20, 18, 16, 0.88) 0%,
-      rgba(20, 18, 16, 0.55) 42%,
-      rgba(20, 18, 16, 0.35) 100%
-    );
+    background:
+      linear-gradient(
+        to right,
+        rgba(20, 18, 16, 0.78) 0%,
+        rgba(20, 18, 16, 0.5) 34%,
+        rgba(20, 18, 16, 0.14) 58%,
+        rgba(20, 18, 16, 0) 76%
+      ),
+      linear-gradient(
+        to top,
+        rgba(20, 18, 16, 0.62) 0%,
+        rgba(20, 18, 16, 0.18) 30%,
+        rgba(20, 18, 16, 0) 55%
+      );
+  }
+
+  @media (max-width: 700px) {
+    /* Stacked text needs more ground on a phone; the right-bias crop keeps
+       the sauna clear of the darkest zone. */
+    .hero__scrim {
+      background:
+        linear-gradient(
+          to right,
+          rgba(20, 18, 16, 0.72) 0%,
+          rgba(20, 18, 16, 0.38) 45%,
+          rgba(20, 18, 16, 0.08) 75%
+        ),
+        linear-gradient(
+          to top,
+          rgba(20, 18, 16, 0.78) 0%,
+          rgba(20, 18, 16, 0.3) 40%,
+          rgba(20, 18, 16, 0) 65%
+        );
+    }
   }
 
   .hero__content {
     position: relative;
     width: 100%;
-    padding-block: clamp(6rem, 4rem + 9vw, 9rem) clamp(4rem, 2.5rem + 5vw, 7rem);
+    /* Bottom padding grew slightly when the two small text links were
+       removed (2026-08-11) — the button row now closes the composition,
+       and this keeps it sitting intentionally above the lower edge. */
+    padding-block: clamp(6rem, 4rem + 9vw, 9rem) clamp(4.75rem, 3rem + 5.5vw, 7.75rem);
   }
 
   .hero__content .shell {
@@ -105,18 +359,19 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
   }
 
   .hero__headline {
-    max-width: 16ch;
-    font-size: clamp(1.8rem, 1.2rem + 2.72vw, 3.6rem);
-    line-height: 1.02;
+    /* One line on desktop/laptop (founder direction 2026-08-11): no width
+       cap, and the size scales so the full phrase fits with room to spare
+       at 1024px and up. Narrow screens wrap naturally. */
+    max-width: none;
+    font-size: clamp(2rem, 1.1rem + 3.2vw, 4.4rem);
+    line-height: 1.05;
     color: var(--linen);
-    animation: rise 1.4s var(--ease) 0.15s both;
+    animation: headline-reveal 0.8s var(--ease) 0.2s both;
   }
 
-  /* force one phrase per line once there is room; on narrow screens the
-     headline just wraps naturally, same as before */
-  .hero__break { display: none; }
-  @media (min-width: 701px) {
-    .hero__break { display: block; content: ''; }
+  @keyframes headline-reveal {
+    from { opacity: 0; transform: translateY(30px); filter: blur(10px); }
+    to { opacity: 1; transform: none; filter: none; }
   }
 
   .hero__lede {
@@ -126,7 +381,7 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
     font-size: clamp(0.98rem, 0.9rem + 0.425vw, 1.17rem);
     line-height: 1.45;
     font-weight: 400;
-    animation: rise 1.4s var(--ease) 0.35s both;
+    animation: rise 0.7s var(--ease) 0.55s both;
   }
 
   .hero__actions {
@@ -134,7 +389,7 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
     flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: clamp(1.7rem, 1.2rem + 1.5vw, 2.5rem);
-    animation: rise 1.4s var(--ease) 0.55s both;
+    animation: rise 0.7s var(--ease) 0.8s both;
   }
   .hero__actions .btn { padding: 0.87rem 1.73rem; font-size: 0.78rem; }
   .hero__actions .btn--outline { color: var(--linen); }
@@ -167,11 +422,13 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero__headline, .hero__lede, .hero__actions, .hero__scroll-line {
+    .hero__headline, .hero__lede, .hero__actions, .hero__scroll-line, .hero__steam {
       animation: none;
       opacity: 1;
       transform: none;
     }
+    .hero__steam { display: none; }
+    .hero__concept, .hero__concept-glow, .hero__concept-slats, .hero__img { animation: none; }
   }
 
   @media (max-width: 700px) {
@@ -188,3 +445,51 @@ const hasImage = fs.existsSync(path.join(process.cwd(), 'public/images/hero.jpg'
     .hero { min-height: clamp(28rem, 70svh, 42rem); }
   }
 </style>
+
+<script>
+  // Cinematic scroll parallax on the hero media only. Transform/opacity
+  // only (never layout properties), rAF-throttled, and never armed at all
+  // under reduced-motion — so the cost when it is off is a single
+  // matchMedia read.
+  const hero = document.querySelector<HTMLElement>('[data-hero]');
+  const media = document.querySelector<HTMLElement>('[data-hero-media]');
+  const content = document.querySelector<HTMLElement>('.hero__content');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (hero && media && !reduce) {
+    // 3× parallax. The media box carries 10% overscan and the coupled
+    // scale below adds growing margin as the shift grows — at every
+    // scroll position the available margin exceeds the travel, so an
+    // edge can never be revealed while the hero is on screen.
+    const MAX_SHIFT = 0.18;
+    let ticking = false;
+
+    const update = () => {
+      ticking = false;
+      const height = hero.offsetHeight;
+      // Only meaningful while the hero is still on screen.
+      const progress = Math.min(Math.max(window.scrollY / height, 0), 1);
+      // Background falls behind the page (translate) while gently swelling
+      // (scale) — the scale also guarantees the shifted layer can never
+      // expose an edge. Together they read as true depth, not decoration.
+      media.style.transform = `translate3d(0, ${progress * MAX_SHIFT * height}px, 0) scale(${1 + progress * 0.18})`;
+      // The headline block drifts up and softly hands off to the next
+      // section — content is long gone before it could affect readability,
+      // and at progress 0 (no scroll) this writes identity values.
+      if (content) {
+        content.style.opacity = String(1 - Math.min(progress * 1.25, 1));
+        content.style.transform = `translate3d(0, ${progress * -28}px, 0)`;
+      }
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+  }
+</script>

@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
+import CategoryViewTrack from '../../components/CategoryViewTrack.astro';
 import { getCollection } from 'astro:content';
 
 const models = (
@@ -76,6 +77,7 @@ const facets = [
             capacityMax={s.data.capacityMax}
             materials={s.data.materials}
             dimensions={s.data.dimensions}
+            fromPrice={s.data.fromPrice}
           />
         ))}
       </div>
@@ -89,6 +91,7 @@ const facets = [
   </section>
 
   <QuoteBand />
+  <CategoryViewTrack category="indoor" />
 </BaseLayout>
 
 <style>

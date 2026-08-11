@@ -1,0 +1,73 @@
+/**
+ * BUXENA — image performance variants.
+ *
+ * Reads every JPG/PNG under public/images and public/media and writes
+ * compressed WebP copies at phone/desktop widths into public/_optimized/,
+ * mirroring the source path:
+ *
+ *   public/images/saunas/ella-h2-hero.png
+ *     → public/_optimized/images/saunas/ella-h2-hero-480.webp
+ *     → public/_optimized/images/saunas/ella-h2-hero-960.webp
+ *     → public/_optimized/images/saunas/ella-h2-hero-1600.webp  (if source is that wide)
+ *
+ * ORIGINALS ARE NEVER TOUCHED — never overwritten, renamed, resized or
+ * deleted. Deleting public/_optimized/ reverts the whole exercise; the
+ * site automatically falls back to the originals (see
+ * src/lib/optimized-image.ts). Aspect ratios are always preserved
+ * (resize by width only). Idempotent: existing up-to-date variants are
+ * skipped, so re-running after new images arrive is cheap.
+ *
+ * og-brand-card.jpg is skipped: social scrapers read that file directly
+ * from its meta tag; it must stay a plain JPG and needs no variants.
+ */
+import sharp from 'sharp';
+import { readdirSync, statSync, mkdirSync, existsSync } from 'node:fs';
+import path from 'node:path';
+
+const ROOTS = ['public/images', 'public/media'];
+const OUT_ROOT = 'public/_optimized';
+const WIDTHS = [480, 960, 1600];
+const QUALITY = 78;
+const SKIP = new Set(['og-brand-card.jpg']);
+
+const files = [];
+const walk = (dir) => {
+  if (!existsSync(dir)) return;
+  for (const name of readdirSync(dir)) {
+    const p = path.join(dir, name);
+    if (statSync(p).isDirectory()) walk(p);
+    else if (/\.(jpe?g|png)$/i.test(name) && !SKIP.has(name)) files.push(p);
+  }
+};
+ROOTS.forEach(walk);
+
+let made = 0, skipped = 0, srcBytes = 0, outBytes = 0;
+for (const file of files) {
+  const meta = await sharp(file).metadata();
+  const rel = path.relative('public', file);
+  const relNoExt = rel.slice(0, -path.extname(rel).length);
+  srcBytes += statSync(file).size;
+
+  // Widths no larger than the source (never enlarge); a source smaller than
+  // the smallest tier still gets a "-480" variant (at its native size —
+  // withoutEnlargement below never upscales) so the site's fixed-name lookup
+  // in src/lib/optimized-image.ts always finds it.
+  let widths = WIDTHS.filter((w) => w <= (meta.width ?? 0));
+  if (widths.length === 0) widths = [WIDTHS[0]];
+
+  for (const w of widths) {
+    const out = path.join(OUT_ROOT, `${relNoExt}-${w}.webp`);
+    if (existsSync(out) && statSync(out).mtimeMs >= statSync(file).mtimeMs) {
+      skipped++;
+      outBytes += statSync(out).size;
+      continue;
+    }
+    mkdirSync(path.dirname(out), { recursive: true });
+    await sharp(file).resize({ width: w, withoutEnlargement: true }).webp({ quality: QUALITY }).toFile(out);
+    outBytes += statSync(out).size;
+    made++;
+  }
+}
+
+console.log(`sources:  ${files.length} images, ${(srcBytes / 1048576).toFixed(1)} MB`);
+console.log(`variants: ${made} written, ${skipped} already current, ${(outBytes / 1048576).toFixed(1)} MB total`);

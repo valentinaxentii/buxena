@@ -1,0 +1,347 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProjectUpload from '../components/ProjectUpload.astro';
+import { publicEmail } from '../data/site';
+import { displayTitle } from '../data/catalog';
+import { getCollection } from 'astro:content';
+
+/**
+ * For Trade — the lead-acquisition path for architects, interior designers,
+ * builders/developers and hospitality/wellness operators.
+ *
+ * CLAIM DISCIPLINE: lists only real current capabilities. No CAD/BIM/Revit
+ * claims (no such files are confirmed to exist), no trade discounts or
+ * partner-program promises (architecture only, per the founders). Trade
+ * submissions carry source "For Trade" so the CRM can prioritize and track
+ * them separately from consumer enquiries.
+ */
+const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+
+const audiences = [
+  { title: 'Architects & Designers', body: 'Dimensions, materials, glazing and heater options for the models you are specifying — with a person to check the details against the design.' },
+  { title: 'Builders & Developers', body: 'Site, foundation and electrical requirements early enough to plan around, and delivery coordinated with your schedule.' },
+  { title: 'Hospitality & Wellness', body: 'Sauna systems specified for guest-facing use, from selection through delivery coordination.' },
+];
+
+const capabilities = [
+  'Product specifications for every current model',
+  'Project consultation against your drawings and site',
+  'Heater and control selection support',
+  'Delivery coordination',
+  'Manuals and available documentation on request',
+  'Project pricing',
+];
+
+const projectTypes = [
+  'Residential — new construction',
+  'Residential — renovation',
+  'Multi-unit / development',
+  'Hospitality / hotel / spa',
+  'Commercial wellness',
+  'Other',
+];
+---
+
+<BaseLayout
+  title="For Trade"
+  description="Specify BUXENA for your next project — product specifications, project consultation, heater and control selection support, and delivery coordination for architects, builders and hospitality."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">For Trade</span>
+      <h1 class="display measure--tight">Specify BUXENA for your next project</h1>
+      <p class="lead measure">
+        European sauna systems for residential, development and hospitality
+        projects — with the technical detail your drawings need and one
+        point of contact from specification to delivery.
+      </p>
+      <div class="trade-ctas">
+        <a class="btn btn--bronze" href="#trade-form" data-track="quote_started" data-track-form-type="trade_submit_project">Submit a Project</a>
+        <a class="btn btn--outline" href="#trade-form" data-track="quote_started" data-track-form-type="trade_request_specs">Request Specifications</a>
+        {publicEmail && (
+          <a class="link trade-ctas__talk" href={`mailto:${publicEmail}`}>Talk to BUXENA <span class="arrow" aria-hidden="true">→</span></a>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--deep">
+    <div class="shell">
+      <div class="grid cols-3">
+        {audiences.map((a) => (
+          <div class="aud">
+            <span class="slats" aria-hidden="true"></span>
+            <h2 class="h3 aud__title">{a.title}</h2>
+            <p class="aud__body">{a.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell split">
+      <div>
+        <span class="eyebrow">What we provide</span>
+        <h2 class="h2 measure--tight">Real capabilities, stated plainly</h2>
+        <ul class="caps">
+          {capabilities.map((c) => (
+            <li>{c}</li>
+          ))}
+        </ul>
+        <p class="caps__note">
+          Drawings and files are shared where they actually exist for a
+          model — tell us what your project needs and we will confirm what
+          is available.
+        </p>
+      </div>
+
+      <div id="trade-form">
+        <span class="eyebrow">Submit a Project</span>
+        <h2 class="h3 tform__h">Tell us what you're specifying</h2>
+
+        <form class="tform" data-trade-form>
+          <p class="tform__hp">
+            <label>Leave this field empty <input name="bot-field-trade" tabindex="-1" autocomplete="off" /></label>
+          </p>
+
+          <div class="tform__grid">
+            <div class="field">
+              <label for="t-name">Name <span aria-hidden="true">*</span></label>
+              <input id="t-name" name="name" type="text" required autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="t-company">Company <span aria-hidden="true">*</span></label>
+              <input id="t-company" name="company" type="text" required autocomplete="organization" />
+            </div>
+            <div class="field">
+              <label for="t-role">Role</label>
+              <select id="t-role" name="role">
+                <option value="">Select…</option>
+                <option>Architect</option>
+                <option>Interior designer</option>
+                <option>Builder / contractor</option>
+                <option>Developer</option>
+                <option>Hospitality / wellness operator</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="t-email">Email <span aria-hidden="true">*</span></label>
+              <input id="t-email" name="email" type="email" required autocomplete="email" />
+            </div>
+            <div class="field">
+              <label for="t-phone">Phone</label>
+              <input id="t-phone" name="phone" type="tel" autocomplete="tel" />
+            </div>
+            <div class="field">
+              <label for="t-location">Project location</label>
+              <input id="t-location" name="projectLocation" type="text" placeholder="City, state or ZIP" />
+            </div>
+            <div class="field">
+              <label for="t-type">Project type</label>
+              <select id="t-type" name="projectType">
+                <option value="">Select…</option>
+                {projectTypes.map((t) => (
+                  <option value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div class="field">
+              <label for="t-timeline">Timeline</label>
+              <select id="t-timeline" name="timeline">
+                <option value="">Not set</option>
+                <option value="asap">As soon as possible</option>
+                <option value="1-3-months">1–3 months</option>
+                <option value="3-6-months">3–6 months</option>
+                <option value="6-plus-months">6+ months</option>
+              </select>
+            </div>
+            <div class="field field--full">
+              <label for="t-model">Model of interest, if known</label>
+              <select id="t-model" name="model">
+                <option value="">Undecided — please advise</option>
+                {saunas.map((s) => (
+                  <option value={s.data.title}>{displayTitle(s.data.title)}</option>
+                ))}
+              </select>
+            </div>
+            <div class="field field--full">
+              <label for="t-notes">Project notes</label>
+              <textarea id="t-notes" name="notes" rows="4" placeholder="What are you specifying, and what do you need from us?"></textarea>
+            </div>
+            <div class="field field--full">
+              <ProjectUpload id="trade-files" label="Plans or drawings (optional)" />
+            </div>
+          </div>
+
+          <button class="btn btn--bronze tform__submit" type="submit">Submit Project</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .trade-ctas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    margin-top: 1.9rem;
+  }
+
+  .aud .slats { color: var(--bronze); margin-bottom: 1.1rem; }
+  .aud__title { margin-bottom: 0.7rem; }
+  .aud__body { font-size: var(--t-small); color: var(--muted); line-height: 1.7; }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
+    align-items: start;
+  }
+
+  .caps { margin-top: 1.5rem; }
+  .caps li {
+    position: relative;
+    padding: 0.55rem 0 0.55rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--t-small);
+  }
+  .caps li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
+  .caps__note { margin-top: 1.2rem; font-size: var(--t-small); color: var(--muted); font-style: italic; }
+
+  .tform__h { margin: 0.6rem 0 1.4rem; }
+  .tform__hp { position: absolute; left: -9999px; }
+
+  .tform__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.1rem 1.5rem;
+  }
+
+  .field { display: grid; gap: 0.5rem; }
+  .field--full { grid-column: 1 / -1; }
+  .field label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .field label span { color: var(--bronze-ink); font-weight: 700; }
+  .field input, .field select, .field textarea {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.6rem 0;
+    width: 100%;
+    border-radius: 0;
+    transition: border-color 0.4s var(--ease);
+  }
+  .field textarea { border: 1.5px solid var(--line); padding: 0.9rem 1rem; resize: vertical; line-height: 1.6; }
+  .field select { appearance: none; cursor: pointer; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--bronze); }
+  .field__hint { font-size: 0.875rem; color: var(--muted); }
+
+  .tform__submit { margin-top: 1.7rem; }
+
+  #trade-form { scroll-margin-top: calc(var(--hdr-h) + 1rem); }
+
+  @media (max-width: 900px) {
+    .split { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .tform__grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+
+  const form = document.querySelector<HTMLFormElement>('[data-trade-form]');
+  if (form) {
+    form.addEventListener(
+      'focusin',
+      () => track('quote_started', { formType: 'trade_form' }),
+      { once: true }
+    );
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const data = new FormData(form);
+      const get = (key: string) => (data.get(key) || '').toString().trim();
+
+      const details = [
+        `TRADE LEAD`,
+        get('company') && `Company: ${get('company')}`,
+        get('role') && `Role: ${get('role')}`,
+        get('projectLocation') && `Project location: ${get('projectLocation')}`,
+        get('projectType') && `Project type: ${get('projectType')}`,
+        get('timeline') && `Timeline: ${get('timeline')}`,
+        get('model') && `Model: ${get('model')}`,
+        get('uploadMeta'),
+      ].filter(Boolean).join(' · ');
+      const message = [get('notes'), details].filter(Boolean).join('\n\n');
+
+      const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      const originalLabel = submitBtn.textContent ?? '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      const restore = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel || 'Submit Project';
+      };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: get('projectLocation'),
+        message,
+        saunaInterest: get('model'),
+        source: 'For Trade',
+        botField: get('bot-field-trade'),
+      });
+
+      if (!result.ok) {
+        console.error('[trade] submission failed:', result.error);
+        restore();
+        showFormStatus(form, 'error');
+        return;
+      }
+
+      track('trade_project_submitted', {
+        formType: 'trade_form',
+        model: get('model'),
+        projectType: get('projectType'),
+        timeline: get('timeline'),
+      });
+
+      if (result.devMode) {
+        restore();
+        showFormStatus(form, 'dev-success');
+        return;
+      }
+
+      rememberEnquiry({
+        model: get('model'),
+        projectType: get('projectType'),
+        timeline: get('timeline'),
+      });
+      window.location.assign('/thank-you/');
+    });
+  }
+</script>

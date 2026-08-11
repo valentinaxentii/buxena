@@ -1,0 +1,300 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProjectUpload from '../components/ProjectUpload.astro';
+import { displayTitle } from '../data/catalog';
+import { getCollection } from 'astro:content';
+
+/**
+ * Project intake — the "Upload My Project" flow.
+ *
+ * Progressive by design: step 1 is the project (type, ZIP, timeline, model),
+ * step 2 is contact + description. No file-upload field exists because no
+ * public upload infrastructure exists yet — the confirmation asks the buyer
+ * to reply to our email with photos and plans, which is the real current
+ * workflow. Do not add a fake upload control.
+ *
+ * Submits to /api/enquiries with source "Project Intake" so these leads are
+ * separable in the CRM from quote-form and chat enquiries.
+ */
+const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+
+const projectTypes = [
+  'New backyard sauna',
+  'Home renovation / addition',
+  'New construction',
+  'Hospitality / commercial wellness',
+  'Other',
+];
+---
+
+<BaseLayout
+  title="Start Your Project"
+  description="Tell BUXENA about your sauna project — space, timeline and plans — and we'll help narrow the right sauna, system and next step."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Start Your Project</span>
+      <h1 class="display measure--tight">Show us your project</h1>
+      <p class="lead measure">
+        Two short steps. Photos, plans or a rough sketch can follow by email
+        once we reply — dimensions and a ZIP code are plenty to start.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell shell--narrow">
+      <form class="pform" data-project-form>
+        <p class="pform__hp">
+          <label>Leave this field empty <input name="bot-field-project" tabindex="-1" autocomplete="off" /></label>
+        </p>
+
+        <!-- Step 1: the project -->
+        <fieldset class="pform__step" data-project-step="1">
+          <legend class="pform__legend">Step 1 — The project</legend>
+
+          <div class="pform__grid">
+            <div class="field">
+              <label for="p-type">Project type</label>
+              <select id="p-type" name="projectType">
+                <option value="">Select…</option>
+                {projectTypes.map((t) => (
+                  <option value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="p-zip">ZIP code <span aria-hidden="true">*</span></label>
+              <input id="p-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" />
+            </div>
+
+            <div class="field">
+              <label for="p-timeline">Timeline</label>
+              <select id="p-timeline" name="timeline">
+                <option value="">Not set</option>
+                <option value="asap">As soon as possible</option>
+                <option value="1-3-months">1–3 months</option>
+                <option value="3-6-months">3–6 months</option>
+                <option value="researching">Still researching</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="p-model">Preferred model, if known</label>
+              <select id="p-model" name="model">
+                <option value="">Undecided — please advise</option>
+                {saunas.map((s) => (
+                  <option value={s.data.title}>{displayTitle(s.data.title)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button class="btn btn--bronze pform__next" type="button" data-project-next>Continue</button>
+        </fieldset>
+
+        <!-- Step 2: contact + description -->
+        <fieldset class="pform__step" data-project-step="2" hidden>
+          <legend class="pform__legend">Step 2 — You and the space</legend>
+
+          <div class="pform__grid">
+            <div class="field">
+              <label for="p-name">Name <span aria-hidden="true">*</span></label>
+              <input id="p-name" name="name" type="text" required autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="p-email">Email <span aria-hidden="true">*</span></label>
+              <input id="p-email" name="email" type="email" required autocomplete="email" />
+            </div>
+            <div class="field">
+              <label for="p-phone">Phone</label>
+              <input id="p-phone" name="phone" type="tel" autocomplete="tel" />
+            </div>
+            <div class="field field--full">
+              <label for="p-desc">Describe the space</label>
+              <textarea
+                id="p-desc"
+                name="description"
+                rows="5"
+                placeholder="Dimensions, access, foundation and power situation — whatever you already know."
+              ></textarea>
+            </div>
+            <div class="field field--full">
+              <ProjectUpload id="project-files" label="Photos or plans (optional)" />
+            </div>
+          </div>
+
+          <div class="pform__nav">
+            <button class="btn btn--outline" type="button" data-project-back>Back</button>
+            <button class="btn btn--bronze" type="submit">Send My Project</button>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+
+  .pform__hp { position: absolute; left: -9999px; }
+
+  .pform__step { border: none; margin: 0; padding: 0; }
+
+  .pform__legend {
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    margin-bottom: 1.5rem;
+    padding: 0;
+  }
+
+  .pform__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 1.75rem;
+  }
+
+  .field { display: grid; gap: 0.55rem; }
+  .field--full { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .field label span { color: var(--bronze-ink); font-weight: 700; }
+
+  .field input,
+  .field select,
+  .field textarea {
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.7rem 0;
+    width: 100%;
+    border-radius: 0;
+    transition: border-color 0.4s var(--ease);
+  }
+  .field textarea {
+    border: 1.5px solid var(--line);
+    padding: 0.9rem 1rem;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  .field select { appearance: none; cursor: pointer; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--bronze); }
+
+  .field__hint { font-size: 0.875rem; color: var(--muted); }
+
+  .pform__next { margin-top: 1.9rem; }
+  .pform__nav { margin-top: 1.9rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+
+  @media (max-width: 640px) {
+    .pform__grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+
+  const form = document.querySelector<HTMLFormElement>('[data-project-form]');
+  if (form) {
+    const step1 = form.querySelector<HTMLElement>('[data-project-step="1"]')!;
+    const step2 = form.querySelector<HTMLElement>('[data-project-step="2"]')!;
+
+    form.addEventListener(
+      'focusin',
+      () => track('quote_started', { formType: 'project_intake' }),
+      { once: true }
+    );
+
+    form.querySelector('[data-project-next]')!.addEventListener('click', () => {
+      const zip = form.querySelector<HTMLInputElement>('#p-zip')!;
+      if (!zip.reportValidity()) return;
+      step1.hidden = true;
+      step2.hidden = false;
+      step2.querySelector<HTMLElement>('input')?.focus();
+    });
+
+    form.querySelector('[data-project-back]')!.addEventListener('click', () => {
+      step2.hidden = true;
+      step1.hidden = false;
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const data = new FormData(form);
+      const get = (key: string) => (data.get(key) || '').toString().trim();
+
+      const details = [
+        get('projectType') && `Project type: ${get('projectType')}`,
+        get('zip') && `ZIP: ${get('zip')}`,
+        get('timeline') && `Timeline: ${get('timeline')}`,
+        get('model') && `Preferred model: ${get('model')}`,
+        get('uploadMeta'),
+      ].filter(Boolean).join(' · ');
+      const message = [get('description'), details].filter(Boolean).join('\n\n');
+
+      const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      const originalLabel = submitBtn.textContent ?? '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      const restore = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel || 'Send My Project';
+      };
+
+      const result = await submitEnquiry({
+        name: get('name'),
+        email: get('email'),
+        phone: get('phone'),
+        location: get('zip'),
+        message,
+        saunaInterest: get('model'),
+        source: 'Project Intake',
+        botField: get('bot-field-project'),
+      });
+
+      if (!result.ok) {
+        console.error('[project] submission failed:', result.error);
+        restore();
+        showFormStatus(form, 'error');
+        return;
+      }
+
+      track('quote_submitted', {
+        formType: 'project_intake',
+        model: get('model'),
+        zip: get('zip'),
+        timeline: get('timeline'),
+        projectType: get('projectType'),
+      });
+
+      if (result.devMode) {
+        restore();
+        showFormStatus(form, 'dev-success');
+        return;
+      }
+
+      rememberEnquiry({
+        model: get('model'),
+        zip: get('zip'),
+        timeline: get('timeline'),
+        projectType: get('projectType'),
+      });
+      window.location.assign('/thank-you/');
+    });
+  }
+</script>

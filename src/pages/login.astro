@@ -18,10 +18,13 @@ let redirectTo = safeNext(nextParam);
 
 let error: string | null = null;
 let notConfigured = false;
+// Preserved so a failed attempt never makes the user retype their email.
+let submittedEmail = '';
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const email = String(form.get('email') ?? '').trim();
+  submittedEmail = email;
   const password = String(form.get('password') ?? '');
   // hidden field wins over the query so the destination can't be lost mid-POST
   redirectTo = safeNext(String(form.get('next') ?? '') || nextParam);
@@ -41,7 +44,10 @@ if (Astro.request.method === 'POST') {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
         if (signInError) {
-          error = 'Incorrect email or password.';
+          // One uniform message for wrong password, unknown user and
+          // unconfirmed email — no internal Supabase error text, and no
+          // hint about which part was wrong.
+          error = "We couldn't sign you in. Check your email and password and try again.";
         } else {
           return Astro.redirect(redirectTo);
         }
@@ -80,18 +86,49 @@ if (Astro.request.method === 'POST') {
         )}
         {error && <p class="notice notice--error">{error}</p>}
 
-        <form method="POST" class="form">
+        <form method="POST" class="form" data-login-form>
           <input type="hidden" name="next" value={redirectTo} />
           <label class="field">
             <span>Email</span>
-            <input type="email" name="email" autocomplete="username" required />
+            <input type="email" name="email" autocomplete="username" required value={submittedEmail} />
           </label>
           <label class="field">
             <span>Password</span>
-            <input type="password" name="password" autocomplete="current-password" required />
+            <span class="field__pw">
+              <input type="password" name="password" autocomplete="current-password" required data-pw-input />
+              <button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password" aria-pressed="false">Show</button>
+            </span>
           </label>
-          <button type="submit" class="submit">Sign In</button>
+          <button type="submit" class="submit" data-login-submit>Sign In</button>
         </form>
+
+        <script is:inline>
+          // Loading state: disable the button and show progress the moment a
+          // valid form submits, so a slow network never looks like a dead
+          // button. Native validation still runs first.
+          var loginForm = document.querySelector('[data-login-form]');
+          var loginBtn = document.querySelector('[data-login-submit]');
+          if (loginForm && loginBtn) {
+            loginForm.addEventListener('submit', function () {
+              loginBtn.disabled = true;
+              loginBtn.textContent = 'Signing in…';
+            });
+          }
+
+          // Password visibility toggle — keyboard accessible, state announced
+          // via aria-pressed.
+          var pwInput = document.querySelector('[data-pw-input]');
+          var pwToggle = document.querySelector('[data-pw-toggle]');
+          if (pwInput && pwToggle) {
+            pwToggle.addEventListener('click', function () {
+              var show = pwInput.type === 'password';
+              pwInput.type = show ? 'text' : 'password';
+              pwToggle.textContent = show ? 'Hide' : 'Show';
+              pwToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+              pwToggle.setAttribute('aria-pressed', String(show));
+            });
+          }
+        </script>
 
         <a class="forgot" href="/login/forgot-password">Forgot Password?</a>
       </div>
@@ -189,6 +226,30 @@ if (Astro.request.method === 'POST') {
   }
 
   .submit:hover { background: #e6cda3; border-color: #e6cda3; }
+  .submit:disabled { opacity: 0.65; cursor: default; }
+  .submit:focus-visible, .pw-toggle:focus-visible, .field input:focus-visible {
+    outline: 2px solid #d4b88c;
+    outline-offset: 2px;
+  }
+
+  .field__pw { position: relative; display: block; }
+  .field__pw input { width: 100%; padding-right: 4rem; }
+  .pw-toggle {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0.5rem 0.6rem;
+    font-family: 'Jost', system-ui, sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(246, 242, 234, 0.55);
+    cursor: pointer;
+  }
+  .pw-toggle:hover { color: #d4b88c; }
 
   .forgot {
     font-size: 0.8rem;

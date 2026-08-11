@@ -27,7 +27,10 @@ export const site = {
 
   // Default social-share preview image (1200×630). Individual pages may
   // override with their own image where one exists (e.g. product pages).
-  ogImage: '/images/og-default.jpg',
+  // og-brand-card.jpg is generated from APPROVED brand assets only
+  // (scripts/make-og-card.mjs) — replaced the rights-unknown og-default.jpg
+  // per the image-rights launch gate.
+  ogImage: '/images/og-brand-card.jpg',
 };
 
 /** The email address, or null when it must not be shown to customers. */
@@ -35,6 +38,8 @@ export const publicEmail = site.emailConfirmed || showDev ? site.email : null;
 
 export const nav = [
   { label: 'Saunas', href: '/saunas/' },
+  { label: 'Sauna Advisor', href: '/plan-your-sauna/' },
+  { label: 'For Trade', href: '/for-trade/' },
   { label: 'Our Story', href: '/our-story/' },
   { label: 'Wellness', href: '/wellness/' },
   { label: 'FAQ', href: '/faq/' },

@@ -88,6 +88,13 @@ const webSiteSchema = {
 
     <!-- pages can inject page-specific structured data here -->
     <slot name="head" />
+    <!-- Reveal animations depend on a script adding .is-in; without any
+         JavaScript, content must simply be visible — never hidden. -->
+    <noscript>
+      <style>
+        .reveal, .reveal * { opacity: 1 !important; transform: none !important; }
+      </style>
+    </noscript>
   </head>
 
   <body>
@@ -98,6 +105,41 @@ const webSiteSchema = {
     </main>
     <Footer />
     <ChatWidget />
+
+    <script>
+      import { track, type TrackEvent, type TrackPayload } from '../lib/track';
+
+      // Delegated conversion tracking. Any element carrying data-track="<event>"
+      // fires that event on click, with every data-track-* attribute passed
+      // through as payload (e.g. data-track-model="BUH-ELLA H2"). One listener
+      // for the whole site — no per-page wiring, nothing to forget on a new page.
+      document.addEventListener('click', (e) => {
+        const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-track]');
+        if (!el) return;
+
+        const event = el.dataset.track as TrackEvent;
+        const payload: TrackPayload = {};
+
+        for (const [key, value] of Object.entries(el.dataset)) {
+          if (key === 'track' || !key.startsWith('track') || value === undefined) continue;
+          // data-track-model -> "model"
+          const name = key.slice(5).replace(/^[A-Z]/, (c) => c.toLowerCase());
+          payload[name] = value;
+        }
+
+        track(event, payload);
+      });
+
+      // tel: and mailto: links are high-intent on a phone — tracked wherever
+      // they appear, without each one needing a data-track attribute.
+      document.addEventListener('click', (e) => {
+        const link = (e.target as HTMLElement | null)?.closest<HTMLAnchorElement>('a[href^="tel:"], a[href^="mailto:"]');
+        if (!link) return;
+        track(link.href.startsWith('tel:') ? 'phone_click' : 'email_click', {
+          href: link.href,
+        });
+      });
+    </script>
 
     <script>
       // Scroll reveal. Respects reduced-motion by simply never arming.

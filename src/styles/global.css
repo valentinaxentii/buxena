@@ -51,10 +51,10 @@
   /* --- layout ------------------------------------------------------------ */
   /* Sticky header height. Shared so the mobile drawer, which pins itself
      directly below the header, can never drift out of sync with it.
-     96px on a phone, 128px on a wide desktop: it was 172px at the top end,
-     which is a lot of permanent furniture above the content on a bar that
-     holds a logo and five links. */
-  --hdr-h: clamp(6rem, 5.2rem + 2.5vw, 8rem);
+     Header rebuild (founder direction, quiet-luxury pass): 78px on a
+     phone, 88px on a wide desktop. The stuck state compacts a further 10%
+     on desktop via the rule in Header.astro. */
+  --hdr-h: clamp(4.875rem, 4.7rem + 0.8vw, 5.5rem);
 
   --shell: 78rem;      /* standard content width  */
   --shell-narrow: 46rem;
@@ -242,6 +242,7 @@ button { font: inherit; color: inherit; }
 .btn--solid:hover { background: var(--bronze-ink); border-color: var(--bronze-ink); }
 
 .btn--bronze { background: var(--bronze-btn); color: #fff; border-color: var(--bronze-btn); }
+.btn:hover { transform: translateY(-2px); }
 .btn--bronze:hover { background: var(--bronze-ink); border-color: var(--bronze-ink); }
 
 .btn--outline { border-color: currentColor; color: inherit; }
@@ -278,6 +279,12 @@ button { font: inherit; color: inherit; }
 .sec-head { margin-bottom: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); }
 .sec-head .lead { margin-top: 1.2rem; }
 
+/* The hidden attribute must always win. Without this, any element whose
+   class sets its own `display` (e.g. .pcard { display:flex }) silently
+   ignores hidden — which is exactly how the catalog filters broke: chips
+   toggled, cards never disappeared. */
+[hidden] { display: none !important; }
+
 /* ==========================================================================
    Scroll reveal — subtle, and fully disabled under reduced-motion
    ========================================================================== */
@@ -288,9 +295,48 @@ button { font: inherit; color: inherit; }
 }
 .reveal.is-in { opacity: 1; transform: none; }
 
+/* Editorial variants — alternate directions so image/text sections read
+   like a magazine spread rather than a uniform rise. */
+.reveal--left  { transform: translateX(-28px); }
+.reveal--right { transform: translateX(28px); }
+
+/* Media reveal — the image settles from a gentle over-scale instead of
+   sliding, behind its figure's own frame. Transform/opacity only: zero
+   layout shift, the box itself never moves. */
+.reveal--media { transform: none; }
+.reveal--media > * { transform: scale(1.045); transition: transform 1.6s var(--ease); }
+.reveal--media.is-in > * { transform: none; }
+
+/* Group stagger — put .reveal + data-reveal-stagger on a grid/list and its
+   children cascade in one after another (max 6 steps, then together).
+   The parent still carries the single IntersectionObserver hook. */
+[data-reveal-stagger].reveal { opacity: 1; transform: none; }
+[data-reveal-stagger].reveal > * {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+}
+[data-reveal-stagger].reveal.is-in > * { opacity: 1; transform: none; }
+[data-reveal-stagger].reveal.is-in > :nth-child(2) { transition-delay: 0.12s; }
+[data-reveal-stagger].reveal.is-in > :nth-child(3) { transition-delay: 0.24s; }
+[data-reveal-stagger].reveal.is-in > :nth-child(4) { transition-delay: 0.36s; }
+[data-reveal-stagger].reveal.is-in > :nth-child(5) { transition-delay: 0.48s; }
+[data-reveal-stagger].reveal.is-in > :nth-child(n + 6) { transition-delay: 0.6s; }
+
+/* Phones: shorter travel so nothing drifts under a thumb mid-tap. */
+@media (max-width: 700px) {
+  .reveal { transform: translateY(14px); }
+  .reveal--left, .reveal--right { transform: translateX(0) translateY(14px); }
+  [data-reveal-stagger].reveal > * { transform: translateY(14px); }
+  [data-reveal-stagger].reveal { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+  .btn:hover { transform: none; }
+  .reveal, .reveal > *, .reveal--media > *, [data-reveal-stagger].reveal > * {
+    opacity: 1; transform: none; transition: none;
+  }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
@@ -352,6 +398,65 @@ button { font: inherit; color: inherit; }
 .crumbs a,
 .crumbs span { font-size: 0.875rem; }
 .crumbs a { display: inline-block; padding-block: 0.55rem; }
+
+/* When the product page's sticky sales bar is on screen, the chat launcher
+   would sit on top of its Request Pricing CTA (both live bottom-right).
+   Lift the launcher clear of the bar. :has() is supported in all current
+   evergreen browsers; where it isn't, the launcher simply overlaps as
+   before — degraded, not broken. */
+body:has(.salesbar.is-shown) .chat-fab {
+  bottom: calc(clamp(1rem, 0.6rem + 1.5vw, 1.75rem) + 4.25rem);
+}
+
+/* ==========================================================================
+   Form status — shared inline success/error states for every lead form.
+   Injected by src/lib/enquiry-client.ts; replaces native alert() dialogs.
+   ========================================================================== */
+.form-status {
+  margin-top: 1.5rem;
+  padding: 1.15rem 1.4rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--bronze);
+  background: var(--linen-deep);
+}
+.form-status--error { border-left-color: #a4483a; }
+.form-status--dev { border-left-color: var(--bronze); }
+
+.form-status__title {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 0.4rem;
+}
+.form-status__body { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.3rem; }
+.form-status__actions { display: flex; flex-wrap: wrap; gap: 0.6rem 1.75rem; align-items: center; margin-top: 0.8rem; }
+.form-status__retry {
+  border: none;
+  background: none;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bronze-ink);
+  border-bottom: 1px solid var(--bronze-soft);
+}
+.form-status__retry:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.form-status__mail {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--bronze-ink);
+  border-bottom: 1px solid var(--bronze-soft);
+  padding-bottom: 0.1rem;
+}
+.form-status__mail:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
 /* ==========================================================================
    Legal / policy pages — shared, compact typography and rhythm.
