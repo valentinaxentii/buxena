@@ -315,18 +315,20 @@ async function buildPresentation(slug) {
   const sceneImg = environment[0] ?? null;
   const secondProduct = transparent.find((t) => t !== coverImg) ?? null;
 
-  pdf.setTitle(`${m.display} — BUXENA Model Presentation`);
-  pdf.setAuthor('BUXENA');
-  pdf.setSubject(`${m.display} sauna — specifications and project overview`);
-  pdf.setProducer('BUXENA');
-
-  const used = { images: [], fields: [], omitted: [] };
-
-  // Customer-facing identity. `display` is what a customer reads; the
+  // Customer-facing identity: publicName is what a customer reads. The
   // supplier reference behind it never appears in the document.
   const identity = identityFor(m.title);
   const publicName = identity ? identity.publicName : m.display;
   const modelCode = identity ? identity.code : null;
+
+
+  pdf.setTitle(`${publicName}${modelCode ? ' ' + modelCode : ''} — BUXENA Model Presentation`);
+  pdf.setAuthor('BUXENA');
+  pdf.setSubject(`${publicName} sauna — specifications and project overview`);
+  pdf.setProducer('BUXENA');
+  if (modelCode) pdf.setKeywords([modelCode, publicName]);
+
+  const used = { images: [], fields: [], omitted: [] };
   if (identity) used.fields.push(`identity: ${publicName} / ${modelCode} (internal ${identity.internalRef})`);
 
   // ============================ PAGE 1 — COVER / PRODUCT OVERVIEW ===========

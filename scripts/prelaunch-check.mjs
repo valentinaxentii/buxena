@@ -225,6 +225,23 @@ if (devLive) {
   }
 }
 
+// ------------------------------------------- 8. model presentation system
+console.log('\n■ 8/8 Model presentations');
+{
+  let out = '';
+  let ok = false;
+  try {
+    out = execSync('node scripts/verify-presentations.mjs', { encoding: 'utf8' });
+    ok = /All mappings correct/.test(out);
+  } catch (e) {
+    out = String(e.stdout ?? e);
+  }
+  const idLine = (out.match(/PDF identity correct:\s+(\S+)/) ?? [])[1] ?? '?';
+  const linkLine = (out.match(/product page links PDF:\s+(\S+)/) ?? [])[1] ?? '?';
+  const detail = out.includes('PROBLEMS') ? out.split('PROBLEMS')[1].replace(/\s+/g, ' ').slice(0, 220) : '';
+  record('pdf', `presentations mapped correctly (identity ${idLine}, linked ${linkLine})`, ok, detail);
+}
+
 // ------------------------------------------------------------------- summary
 const fails = results.filter((r) => !r.ok);
 console.log('\n════════════════════════════════════════');

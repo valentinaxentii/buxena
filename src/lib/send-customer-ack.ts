@@ -103,6 +103,14 @@ export function buildCustomerAckEmail(input: CustomerAckInput): CustomerAckEmail
     ...(location ? ([['Location / ZIP', location]] as [string, string][]) : []),
   ];
 
+  // The model's own presentation, as a LINK rather than an attachment:
+  // it keeps the email small and deliverable, and the file can be corrected
+  // after sending. Only included when the model is mapped AND not on hold —
+  // a held model must never be promoted to a customer.
+  const identity = identityFor(clean(input.saunaInterest));
+  const presentationUrl =
+    identity && !identity.hold ? `https://buxena.com${presentationPath(identity.slug)}` : null;
+
   const subject = 'We received your BUXENA request';
 
   const text = [
@@ -118,6 +126,9 @@ export function buildCustomerAckEmail(input: CustomerAckInput): CustomerAckEmail
       ? ['Your request:', ...summaryRows.map(([k, v]) => `  ${k}: ${v}`), '']
       : []),
     ...(message ? ['Your notes:', message, ''] : []),
+    ...(presentationUrl
+      ? [`Your ${model} presentation:`, presentationUrl, '']
+      : []),
     closing,
     '',
     lookForward,
@@ -172,6 +183,13 @@ export function buildCustomerAckEmail(input: CustomerAckInput): CustomerAckEmail
             ? `<tr><td style="padding:22px 32px 0;">
           <p style="margin:0 0 6px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#8a7c6a;">Your notes</p>
           <div style="white-space:pre-wrap;padding:14px 16px;background:#f7f3ec;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#453a30;">${esc(message)}</div>
+        </td></tr>`
+            : ''
+        }
+        ${
+          presentationUrl
+            ? `<tr><td style="padding:22px 32px 0;">
+          <a href="${esc(presentationUrl)}" style="display:inline-block;padding:12px 22px;background:#9c7a4a;color:#fdfbf7;text-decoration:none;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:0.08em;">Download the ${esc(model)} presentation</a>
         </td></tr>`
             : ''
         }
