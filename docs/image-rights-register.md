@@ -206,7 +206,7 @@ that group's row with the proof reference and re-mark it Approved.
 
 ---
 
-## 7. CAPRA dealer-pack renders — `public/images/supplier-capra/*`
+## 7. CAPRA dealer-pack renders — `public/images/catalog/*`
 
 | Field | Value |
 |---|---|

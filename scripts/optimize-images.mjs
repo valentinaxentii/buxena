@@ -48,12 +48,18 @@ for (const file of files) {
   const relNoExt = rel.slice(0, -path.extname(rel).length);
   srcBytes += statSync(file).size;
 
-  // Widths no larger than the source (never enlarge); a source smaller than
+  // Widths no larger than the source (never enlarge). A source smaller than
   // the smallest tier still gets a "-480" variant (at its native size —
-  // withoutEnlargement below never upscales) so the site's fixed-name lookup
-  // in src/lib/optimized-image.ts always finds it.
-  let widths = WIDTHS.filter((w) => w <= (meta.width ?? 0));
+  // withoutEnlargement never upscales) so the fixed-name lookup in
+  // src/lib/optimized-image.ts always finds one.
+  //
+  // ALSO emit the source's native width when it falls between tiers. Without
+  // this, an 800px product photo offered only a 480w candidate, and desktop
+  // browsers upscaled it — visibly soft on exactly the images that sell.
+  const srcW = meta.width ?? 0;
+  let widths = WIDTHS.filter((w) => w <= srcW);
   if (widths.length === 0) widths = [WIDTHS[0]];
+  else if (srcW > widths[widths.length - 1] && srcW < WIDTHS[WIDTHS.length - 1]) widths.push(srcW);
 
   for (const w of widths) {
     const out = path.join(OUT_ROOT, `${relNoExt}-${w}.webp`);

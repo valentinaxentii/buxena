@@ -16,9 +16,9 @@ heroImage:
   src: "/images/saunas/ella-h2-hero.png"
   alt: "ELLA H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
-  - src: "/images/supplier-capra/ella-h2-indoor-cutout.png"
+  - src: "/images/catalog/ella-h2-indoor-cutout.png"
     alt: "ELLA H2 indoor sauna — transparent product render"
-  - src: "/images/supplier-capra/ella-h2-interior.jpg"
+  - src: "/images/catalog/ella-h2-interior.jpg"
     alt: "ELLA H2 interior — benches and heater guard"
 dimensions:
   - { label: "External (D × W × H)", value: "51.2 × 53.1 × 89.0 in (1300 × 1350 × 2260 mm)" }

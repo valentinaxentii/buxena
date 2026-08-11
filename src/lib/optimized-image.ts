@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const WIDTHS = [480, 960, 1600];
+const VARIANT_RE = /-(\d{3,4})\.webp$/;
 const cache = new Map<string, string | null>();
 
 export function webpSrcset(src?: string): string | null {
@@ -26,11 +27,22 @@ export function webpSrcset(src?: string): string | null {
   if (hit !== undefined) return hit;
 
   const relNoExt = src.slice(1, src.length - ext.length);
-  const entries = WIDTHS.map((w) => ({
-    w,
-    file: path.join(process.cwd(), 'public', '_optimized', `${relNoExt}-${w}.webp`),
-    url: `/_optimized/${relNoExt}-${w}.webp`,
-  })).filter((e) => fs.existsSync(e.file));
+  // Discover every generated variant for this image, including the native
+  // width emitted when a source falls between tiers.
+  const dir = path.join(process.cwd(), 'public', '_optimized', path.dirname(relNoExt));
+  const base = path.basename(relNoExt);
+  let entries: { w: number; url: string }[] = [];
+  try {
+    entries = fs.readdirSync(dir)
+      .filter((f) => f.startsWith(base + '-') && f.endsWith('.webp'))
+      .map((f) => ({ w: Number((f.match(VARIANT_RE) ?? [])[1] ?? 0), f }))
+      .filter((e) => e.w > 0)
+      .sort((a, b) => a.w - b.w)
+      .map((e) => ({
+        w: e.w,
+        url: `/_optimized/${path.dirname(relNoExt).split(path.sep).join('/')}/${e.f}`,
+      }));
+  } catch { entries = []; }
 
   const result = entries.length ? entries.map((e) => `${e.url} ${e.w}w`).join(', ') : null;
   cache.set(src, result);

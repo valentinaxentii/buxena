@@ -16,7 +16,7 @@ heroImage:
   src: "/images/saunas/illi-h2-hero.png"
   alt: "ILLI H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
-  - src: "/images/supplier-capra/illi-h2-outdoor-spruce.png"
+  - src: "/images/catalog/illi-h2-outdoor-spruce.png"
     alt: "ILLI H2 outdoor spruce configuration — transparent render"
 dimensions:
   - { label: "External (D × W × H)", value: "51.2 × 76.8 × 89.0 in (1300 × 1950 × 2260 mm)" }

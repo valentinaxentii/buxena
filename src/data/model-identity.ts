@@ -54,6 +54,14 @@ export interface ModelIdentity {
   imageRights?: string;
   /** Set when the model is withheld from customer-facing sales. */
   hold?: string | null;
+  /**
+   * Launch readiness, classified on the MOST SEVERE outstanding blocker:
+   * READY · WAITING FOR PERMISSION · WAITING FOR COST · SPECIAL ORDER ·
+   * WAITING FOR SUPPLIER · HOLD. Surfaced at Admin → Catalog Status.
+   */
+  launchStatus?: string;
+  /** One-line description of what is actually outstanding. */
+  launchBlocker?: string;
   sourceFile: string;
   slug: string;
 }
