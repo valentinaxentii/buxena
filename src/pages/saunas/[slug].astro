@@ -136,7 +136,24 @@ const breadcrumbSchema = {
 };
 ---
 
-<BaseLayout title={displayTitle(data.title)} description={data.summary} image={data.heroImage.src}>
+{/* Meta description is built per model rather than reusing `summary`, which
+    several models in a series share word-for-word — duplicate descriptions
+    weaken every page in that series. Facts only: name, capacity, material,
+    placement and size, all from this model's own verified data. */}
+<BaseLayout
+  title={displayTitle(data.title)}
+  description={[
+    `${displayTitle(data.title)} —`,
+    data.summary?.replace(/\.$/, '') ?? '',
+    [
+      data.capacity,
+      data.materials?.[0],
+      data.location ? `${data.location} sauna` : null,
+      data.dimensions?.[0]?.value?.replace(/\s*\(.*\)/, ''),
+    ].filter(Boolean).join(', '),
+  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 160)}
+  image={data.heroImage.src}
+>
   <script type="application/ld+json" set:html={JSON.stringify(productSchema)} slot="head" />
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} slot="head" />
   <article>

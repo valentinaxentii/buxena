@@ -16,7 +16,7 @@ export const site = {
 
   // BUXENA curates, imports and supplies. It does not manufacture.
   description:
-    'BUXENA selects European-designed saunas for American homes — outdoor cabins, indoor rooms, barrel and cube. Chosen, specified and delivered with guidance at every step.',
+    'European-designed saunas for American homes — outdoor cabins, indoor rooms, barrel and cube. Chosen, specified and delivered with guidance at every step.',
 
   email: 'info@buxena.com',
   emailConfirmed: true,
