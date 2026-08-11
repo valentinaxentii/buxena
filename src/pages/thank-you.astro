@@ -57,12 +57,29 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </style>
 
 <script>
+  import { track } from '../lib/track';
+
   // Render the enquiry summary stored by the submitting form (see
   // src/lib/enquiry-client.ts). Display-only, non-sensitive fields; cleared
   // after render so a later unrelated visit doesn't resurrect stale data.
   const el = document.querySelector<HTMLElement>('[data-ty-summary]');
+  let confirmed = false;
   try {
     const raw = sessionStorage.getItem('buxena:lastEnquiry');
+    if (raw) {
+      // THE conversion event. Ad platforms and GA4 count a lead here, on the
+      // confirmation page, rather than on submit — it is the signal that the
+      // enquiry actually completed. Carries the model and request type so
+      // conversions can be valued per product once pricing exists.
+      const s = JSON.parse(raw) as Record<string, string>;
+      track('lead_confirmed', {
+        model: s.model ?? '',
+        formType: s.request ?? s.formType ?? 'enquiry',
+        zip: s.zip ?? '',
+        timeline: s.timeline ?? '',
+      });
+      confirmed = true;
+    }
     if (el && raw) {
       const summary = JSON.parse(raw) as Record<string, string>;
       const LABELS: Record<string, string> = {
@@ -91,4 +108,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   } catch {
     /* storage unavailable — generic page is fine */
   }
+
+  // Direct visit with no stored enquiry (bookmark, refresh after clear, or a
+  // shared link). Recorded separately so it can never be counted as a lead.
+  if (!confirmed) track('thank_you_direct_visit', { formType: 'none' });
 </script>

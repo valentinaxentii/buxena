@@ -1,0 +1,134 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import '../../styles/admin.css';
+import { MODEL_IDENTITY } from '../../data/model-identity';
+
+/**
+ * Internal supplier & product status board.
+ *
+ * Staff-only (behind the admin auth middleware). Shows the launch blocker for
+ * every model in one place so the team can see exactly what is outstanding
+ * and who owes it. Reads the same model-identity data the website and the
+ * PDF generator use, so it can never drift from what customers see.
+ *
+ * INTERNAL DATA — manufacturer, supplier model designation and EXW appear
+ * here and must never be rendered on a customer-facing page.
+ */
+const rows = Object.values(MODEL_IDENTITY).sort((a, b) => a.code.localeCompare(b.code));
+
+const STATUS_ORDER = ['READY', 'WAITING FOR PERMISSION', 'WAITING FOR COST', 'WAITING FOR SUPPLIER', 'HOLD'];
+const counts = STATUS_ORDER.map((s) => ({ s, n: rows.filter((r) => r.launchStatus === s).length })).filter((x) => x.n);
+
+const tone = (s: string) =>
+  s === 'READY' ? 'ok' : s === 'WAITING FOR PERMISSION' ? 'near' : s === 'HOLD' ? 'stop' : 'wait';
+
+const byManufacturer = Object.entries(
+  rows.reduce<Record<string, number>>((acc, r) => {
+    const k = r.manufacturer ?? 'UNIDENTIFIED';
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {})
+).sort((a, b) => b[1] - a[1]);
+---
+
+<AdminLayout title="Catalog Status" subtitle={`${rows.length} models · internal supplier and launch-readiness board`}>
+  <div class="cs-summary">
+    {counts.map(({ s, n }) => (
+      <div class={`cs-card cs-card--${tone(s)}`}>
+        <span class="cs-card__n">{n}</span>
+        <span class="cs-card__l">{s}</span>
+      </div>
+    ))}
+  </div>
+
+  <p class="cs-note">
+    Manufacturer, supplier model and EXW below are <strong>internal only</strong> —
+    they never appear on a customer-facing page, PDF or email.
+    Sources: <code>src/data/model-identity.json</code>,
+    <code>docs/master-supplier-product-status.md</code>.
+  </p>
+
+  <div class="cs-mfr">
+    {byManufacturer.map(([m, n]) => <span class="cs-chip">{m}: <strong>{n}</strong></span>)}
+  </div>
+
+  <div class="admin-panel cs-wrap">
+    <table class="cs-table">
+      <thead>
+        <tr>
+          <th>Code</th><th>Public name</th><th>Status</th><th>Manufacturer</th>
+          <th>Supplier model</th><th>EXW</th><th>40HC</th><th>US territory</th><th>Outstanding</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr class={r.hold ? 'cs-held' : undefined}>
+            <td class="cs-code">{r.code}</td>
+            <td>{r.publicName}</td>
+            <td><span class={`cs-badge cs-badge--${tone(r.launchStatus ?? '')}`}>{r.launchStatus}</span></td>
+            <td>{r.manufacturer ?? '—'}</td>
+            <td class="cs-dim">{r.supplierModel ?? r.internalRef}</td>
+            <td>
+              {r.exwEur
+                ? <strong>€{r.exwEur}</strong>
+                : r.exwListEur
+                  ? <span class="cs-dim">€{r.exwListEur} list</span>
+                  : '—'}
+            </td>
+            <td class="cs-dim">{r.container ? `${r.container.unitsPer40HC}u` : '—'}</td>
+            <td class="cs-dim">{(r.usTerritory ?? '').split('—')[0]}</td>
+            <td class="cs-dim">{r.launchBlocker}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>
+
+<style>
+  .cs-summary { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+  .cs-card {
+    padding: 0.85rem 1.15rem; border: 1px solid var(--admin-border);
+    border-radius: 6px; display: grid; gap: 0.2rem; min-width: 9rem;
+  }
+  .cs-card__n { font-size: 1.6rem; font-weight: 600; color: var(--admin-cream); line-height: 1; }
+  .cs-card__l { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
+  .cs-card--ok { border-color: rgba(143,191,138,0.5); }
+  .cs-card--near { border-color: rgba(196,162,119,0.55); }
+  .cs-card--wait { border-color: rgba(230,180,90,0.35); }
+  .cs-card--stop { border-color: rgba(230,130,90,0.45); }
+
+  .cs-note { font-size: 0.78rem; color: var(--admin-muted); margin: 0 0 0.75rem; }
+  .cs-note code { font-size: 0.72rem; }
+  .cs-mfr { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .cs-chip {
+    font-size: 0.72rem; padding: 0.3rem 0.6rem;
+    border: 1px solid var(--admin-border); border-radius: 999px; color: var(--admin-muted);
+  }
+  .cs-chip strong { color: var(--admin-cream); }
+
+  .cs-wrap { padding: 0; overflow-x: auto; }
+  .cs-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .cs-table th, .cs-table td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--admin-border); vertical-align: top; white-space: nowrap;
+  }
+  .cs-table th {
+    font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--admin-muted); position: sticky; top: 0; background: var(--admin-panel);
+  }
+  .cs-table td { color: var(--admin-cream); }
+  .cs-code { font-variant-numeric: tabular-nums; color: var(--admin-muted); }
+  .cs-dim { color: var(--admin-muted); white-space: normal; max-width: 20rem; }
+  .cs-held { opacity: 0.6; }
+  .cs-badge {
+    font-size: 0.6rem; letter-spacing: 0.07em; text-transform: uppercase;
+    padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid currentColor;
+  }
+  .cs-badge--ok { color: #a9cfa4; }
+  .cs-badge--near { color: #c4a277; }
+  .cs-badge--wait { color: #d8b06a; }
+  .cs-badge--stop { color: #e6b7a0; }
+</style>

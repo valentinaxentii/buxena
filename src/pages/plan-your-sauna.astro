@@ -537,7 +537,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
         return;
       }
 
-      rememberEnquiry({ model: recs[0]?.model.title ?? '', zip, timeline: '' });
+      rememberEnquiry({ request: 'Sauna Advisor', model: recs[0]?.model.title ?? '', zip, timeline: '' });
       window.location.assign('/thank-you/');
     });
 

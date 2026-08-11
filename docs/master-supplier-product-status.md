@@ -89,3 +89,39 @@ group and give the Wood Architects pair a separate series name.
 
 *Outreach drafts: `docs/capra-pricing-request.md`,
 `docs/wood-architects-pricing-request.md`, `docs/baltresto-pricing-request.md`.*
+
+---
+
+## Launch classification (added 2026-08-11)
+
+Each model carries `launchStatus` + `launchBlocker` in
+`src/data/model-identity.json`, surfaced for staff at **Admin → Catalog
+Status**. Classification is on the MOST SEVERE outstanding blocker.
+
+| Status | Count | Models |
+|---|---|---|
+| **READY** | 0 | — nothing clears both cost and permission yet |
+| **WAITING FOR PERMISSION** | 3 | ELLA (BUH-01), UKU 160 (BUH-10), UKU 230 (BUH-11) — dealer EXW verified; written image/document permission outstanding |
+| **WAITING FOR COST** | 29 | all remaining sellable models — manufacturer known, dealer EXW not quoted |
+| **WAITING FOR SUPPLIER** | 0 | — the unidentified models are all on HOLD |
+| **HOLD** | 3 | ITI 2.3m (BUH-36), AURA 1.3m (BUH-37), VIRU 3.6m (BUH-40) |
+| **REMOVE** | 0 recommended | see note below |
+
+### Launch catalogue — what we can responsibly offer
+
+**The catalogue is complete and sellable today as an enquiry-driven range.**
+All 32 non-held models have verified specifications, real images, a correct
+model presentation and a working enquiry path. None displays a price, and the
+site sells via Request Pricing — so no model is misrepresented.
+
+**The three closest to a priced launch** are ELLA, UKU 160 and UKU 230: dealer
+EXW is verified for all three and the market benchmark is established. They
+need only written image permission and founder price approval.
+
+### On REMOVE
+
+No model is recommended for deletion. **AURA (BUH-37) is the only candidate** —
+it appears in no supplier document across all four suppliers and its admin
+record carries NO SUPPLIER, so it may have been listed in error. It is on
+HOLD and invisible to customers, which achieves the same commercial effect
+while preserving the data. Decide only after Capra replies.

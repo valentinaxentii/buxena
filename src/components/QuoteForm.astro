@@ -362,6 +362,7 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 
     const finish = () => {
       rememberEnquiry({
+        request: 'Pricing request',
         model: capturedModel,
         zip: get('zip'),
         timeline: get('timeline'),

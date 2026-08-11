@@ -161,8 +161,8 @@ const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
         return;
       }
       rememberEnquiry({
-        model: get('model'),
         request: 'Warranty claim',
+        model: get('model'),
       });
       window.location.href = '/thank-you/';
     });

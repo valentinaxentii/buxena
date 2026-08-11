@@ -23,7 +23,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR PERMISSION",
+    "launchBlocker": "Cost verified; written image/document permission outstanding"
   },
   "BUH-ELLA H1": {
     "code": "BUH-02",
@@ -49,7 +51,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-ILLI H2": {
     "code": "BUH-03",
@@ -75,7 +79,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-ILLI H1": {
     "code": "BUH-04",
@@ -101,7 +107,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-ALLA H1": {
     "code": "BUH-05",
@@ -127,7 +135,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-ALLA H2": {
     "code": "BUH-06",
@@ -153,7 +163,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-UKU 160": {
     "code": "BUH-10",
@@ -180,7 +192,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR PERMISSION",
+    "launchBlocker": "Cost verified; written image/document permission outstanding"
   },
   "BUH-UKU 230": {
     "code": "BUH-11",
@@ -207,7 +221,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR PERMISSION",
+    "launchBlocker": "Cost verified; written image/document permission outstanding"
   },
   "BUH-NORD Cube 200": {
     "code": "BUH-12",
@@ -236,7 +252,9 @@
     },
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-NORD Cube 240": {
     "code": "BUH-13",
@@ -265,7 +283,9 @@
     },
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-EDA Thermowood 1.3m": {
     "code": "BUH-20",
@@ -291,7 +311,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 2.35m": {
     "code": "BUH-21",
@@ -317,7 +339,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 2.5m": {
     "code": "BUH-22",
@@ -343,7 +367,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 2.8m": {
     "code": "BUH-23",
@@ -369,7 +395,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 3.0m": {
     "code": "BUH-24",
@@ -395,7 +423,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 3.3m": {
     "code": "BUH-25",
@@ -421,7 +451,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermowood 4.0m": {
     "code": "BUH-26",
@@ -447,7 +479,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Thermo-Treated Pine 1.6m": {
     "code": "BUH-27",
@@ -473,7 +507,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 1.6m": {
     "code": "BUH-28",
@@ -499,7 +535,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 2.0m": {
     "code": "BUH-29",
@@ -525,7 +563,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 2.35m": {
     "code": "BUH-30",
@@ -551,7 +591,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 2.5m": {
     "code": "BUH-31",
@@ -577,7 +619,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 2.8m": {
     "code": "BUH-32",
@@ -603,7 +647,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 3.0m": {
     "code": "BUH-33",
@@ -629,7 +675,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 3.3m": {
     "code": "BUH-34",
@@ -655,7 +703,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-EDA Nordic Spruce 4.0m": {
     "code": "BUH-35",
@@ -681,7 +731,9 @@
     },
     "usTerritory": "UNKNOWN — asked in outreach",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-ITI Thermowood 2.3m": {
     "code": "BUH-36",
@@ -703,7 +755,9 @@
     "container": null,
     "usTerritory": "UNKNOWN",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": "HOLD — supplier verification"
+    "hold": "HOLD — supplier verification",
+    "launchStatus": "HOLD",
+    "launchBlocker": "No manufacturer identified — withheld from sale"
   },
   "BUH-AURA Thermowood 1.3m": {
     "code": "BUH-37",
@@ -725,7 +779,9 @@
     "container": null,
     "usTerritory": "UNKNOWN",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": "HOLD — supplier verification"
+    "hold": "HOLD — supplier verification",
+    "launchStatus": "HOLD",
+    "launchBlocker": "No manufacturer identified — withheld from sale"
   },
   "BUH-VIRU Thermowood 2.4m": {
     "code": "BUH-38",
@@ -752,7 +808,9 @@
     },
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "No dealer EXW"
   },
   "BUH-VIRU Thermowood 3.0m": {
     "code": "BUH-39",
@@ -780,7 +838,9 @@
     },
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-VIRU Thermowood 3.6m": {
     "code": "BUH-40",
@@ -802,7 +862,9 @@
     "container": null,
     "usTerritory": "UNKNOWN",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": "HOLD — supplier verification"
+    "hold": "HOLD — supplier verification",
+    "launchStatus": "HOLD",
+    "launchBlocker": "No manufacturer identified — withheld from sale"
   },
   "BUH-VIRU Thermowood 4.0m": {
     "code": "BUH-41",
@@ -830,7 +892,9 @@
     },
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-VIRU Vertical 2.6m": {
     "code": "BUH-42",
@@ -858,7 +922,9 @@
     },
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-VIRU Panorama 5.0m": {
     "code": "BUH-43",
@@ -886,7 +952,9 @@
     },
     "usTerritory": "RISK — BSaunas USA distributes the line; no exclusivity claimed publicly",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   },
   "BUH-VIRU Grand 6.0m": {
     "code": "BUH-44",
@@ -915,6 +983,8 @@
     },
     "usTerritory": "APPEARS OPEN — no US/North America arrangement found",
     "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null
+    "hold": null,
+    "launchStatus": "WAITING FOR COST",
+    "launchBlocker": "Supplier-list price only; dealer EXW not quoted"
   }
 }

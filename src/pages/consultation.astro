@@ -202,7 +202,7 @@ const types = [
 
       if (result.devMode) { restore(); showFormStatus(form, 'dev-success'); return; }
 
-      rememberEnquiry({ model: get('model'), zip: get('zip'), timeline: get('preferredTime'), projectType: get('consultType') });
+      rememberEnquiry({ request: 'Consultation request', model: get('model'), zip: get('zip'), timeline: get('preferredTime'), projectType: get('consultType') });
       window.location.assign('/thank-you/');
     });
   }

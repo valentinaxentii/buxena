@@ -74,7 +74,13 @@ export type TrackEvent =
   | 'consultation_request_started'
   | 'consultation_request_submitted'
   | 'compare_view'
-  | 'compare_pricing_click';
+  | 'compare_pricing_click'
+  // THE conversion event — fired on /thank-you/ when an enquiry completes.
+  // This is what GA4/Meta should count as a lead, not the submit click.
+  | 'lead_confirmed'
+  | 'thank_you_direct_visit'
+  | 'trade_specification_request'
+  | 'presentation_download';
 
 /**
  * Context carried with every lead so the CRM and ad platforms can attribute
