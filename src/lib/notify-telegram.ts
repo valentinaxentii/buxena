@@ -63,14 +63,19 @@ function line(label: string, value?: string | null): string | null {
   return v ? `<b>${esc(label)}:</b> ${esc(v)}` : null;
 }
 
-async function send(text: string, context: string): Promise<void> {
+/**
+ * Returns TRUE only when Telegram accepted the message. Not configured, an
+ * API rejection, a timeout or a network failure all return FALSE — it still
+ * never throws. See sendEnquiryEmail for why the boolean is load-bearing.
+ */
+async function send(text: string, context: string): Promise<boolean> {
   const config = getTelegramConfig();
 
   if (!config) {
     if (import.meta.env.DEV) {
       console.info(`[${context}] TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set — skipping Telegram.`);
     }
-    return;
+    return false;
   }
 
   try {
@@ -100,7 +105,9 @@ async function send(text: string, context: string): Promise<void> {
         // it is the difference between "misconfigured" and "network blip".
         const detail = await res.text().catch(() => '');
         console.error(`[${context}] Telegram API ${res.status}: ${detail.slice(0, 300)}`);
+        return false;
       }
+      return true;
     } finally {
       clearTimeout(timeout);
     }
@@ -108,6 +115,7 @@ async function send(text: string, context: string): Promise<void> {
     // Logged to the Netlify function logs only. Never surfaced to the visitor,
     // never rethrown — the record is already saved and the email already sent.
     console.error(`[${context}] Telegram send failed:`, err);
+    return false;
   }
 }
 
@@ -119,14 +127,21 @@ export interface EnquiryTelegramInput {
   message?: string | null;
   saunaInterest?: string | null;
   source?: string | null;
+  /**
+   * True when the database write failed and this message is the ONLY
+   * surviving copy of the enquiry — see EnquiryEmailInput.unrecorded.
+   */
+  unrecorded?: boolean;
 }
 
-export async function sendEnquiryTelegram(input: EnquiryTelegramInput): Promise<void> {
+export async function sendEnquiryTelegram(input: EnquiryTelegramInput): Promise<boolean> {
   const source = input.source?.trim() || 'Website';
   const message = input.message?.trim();
 
   const text = [
-    `🔔 <b>New enquiry — ${esc(source)}</b>`,
+    input.unrecorded
+      ? `⚠️ <b>New enquiry — ${esc(source)} — NOT SAVED</b>`
+      : `🔔 <b>New enquiry — ${esc(source)}</b>`,
     '',
     line('Name', input.name) ?? '<b>Name:</b> —',
     line('Email', input.email),
@@ -135,12 +150,14 @@ export async function sendEnquiryTelegram(input: EnquiryTelegramInput): Promise<
     line('Model / request', input.saunaInterest),
     message ? `\n<b>Message</b>\n${esc(message)}` : null,
     '',
-    '<i>Also in BUXENA Admin → Website Enquiries</i>',
+    input.unrecorded
+      ? '<i>⚠️ Could NOT be saved to the database — this message is the only copy. Add it manually in Admin → Website Enquiries and reply to the customer.</i>'
+      : '<i>Also in BUXENA Admin → Website Enquiries</i>',
   ]
     .filter((l) => l !== null)
     .join('\n');
 
-  await send(text, 'enquiry-telegram');
+  return send(text, 'enquiry-telegram');
 }
 
 export interface LeadTelegramInput {

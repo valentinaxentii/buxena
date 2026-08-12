@@ -34,9 +34,24 @@ export interface EnquiryEmailInput {
   message?: string | null;
   saunaInterest?: string | null;
   source?: string | null;
+  /**
+   * True when the database write failed and this email is the ONLY surviving
+   * copy of the enquiry. Changes the closing line from "it's also in Admin" —
+   * which would be false — into an instruction to add it by hand.
+   */
+  unrecorded?: boolean;
 }
 
-export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> {
+/**
+ * Returns TRUE only when the message was actually handed to Zoho. Not
+ * configured, or the send failed, returns FALSE — it still never throws.
+ *
+ * The boolean matters: /api/enquiries treats a delivered staff notification
+ * as a second capture path when the database write fails, and "resolved
+ * without throwing" is not the same as "a human received this". Returning
+ * void made those two indistinguishable.
+ */
+export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolean> {
   const config = getNotifySmtpConfig();
 
   // Unconfigured — quietly skip. Submissions still record to Supabase.
@@ -44,7 +59,7 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
     if (import.meta.env.DEV) {
       console.info('[enquiry-email] ZOHO_SMTP_USER/ZOHO_SMTP_PASSWORD not set — skipping email.');
     }
-    return;
+    return false;
   }
 
   const source = input.source?.trim() || 'Website';
@@ -70,12 +85,23 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
     '',
     message ? `Message:\n${message}` : 'Message: —',
     '',
-    'This enquiry is also saved in BUXENA Admin → Website Enquiries.',
+    input.unrecorded
+      ? 'ACTION NEEDED — this enquiry could NOT be saved to the database. This email is the only copy. Add it manually in BUXENA Admin → Website Enquiries, and reply to the customer.'
+      : 'This enquiry is also saved in BUXENA Admin → Website Enquiries.',
   ].join('\n');
 
   const htmlBody = `
     <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; line-height: 1.6;">
       <h2 style="margin: 0 0 4px; font-size: 18px;">New enquiry — ${esc(source)}</h2>
+      ${
+        input.unrecorded
+          ? `<p style="margin: 8px 0 12px; padding: 10px 12px; background: #fdf0ea; border: 1px solid #e2a184; border-radius: 6px; color: #8c3d1c; font-size: 13px;">
+              <strong>Action needed — not saved to the database.</strong><br />
+              This email is the only copy of this enquiry. Add it manually in
+              BUXENA Admin → Website Enquiries, and reply to the customer.
+            </p>`
+          : ''
+      }
       <table style="border-collapse: collapse; margin: 12px 0;">
         ${rows
           .map(
@@ -94,7 +120,11 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
           : '<p style="color: #6b6b6b;">No message provided.</p>'
       }
       <p style="margin: 16px 0 0; font-size: 12px; color: #8a8a8a;">
-        Also saved in BUXENA Admin → Website Enquiries.
+        ${
+          input.unrecorded
+            ? 'NOT saved to the database — add this enquiry manually.'
+            : 'Also saved in BUXENA Admin → Website Enquiries.'
+        }
       </p>
     </div>
   `.trim();
@@ -115,10 +145,12 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<void> 
       // Let staff reply straight to the customer from their inbox.
       ...(input.email?.trim() ? { replyTo: input.email.trim() } : {}),
     });
+    return true;
   } catch (err) {
     // Surface the failure in the Netlify function logs only — never to the
     // visitor, and never as a thrown error that could mask a saved enquiry.
     console.error('[enquiry-email] Zoho SMTP send failed:', err);
+    return false;
   } finally {
     transporter.close();
   }

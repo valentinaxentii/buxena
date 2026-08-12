@@ -4,6 +4,7 @@ import { sendEnquiryEmail } from '../../lib/send-enquiry-email';
 import { sendCustomerAckEmail, buildCustomerAckEmail } from '../../lib/send-customer-ack';
 import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
+import { decideEnquiryOutcome, wasDelivered } from '../../lib/enquiry-capture';
 
 export const prerender = false;
 
@@ -92,39 +93,61 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       return new Response(JSON.stringify({ ok: true, devMode: true }), { status: 200 });
     }
 
-    // PRODUCTION — if the integration is missing, fail loudly and clearly
-    // (createSupabaseAdminClient throws a descriptive, secret-free message
-    // that the catch below returns to the UI as a controlled error).
-    const supabase = createSupabaseAdminClient();
-    const { data: inserted, error } = await supabase
-      .from('enquiries')
-      .insert({
-        name: name || null,
-        email: email || null,
-        phone: phone || null,
-        location: location || null,
-        message: message || null,
-        chat_transcript: chatTranscript || null,
-        sauna_interest: saunaInterest || null,
-        source: source || 'Sauna Advisor',
-        status: 'New',
-      })
-      .select('id')
-      .single();
+    // PRODUCTION — two INDEPENDENT capture paths, in this order:
+    //   1. the database row (the system of record)
+    //   2. the staff email + Telegram (a human who can act on it)
+    //
+    // Neither is allowed to take the other down. A failed insert used to
+    // return 500 immediately, which skipped the notifications too — so a
+    // Supabase outage silently destroyed every lead that arrived during it,
+    // with no copy anywhere and a visitor told to "try again". For a business
+    // whose entire funnel ends in one of these forms, losing the lead is the
+    // most expensive possible failure. The write is now best-effort and the
+    // request continues either way.
+    let recorded = false;
+    let inserted: { id: string } | null = null;
+    let supabase: ReturnType<typeof createSupabaseAdminClient> | null = null;
+    try {
+      supabase = createSupabaseAdminClient();
+      const { data, error } = await supabase
+        .from('enquiries')
+        .insert({
+          name: name || null,
+          email: email || null,
+          phone: phone || null,
+          location: location || null,
+          message: message || null,
+          chat_transcript: chatTranscript || null,
+          sauna_interest: saunaInterest || null,
+          source: source || 'Sauna Advisor',
+          status: 'New',
+        })
+        .select('id')
+        .single();
 
-    if (error) {
-      // Log the real cause server-side; return a generic message. Supabase
-      // error text names tables, columns and constraints — free schema
-      // reconnaissance for anyone probing a public endpoint, and meaningless
-      // to the visitor who triggered it.
-      console.error('[enquiries] insert failed:', error.message);
-      return new Response(JSON.stringify({ ok: false, error: SUBMISSION_FAILED }), { status: 500 });
+      if (error) {
+        // Log the real cause server-side; the visitor never sees it. Supabase
+        // error text names tables, columns and constraints — free schema
+        // reconnaissance for anyone probing a public endpoint, and meaningless
+        // to the person who triggered it.
+        console.error('[enquiries] insert failed, falling back to notifications:', error.message);
+      } else {
+        recorded = true;
+        inserted = data as { id: string };
+      }
+    } catch (e) {
+      // Covers createSupabaseAdminClient() throwing on missing env vars, and
+      // any network failure reaching the database.
+      console.error(
+        '[enquiries] database unavailable, falling back to notifications:',
+        e instanceof Error ? e.message : e
+      );
     }
 
     // Audit trail entry. Awaited (not fire-and-forget) so the serverless
     // function doesn't freeze before the write lands, but its failure is
     // swallowed — it must never turn a recorded enquiry into an error.
-    if (inserted) {
+    if (inserted && supabase) {
       const cleanAttribution = (key: string) => {
         const value = attribution && typeof attribution === 'object' ? (attribution as Record<string, unknown>)[key] : null;
         return typeof value === 'string' ? value.trim().slice(0, 300) : '';
@@ -157,18 +180,32 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // before the function returns (fire-and-forget can be killed mid-flight in
     // serverless), and run concurrently so the slower one does not add its
     // latency to the faster one. allSettled, not all: each is independently
-    // best-effort, and one failing must not skip the other or fail the
-    // submission — the enquiry is already safely recorded either way.
+    // best-effort, and one failing must not skip the other.
+    //
+    // `unrecorded` tells both messages to stop claiming the enquiry is "also
+    // in Admin" and to say plainly that they are the only copy — a staff
+    // notification that lies about where the data is, is worse than none.
     const notify = { name, email, phone, location, message, saunaInterest, source };
-    const [emailResult, telegramResult, ackResult] = await Promise.allSettled([
-      sendEnquiryEmail(notify),
-      sendEnquiryTelegram(notify),
-      // Customer-facing acknowledgment. Same best-effort contract as the two
-      // staff notifications: it can only run after the enquiry is safely
-      // inserted above, and its failure never fails the submission. The
-      // module itself skips enrichment submissions ("Quote Form — details")
-      // so one visitor journey can never receive two acknowledgments.
-      sendCustomerAckEmail(notify),
+    const staffNotify = { ...notify, unrecorded: !recorded };
+
+    // The customer acknowledgment promises a human will follow up, so it may
+    // only go out once we know somebody actually received the lead. On the
+    // normal path `recorded` is already true, so all three still run
+    // concurrently and this costs nothing; only a failed database write makes
+    // the ack wait for the staff notifications to report back.
+    const sendAck = () =>
+      sendCustomerAckEmail(notify).catch((err) => {
+        console.error('[enquiries] customer ack failed:', err);
+        throw err;
+      });
+
+    const [emailResult, telegramResult, eagerAck] = await Promise.allSettled([
+      sendEnquiryEmail(staffNotify),
+      sendEnquiryTelegram(staffNotify),
+      // The module itself skips enrichment submissions ("Quote Form —
+      // details"), so one visitor journey can never receive two
+      // acknowledgments.
+      recorded ? sendAck() : Promise.resolve('deferred' as const),
     ]);
     if (emailResult.status === 'rejected') {
       console.error('[enquiries] email notify failed:', emailResult.reason);
@@ -176,11 +213,33 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     if (telegramResult.status === 'rejected') {
       console.error('[enquiries] telegram notify failed:', telegramResult.reason);
     }
-    if (ackResult.status === 'rejected') {
-      console.error('[enquiries] customer ack failed:', ackResult.reason);
+    if (eagerAck.status === 'rejected') {
+      console.error('[enquiries] customer ack failed:', eagerAck.reason);
     }
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    const decision = decideEnquiryOutcome({
+      recorded,
+      emailDelivered: wasDelivered(emailResult),
+      telegramDelivered: wasDelivered(telegramResult),
+    });
+
+    if (!recorded && decision.shouldAcknowledge) {
+      // The database is down but staff have the lead — the acknowledgment's
+      // promise of follow-up is now true, so send it.
+      await sendAck().catch(() => {});
+    }
+
+    if (!decision.captured) {
+      // Nothing worked: no row, no email, no Telegram. This is the only case
+      // where the visitor must be asked to try again, because this is the
+      // only case where nobody has their details.
+      console.error('[enquiries] LEAD LOST — database, email and Telegram all failed');
+      return new Response(JSON.stringify({ ok: false, error: SUBMISSION_FAILED }), {
+        status: decision.status,
+      });
+    }
+
+    return new Response(JSON.stringify({ ok: true }), { status: decision.status });
   } catch (e) {
     // Same rule as above: the visitor gets one honest, actionable sentence,
     // the detail goes to the function log. This catch also covers

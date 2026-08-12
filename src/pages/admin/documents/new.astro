@@ -107,6 +107,22 @@ try {
     </label>
     <label class="admin-field"><span>File Name</span><input type="text" name="file_name" placeholder="e.g. ELLA H2 Installation Manual.pdf" /></label>
 
+    <div class="admin-form__full">
+      <p class="upload-warning">
+        <strong>Anything uploaded here is readable by anyone with the link.</strong>
+        The storage bucket is public so that customers can open manuals from the QR label on
+        their sauna without signing in. The web address is long and unguessable, but it is not
+        protected — if it is forwarded, pasted into a chat, or lands in browser history, it
+        works for whoever has it.
+        <br /><br />
+        Safe to upload: manuals, brochures, spec sheets, warranty documents, product photos.
+        <br />
+        <strong>Do not upload:</strong> supplier price lists or anything showing dealer cost,
+        customer contracts, signed invoices, ID documents, or anything you would not publish
+        on the website.
+      </p>
+    </div>
+
     <label class="admin-field admin-form__full">
       <span>Upload a File</span>
       <input type="file" name="upload" />
@@ -150,4 +166,18 @@ try {
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+
+  /* Reads as caution, not as an error — nothing has gone wrong, but this is
+     the one decision on this form that cannot be undone after the fact. */
+  .upload-warning {
+    margin: 0 0 0.5rem;
+    padding: 0.85rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #e8cfa4;
+    background: rgba(201, 166, 104, 0.07);
+    border: 1px solid rgba(201, 166, 104, 0.32);
+    border-radius: 2px;
+  }
+  .upload-warning strong { color: #f2dfb8; }
 </style>
