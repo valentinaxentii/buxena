@@ -1,11 +1,12 @@
 /**
- * READ-ONLY check of the documents bucket and the signed-URL path.
- * Changes nothing: no uploads, no deletes, no bucket settings touched.
+ * Checks the documents bucket and the signed-URL path.
  *
- * Run it BEFORE flipping the bucket to private, to confirm signing works
- * against the real project, and AFTER, to confirm anonymous access is closed.
+ *   node scripts/verify-document-storage.mjs           read-only
+ *   node scripts/verify-document-storage.mjs --probe   proves it, see below
  *
- *   node scripts/verify-document-storage.mjs
+ * The default run changes nothing. `--probe` uploads one tiny throwaway file
+ * and deletes it again, which is the only way to prove an unsigned URL is
+ * actually refused when the bucket is empty.
  *
  * Reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from .env. Neither is
  * printed, and no signed URL is written to disk — one is fetched to prove it
@@ -46,23 +47,55 @@ if (bucketErr) {
 } else {
   const bucket = buckets.find((b) => b.id === BUCKET);
   if (!bucket) {
-    bad(`bucket "${BUCKET}" does not exist — run supabase/schema.sql`);
+    bad(`bucket "${BUCKET}" does not exist — run supabase/migrations/2026-08-12-archive-and-private-documents.sql`);
   } else if (bucket.public) {
     bad('bucket is PUBLIC — every stored file is readable by anyone with the URL');
-    console.log('     Fix: run supabase/schema.sql (its insert…on conflict now sets public = false)');
+    console.log('     Fix: run supabase/migrations/2026-08-12-archive-and-private-documents.sql');
   } else {
     ok('bucket is PRIVATE');
   }
 }
 
+/**
+ * The decisive test — "an unsigned URL is refused" — needs an object to aim
+ * at, and immediately after the migration the bucket is empty. `--probe`
+ * uploads a tiny throwaway file, runs the real round-trip against it, and
+ * deletes it again. It is the only way to PROVE the bucket is closed rather
+ * than infer it from a flag.
+ *
+ * Opt-in because it writes: the default run stays strictly read-only.
+ */
+const PROBE = process.argv.includes('--probe');
+
 console.log('\n■ Stored objects');
 const { data: objects, error: listErr } = await supabase.storage
   .from(BUCKET)
   .list('', { limit: 100 });
+
+let probePath = null;
+if (!listErr && !objects?.length && PROBE) {
+  probePath = `_verify-probe-${Date.now()}.txt`;
+  const { error: upErr } = await supabase.storage
+    .from(BUCKET)
+    .upload(probePath, new Blob(['buxena storage verification probe']), {
+      contentType: 'text/plain',
+      upsert: true,
+    });
+  if (upErr) {
+    bad(`probe upload failed: ${upErr.message}`);
+    probePath = null;
+  } else {
+    ok(`probe object uploaded (${probePath}) — removed at the end of this run`);
+    objects.push({ name: probePath, id: 'probe' });
+  }
+}
+
 if (listErr) {
   bad(`could not list objects: ${listErr.message}`);
 } else if (!objects?.length) {
-  ok('bucket is empty — nothing exposed either way (nothing to sign-test)');
+  ok('bucket is empty — nothing exposed either way');
+  console.log('     Re-run with --probe to PROVE the unsigned URL is refused:');
+  console.log('       node scripts/verify-document-storage.mjs --probe');
 } else {
   ok(`${objects.length} object(s) stored`);
 
@@ -91,9 +124,25 @@ if (listErr) {
   }
 }
 
+// Always clean up the probe, including when a check above failed — a
+// verification script must not leave litter in the bucket it just inspected.
+if (probePath) {
+  const { error: rmErr } = await supabase.storage.from(BUCKET).remove([probePath]);
+  console.log(
+    rmErr
+      ? `\n  ! probe object ${probePath} could NOT be removed: ${rmErr.message} — delete it by hand`
+      : `\n  ✓ probe object removed (${probePath})`
+  );
+  if (rmErr) failures++;
+}
+
 console.log('\n' + '─'.repeat(60));
 if (failures) {
-  console.log(`${failures} problem(s) found. Nothing was changed by this script.`);
+  console.log(`${failures} problem(s) found.`);
   process.exit(1);
 }
-console.log('All checks passed. Nothing was changed by this script.\n');
+console.log(
+  probePath
+    ? 'All checks passed. The bucket is closed to unsigned access.\n'
+    : 'All checks passed. Nothing was changed by this script.\n'
+);
