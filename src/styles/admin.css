@@ -487,3 +487,14 @@ select,
   background-size: 0.6rem auto;
   padding-right: 1.7rem;
 }
+
+/* ZIP validation feedback (src/lib/zip-validate.ts) */
+.zip-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #e6b7a0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.zip-error[hidden] { display: none; }
+input.is-zip-invalid { border-color: rgba(230, 130, 90, 0.6); }

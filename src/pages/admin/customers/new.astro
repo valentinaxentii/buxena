@@ -3,6 +3,7 @@ export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
+import { checkOptionalZip } from '../../../lib/zip';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 
 let error: string | null = null;
@@ -22,8 +23,11 @@ if (Astro.request.method === 'POST') {
       lead_source: String(form.get('lead_source') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
+    const zipCheck = checkOptionalZip(payload.zip);
     if (!payload.name) {
       error = 'Name is required.';
+    } else if (!zipCheck.ok) {
+      error = zipCheck.message;
     } else {
       const { data, error: insertError } = await supabase.from('customers').insert(payload).select('id').single();
       if (insertError) error = insertError.message;
@@ -45,7 +49,7 @@ if (Astro.request.method === 'POST') {
     <label class="admin-field admin-form__full"><span>Address</span><input type="text" name="address" /></label>
     <label class="admin-field"><span>City</span><input type="text" name="city" /></label>
     <label class="admin-field"><span>State</span><input type="text" name="state" /></label>
-    <label class="admin-field"><span>ZIP</span><input type="text" name="zip" /></label>
+    <label class="admin-field"><span>ZIP</span><input type="text" name="zip" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input /></label>
     <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes"></textarea></label>
     <div class="admin-form__actions">
       <button class="admin-btn" type="submit">Create Customer</button>
@@ -53,6 +57,14 @@ if (Astro.request.method === 'POST') {
     </div>
   </form>
 </AdminLayout>
+<script>
+  import { initZipValidation } from '../../../lib/zip-validate';
+
+  // Same ZIP rule as the public forms. The server checks it too — this is
+  // for immediate feedback, not the control.
+  initZipValidation();
+</script>
+
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }

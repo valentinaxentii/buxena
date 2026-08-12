@@ -5,6 +5,7 @@ import { sendCustomerAckEmail, buildCustomerAckEmail } from '../../lib/send-cust
 import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { decideEnquiryOutcome, wasDelivered } from '../../lib/enquiry-capture';
+import { checkOptionalZip } from '../../lib/zip';
 
 export const prerender = false;
 
@@ -44,7 +45,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   try {
     const body = await request.json();
-    const { name, email, phone, location, message, chatTranscript, saunaInterest, source, attribution, botField } =
+    const { name, email, phone, location, zip, message, chatTranscript, saunaInterest, source, attribution, botField } =
       body ?? {};
 
     // Honeypot: a real visitor never fills the hidden field. Bots that blindly
@@ -63,6 +64,15 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // client can be bypassed, the server cannot.
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email))) {
       return new Response(JSON.stringify({ ok: false, error: 'Please enter a valid email address.' }), { status: 400 });
+    }
+
+    // ZIP arrives in its own field precisely so it can be checked here.
+    // `location` cannot be validated as a ZIP: two forms legitimately put a
+    // placement answer ("outdoor", "poolside") in it, so a blanket rule there
+    // would reject valid submissions and cost leads.
+    const zipCheck = checkOptionalZip(zip);
+    if (!zipCheck.ok) {
+      return new Response(JSON.stringify({ ok: false, error: zipCheck.message }), { status: 400 });
     }
 
     // LOCAL DEV MODE — never touches production services. In `astro dev`

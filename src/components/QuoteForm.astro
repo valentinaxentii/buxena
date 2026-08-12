@@ -55,7 +55,7 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 
       <div class="field">
         <label for="q-zip">ZIP code <span aria-hidden="true">*</span></label>
-        <input id="q-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4, e.g. 06010 or 06010-1234)" />
+        <input id="q-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input />
         <span class="field__hint">Delivery depends on where the sauna is going.</span>
       </div>
 
@@ -256,6 +256,11 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 </style>
 
 <script>
+  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
+
+  // Immediate inline feedback on every ZIP field, and a capture-phase
+  // submit guard so an invalid ZIP cannot reach the network.
+  initZipValidation();
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
@@ -322,6 +327,7 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
         email: get('email'),
         phone: get('phone'),
         location: zip,
+        zip,
         message: [isCompare ? 'Pricing request (has another quote to compare)' : 'Pricing request', extras]
           .filter(Boolean)
           .join('\n\n'),
@@ -392,6 +398,7 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
         email: capturedEmail,
         phone: get('phone'),
         location: get('zip'),
+        zip: get('zip'),
         message: details,
         saunaInterest: capturedModel,
         source: 'Quote Form — details',

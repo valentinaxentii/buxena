@@ -519,3 +519,15 @@ body:has(.salesbar.is-shown) .chat-fab {
 @media (max-width: 640px) {
   .legal__toc ol { grid-template-columns: 1fr; }
 }
+
+/* ZIP validation feedback (src/lib/zip-validate.ts) */
+.zip-error {
+  margin: 0.35rem 0 0;
+  font-size: var(--t-small, 0.8125rem);
+  color: #9a3d1c;
+}
+.zip-error[hidden] { display: none; }
+input.is-zip-invalid {
+  border-color: #9a3d1c;
+  outline-color: #9a3d1c;
+}

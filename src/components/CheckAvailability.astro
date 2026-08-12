@@ -40,7 +40,7 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       </div>
       <div class="avail-check__field">
         <label for={`avail-zip-${idSlug}`}>ZIP code</label>
-        <input id={`avail-zip-${idSlug}`} name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" />
+        <input id={`avail-zip-${idSlug}`} name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input />
       </div>
     </div>
 
@@ -116,6 +116,11 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 </style>
 
 <script>
+  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
+
+  // Immediate inline feedback on every ZIP field, and a capture-phase
+  // submit guard so an invalid ZIP cannot reach the network.
+  initZipValidation();
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus } from '../lib/enquiry-client';
 
@@ -140,6 +145,7 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         name: get('name'),
         email: get('email'),
         location: zip,
+        zip,
         message: `Availability request for ${model}${zip ? ` — ZIP ${zip}` : ''}`,
         saunaInterest: model,
         source: 'Check Availability',

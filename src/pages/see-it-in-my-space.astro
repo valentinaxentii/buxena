@@ -91,7 +91,7 @@ const TOTAL_STEPS = 5;
             <div class="space__fields">
               <div class="space__field">
                 <label for="space-zip">ZIP code</label>
-                <input id="space-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-space-input="zip" />
+                <input id="space-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input data-space-input="zip" />
               </div>
               <div class="space__field">
                 <label for="space-size">Approximate available space</label>
@@ -373,6 +373,11 @@ const TOTAL_STEPS = 5;
 </style>
 
 <script>
+  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
+
+  // Immediate inline feedback on every ZIP field, and a capture-phase
+  // submit guard so an invalid ZIP cannot reach the network.
+  initZipValidation();
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
@@ -619,6 +624,12 @@ const TOTAL_STEPS = 5;
     };
 
     nextBtn.addEventListener('click', () => {
+      // Same as Plan Your Sauna: these steps are not inside a submitting
+      // <form>, so the ZIP field's `pattern` was decorative. Block advancing
+      // past a visible, invalid ZIP.
+      const stepEl = steps[current];
+      if (stepEl && !zipFieldsValid(stepEl)) return;
+
       startOnce();
       if (current < steps.length - 1) {
         current += 1;
@@ -702,6 +713,7 @@ const TOTAL_STEPS = 5;
         email: get('email'),
         phone: get('phone'),
         location: answers.zip,
+        zip: answers.zip,
         message: context,
         saunaInterest: get('model'),
         source: 'See It In My Space',

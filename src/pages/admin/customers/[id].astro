@@ -6,6 +6,7 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
+import { checkOptionalZip } from '../../../lib/zip';
 import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 
@@ -52,8 +53,13 @@ try {
       lead_source: String(form.get('lead_source') ?? '') || null,
       notes: String(form.get('notes') ?? '') || null,
     };
-    const { error: updateError } = await supabase.from('customers').update(payload).eq('id', id);
-    if (updateError) error = updateError.message;
+    const zipCheck = checkOptionalZip(payload.zip);
+    if (!zipCheck.ok) {
+      error = zipCheck.message;
+    } else {
+      const { error: updateError } = await supabase.from('customers').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
+    }
     }
   }
 
@@ -98,7 +104,7 @@ try {
         <label class="admin-field admin-form__full"><span>Address</span><input type="text" name="address" value={customer.address ?? ''} /></label>
         <label class="admin-field"><span>City</span><input type="text" name="city" value={customer.city ?? ''} /></label>
         <label class="admin-field"><span>State</span><input type="text" name="state" value={customer.state ?? ''} /></label>
-        <label class="admin-field"><span>ZIP</span><input type="text" name="zip" value={customer.zip ?? ''} /></label>
+        <label class="admin-field"><span>ZIP</span><input type="text" name="zip" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input value={customer.zip ?? ''} /></label>
         <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes">{customer.notes ?? ''}</textarea></label>
         <div class="admin-form__actions">
           <button class="admin-btn" type="submit">Save Changes</button>
@@ -149,6 +155,14 @@ try {
     </>
   )}
 </AdminLayout>
+<script>
+  import { initZipValidation } from '../../../lib/zip-validate';
+
+  // Same ZIP rule as the public forms. The server checks it too — this is
+  // for immediate feedback, not the control.
+  initZipValidation();
+</script>
+
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }

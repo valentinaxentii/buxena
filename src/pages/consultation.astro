@@ -66,7 +66,7 @@ const types = [
           </div>
           <div class="field">
             <label for="c-zip">ZIP code</label>
-            <input id="c-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" />
+            <input id="c-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input />
           </div>
           <div class="field">
             <label for="c-type">Consultation type <span aria-hidden="true">*</span></label>
@@ -151,6 +151,11 @@ const types = [
 </style>
 
 <script>
+  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
+
+  // Immediate inline feedback on every ZIP field, and a capture-phase
+  // submit guard so an invalid ZIP cannot reach the network.
+  initZipValidation();
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
@@ -186,6 +191,7 @@ const types = [
         email: get('email'),
         phone: get('phone'),
         location: get('zip'),
+        zip: get('zip'),
         message,
         saunaInterest: get('model'),
         source: 'Consultation Request',

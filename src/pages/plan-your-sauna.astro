@@ -88,7 +88,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
             <legend class="plan__question">Where is the sauna going?</legend>
             <p class="plan__note">This helps us consider delivery and installation availability.</p>
             <label class="plan__zip-label" for="plan-zip">ZIP code</label>
-            <input class="plan__zip" type="text" id="plan-zip" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-plan-zip />
+            <input class="plan__zip" type="text" id="plan-zip" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input data-plan-zip />
           </fieldset>
 
           <div class="plan__nav">
@@ -156,7 +156,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
                 </div>
                 <div class="field">
                   <label for="plan-review-zip">ZIP code</label>
-                  <input id="plan-review-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}(-\d{4})?" title="Enter a 5-digit ZIP code (or ZIP+4)" data-plan-field="zip" />
+                  <input id="plan-review-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input data-plan-field="zip" />
                 </div>
                 <div class="field field--full">
                   <label for="plan-notes">Notes (optional)</label>
@@ -179,6 +179,11 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
 <script type="application/json" id="plan-catalog" set:html={JSON.stringify(catalog)} />
 
 <script>
+  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
+
+  // Immediate inline feedback on every ZIP field, and a capture-phase
+  // submit guard so an invalid ZIP cannot reach the network.
+  initZipValidation();
   import { recommendSaunas, type PlanAnswers, type CatalogModel } from '../data/planYourSauna';
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
@@ -451,6 +456,13 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
     });
 
     nextBtn.addEventListener('click', () => {
+      // This wizard's steps are not inside a submitting <form>, so the ZIP
+      // field's `pattern` was never enforced by the browser — which is how an
+      // invalid ZIP could reach the shortlist and the enquiry. Advancing past
+      // a visible, invalid ZIP is blocked here instead.
+      const stepEl = visible[current];
+      if (stepEl && !zipFieldsValid(stepEl)) return;
+
       if (current < visible.length - 1) {
         current += 1;
         showStep();
@@ -518,6 +530,7 @@ const TOTAL_STEPS = steps.length + 1; // +1 for the ZIP step
         email: get('email'),
         phone: get('phone'),
         location: zip,
+        zip: zip,
         message,
         saunaInterest: recommended,
         source: 'Plan Your Sauna',
