@@ -15,6 +15,68 @@ const imageSlot = z.object({
 });
 
 /**
+ * TECHNICAL ASSET STATES.
+ *
+ * Every slot carries one, and the default is MISSING — the honest answer for
+ * a catalogue where no supplier has yet sent a drawing, a manual or a video.
+ *
+ *   VERIFIED       we hold it, it is correct, and we may publish it
+ *   REQUESTED      asked for; waiting on the supplier
+ *   MISSING        not held and not yet asked for
+ *   UNVERIFIED     held, but not confirmed correct or not cleared for use
+ *   NOT_APPLICABLE genuinely does not exist for this model (e.g. no chimney)
+ *   INTERNAL_ONLY  held, correct, but never for customers (cost sheets)
+ *
+ * Only VERIFIED can ever reach a customer, and only with written permission
+ * as well — see `technicalAsset` below.
+ */
+const assetStatus = z.enum([
+  'VERIFIED',
+  'REQUESTED',
+  'MISSING',
+  'UNVERIFIED',
+  'NOT_APPLICABLE',
+  'INTERNAL_ONLY',
+]);
+
+/**
+ * A technical document, drawing or file.
+ *
+ * PUBLICATION NEEDS THREE THINGS, and every default refuses:
+ *   status: 'VERIFIED'          — we know it is right
+ *   permission: 'granted-written' — the supplier said in writing we may use it
+ *   url                          — there is actually something to open
+ *
+ * `docs/image-rights-register.md` exists because publication permission was
+ * once assumed rather than recorded. 0 of 35 assets currently have written
+ * permission, so nothing here publishes today — which is the correct state,
+ * not a bug.
+ */
+const technicalAsset = z.object({
+  status: assetStatus.default('MISSING'),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  /** Who supplied it — used by the gap report, never shown to customers. */
+  source: z.string().optional(),
+  permission: z.enum(['granted-written', 'pending', 'none']).default('none'),
+  note: z.string().optional(),
+});
+
+/** An approved installation or assembly video. */
+const technicalVideo = technicalAsset.extend({
+  provider: z.enum(['youtube', 'vimeo', 'url']).optional(),
+  /** Poster frame. Without one the player shows a neutral panel, never a guess. */
+  poster: z.string().optional(),
+  /** Seconds — shown on the button so nobody starts a 40-minute film by accident. */
+  durationSeconds: z.number().optional(),
+});
+
+/** A 3D model or an approved external viewer. */
+const technicalModel = technicalAsset.extend({
+  provider: z.enum(['sketchfab', 'glb', 'external']).optional(),
+});
+
+/**
  * IMPORTANT — factual integrity.
  * Every specification field below is OPTIONAL by design. Nothing about
  * dimensions, capacity, materials, heaters, certifications, warranty or price
@@ -89,6 +151,40 @@ const saunas = defineCollection({
     projectPricing: z.boolean().default(false),  // true → "Project Pricing" label
     deliveryEstimate: z.string().optional(),     // location-based wording, only if approved
     availability: z.enum(['in-stock', 'in-transit', 'preorder']).optional(),
+
+    /**
+     * TECHNICAL ASSETS — drawings, manuals, video, 3D.
+     *
+     * ARCHITECTURE ONLY UNTIL SUPPLIERS ANSWER. Every slot is optional and
+     * every one is empty today. The product page renders an action for a slot
+     * only when it is VERIFIED, permitted in writing, and has a URL — so a
+     * model with no assets shows no buttons, no empty tabs and no "coming
+     * soon", exactly like every other unverified field in this schema.
+     *
+     * `imagePermission` tracks the gallery photography rather than a document:
+     * it is the answer blocking 48 assets in docs/image-rights-register.md and
+     * gates paid advertising, so it is worth reporting alongside the rest.
+     */
+    technicalAssets: z
+      .object({
+        installationVideo: technicalVideo.optional(),
+        assemblyVideo: technicalVideo.optional(),
+        floorPlan: technicalAsset.optional(),
+        dimensionDrawing: technicalAsset.optional(),
+        elevations: technicalAsset.optional(),
+        benchLayout: technicalAsset.optional(),
+        installationManual: technicalAsset.optional(),
+        electricalGuide: technicalAsset.optional(),
+        foundationGuide: technicalAsset.optional(),
+        heaterManual: technicalAsset.optional(),
+        warrantyDocument: technicalAsset.optional(),
+        packagingDimensions: technicalAsset.optional(),
+        packagingPhotos: technicalAsset.optional(),
+        unloadingInstructions: technicalAsset.optional(),
+        threeD: technicalModel.optional(),
+        imagePermission: technicalAsset.optional(),
+      })
+      .optional(),
 
     // --- Catalog facets (sourced from supplier product data) ---
     location: z.enum(['outdoor', 'indoor']).optional(),

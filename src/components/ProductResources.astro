@@ -1,0 +1,276 @@
+---
+import { publicAssets } from '../lib/product-assets';
+import type { TechnicalAssets } from '../lib/product-assets';
+
+/**
+ * Technical resources for a product — video, drawings, 3D, manuals.
+ *
+ * RENDERS NOTHING unless the model has at least one asset that is VERIFIED,
+ * permitted in writing, and has a URL. No empty tabs, no dead buttons, no
+ * "coming soon" — a placeholder for a drawing we do not have invites a
+ * customer to ask for it, and tells them we are not ready.
+ *
+ * These are SUPPORTING actions. Configure and Get Exact Quote remain the
+ * primary CTAs above; this section sits below the specifications, styled
+ * quietly, because a floor plan reassures a buyer who has already decided to
+ * take the model seriously — it does not create that decision.
+ *
+ * PERFORMANCE: nothing third-party loads until a click. No YouTube iframe, no
+ * Vimeo player, no 3D viewer is in the initial page. A product page with a
+ * video costs the same as one without until the customer asks for it.
+ */
+interface Props {
+  assets?: TechnicalAssets;
+  /** Internal model title, for analytics. */
+  model: string;
+}
+const { assets, model } = Astro.props;
+
+const resources = publicAssets(assets);
+
+/** Poster-less videos still need a labelled play target. */
+function embedUrl(provider: string | undefined, url: string): string {
+  if (provider === 'youtube') {
+    const id = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{6,})/)?.[1];
+    return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : url;
+  }
+  if (provider === 'vimeo') {
+    const id = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+    return id ? `https://player.vimeo.com/video/${id}` : url;
+  }
+  return url;
+}
+
+function minutes(seconds?: number): string {
+  if (!seconds || seconds <= 0) return '';
+  const m = Math.round(seconds / 60);
+  return m >= 1 ? `${m} min` : `${seconds}s`;
+}
+---
+
+{resources.length > 0 && (
+  <section class="band band--tight" id="resources">
+    <div class="shell">
+      <div class="sec-head">
+        <span class="eyebrow">Technical Resources</span>
+        <h2 class="h2 measure--tight">See exactly what you are buying</h2>
+        <p class="lead measure">
+          Drawings, manuals and installation footage for this model — the same
+          documents your builder or electrician will want.
+        </p>
+      </div>
+
+      <div class="pres" data-resources data-model={model}>
+        {resources.map(({ slot, asset }) => (
+          <div class="pres__item" data-pres-item={slot.key}>
+            {slot.kind === 'video' ? (
+              <button
+                class="pres__btn pres__btn--video"
+                type="button"
+                data-pres-play={slot.key}
+                data-pres-src={embedUrl(asset.provider, asset.url!)}
+                data-pres-title={asset.title ?? slot.label}
+                aria-label={`Play ${asset.title ?? slot.label}`}
+              >
+                <span class="pres__icon" aria-hidden="true">▶</span>
+                <span class="pres__body">
+                  <span class="pres__label">{slot.action}</span>
+                  {minutes(asset.durationSeconds) && (
+                    <span class="pres__meta">{minutes(asset.durationSeconds)}</span>
+                  )}
+                </span>
+              </button>
+            ) : slot.kind === 'model' ? (
+              <button
+                class="pres__btn"
+                type="button"
+                data-pres-embed={slot.key}
+                data-pres-src={asset.url}
+                data-pres-title={asset.title ?? slot.label}
+                aria-label={`Open ${asset.title ?? slot.label}`}
+              >
+                <span class="pres__icon" aria-hidden="true">◈</span>
+                <span class="pres__body"><span class="pres__label">{slot.action}</span></span>
+              </button>
+            ) : (
+              /* Drawings and documents open in a new tab: a PDF or a large
+                 drawing is better handled by the browser's own viewer, which
+                 can zoom and print, than by anything reimplemented here. */
+              <a
+                class="pres__btn"
+                href={asset.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-pres-open={slot.key}
+                data-track="product_resource_opened"
+                data-track-model={model}
+              >
+                <span class="pres__icon" aria-hidden="true">▤</span>
+                <span class="pres__body">
+                  <span class="pres__label">{slot.action}</span>
+                  <span class="pres__meta">Opens in a new tab</span>
+                </span>
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* One dialog reused by every embed. Empty until something is opened, so
+        no third-party frame exists in the delivered page. */}
+    <dialog class="pres-modal" data-pres-modal aria-label="Technical resource">
+      <div class="pres-modal__bar">
+        <p class="pres-modal__title" data-pres-modal-title></p>
+        <button class="pres-modal__close" type="button" data-pres-close aria-label="Close">×</button>
+      </div>
+      <div class="pres-modal__frame" data-pres-modal-frame></div>
+    </dialog>
+  </section>
+)}
+
+<style>
+  .pres {
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: 1fr;
+    margin-top: clamp(1.25rem, 1rem + 1vw, 2rem);
+  }
+  @media (min-width: 560px) {
+    .pres { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+  }
+
+  .pres__btn {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    min-height: 3.5rem;
+    padding: 0.9rem 1.1rem;
+    font-family: inherit;
+    text-align: left;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--linen);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  .pres__btn:hover { border-color: var(--bronze); background: var(--linen-deep); }
+  .pres__btn:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
+
+  .pres__icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.85rem;
+    color: var(--bronze-ink);
+    border: 1px solid var(--bronze-soft);
+    border-radius: 50%;
+  }
+  .pres__body { display: grid; gap: 0.15rem; min-width: 0; }
+  .pres__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .pres__meta { font-size: 0.78rem; color: var(--muted); }
+
+  /* -- modal -- */
+  .pres-modal {
+    width: min(64rem, 94vw);
+    max-height: 90vh;
+    padding: 0;
+    border: 1px solid var(--line);
+    background: var(--linen);
+  }
+  .pres-modal::backdrop { background: rgba(27, 25, 23, 0.75); }
+  .pres-modal__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .pres-modal__title { margin: 0; font-size: 0.875rem; color: var(--ink); }
+  .pres-modal__close {
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--ink);
+    background: none;
+    border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .pres-modal__close:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
+  .pres-modal__frame { aspect-ratio: 16 / 9; width: 100%; background: #000; }
+  .pres-modal__frame :global(iframe) { width: 100%; height: 100%; border: 0; display: block; }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+
+  document.querySelectorAll<HTMLElement>('[data-resources]').forEach((root) => {
+    const found = document.querySelector<HTMLDialogElement>('[data-pres-modal]');
+    if (!found) return;
+    // Bound to a fresh const after the guard: TypeScript will not narrow a
+    // nullable across hoisted function declarations, which can be called
+    // before the guard runs as far as it is concerned.
+    const modal = found;
+    const frame = modal.querySelector<HTMLElement>('[data-pres-modal-frame]')!;
+    const title = modal.querySelector<HTMLElement>('[data-pres-modal-title]')!;
+    const model = root.dataset.model ?? '';
+
+    const open = (src: string, label: string, event: string, key: string) => {
+      // The iframe is created HERE, on click — never in the delivered HTML.
+      // That is the whole performance contract: a page with a video weighs the
+      // same as one without until someone asks to watch it.
+      const iframe = document.createElement('iframe');
+      iframe.src = src;
+      iframe.title = label;
+      iframe.loading = 'lazy';
+      iframe.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+      iframe.setAttribute('allowfullscreen', '');
+      // No autoplay attribute anywhere: the customer starts it.
+      frame.replaceChildren(iframe);
+      title.textContent = label;
+      modal.showModal();
+      track(event as any, { model, resource: key });
+    };
+
+    const close = () => {
+      // Emptying the frame stops playback and releases the third-party
+      // connection; leaving it would keep a hidden player running.
+      frame.replaceChildren();
+      if (modal.open) modal.close();
+    };
+
+    root.querySelectorAll<HTMLElement>('[data-pres-play]').forEach((btn) => {
+      btn.addEventListener('click', () =>
+        open(btn.dataset.presSrc!, btn.dataset.presTitle!, 'product_video_opened', btn.dataset.presPlay!)
+      );
+    });
+    root.querySelectorAll<HTMLElement>('[data-pres-embed]').forEach((btn) => {
+      btn.addEventListener('click', () =>
+        open(btn.dataset.presSrc!, btn.dataset.presTitle!, 'product_3d_opened', btn.dataset.presEmbed!)
+      );
+    });
+    root.querySelectorAll<HTMLElement>('[data-pres-open]').forEach((link) => {
+      link.addEventListener('click', () =>
+        track('product_resource_opened', { model, resource: link.dataset.presOpen })
+      );
+    });
+
+    modal.querySelector('[data-pres-close]')?.addEventListener('click', close);
+    // Esc fires `cancel`; the backdrop click surfaces as a click on the dialog
+    // itself. Both must also clear the frame, or playback continues unseen.
+    modal.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  });
+</script>

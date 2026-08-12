@@ -64,6 +64,11 @@ export type TrackEvent =
   | 'product_option_selected'
   | 'product_zip_entered'
   | 'product_quote_cta'
+  // Technical resources (components/ProductResources.astro). A customer who
+  // opens a floor plan or an installation video is qualifying themselves.
+  | 'product_resource_opened'
+  | 'product_video_opened'
+  | 'product_3d_opened'
   | 'product_availability_click'
   | 'product_package_view'
   | 'product_package_selected'

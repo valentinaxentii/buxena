@@ -14,6 +14,7 @@ import RitualKit from '../../components/RitualKit.astro';
 import ProductConfigurator from '../../components/ProductConfigurator.astro';
 import ProductGallery from '../../components/ProductGallery.astro';
 import ProductConfigPending from '../../components/ProductConfigPending.astro';
+import ProductResources from '../../components/ProductResources.astro';
 import { groupSpecs } from '../../lib/product-specs';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
@@ -424,6 +425,9 @@ const breadcrumbSchema = {
             </div>
       </div>
     </section>
+
+    {/* Renders nothing unless this model has a VERIFIED, permitted asset. */}
+    <ProductResources assets={data.technicalAssets} model={data.title} />
 
     <PackageBand model={data.title} />
 

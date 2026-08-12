@@ -1,0 +1,133 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import '../../styles/admin.css';
+import { getCollection } from 'astro:content';
+import { displayTitle } from '../../data/catalog';
+import { ASSET_SLOTS, productReadiness } from '../../lib/product-assets';
+import type { ReadinessVerdict } from '../../lib/product-assets';
+
+/**
+ * Internal asset readiness for the whole catalogue.
+ *
+ * The point is to answer one question fast: what do we have to chase, and from
+ * whom? So it sorts by what is missing rather than alphabetically, and it
+ * never reduces a model to a percentage — "7/10" reads as nearly done when the
+ * three gaps might be the floor plan, the electrical guide and image
+ * permission, which are exactly the things that lose the sale.
+ *
+ * Reads the same content collection the public pages read, so it cannot drift
+ * from what customers actually see.
+ */
+const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+
+const rows = models.map((m) => ({
+  slug: m.id,
+  title: displayTitle(m.data.title),
+  series: m.data.series ?? '—',
+  readiness: productReadiness(m.data.technicalAssets as any),
+}));
+
+const counts: Record<ReadinessVerdict, number> = {
+  'READY FOR SALES': rows.filter((r) => r.readiness.verdict === 'READY FOR SALES').length,
+  PARTIAL: rows.filter((r) => r.readiness.verdict === 'PARTIAL').length,
+  BLOCKED: rows.filter((r) => r.readiness.verdict === 'BLOCKED').length,
+};
+
+// Which slot is missing on the most models — the single most valuable ask.
+const gapTally = ASSET_SLOTS.filter((s) => s.weight === 'sales')
+  .map((slot) => ({
+    slot,
+    missing: rows.filter((r) => r.readiness.missingHighValue.some((m) => m.key === slot.key)).length,
+  }))
+  .sort((a, b) => b.missing - a.missing);
+
+function tone(v: ReadinessVerdict): string {
+  if (v === 'READY FOR SALES') return 'green';
+  if (v === 'PARTIAL') return 'amber';
+  return 'red';
+}
+---
+
+<AdminLayout
+  title="Catalog Readiness"
+  subtitle="Which technical assets each model has, and what is still owed by a supplier."
+  parentLabel="Dashboard"
+  parentHref="/admin"
+>
+  <div class="rd-cards">
+    <div class="rd-card"><span class="rd-card__v">{counts['READY FOR SALES']}</span><span class="rd-card__l">Ready for sales</span></div>
+    <div class="rd-card"><span class="rd-card__v">{counts.PARTIAL}</span><span class="rd-card__l">Partial</span></div>
+    <div class="rd-card"><span class="rd-card__v">{counts.BLOCKED}</span><span class="rd-card__l">Blocked</span></div>
+    <div class="rd-card"><span class="rd-card__v">{rows.length}</span><span class="rd-card__l">Sellable models</span></div>
+  </div>
+
+  <h2 class="admin-section-title" style="margin-top:2rem;">Biggest gaps across the catalog</h2>
+  <p class="rd-note">
+    Sales-critical assets only, ordered by how many models are waiting on them.
+    The top row is the single most valuable thing to ask a supplier for.
+  </p>
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Asset</th><th>Models missing it</th></tr></thead>
+        <tbody>
+          {gapTally.map((g) => (
+            <tr>
+              <td>{g.slot.label}</td>
+              <td>{g.missing} of {rows.length}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="admin-section-title" style="margin-top:2rem;">By model</h2>
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Model</th><th>Series</th><th>Verdict</th><th>Missing (sales-critical)</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td><a href={`/saunas/${r.slug}/`} target="_blank" rel="noopener">{r.title}</a></td>
+              <td>{r.series}</td>
+              <td><span class={`rd-pill rd-pill--${tone(r.readiness.verdict)}`}>{r.readiness.verdict}</span></td>
+              <td class="rd-missing">
+                {r.readiness.missingHighValue.length === 0
+                  ? '—'
+                  : r.readiness.missingHighValue.map((s) => s.label).join(', ')}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="rd-note" style="margin-top:1.25rem;">
+    Run <code>node scripts/asset-gap-report.mjs</code> for the same information
+    grouped by supplier, ready to paste into a request.
+  </p>
+</AdminLayout>
+
+<style>
+  .rd-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+  .rd-card { padding: 1rem 1.1rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(212,184,140,0.12); border-radius: 3px; }
+  .rd-card__v { display: block; font-size: 1.6rem; color: var(--admin-cream); }
+  .rd-card__l { display: block; margin-top: 0.2rem; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--admin-muted); }
+
+  .rd-note { margin: 0.5rem 0 1rem; font-size: 0.8rem; line-height: 1.6; color: var(--admin-muted); }
+  .rd-missing { font-size: 0.8rem; color: var(--admin-muted); }
+
+  .rd-pill { display: inline-block; padding: 0.15rem 0.55rem; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 2px; border: 1px solid; white-space: nowrap; }
+  .rd-pill--green { color: #a8d3a0; border-color: rgba(143,191,138,0.4); background: rgba(143,191,138,0.08); }
+  .rd-pill--amber { color: #e8cfa4; border-color: rgba(201,166,104,0.4); background: rgba(201,166,104,0.08); }
+  .rd-pill--red { color: #e6b7a0; border-color: rgba(230,130,90,0.4); background: rgba(230,130,90,0.08); }
+</style>
