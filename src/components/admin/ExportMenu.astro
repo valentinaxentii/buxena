@@ -124,7 +124,7 @@ const ICON_PATHS: Record<string, string> = {
   document.querySelectorAll<HTMLElement>('[data-expmenu]:not([data-em-ready])').forEach((root) => {
     root.setAttribute('data-em-ready', '1');
     const btn = root.querySelector('button.expmenu__btn') as HTMLButtonElement;
-    const list = root.querySelector('ul')!;
+    const list = root.querySelector<HTMLUListElement>('ul')!;
     const items = [...list.querySelectorAll<HTMLElement>('a, button[data-print-action]')];
 
     const setOpen = (open: boolean) => {
@@ -133,7 +133,10 @@ const ICON_PATHS: Record<string, string> = {
       if (open) items[0]?.focus();
     };
 
-    btn.addEventListener('click', () => setOpen(list.hidden));
+    // `hidden` is `boolean | "until-found"`, so coerce rather than pass it
+    // straight through: any hidden state — including "until-found" — means
+    // the next click should open the menu.
+    btn.addEventListener('click', () => setOpen(Boolean(list.hidden)));
 
     list.querySelectorAll('[data-print-action]').forEach((el) =>
       el.addEventListener('click', () => {

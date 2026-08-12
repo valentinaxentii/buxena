@@ -7,7 +7,11 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check": "astro check",
+    "test": "node --test \"tests/*.test.ts\"",
+    "prelaunch": "node scripts/prelaunch-check.mjs",
+    "verify": "npm run check && npm test && npm run prelaunch"
   },
   "dependencies": {
     "@astrojs/netlify": "^8.1.2",

@@ -118,12 +118,6 @@ try {
       .order('eta', { ascending: true })
       .limit(4),
     supabase.from('enquiries').select('id, name, source, created_at').eq('status', 'New').order('created_at', { ascending: false }).limit(4),
-    supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
-    supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .lte('follow_up_date', today)
-      .not('status', 'in', '("Won","Lost")'),
     supabase.from('leads').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
     supabase.from('quotes').select('id, quote_number, created_at').order('created_at', { ascending: false }).limit(6),
     supabase.from('orders').select('id, order_number, created_at').order('created_at', { ascending: false }).limit(6),
@@ -134,6 +128,20 @@ try {
     supabase.from('invoices').select('balance_due, due_date, status').in('status', ['issued', 'partially_paid', 'overdue']),
     // NEW (read-only): earliest inbound container not yet received/cancelled
     supabase.from('shipments').select('eta, container_number, total_units, status').not('status', 'in', '("Received","Cancelled")').not('eta', 'is', null).order('eta', { ascending: true }).limit(1),
+    // The two head:true count queries stay LAST, matching the final two names
+    // in the destructuring above. They previously sat mid-array while their
+    // names sat at the end, which silently shifted every result after
+    // `newEnquiryRows` by two positions — Recent Activity showed leads
+    // labelled as orders, outstanding invoice balance read enquiry rows and
+    // always totalled 0, and both KPI counts fell back to their capped
+    // limit(4) fetches. Order here is load-bearing: keep names and queries
+    // in step.
+    supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .lte('follow_up_date', today)
+      .not('status', 'in', '("Won","Lost")'),
   ]);
 
   const leads = leadRows.data ?? [];
@@ -269,8 +277,14 @@ const donutStops = donutSlices
   .join(', ');
 const pct = (n: number) => (donutTotal > 0 ? Math.round((n / donutTotal) * 100) : 0);
 
-// Set by the middleware when a staff-role account tries to open Settings.
-const deniedSettings = Astro.url.searchParams.get('denied') === 'settings';
+// Set by the middleware when an account without confirmed admin rights tries
+// to open Settings. Two distinct reasons, because the fix differs: 'settings'
+// means "you are staff" (ask an admin), 'settings-unverified' means the role
+// could not be read at all (a configuration problem to fix, not a permission
+// to request).
+const denied = Astro.url.searchParams.get('denied');
+const deniedSettings = denied === 'settings';
+const deniedUnverified = denied === 'settings-unverified';
 ---
 
 <AdminLayout title="Dashboard" subtitle="Business overview">
@@ -279,6 +293,14 @@ const deniedSettings = Astro.url.searchParams.get('denied') === 'settings';
   {deniedSettings && (
     <p style="margin:0 0 1rem; padding:0.75rem 1rem; font-size:0.85rem; color:#e6b7a0; background:rgba(230,130,90,0.06); border:1px solid rgba(230,130,90,0.35); border-radius:3px;">
       Settings is limited to admin accounts. Ask an admin if something there needs changing.
+    </p>
+  )}
+
+  {deniedUnverified && (
+    <p style="margin:0 0 1rem; padding:0.75rem 1rem; font-size:0.85rem; color:#e6b7a0; background:rgba(230,130,90,0.06); border:1px solid rgba(230,130,90,0.35); border-radius:3px;">
+      We couldn't confirm your account's role, so Settings stayed locked. If this account should
+      be an admin, run <code>node supabase/seed-profiles.mjs</code> and set its role to
+      <code>admin</code> in the Supabase dashboard (Table Editor → profiles), then sign in again.
     </p>
   )}
 

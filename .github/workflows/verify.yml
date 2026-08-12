@@ -1,0 +1,60 @@
+# Automated verification for the V2 branch.
+#
+# Runs the same four gates a person would run by hand — build, type check,
+# unit tests, pre-launch board — on every push and pull request touching
+# buxena-v2. It only ever reads and builds: nothing here deploys, publishes,
+# or touches `main` / V1.
+#
+# No secrets are used or needed. The build is fully static plus a Netlify SSR
+# function bundle; the admin and enquiry paths never run here, so no Supabase,
+# SMTP or Telegram credentials are involved. Keep it that way — a CI job that
+# needs production keys is a CI job that can email a real customer by accident.
+name: Verify
+
+on:
+  push:
+    branches: [buxena-v2]
+  pull_request:
+    branches: [buxena-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches local development. Node 22+ is required: the unit tests are
+          # TypeScript and rely on native type stripping.
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Type check first — it is the cheapest gate and the one that catches
+      # the widest class of mistakes. It has already caught a real dashboard
+      # bug (a Promise.all whose results were destructured out of order), so
+      # it must stay at zero errors rather than being treated as advisory.
+      - name: Type check
+        run: npm run check
+
+      - name: Unit tests
+        run: npm test
+
+      # The pre-launch board builds the site itself and then asserts on the
+      # output: routes present, no broken internal links, titles/descriptions,
+      # sitemap and robots correctness, the pricing freeze (no unapproved
+      # price may appear on any public page), lead-form paths, and that no
+      # watermarked preview image is referenced.
+      #
+      # It boots `astro dev` for the form checks; nothing is sent or stored,
+      # because dev mode short-circuits before any production service.
+      - name: Pre-launch board
+        run: npm run prelaunch

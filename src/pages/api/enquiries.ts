@@ -8,6 +8,15 @@ import { checkRateLimit } from '../../lib/rate-limit';
 export const prerender = false;
 
 /**
+ * The single message any server-side failure returns to the public. Never
+ * echo a Supabase, SMTP or environment error to a visitor: it leaks schema
+ * and configuration, and it tells the person nothing they can act on. It
+ * keeps a route open for the lead — a sale must not be lost to a 500.
+ */
+const SUBMISSION_FAILED =
+  "We couldn't record that just now. Please try again, or email info@buxena.com and we'll pick it up from there.";
+
+/**
  * Public-facing endpoint the Sauna Advisor (and, later, other site forms)
  * calls to record an enquiry. Uses the service-role client server-side only
  * — the browser never sees a Supabase key, it just POSTs a small JSON body
@@ -104,7 +113,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       .single();
 
     if (error) {
-      return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500 });
+      // Log the real cause server-side; return a generic message. Supabase
+      // error text names tables, columns and constraints — free schema
+      // reconnaissance for anyone probing a public endpoint, and meaningless
+      // to the visitor who triggered it.
+      console.error('[enquiries] insert failed:', error.message);
+      return new Response(JSON.stringify({ ok: false, error: SUBMISSION_FAILED }), { status: 500 });
     }
 
     // Audit trail entry. Awaited (not fire-and-forget) so the serverless
@@ -168,9 +182,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' }),
-      { status: 500 }
-    );
+    // Same rule as above: the visitor gets one honest, actionable sentence,
+    // the detail goes to the function log. This catch also covers
+    // createSupabaseAdminClient() throwing on missing env vars — a message
+    // that names our environment variables and belongs in the log, not in a
+    // public HTTP response.
+    console.error('[enquiries] submission failed:', e instanceof Error ? e.message : e);
+    return new Response(JSON.stringify({ ok: false, error: SUBMISSION_FAILED }), { status: 500 });
   }
 };

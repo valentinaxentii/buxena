@@ -84,7 +84,13 @@ try {
       getSettings(supabase),
     ]);
     staffLabel = profile?.full_name || staffUser.email || null;
-    staffRole = profile?.role ?? null;
+    // On admin-only routes the middleware has already resolved the role for
+    // this request — prefer that over this page-level read, so the two layers
+    // can never disagree about what the sidebar shows versus what the server
+    // enforces.
+    staffRole = Astro.locals.staffRoleResolved
+      ? Astro.locals.staffRole ?? null
+      : profile?.role ?? null;
     staffSublabel = staffRole ? staffRole.charAt(0).toUpperCase() + staffRole.slice(1) : null;
     printSettings = settings;
   }
@@ -92,12 +98,13 @@ try {
   staffLabel = Astro.locals.staffUser?.email ?? null;
 }
 
-// Settings (business config + staff accounts) is admin-only — the middleware
-// enforces it server-side; hiding the nav item just keeps the UI honest. A
-// null role (profile row missing / lookup failed) keeps the item visible so a
-// half-configured project can still reach Settings' own setup notices.
+// Settings (business config + staff accounts) is admin-only. Authorisation is
+// enforced server-side in two places — middleware.ts and each page's own
+// requireAdmin() — so hiding the nav item is presentation only: it stops
+// offering a link that would bounce straight back to the dashboard. Anything
+// other than a confirmed 'admin' hides it, matching what the server will do.
 const visibleNavItems = navItems.filter(
-  (item) => item.href !== '/admin/settings' || staffRole === 'admin' || staffRole === null
+  (item) => item.href !== '/admin/settings' || staffRole === 'admin'
 );
 
 const printGeneratedAt = new Date();

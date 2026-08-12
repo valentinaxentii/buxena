@@ -48,7 +48,12 @@ let safe: {
 try {
   const supabase = createSupabaseAdminClient();
 
-  const { data: unit } = await supabase
+  // `as any` on the result, not the query: the select string is built by
+  // concatenation, which defeats supabase-js's literal-type parser and makes
+  // it infer every column as GenericStringError. Every field is copied into
+  // the explicitly-typed `safe` object below, so the real shape is still
+  // checked at the only boundary that matters — what reaches the template.
+  const { data: unitRow } = await supabase
     .from('inventory_units')
     .select(
       'id, unit_code, product_id, order_id, delivery_date, installation_date, installation_type, installation_status, installer_company, ' +
@@ -57,14 +62,25 @@ try {
     )
     .eq('public_token', token ?? '')
     .maybeSingle();
+  const unit = unitRow as any;
 
   if (unit) {
     found = true;
-    const product = (unit as any).products ?? {};
+    const product = unit.products ?? {};
 
     const [warrantyRes, docsRes, orderRes, settings] = await Promise.all([
       supabase.from('warranties').select('status, warranty_start_date, warranty_end_date').eq('unit_id', unit.id).maybeSingle(),
-      supabase.from('documents').select('category, file_url, file_name').or(`unit_id.eq.${unit.id},product_id.eq.${unit.product_id}`),
+      // A unit with no product_id yet would otherwise build `product_id.eq.null`,
+      // which PostgREST rejects — failing the whole query and silently dropping
+      // the unit's own documents along with it.
+      supabase
+        .from('documents')
+        .select('category, file_url, file_name')
+        .or(
+          unit.product_id
+            ? `unit_id.eq.${unit.id},product_id.eq.${unit.product_id}`
+            : `unit_id.eq.${unit.id}`
+        ),
       unit.order_id
         ? supabase.from('orders').select('created_at').eq('id', unit.order_id).maybeSingle()
         : Promise.resolve({ data: null }),

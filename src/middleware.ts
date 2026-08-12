@@ -1,18 +1,20 @@
 import { defineMiddleware } from 'astro:middleware';
 import { createSupabaseServerClient } from './lib/supabase-auth';
-import { createSupabaseAdminClient } from './lib/supabase-admin';
-
-/**
- * Routes only an admin-role profile may open. Everything else under /admin
- * is available to any authenticated staff account. Settings covers both
- * business configuration and staff account management.
- */
-const ADMIN_ONLY_PREFIXES = ['/admin/settings'];
+import {
+  denyRedirectPath,
+  isAdminOnlyPath,
+  isAdminRole,
+  lookupStaffRole,
+} from './lib/staff-access';
 
 /**
  * Gate for every /admin/* route. Astro only invokes middleware for
  * on-demand (non-prerendered) routes — the entire public site stays fully
  * static and never touches this file at all.
+ *
+ * Which routes are admin-only, and what counts as an admin, live in
+ * lib/staff-access.ts so the pages themselves can enforce the same rule
+ * (see requireAdmin) rather than trusting this file alone.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
@@ -45,30 +47,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   context.locals.staffUser = user;
 
-  // Role enforcement for admin-only routes. A missing profiles row counts as
-  // 'staff' (least privilege) — run scripts/seed-profiles.mjs after adding an
-  // auth user, and promote via Settings → Staff (or SQL) as needed. If the
-  // role lookup itself fails (schema not applied yet), fall back to allowing
-  // the request so a half-configured project can still reach Settings to see
-  // its own setup notices.
-  if (user && ADMIN_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    let role: string | null = null;
-    let lookupFailed = false;
-    try {
-      const admin = createSupabaseAdminClient();
-      const { data: profile, error } = await admin
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (error) lookupFailed = true;
-      else role = profile?.role ?? null;
-    } catch {
-      lookupFailed = true;
-    }
-    context.locals.staffRole = role;
-    if (!lookupFailed && role !== 'admin') {
-      return context.redirect('/admin?denied=settings');
+  // Role enforcement for admin-only routes. Resolved once here and published
+  // on `locals` so the page's own requireAdmin() check and AdminLayout's
+  // sidebar both reuse it instead of re-querying.
+  //
+  // A missing profiles row counts as NOT admin (least privilege), and a
+  // failed lookup counts as NOT admin either — see lib/staff-access.ts for
+  // why that fails closed rather than open.
+  if (user && isAdminOnlyPath(pathname)) {
+    const lookup = await lookupStaffRole(user.id);
+    context.locals.staffRole = lookup.role;
+    context.locals.staffRoleResolved = lookup.resolved;
+    if (!isAdminRole(lookup)) {
+      return context.redirect(denyRedirectPath(lookup));
     }
   }
 

@@ -23,7 +23,12 @@ try {
   const { data } = await supabase
     .from('inventory')
     .select('product_id, in_stock, reserved, available, incoming, landed_cost, products(model_name, cost, selling_price, is_active)');
-  const raw = data ?? [];
+  // The client is untyped (no generated database types), so supabase-js infers
+  // the embedded `products` relation as an array even though inventory→products
+  // is many-to-one and PostgREST returns a single object. Cast once here rather
+  // than sprinkling `as any` through the loop below; the shape is asserted by
+  // the select string one line above.
+  const raw = (data ?? []) as any[];
 
   // Report is per-model, not per-inventory-row — a product can have more
   // than one inventory row (different containers/suppliers).

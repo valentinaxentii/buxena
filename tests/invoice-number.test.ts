@@ -1,7 +1,9 @@
 /**
  * Pure unit tests for the invoice-numbering format helpers — no database.
- * Run with:  node --test tests/
- * (Node 22+ strips the TypeScript types natively.)
+ * Run with:  npm test
+ * (Node 22+ strips the TypeScript types natively. The script passes a glob,
+ * not the bare `tests/` directory — Node 24 tries to load a directory
+ * argument as a module and fails before any test runs.)
  *
  * The database-side behavior (gapless counter, locking, rollback) lives in
  * the plpgsql function `issue_document_number` and is covered by

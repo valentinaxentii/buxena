@@ -5,6 +5,14 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { FALLBACK_SETTINGS, type BuxenaSettings } from '../../../lib/settings';
+import { requireAdmin } from '../../../lib/staff-access';
+
+// Defence in depth. The middleware already gates /admin/settings/*, but this
+// page writes business configuration with the service-role key, so it asks
+// for authorisation itself rather than trusting a prefix list elsewhere.
+// MUST stay the first statement that can touch data.
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
 
 let settings: BuxenaSettings = FALLBACK_SETTINGS;
 let error: string | null = null;

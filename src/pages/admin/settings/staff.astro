@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
 
 /**
  * Staff account management — admin-only (the middleware gates all of
@@ -19,6 +20,12 @@ import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
  * and destructive enough, that it stays a deliberate act in the Supabase
  * dashboard (Authentication → Users) rather than one click here.
  */
+
+// Defence in depth. This page can grant admin to anyone, so it verifies the
+// caller's role itself instead of trusting only the middleware's prefix list.
+// MUST stay above every read and write below, including the POST handler.
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
 
 const ROLES = ['staff', 'admin'];
 
