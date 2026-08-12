@@ -3,12 +3,12 @@
  * ProjectUpload — reusable photo/plan attachment control for lead forms.
  *
  * PRIVACY / SAFETY (founders' rules):
- * - Files NEVER leave the visitor's browser in this MVP. No production
- *   storage integration is configured or approved (the existing Supabase
- *   "documents" bucket is PUBLIC and must not hold customer project
- *   photos). Until a private bucket + upload endpoint is explicitly
- *   approved, only file METADATA (names, types, sizes) travels with the
- *   enquiry, via the hidden input this component maintains.
+ * - Files are uploaded to a PRIVATE Supabase bucket, after the enquiry is
+ *   created, and linked to it. They are readable only through short-lived
+ *   signed URLs minted server-side behind admin auth. No public URL is ever
+ *   produced for a customer's photo.
+ * - The metadata summary (names and sizes) still travels with the enquiry, so
+ *   staff can see what was attached even if an upload failed.
  * - Customer uploads are private project data — never marketing imagery,
  *   never gallery content.
  *
@@ -186,6 +186,10 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
       const dt = new DataTransfer();
       attached.forEach((f) => dt.items.add(f));
       input.files = dt.files;
+      // Published on the control so the consuming form can send the real
+      // files after its enquiry is created. Reading input.files works too;
+      // this is the explicit contract.
+      (root as any).buxenaFiles = attached;
     }
 
     function setStatus(message: string, isError = false) {

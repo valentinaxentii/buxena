@@ -106,6 +106,43 @@ on conflict (id) do update set public = false;
 
 
 -- ----------------------------------------------------------------------------
+-- 2b. Customer project files
+-- ----------------------------------------------------------------------------
+-- Photos and plans a customer attaches to a Start Your Project / quote
+-- submission. Until now they never left the visitor's browser: the bucket was
+-- public, so uploading a customer's backyard photo to it was not acceptable,
+-- and the enquiry carried only the file NAMES with "request by email reply".
+-- Staff had to email the customer back and ask for the very files they had
+-- already chosen. With the bucket private (section 2) that constraint is gone.
+--
+-- `on delete cascade`, unlike every other FK on this table: a project file has
+-- no meaning without its enquiry, and leaving orphaned rows pointing at
+-- storage objects nobody can reach is how private files quietly accumulate.
+alter table documents add column if not exists enquiry_id uuid
+  references enquiries(id) on delete cascade;
+
+create index if not exists idx_documents_enquiry on documents (enquiry_id)
+  where enquiry_id is not null;
+
+-- The category CHECK is an enumerated list, so a new category needs the
+-- constraint rebuilt rather than extended. Dropped by name and recreated with
+-- the full list plus 'Customer Project File'; re-running is harmless because
+-- the drop is IF EXISTS and the definition is identical.
+alter table documents drop constraint if exists documents_category_check;
+alter table documents add constraint documents_category_check check (
+  category in (
+    'Supplier Price List', 'Brochure', 'Installation Manual', 'Installation Document',
+    'Product Specification', 'Electrical Specification', 'Warranty Document',
+    'Customs Document', 'Shipping Document', 'Container Document', 'Purchase Order',
+    'Customer Quote', 'Invoice',
+    'Receiving Report', 'Quality Inspection', 'Delivery Document', 'Delivery Photo',
+    'Installation Photo', 'Warranty Certificate', 'Service Document', 'Service Photo',
+    'Customer Project File'
+  )
+);
+
+
+-- ----------------------------------------------------------------------------
 -- 3. Verification (read-only — safe to run, changes nothing)
 -- ----------------------------------------------------------------------------
 -- Expect 12 rows, each showing has_archived_at = true.

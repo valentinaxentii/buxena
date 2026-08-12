@@ -100,12 +100,15 @@ export function mergeProjectFiles<T extends UploadCandidate>(
 }
 
 /**
- * The hidden field the enquiry carries. Files never leave the browser in this
- * MVP, so staff get an exact list to request by email reply — the wording says
- * so explicitly rather than implying an attachment is on its way.
+ * The hidden field the enquiry carries. The files themselves are uploaded
+ * separately to a private bucket and linked to the enquiry; this list is the
+ * fallback that tells staff what to ask for if that upload failed.
  */
 export function buildUploadMeta(files: UploadCandidate[]): string {
   if (files.length === 0) return '';
   const listed = files.map((f) => `${f.name} (${formatFileSize(f.size)})`).join(', ');
-  return `Customer prepared ${files.length} file(s): ${listed} — PRIVATE project data, request by email reply; files were not transmitted.`;
+  // Names and sizes still travel in the enquiry text even though the files
+  // themselves are uploaded separately: if an upload fails, this line is how
+  // staff know what to ask the customer for.
+  return `Customer attached ${files.length} file(s): ${listed} — private project data, viewable on the enquiry in BUXENA Admin.`;
 }

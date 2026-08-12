@@ -100,7 +100,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           ? `[enquiries][dev] customer ack would send — subject: "${ackPreview.subject}"\n${ackPreview.text}`
           : '[enquiries][dev] customer ack would NOT send (no email address, or enrichment submission).'
       );
-      return new Response(JSON.stringify({ ok: true, devMode: true }), { status: 200 });
+      // A synthetic id so the browser exercises the same follow-up path it
+      // uses in production; /api/project-files also short-circuits in dev.
+      return new Response(
+        JSON.stringify({ ok: true, devMode: true, enquiryId: 'dev-mode-enquiry' }),
+        { status: 200 }
+      );
     }
 
     // PRODUCTION — two INDEPENDENT capture paths, in this order:
@@ -249,7 +254,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), { status: decision.status });
+    // The id lets the browser attach project files to THIS enquiry in a
+    // second request. Returning it is safe: it is a random uuid, it grants
+    // no read access, and /api/project-files still verifies the enquiry
+    // exists before accepting anything against it.
+    return new Response(JSON.stringify({ ok: true, enquiryId: inserted?.id ?? null }), {
+      status: decision.status,
+    });
   } catch (e) {
     // Same rule as above: the visitor gets one honest, actionable sentence,
     // the detail goes to the function log. This catch also covers

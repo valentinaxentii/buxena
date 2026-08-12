@@ -121,10 +121,10 @@ test('sizes read the way a person expects', () => {
   assert.equal(formatFileSize(2 * 1024 * 1024), '2.0 MB');
 });
 
-test('the enquiry metadata is honest about the files not being sent', () => {
+test('the enquiry metadata lists what was attached', () => {
   assert.equal(buildUploadMeta([]), '', 'no files means no note at all');
   const meta = buildUploadMeta([file({ name: 'garden.jpg', size: 1024 })]);
   assert.match(meta, /garden\.jpg \(1 KB\)/);
-  assert.match(meta, /were not transmitted/);
-  assert.match(meta, /request by email reply/);
+  assert.match(meta, /viewable on the enquiry/);
+  assert.match(meta, /private project data/);
 });

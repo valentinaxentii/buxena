@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { signDocumentUrls } from '../../../lib/document-access';
 import { isAdminStaff } from '../../../lib/staff-access';
 import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
@@ -23,6 +24,10 @@ let quote: any = null;
 let timeline: any[] = [];
 let notFound = false;
 let error: string | null = null;
+// Files the customer attached to this enquiry. Read with the service-role
+// client behind the admin middleware, then each one is given a short-lived
+// signed URL — the private object path never reaches the browser.
+let projectFiles: { name: string; url: string | null; created: string | null }[] = [];
 let actions = { supported: false, archived: false };
 let notice: string | null = null;
 
@@ -88,6 +93,22 @@ try {
     lead = leadRow.data;
     quote = quoteRow.data;
     timeline = activityRows.data ?? [];
+  }
+
+  // Customer project files, newest first.
+  if (enquiry) {
+    const { data: fileRows } = await supabase
+      .from('documents')
+      .select('file_url, file_name, created_at')
+      .eq('enquiry_id', id)
+      .order('created_at', { ascending: false });
+    const rows = fileRows ?? [];
+    const signed = await signDocumentUrls(supabase, rows.map((r: any) => r.file_url));
+    projectFiles = rows.map((r: any) => ({
+      name: r.file_name || 'Attachment',
+      url: signed.get(String(r.file_url ?? '').trim()) ?? null,
+      created: r.created_at ?? null,
+    }));
   }
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
@@ -179,6 +200,35 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
               <div><dt>Phone</dt><dd>{enquiry.phone || '—'}</dd></div>
               <div><dt>ZIP / Postal Code</dt><dd>{enquiry.location || '—'}</dd></div>
             </dl>
+
+            {projectFiles.length > 0 && (
+              <div class="enq-files">
+                <h3 class="enq-files__h">Customer project files ({projectFiles.length})</h3>
+                <p class="enq-files__note">
+                  Uploaded by the customer with this enquiry. Links are private and
+                  expire after an hour — reopen this page for a fresh one.
+                </p>
+                <ul class="enq-files__list">
+                  {projectFiles.map((file) => (
+                    <li>
+                      <span class="enq-files__name">{file.name}</span>
+                      {file.url ? (
+                        <a
+                          class="admin-btn admin-btn--ghost"
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-track="project_file_opened"
+                        >View / Download</a>
+                      ) : (
+                        <span class="enq-files__missing">File missing from storage</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
           </section>
 
           <section class="admin-panel enq-sec">
@@ -243,6 +293,14 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
 </AdminLayout>
 
 <style>
+  .enq-files { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid rgba(212, 184, 140, 0.14); }
+  .enq-files__h { margin: 0 0 0.35rem; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--admin-gold); }
+  .enq-files__note { margin: 0 0 0.9rem; font-size: 0.78rem; line-height: 1.6; color: var(--admin-muted); }
+  .enq-files__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+  .enq-files__list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0.7rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(212,184,140,0.12); border-radius: 3px; }
+  .enq-files__name { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .enq-files__missing { font-size: 0.78rem; color: #e6b7a0; }
+
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
   .notice--ok { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a9cfa4; background: rgba(143, 191, 138, 0.06); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
 

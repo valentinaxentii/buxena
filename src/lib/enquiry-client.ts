@@ -20,6 +20,8 @@ export interface EnquiryResult {
   ok: boolean;
   devMode?: boolean;
   error?: string;
+  /** Set on success — the id project files are attached to. */
+  enquiryId?: string | null;
 }
 
 export async function submitEnquiry(payload: Record<string, unknown>): Promise<EnquiryResult> {
@@ -64,7 +66,7 @@ export async function submitEnquiry(payload: Record<string, unknown>): Promise<E
       return { ok: false, error: body.error || `Request failed (${res.status})` };
     }
     emit('form_success', { devMode: Boolean(body.devMode) });
-    return { ok: true, devMode: Boolean(body.devMode) };
+    return { ok: true, devMode: Boolean(body.devMode), enquiryId: body.enquiryId ?? null };
   } catch {
     emit('form_error', { errorStatus: 'network' });
     return { ok: false, error: 'Network error' };
@@ -125,4 +127,37 @@ export function showFormStatus(
 
   form.appendChild(box);
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Attach the customer's project files to an enquiry that has just been created.
+ *
+ * Called AFTER submitEnquiry succeeds, never before: the lead is the thing
+ * that must not be lost, and files are the enhancement. If this fails the
+ * enquiry is already safely recorded and staff already have the notification —
+ * the customer is told their enquiry went through, because it did.
+ *
+ * The files themselves go to a private bucket server-side; the browser never
+ * receives a storage credential or a public URL.
+ */
+export async function attachProjectFiles(
+  enquiryId: string,
+  files: File[]
+): Promise<{ ok: boolean; uploaded: number; error?: string }> {
+  if (!enquiryId || files.length === 0) return { ok: true, uploaded: 0 };
+
+  const body = new FormData();
+  body.append('enquiryId', enquiryId);
+  for (const file of files) body.append('files', file);
+
+  try {
+    const res = await fetch('/api/project-files', { method: 'POST', body });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      return { ok: false, uploaded: 0, error: json.error || `Upload failed (${res.status})` };
+    }
+    return { ok: true, uploaded: Number(json.uploaded ?? 0) };
+  } catch {
+    return { ok: false, uploaded: 0, error: 'Network error while attaching files.' };
+  }
 }

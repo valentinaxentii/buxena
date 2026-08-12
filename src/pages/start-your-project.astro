@@ -209,7 +209,25 @@ const projectTypes = [
   // submit guard so an invalid ZIP cannot reach the network.
   initZipValidation();
   import { track } from '../lib/track';
-  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
+  import { submitEnquiry, showFormStatus, rememberEnquiry, attachProjectFiles } from '../lib/enquiry-client';
+
+  /**
+   * Send the customer's actual project files, once the enquiry exists.
+   *
+   * Deliberately after the enquiry and deliberately non-blocking: the lead is
+   * already captured and staff already notified, so a failed upload degrades
+   * to "we have your enquiry, ask them for the photos" rather than losing
+   * anything. The enquiry note already lists the filenames.
+   */
+  async function sendProjectFiles(enquiryId: string | null | undefined): Promise<void> {
+    if (!enquiryId) return;
+    const control = document.querySelector<HTMLElement>('[data-pupload]');
+    const files = ((control as any)?.buxenaFiles ?? []) as File[];
+    if (!files.length) return;
+    const result = await attachProjectFiles(enquiryId, files);
+    if (!result.ok) console.error('[project-files] attach failed:', result.error);
+  }
+
 
   const form = document.querySelector<HTMLFormElement>('[data-project-form]');
   if (form) {
@@ -273,6 +291,7 @@ const projectTypes = [
         botField: get('bot-field-project'),
       });
 
+      await sendProjectFiles(result.enquiryId);
       if (!result.ok) {
         console.error('[project] submission failed:', result.error);
         restore();
