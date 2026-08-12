@@ -5,6 +5,7 @@ import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import '../../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../../lib/supabase-admin';
 import { generateUnitQrDataUrl } from '../../../../lib/qr';
+import { signDocumentUrls } from '../../../../lib/document-access';
 import {
   assignUnitToOrder,
   unassignUnitFromOrder,
@@ -172,7 +173,14 @@ try {
 
     const [warrantyRes, docsRes, serviceRes, activityRes, ordersRes, assignedUnitOrderIdsRes] = await Promise.all([
       supabase.from('warranties').select('*').eq('unit_id', id).maybeSingle(),
-      supabase.from('documents').select('*').or(`unit_id.eq.${id},product_id.eq.${unit.product_id}`).order('created_at', { ascending: false }),
+      // A unit with no product_id yet would build `product_id.eq.null`, which
+      // PostgREST rejects — failing the whole query and dropping this unit's
+      // own documents along with it.
+      supabase
+        .from('documents')
+        .select('*')
+        .or(unit.product_id ? `unit_id.eq.${id},product_id.eq.${unit.product_id}` : `unit_id.eq.${id}`)
+        .order('created_at', { ascending: false }),
       supabase.from('service_cases').select('*').eq('unit_id', id).order('opened_date', { ascending: false }),
       supabase.from('activities').select('id, description, created_at').eq('entity_type', 'inventory_unit').eq('entity_id', id).order('created_at', { ascending: false }),
       supabase.from('orders').select('id, order_number').eq('product_id', unit.product_id).order('created_at', { ascending: false }),
@@ -181,6 +189,32 @@ try {
 
     warranty = warrantyRes.data;
     const docs = docsRes.data ?? [];
+
+    // The documents bucket is private. Every link this page renders — the six
+    // document lists plus the three product-level URLs — is signed here in one
+    // batch, and `file_url` is replaced in place with the signed value so no
+    // render site can accidentally emit the unsigned original. External links
+    // pass through unchanged; a file missing from storage becomes null and its
+    // row renders as unavailable rather than as a dead link.
+    const productDocUrls = [
+      unit.products?.brochure_url,
+      unit.products?.installation_manual_url,
+      unit.products?.warranty_document_url,
+    ];
+    const signedDocs = await signDocumentUrls(supabase, [
+      ...docs.map((d: any) => d.file_url),
+      ...productDocUrls,
+    ]);
+    const signFor = (url: string | null | undefined) =>
+      url ? signedDocs.get(String(url).trim()) ?? null : null;
+
+    for (const d of docs as any[]) d.file_url = signFor(d.file_url);
+    if (unit.products) {
+      unit.products.brochure_url = signFor(unit.products.brochure_url);
+      unit.products.installation_manual_url = signFor(unit.products.installation_manual_url);
+      unit.products.warranty_document_url = signFor(unit.products.warranty_document_url);
+    }
+
     unitDocuments = docs.filter((d: any) => d.unit_id === id);
     modelDocuments = docs.filter((d: any) => d.unit_id !== id && d.product_id === unit.product_id);
     serviceCases = serviceRes.data ?? [];
@@ -253,7 +287,10 @@ const config = [
               <h2 class="unit-sec__h">Documents</h2>
               {unitDocuments.length === 0 && modelDocuments.length === 0 && <p class="admin-empty">No documents linked yet.</p>}
               {[...unitDocuments, ...modelDocuments].slice(0, 5).map((d) => (
-                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                <p class="unit-doc-row">{d.file_url
+                  ? <a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a>
+                  : <span class="unit-doc-missing">{d.file_name || d.category} — file missing from storage</span>
+                } <span class="unit-doc-cat">{d.category}</span></p>
               ))}
             </section>
 
@@ -312,7 +349,10 @@ const config = [
               </div>
               {unitDocuments.length === 0 && <p class="admin-empty">No unit-specific documents yet — receiving reports, delivery documents, service records.</p>}
               {unitDocuments.map((d) => (
-                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                <p class="unit-doc-row">{d.file_url
+                  ? <a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a>
+                  : <span class="unit-doc-missing">{d.file_name || d.category} — file missing from storage</span>
+                } <span class="unit-doc-cat">{d.category}</span></p>
               ))}
             </section>
             <section class="admin-panel unit-sec">
@@ -322,7 +362,10 @@ const config = [
               {product.installation_manual_url && <p class="unit-doc-row"><a href={product.installation_manual_url} target="_blank" rel="noopener">Installation Manual</a></p>}
               {product.warranty_document_url && <p class="unit-doc-row"><a href={product.warranty_document_url} target="_blank" rel="noopener">Warranty Document</a></p>}
               {modelDocuments.map((d) => (
-                <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                <p class="unit-doc-row">{d.file_url
+                  ? <a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a>
+                  : <span class="unit-doc-missing">{d.file_name || d.category} — file missing from storage</span>
+                } <span class="unit-doc-cat">{d.category}</span></p>
               ))}
               {!product.brochure_url && !product.installation_manual_url && !product.warranty_document_url && modelDocuments.length === 0 && (
                 <p class="admin-empty">No model-level documents on file.</p>
@@ -393,7 +436,10 @@ const config = [
                   <p class="admin-empty">No delivery documents or photos linked yet.</p>
                 ) : (
                   deliveryDocs.map((d: any) => (
-                    <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                    <p class="unit-doc-row">{d.file_url
+                  ? <a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a>
+                  : <span class="unit-doc-missing">{d.file_name || d.category} — file missing from storage</span>
+                } <span class="unit-doc-cat">{d.category}</span></p>
                   ))
                 );
               })()}
@@ -499,7 +545,10 @@ const config = [
                   <p class="admin-empty">No installation documents or photos linked yet.</p>
                 ) : (
                   installDocs.map((d: any) => (
-                    <p class="unit-doc-row"><a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a> <span class="unit-doc-cat">{d.category}</span></p>
+                    <p class="unit-doc-row">{d.file_url
+                  ? <a href={d.file_url} target="_blank" rel="noopener">{d.file_name || d.category}</a>
+                  : <span class="unit-doc-missing">{d.file_name || d.category} — file missing from storage</span>
+                } <span class="unit-doc-cat">{d.category}</span></p>
                   ))
                 );
               })()}
@@ -702,6 +751,9 @@ const config = [
   .unit-doc-row { margin: 0.3rem 0; font-size: 0.85rem; }
   .unit-doc-row a { color: var(--admin-gold); }
   .unit-doc-cat { font-size: 0.7rem; color: var(--admin-muted); margin-left: 0.4rem; }
+  /* The row exists but the file behind it does not — say so plainly rather
+     than rendering a link that fails when clicked. */
+  .unit-doc-missing { color: #e6b7a0; }
 
   .unit-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
   .unit-inline-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }

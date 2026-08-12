@@ -1211,19 +1211,27 @@ alter table warranties add column if not exists duration_months_applied integer;
 -- Documents page can upload a file instead of only linking to one that
 -- already lives elsewhere.
 -- ============================================================================
--- Public bucket, deliberately: object paths are random UUIDs (never derived
--- from anything guessable), and every upload/list/edit still requires signing
--- in to /admin. A private bucket would need either signed URLs regenerated on
--- every page render or a stricter RLS setup — more moving parts for the same
--- practical protection, and it would break the existing render-time assumption
--- (document-url.ts, documents/[id].astro) that file_url is always usable
--- directly as an href/img-src/iframe-src, exactly like a pasted external link.
+-- PRIVATE bucket (changed 2026-08-12). It was public, on the reasoning that a
+-- random-UUID path plus an admin-only upload route was protection enough. That
+-- reasoning held for installation manuals and failed for everything else the
+-- upload form actually offers to store: Supplier Price List, Invoice, Customer
+-- Quote, Purchase Order. Dealer cost is the core commercial secret of this
+-- business, and with a public bucket a single forwarded link handed it to
+-- whoever received it — no login, no expiry, no audit.
+--
+-- Reads now go through src/lib/document-access.ts, which mints a short-lived
+-- signed URL server-side on every render. The service-role key never leaves
+-- the server; the browser only ever receives the time-limited URL.
+--
+-- The `set public = false` is what makes this safe to re-run against a project
+-- where the bucket already exists as public — `on conflict do nothing` alone
+-- would silently leave an existing public bucket public.
 insert into storage.buckets (id, name, public)
-values ('documents', 'documents', true)
-on conflict (id) do nothing;
+values ('documents', 'documents', false)
+on conflict (id) do update set public = false;
 
--- Uploads and deletes go through the service-role client only (Documents
--- pages, prerender=false), which bypasses storage RLS entirely — same trust
--- boundary as every other table in this schema. No policies are added here
--- because none are needed for that path; the bucket's own `public` flag is
--- what authorizes anonymous reads via the /storage/v1/object/public/ URL.
+-- Uploads, deletes and signing all go through the service-role client only
+-- (admin pages and the unit passport page, prerender=false), which bypasses
+-- storage RLS entirely — same trust boundary as every other table in this
+-- schema. No policies are added here because none are needed for that path,
+-- and with `public = false` there is no anonymous read path left to police.

@@ -6,6 +6,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { normalizeDocumentUrl, resolveDocumentHref, documentLinkLabel } from '../../../lib/document-url';
+import { signDocumentUrl, isStoredDocument } from '../../../lib/document-access';
 import { uploadDocumentFile, deleteDocumentFile, MAX_UPLOAD_BYTES } from '../../../lib/document-storage';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
@@ -106,19 +107,33 @@ try {
 
 // Render-time defense for rows saved before normalization existed: a stored
 // value with no protocol still gets a working absolute href. No data touched.
-const docHref = doc ? resolveDocumentHref(doc.file_url) : '#';
-const docLinkLabel = doc ? documentLinkLabel(docHref, import.meta.env.SUPABASE_URL) : 'Open file';
+const storedHref = doc ? resolveDocumentHref(doc.file_url) : '#';
+const docLinkLabel = doc ? documentLinkLabel(storedHref, import.meta.env.SUPABASE_URL) : 'Open file';
 
-// Preview panel: what can the browser natively display?
+// The bucket is private, so our own files need a signed link before the
+// browser can fetch them — including for the inline preview below. External
+// links pass through untouched. Minted here on the server, behind the admin
+// auth middleware; only the time-limited URL is sent to the page.
+let docHref = storedHref;
+let signingFailed = false;
+if (doc?.file_url) {
+  const signed = await signDocumentUrl(createSupabaseAdminClient(), doc.file_url);
+  if (signed) docHref = signed;
+  else if (isStoredDocument(doc.file_url)) signingFailed = true;
+}
+
+// Preview panel: what can the browser natively display? Decided from the
+// STORED path, not the signed URL — a signature adds query parameters and
+// would break a naive extension test.
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|svg)$/i;
 const PDF_EXT = /\.pdf$/i;
 let previewKind: 'image' | 'pdf' | 'other' | 'none' = 'none';
 let previewHost = '';
-if (doc?.file_url && docHref !== '#') {
+if (doc?.file_url && storedHref !== '#' && !signingFailed) {
   previewKind = 'other';
-  let path = docHref;
+  let path = storedHref;
   try {
-    const u = new URL(docHref);
+    const u = new URL(storedHref);
     path = u.pathname;
     previewHost = u.hostname;
   } catch { /* keep raw string for the extension test */ }
@@ -224,7 +239,11 @@ const previewIsSite =
             {previewKind === 'none' ? (
               <>
                 <svg class="doc-preview__icon" viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.8h8l4 4V21H6z"/><path d="M14 2.8v4h4"/></svg>
-                <p class="doc-preview__name">No file linked</p>
+                <p class="doc-preview__name">
+                  {signingFailed
+                    ? 'This file is recorded here but is missing from storage — re-upload it.'
+                    : 'No file linked'}
+                </p>
               </>
             ) : (
               <>

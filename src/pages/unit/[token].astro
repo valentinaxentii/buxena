@@ -16,6 +16,7 @@ export const prerender = false;
 // through an incidental {JSON.stringify(row)} or a future careless edit.
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { getSettings } from '../../lib/settings';
+import { signDocumentUrls } from '../../lib/document-access';
 
 const { token } = Astro.params;
 
@@ -91,18 +92,38 @@ try {
     const docs = docsRes.data ?? [];
 
     const MANUAL_CATEGORIES = new Set(['Installation Manual', 'Brochure', 'Product Specification']);
-    const manuals: { label: string; url: string }[] = [];
-    if (product.installation_manual_url) manuals.push({ label: 'Installation Manual', url: product.installation_manual_url });
-    if (product.brochure_url) manuals.push({ label: 'Brochure', url: product.brochure_url });
+    const rawManuals: { label: string; url: string }[] = [];
+    if (product.installation_manual_url) rawManuals.push({ label: 'Installation Manual', url: product.installation_manual_url });
+    if (product.brochure_url) rawManuals.push({ label: 'Brochure', url: product.brochure_url });
     for (const d of docs) {
       if (MANUAL_CATEGORIES.has(d.category) && d.file_url) {
-        manuals.push({ label: d.file_name || d.category, url: d.file_url });
+        rawManuals.push({ label: d.file_name || d.category, url: d.file_url });
       }
     }
 
     // Prefer a unit-specific certificate over the model-level warranty PDF.
     const unitCert = docs.find((d: any) => d.category === 'Warranty Document' && d.file_url);
-    const warrantyCertificateUrl = unitCert?.file_url ?? product.warranty_document_url ?? null;
+    const rawCertificateUrl = unitCert?.file_url ?? product.warranty_document_url ?? null;
+
+    // The documents bucket is private, so every one of these has to be signed
+    // before it can be opened. This page has no login — the unguessable
+    // public_token in the URL is what authorises the request, and it has
+    // already matched a real unit by the time we get here. Signed in one batch,
+    // and only the resulting time-limited links reach the browser.
+    //
+    // A file that cannot be signed (deleted from storage, or never uploaded) is
+    // dropped rather than rendered as a dead link — a customer scanning the QR
+    // on their own sauna should not be handed a broken download.
+    const signed = await signDocumentUrls(
+      supabase,
+      [...rawManuals.map((m) => m.url), rawCertificateUrl]
+    );
+    const manuals = rawManuals
+      .map((m) => ({ label: m.label, url: signed.get(m.url.trim()) ?? null }))
+      .filter((m): m is { label: string; url: string } => Boolean(m.url));
+    const warrantyCertificateUrl = rawCertificateUrl
+      ? signed.get(rawCertificateUrl.trim()) ?? null
+      : null;
 
     const heaterOptions: string[] = Array.isArray(product.heater_options) ? product.heater_options : [];
 
