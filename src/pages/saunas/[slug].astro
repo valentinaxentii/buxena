@@ -13,6 +13,7 @@ import NaturalWoodNote from '../../components/NaturalWoodNote.astro';
 import RitualKit from '../../components/RitualKit.astro';
 import ProductConfigurator from '../../components/ProductConfigurator.astro';
 import ProductGallery from '../../components/ProductGallery.astro';
+import ProductConfigPending from '../../components/ProductConfigPending.astro';
 import { groupSpecs } from '../../lib/product-specs';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
@@ -390,8 +391,10 @@ const breadcrumbSchema = {
         and project CTAs instead, and installation is asked once in the quote
         form where EVERY model asks it. Turns itself on automatically when
         verified options are added to the model's frontmatter. */}
-    {shouldShowConfigurator(data) && (
+    {shouldShowConfigurator(data) ? (
       <ProductConfigurator model={data} displayName={displayTitle(data.title)} />
+    ) : (
+      <ProductConfigPending displayName={displayTitle(data.title)} model={data.title} />
     )}
 
     <section class="band">

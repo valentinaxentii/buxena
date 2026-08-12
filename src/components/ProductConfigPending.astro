@@ -1,0 +1,140 @@
+---
+/**
+ * Shown in place of the configurator on a model whose options are not yet
+ * confirmed with the manufacturer.
+ *
+ * The alternative was to render nothing, which is what the page did before.
+ * That is worse in both directions: a customer comparing an EDA barrel against
+ * a VIRU sees one page offering choices and one offering silence, and reads it
+ * as the EDA having none — when in fact the EDA line is configurable and we
+ * are simply waiting on Capra (see docs/capra-pricing-request.md §14).
+ *
+ * So the page says what is true: the choices exist, they are being confirmed,
+ * and a specialist will walk through them. That is honest, it keeps the two
+ * page types visually consistent, and it converts — the CTA is the same one
+ * the configurator ends with.
+ *
+ * NOTHING HERE IS A SPECIFICATION. No option, heater, timber or upgrade is
+ * named, because none is verified for these models. When the data arrives this
+ * component stops rendering on its own: shouldShowConfigurator() flips to true
+ * from the model's own frontmatter and the real configurator takes over. No UI
+ * rewrite, no page to remember to update.
+ */
+interface Props {
+  /** Customer-facing model name. */
+  displayName: string;
+  /** Internal title, for analytics. */
+  model: string;
+}
+const { displayName, model } = Astro.props;
+---
+
+<section class="band band--deep" id="configure">
+  <div class="shell">
+    <div class="sec-head">
+      <span class="eyebrow">Configure This Sauna</span>
+      <h2 class="h2 measure--tight">Specified with you directly</h2>
+      <p class="lead measure">
+        The {displayName} is built to order, and its options — timber, heater,
+        glazing and finish — are confirmed with you before anything is ordered.
+        We are finalising the published option list with the manufacturer, so
+        rather than show a partial list here, a specialist walks you through the
+        choices that apply to your project.
+      </p>
+    </div>
+
+    <div class="cfgp">
+      <div class="cfgp__body">
+        <h3 class="cfgp__h">What a specialist confirms with you</h3>
+        <ul class="cfgp__list">
+          <li>Timber and exterior finish for this length</li>
+          <li>Heater type and the correct output for the cabin volume</li>
+          <li>Controls, and the electrical supply your site needs</li>
+          <li>Glazing, door and roof specification</li>
+          <li>Delivery to your ZIP code, and how it is installed</li>
+        </ul>
+        <p class="cfgp__note">
+          Every line is itemised in your written quote before anything is
+          committed. We do not publish a specification we have not confirmed.
+        </p>
+      </div>
+
+      <div class="cfgp__cta-card">
+        <p class="cfgp__cta-eyebrow">Your sauna</p>
+        <p class="cfgp__cta-model">{displayName}</p>
+        <p class="cfgp__cta-price">Exact package pricing will be confirmed by BUXENA.</p>
+        <a
+          class="btn btn--bronze cfgp__cta"
+          href="#enquire"
+          data-track="product_quote_cta"
+          data-track-model={model}
+          data-track-cta="config_pending_exact_quote"
+        >Get My Exact Quote</a>
+        <a class="btn btn--ghost cfgp__cta" href="/start-your-project/">Start Your Project</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .cfgp {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    margin-top: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  }
+  @media (min-width: 900px) {
+    .cfgp { grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr); align-items: start; }
+  }
+
+  .cfgp__body { min-width: 0; }
+  .cfgp__h {
+    margin: 0 0 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .cfgp__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.65rem; }
+  .cfgp__list li {
+    position: relative;
+    padding-left: 1.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  .cfgp__list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 0.4rem;
+    height: 1px;
+    background: var(--bronze);
+  }
+  .cfgp__note { margin: 1.1rem 0 0; font-size: 0.8125rem; line-height: 1.65; color: var(--muted); }
+
+  .cfgp__cta-card {
+    padding: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+    background: var(--linen);
+    border: 1px solid var(--bronze-soft);
+  }
+  .cfgp__cta-eyebrow {
+    margin: 0;
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+  }
+  .cfgp__cta-model {
+    margin: 0.35rem 0 1rem;
+    font-family: var(--font-display, inherit);
+    font-size: 1.35rem;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+  .cfgp__cta-price { margin: 0 0 1.1rem; font-size: 0.875rem; line-height: 1.6; color: var(--bronze-ink); }
+  .cfgp__cta { width: 100%; text-align: center; }
+  .cfgp__cta + .cfgp__cta { margin-top: 0.6rem; }
+</style>

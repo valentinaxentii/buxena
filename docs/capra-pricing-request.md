@@ -5,8 +5,17 @@ Finalised 2026-08-11 for founder review. **Not sent.**
 **To:** Andres Sokk — andres.sokk@capra.ee — +372 5618 5580
 **Manufacturer:** Capra · Estonia
 **Covers:** 24 BUXENA models — ELLA ×2, ILLI ×2, ALLA ×2, UKU ×2, 16 EDA barrels
-**Why first:** unlocks dealer EXW for 21 models currently missing it, plus the
-image-permission answer blocking 48 assets in `docs/image-rights-register.md`.
+**Why first:** unlocks dealer EXW for 21 models currently missing it, the
+image-permission answer blocking 48 assets in `docs/image-rights-register.md`,
+and — via §14 — the configuration data that currently keeps the configurator
+switched off on 16 of our 32 sellable models (every EDA barrel).
+
+**Already verified for EDA — deliberately NOT re-asked in §14:** the 16 models
+and their capacities, length and height per model, roof (bitumen shingle),
+and the standard door (tempered glass, brown-tinted). §1 still asks Capra to
+confirm the range and each model's correct designation, because our size list
+is marked "exact sizes unconfirmed" in
+`docs/master-supplier-product-status.md`.
 
 **Deliberate exclusions** (do not reintroduce): no "startup" framing, no
 competitor research, no intended retail markup, no internal BUH- codes.
@@ -77,7 +86,35 @@ distribution arrangements apply to any of the models above.
 Please confirm **in writing** whether BUXENA may use your product photography,
 technical drawings, dimensional data, manuals and installation documents on
 our U.S. website, in printed brochures, in **advertising**, and in customer
-proposals.
+proposals. Where available, please also send the files themselves — dimension
+drawings, floor plans, installation manuals, electrical guides, foundation
+requirements, heater manuals and warranty documents.
+
+**14 · Configurable options — the EDA barrel line**
+Our website lets a customer specify their sauna before requesting a quote. For
+the EDA line we currently show no options, because we will not list a choice we
+cannot confirm. Please complete the table below for **each EDA model** (or tell
+us the answer is identical across the line, which is just as useful):
+
+| | What we need |
+|---|---|
+| Timber | Which sizes are available in Nordic spruce, and which in thermowood — is every length offered in both? |
+| Supply format | Is each model offered as a flat-pack kit, factory-assembled, or both? |
+| Heaters — electric | The specific electric heaters approved for each model, with the correct kW for that cabin volume |
+| Heaters — wood | The specific wood-burning heaters approved for each model, and the flue/chimney kit required |
+| Controllers | Which control units pair with each heater, and which are built-in versus separate |
+| Glass and front | Options beyond the standard brown-tinted glass door — panoramic front, full-glass, clear or bronze glazing |
+| Door | Hinge side, whether it is reversible, and whether the door can be specified left or right |
+| Roof | Options beyond bitumen shingle |
+| Benches and layout | Bench material options, and any layout variants (e.g. with or without a changing room) |
+| Included as standard | Exactly what the base price includes — benches, door, roof, hardware, stones, chimney, lighting |
+| Optional upgrades | Everything orderable as an extra, with dealer pricing per item |
+| Electrical | Supply requirement per model and heater — kW, phase, and recommended breaker |
+| Accessories | Your accessory range with dealer pricing |
+
+Two clarifications that matter most, if the table is too much detail to send at
+once: **which heaters are approved for which EDA model**, and **what the base
+price includes**. Those two answers alone let us present the EDA line properly.
 
 Once we have this information we can confirm model selection, container
 composition and order timing.
