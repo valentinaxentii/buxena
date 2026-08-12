@@ -26,19 +26,21 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
 
 <div class="pupload" data-pupload>
   <span class="pupload__label">{label}</span>
-  <label class="pupload__drop" for={id}>
+  <label class="pupload__drop" for={id} data-pupload-zone>
     <input
       id={id}
       type="file"
-      accept="image/jpeg,image/png,image/webp,application/pdf"
+      accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
       multiple
-      capture="environment"
       data-pupload-input
     />
     <span class="pupload__cta">Add photos or plans</span>
-    <span class="pupload__hint">JPG, PNG, WEBP or PDF — kept private, never public</span>
+    <span class="pupload__hint">
+      JPG, PNG, WEBP or PDF — drag them here or click to browse. Kept private, never public.
+    </span>
   </label>
   <ul class="pupload__list" data-pupload-list></ul>
+  <p class="pupload__status" data-pupload-status role="status" aria-live="polite"></p>
   <input type="hidden" name="uploadMeta" data-pupload-meta />
 </div>
 
@@ -76,9 +78,19 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
   }
   .pupload__hint { font-size: 0.8125rem; color: var(--muted); }
 
+  /* Active drag state — the zone has to visibly become a target, otherwise a
+     customer cannot tell whether releasing here will work. */
+  .pupload__drop.is-dragover {
+    border-color: var(--bronze);
+    border-style: solid;
+    background: var(--linen-deep);
+  }
+  .pupload__drop.is-dragover .pupload__cta { color: var(--ink); }
+
   .pupload__list { display: grid; gap: 0.3rem; }
   .pupload__list li {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
     font-size: 0.8125rem;
@@ -86,47 +98,204 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
     padding: 0.35rem 0;
     border-bottom: 1px solid var(--line);
   }
+  .pupload__file { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+  .pupload__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .pupload__size { flex: 0 0 auto; }
+
+  .pupload__remove {
+    flex: 0 0 auto;
+    padding: 0.15rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .pupload__remove:hover { border-color: var(--bronze); color: var(--ink); }
+  .pupload__remove:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
+
+  .pupload__status { margin: 0; font-size: 0.8125rem; color: var(--muted); }
+  .pupload__status:empty { display: none; }
+  .pupload__status--error { color: #9a3d1c; }
 </style>
 
 <script>
   import { track } from '../lib/track';
 
+  /**
+   * PAGE-WIDE GUARD — the actual bug fix.
+   *
+   * A browser's default action for a file dropped anywhere on a document is to
+   * NAVIGATE to that file. The drop zone was a <label> that merely looked like
+   * a drop target: nothing listened for drop, so releasing a file over it fell
+   * through to the default and Chrome left the site for
+   * file:///C:/Users/…/cube.png — losing everything the customer had typed
+   * into the form.
+   *
+   * Preventing the default only on the zone itself is not enough. A drop that
+   * lands one pixel outside it, or on the page while the customer is aiming,
+   * still navigates. So the default is cancelled for FILE drags across the
+   * whole window.
+   *
+   * Scoped to file drags on purpose: dragging selected TEXT into an input is a
+   * real browser feature people use, and a blanket preventDefault would break
+   * it. `types` contains 'Files' only when the payload is actual files.
+   */
+  const isFileDrag = (event: DragEvent): boolean =>
+    Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+  // Module scope: Astro bundles this once per page, so this runs once no matter
+  // how many upload controls the page has.
+  window.addEventListener('dragover', (event: DragEvent) => {
+    if (isFileDrag(event)) event.preventDefault();
+  });
+  window.addEventListener('drop', (event: DragEvent) => {
+    if (isFileDrag(event)) event.preventDefault();
+  });
+
+  // Accept/reject rules live in lib/project-upload-files.ts so they can be
+  // unit-tested without a browser — see tests/project-upload-files.test.ts.
+  import {
+    buildUploadMeta,
+    formatFileSize as fmtSize,
+    mergeProjectFiles,
+  } from '../lib/project-upload-files';
+
   document.querySelectorAll<HTMLElement>('[data-pupload]').forEach((root) => {
     const input = root.querySelector<HTMLInputElement>('[data-pupload-input]')!;
+    const zone = root.querySelector<HTMLElement>('[data-pupload-zone]')!;
     const list = root.querySelector<HTMLElement>('[data-pupload-list]')!;
+    const status = root.querySelector<HTMLElement>('[data-pupload-status]')!;
     const meta = root.querySelector<HTMLInputElement>('[data-pupload-meta]')!;
+
+    /**
+     * The attached files. This array — not input.files — is the source of
+     * truth, because a drop and a click both have to land in the same place,
+     * and because a file has to be removable. input.files is kept in step so
+     * the control still behaves like a normal file input to anything else.
+     */
+    let attached: File[] = [];
     let started = false;
 
-    input.addEventListener('change', () => {
-      const files = Array.from(input.files ?? []);
+    /** Mirror `attached` back into the real input via DataTransfer. */
+    function syncInput() {
+      const dt = new DataTransfer();
+      attached.forEach((f) => dt.items.add(f));
+      input.files = dt.files;
+    }
+
+    function setStatus(message: string, isError = false) {
+      status.textContent = message;
+      status.classList.toggle('pupload__status--error', isError);
+    }
+
+    function render() {
       list.innerHTML = '';
-
-      if (!started && files.length > 0) {
-        started = true;
-        track('project_upload_started', { fileCount: files.length });
-      }
-
-      const fmtSize = (bytes: number) =>
-        bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
-
-      files.forEach((f) => {
+      attached.forEach((file, index) => {
         const li = document.createElement('li');
+
+        const detail = document.createElement('span');
+        detail.className = 'pupload__file';
         const name = document.createElement('span');
-        name.textContent = f.name;
+        name.className = 'pupload__name';
+        name.textContent = file.name;
         const size = document.createElement('span');
-        size.textContent = fmtSize(f.size);
-        li.append(name, size);
+        size.className = 'pupload__size';
+        size.textContent = fmtSize(file.size);
+        detail.append(name, size);
+
+        // type="button" — inside a lead form, a default-type button submits it.
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'pupload__remove';
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.addEventListener('click', () => {
+          attached.splice(index, 1);
+          syncInput();
+          render();
+          setStatus(attached.length ? `${attached.length} file(s) attached.` : 'File removed.');
+        });
+
+        li.append(detail, remove);
         list.appendChild(li);
       });
 
-      // Metadata only — the enquiry tells staff what to request by email.
-      meta.value = files.length
-        ? `Customer prepared ${files.length} file(s): ${files.map((f) => `${f.name} (${fmtSize(f.size)})`).join(', ')} — PRIVATE project data, request by email reply; files were not transmitted.`
-        : '';
+      // Metadata only — the files themselves never leave the browser, so the
+      // enquiry tells staff exactly what to ask for by email reply.
+      meta.value = buildUploadMeta(attached);
+    }
 
-      if (files.length > 0) {
-        track('project_upload_completed', { fileCount: files.length });
+    function addFiles(incoming: File[]) {
+      const { files, rejected, added: addedCount } = mergeProjectFiles(attached, incoming);
+      attached = files;
+
+      if (!started && attached.length > 0) {
+        started = true;
+        track('project_upload_started', { fileCount: attached.length });
       }
+
+      syncInput();
+      render();
+
+      if (rejected.length) {
+        setStatus(`Not attached — ${rejected.join('; ')}.`, true);
+      } else if (addedCount) {
+        setStatus(`${attached.length} file(s) attached.`);
+      }
+
+      if (addedCount > 0) {
+        track('project_upload_completed', { fileCount: attached.length });
+      }
+    }
+
+    // --- click-to-select -----------------------------------------------
+    // The <label for> still opens the picker natively; this only folds the
+    // result into the same state a drop uses. Assigning input.files does NOT
+    // fire `change`, so there is no loop back into this handler.
+    input.addEventListener('change', () => {
+      addFiles(Array.from(input.files ?? []));
+    });
+
+    // --- drag and drop --------------------------------------------------
+    // dragenter/dragover must BOTH preventDefault: without it the element is
+    // not a valid drop target and the browser refuses the drop (and then
+    // navigates instead). A counter tracks enter/leave because moving the
+    // pointer over a child element fires dragleave on the parent, which would
+    // otherwise flicker the highlight off mid-drag.
+    let depth = 0;
+
+    zone.addEventListener('dragenter', (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      depth += 1;
+      zone.classList.add('is-dragover');
+    });
+
+    zone.addEventListener('dragover', (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    });
+
+    zone.addEventListener('dragleave', (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) zone.classList.remove('is-dragover');
+    });
+
+    // Bound to the whole control, not just the dashed box: a near-miss on the
+    // caption or the file list attaches the file rather than doing nothing.
+    root.addEventListener('drop', (event: DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      depth = 0;
+      zone.classList.remove('is-dragover');
+      addFiles(Array.from(event.dataTransfer?.files ?? []));
     });
   });
 </script>
