@@ -4,6 +4,10 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 let product: any = null;
@@ -17,6 +21,7 @@ try {
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
     if (String(form.get('_intent')) === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       await supabase.from('products').delete().eq('id', id);
       return Astro.redirect('/admin/products');
     }
@@ -159,10 +164,12 @@ const salesFlags = [
         </div>
       </form>
 
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this product? This cannot be undone.');">
+      {canDelete && (
+        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this product? This cannot be undone.');">
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Product</button>
-      </form>
+        </form>
+      )}
     </div>
 
     <aside class="pd__right">

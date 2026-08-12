@@ -47,18 +47,22 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   context.locals.staffUser = user;
 
-  // Role enforcement for admin-only routes. Resolved once here and published
-  // on `locals` so the page's own requireAdmin() check and AdminLayout's
-  // sidebar both reuse it instead of re-querying.
+  // Resolve the role ONCE per admin request and publish it on `locals`. Three
+  // consumers share it: this file's admin-only gate below, each page's own
+  // requireAdmin()/isAdminStaff() check, and AdminLayout's sidebar. Resolving
+  // it here rather than in each of them means one query per request instead of
+  // three, and removes any chance of the three disagreeing.
   //
-  // A missing profiles row counts as NOT admin (least privilege), and a
-  // failed lookup counts as NOT admin either — see lib/staff-access.ts for
-  // why that fails closed rather than open.
-  if (user && isAdminOnlyPath(pathname)) {
+  // A missing profiles row counts as NOT admin (least privilege), and a failed
+  // lookup counts as NOT admin either — see lib/staff-access.ts for why that
+  // fails closed rather than open.
+  if (user && isAdminRoute) {
     const lookup = await lookupStaffRole(user.id);
     context.locals.staffRole = lookup.role;
     context.locals.staffRoleResolved = lookup.resolved;
-    if (!isAdminRole(lookup)) {
+    context.locals.staffFullName = lookup.fullName;
+
+    if (isAdminOnlyPath(pathname) && !isAdminRole(lookup)) {
       return context.redirect(denyRedirectPath(lookup));
     }
   }

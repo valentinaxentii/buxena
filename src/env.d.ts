@@ -11,5 +11,7 @@ declare namespace App {
      * Undefined means no lookup has run for this request yet.
      */
     staffRoleResolved?: boolean;
+    /** Display name from the staff member's profile, when there is one. */
+    staffFullName?: string | null;
   }
 }

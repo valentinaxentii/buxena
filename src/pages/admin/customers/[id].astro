@@ -5,7 +5,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 
+const canDelete = await isAdminStaff(Astro);
 const { id } = Astro.params;
 let customer: any = null;
 let quotes: any[] = [];
@@ -20,6 +22,10 @@ try {
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
     if (String(form.get('_intent')) === 'delete') {
+      // Permanent deletion is admin-only, enforced here on the server. The
+      // button is also hidden for staff, but that is presentation — this is
+      // the control.
+      if (!canDelete) return refuseDelete(Astro);
       await supabase.from('customers').delete().eq('id', id);
       return Astro.redirect('/admin/customers');
     }
@@ -117,10 +123,12 @@ try {
         {documents.length === 0 && <p class="admin-empty">No documents yet.</p>}
       </div>
 
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this customer? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Customer</button>
-      </form>
+      {canDelete && (
+        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this customer? This cannot be undone.');">
+          <input type="hidden" name="_intent" value="delete" />
+          <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Customer</button>
+        </form>
+      )}
     </>
   )}
 </AdminLayout>

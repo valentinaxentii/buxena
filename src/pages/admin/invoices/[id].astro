@@ -4,8 +4,12 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { issueInvoiceNumber } from '../../../lib/invoice-number';
 import { generateUnitQrDataUrl } from '../../../lib/qr';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 
@@ -67,6 +71,7 @@ try {
         else return Astro.redirect(`/admin/invoices/${id}`);
       }
     } else if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       if (current.status !== 'draft' || current.invoice_number) {
         error = 'Only unnumbered drafts can be deleted — issued invoices are permanent.';
       } else {
@@ -305,7 +310,7 @@ const numberLine = invoice ? (invoice.invoice_number ?? '— unassigned (draft)'
       )}
 
       <div class="inv-actions">
-        {isDraft && (
+        {isDraft && canDelete && (
           <form method="POST" onsubmit="return confirm('Delete this draft? Drafts have no number, so nothing is consumed and no gap is created.');" style="margin:0;">
             <input type="hidden" name="_intent" value="delete" />
             <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Draft</button>

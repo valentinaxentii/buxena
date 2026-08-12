@@ -6,8 +6,12 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { releaseInventoryUnit } from '../../../lib/inventory-reservation';
 import { assignUnitToOrder, unassignUnitFromOrder } from '../../../lib/inventory-units';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 const STATUSES = [
@@ -35,6 +39,7 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       const { data: existing } = await supabase.from('orders').select('product_id, products(unit_tracked)').eq('id', id).single();
       const isUnitTracked = !!(existing as any)?.products?.unit_tracked;
       if (isUnitTracked) {
@@ -252,10 +257,12 @@ function money(n: number | null | undefined): string {
         </div>
       </form>
 
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
+      {canDelete && (
+        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Order</button>
-      </form>
+        </form>
+      )}
     </>
   )}
 </AdminLayout>

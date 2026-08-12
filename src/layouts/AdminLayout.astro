@@ -4,6 +4,7 @@ export const prerender = false;
 import { createSupabaseAdminClient } from '../lib/supabase-admin';
 import { getSettings, FALLBACK_SETTINGS, type BuxenaSettings } from '../lib/settings';
 import { docThemeCssVars } from '../lib/doc-theme';
+import { wasDeleteRefused, DELETE_REQUIRES_ADMIN } from '../lib/staff-access';
 import ExportMenu from '../components/admin/ExportMenu.astro';
 import '../styles/admin-print.css';
 
@@ -78,24 +79,16 @@ let printSettings: BuxenaSettings = FALLBACK_SETTINGS;
 try {
   const staffUser = Astro.locals.staffUser;
   if (staffUser) {
-    const supabase = createSupabaseAdminClient();
-    const [{ data: profile }, settings] = await Promise.all([
-      supabase.from('profiles').select('full_name, role').eq('id', staffUser.id).single(),
-      getSettings(supabase),
-    ]);
-    staffLabel = profile?.full_name || staffUser.email || null;
-    // On admin-only routes the middleware has already resolved the role for
-    // this request — prefer that over this page-level read, so the two layers
-    // can never disagree about what the sidebar shows versus what the server
-    // enforces.
-    staffRole = Astro.locals.staffRoleResolved
-      ? Astro.locals.staffRole ?? null
-      : profile?.role ?? null;
+    // Name and role both come from the lookup the middleware already did for
+    // this request — no second profiles query here, and no way for the sidebar
+    // to show a role different from the one the server is enforcing.
+    staffLabel = Astro.locals.staffFullName || staffUser.email || null;
+    staffRole = Astro.locals.staffRole ?? null;
     staffSublabel = staffRole ? staffRole.charAt(0).toUpperCase() + staffRole.slice(1) : null;
-    printSettings = settings;
+    printSettings = await getSettings(createSupabaseAdminClient());
   }
 } catch {
-  staffLabel = Astro.locals.staffUser?.email ?? null;
+  staffLabel = Astro.locals.staffFullName || Astro.locals.staffUser?.email || null;
 }
 
 // Settings (business config + staff accounts) is admin-only. Authorisation is
@@ -106,6 +99,8 @@ try {
 const visibleNavItems = navItems.filter(
   (item) => item.href !== '/admin/settings' || staffRole === 'admin'
 );
+
+const deleteRefused = wasDeleteRefused(Astro);
 
 const printGeneratedAt = new Date();
 
@@ -374,6 +369,12 @@ const initials = (staffLabel ?? '')
           <p class="print-form-notice" aria-hidden="true">
             This is an editing view. To print this record, open its detail page and print from there.
           </p>
+          {/* Bounce from a delete refused by role. Rendered here, once, rather
+              than in each of the twelve record pages that can refuse one —
+              same wording everywhere, and a new record type gets it free. */}
+          {deleteRefused && (
+            <p class="admin-denied" role="alert">{DELETE_REQUIRES_ADMIN}</p>
+          )}
           <slot />
           {/* print-only footer: address lines left (no company name), status right */}
           <div class="print-footer" aria-hidden="true">
@@ -401,6 +402,16 @@ const initials = (staffLabel ?? '')
 </html>
 
 <style>
+  .admin-denied {
+    margin: 0 0 1.25rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: #e6b7a0;
+    background: rgba(230, 130, 90, 0.06);
+    border: 1px solid rgba(230, 130, 90, 0.35);
+    border-radius: 3px;
+  }
+
   * { box-sizing: border-box; }
 
   :root {

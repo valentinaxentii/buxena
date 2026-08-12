@@ -6,6 +6,10 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
@@ -34,6 +38,7 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       await supabase.from('quotes').delete().eq('id', id);
       return Astro.redirect('/admin/quotes');
     }
@@ -209,10 +214,12 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
         <div class="admin-form__actions"><button class="admin-btn admin-btn--ghost" type="submit">+ Add Item</button></div>
       </form>
 
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this quote? This cannot be undone.');">
+      {canDelete && (
+        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this quote? This cannot be undone.');">
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Quote</button>
-      </form>
+        </form>
+      )}
     </>
   )}
 </AdminLayout>

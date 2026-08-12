@@ -5,8 +5,12 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
 import { ensureExpectedUnitsForShipment } from '../../../lib/inventory-units';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 
@@ -35,6 +39,7 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       await supabase.from('shipments').delete().eq('id', id);
       return Astro.redirect('/admin/shipments');
     }

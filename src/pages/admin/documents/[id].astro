@@ -4,8 +4,12 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { normalizeDocumentUrl, resolveDocumentHref, documentLinkLabel } from '../../../lib/document-url';
 import { uploadDocumentFile, deleteDocumentFile, MAX_UPLOAD_BYTES } from '../../../lib/document-storage';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
 const CATEGORIES = [
@@ -32,6 +36,7 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       const { data: doomed } = await supabase.from('documents').select('file_url').eq('id', id).single();
       await supabase.from('documents').delete().eq('id', id);
       if (doomed?.file_url) await deleteDocumentFile(supabase, doomed.file_url);
@@ -178,10 +183,12 @@ const previewIsSite =
         </div>
       </form>
 
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this document record? This cannot be undone.');">
+      {canDelete && (
+        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this document record? This cannot be undone.');">
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Record</button>
-      </form>
+        </form>
+      )}
       </div>
 
       <aside class="doc-preview" id="doc-preview" data-kind={previewKind}>

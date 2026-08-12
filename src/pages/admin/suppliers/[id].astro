@@ -4,7 +4,11 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
 import { COUNTRIES, FREQUENT_COUNTRIES } from '../../../lib/countries';
+
+// Permanent deletion is admin-only; enforced server-side in the handler below.
+const canDelete = await isAdminStaff(Astro);
 
 const ACTIVE_INCOMING_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
 
@@ -29,6 +33,7 @@ try {
     const intent = String(form.get('_intent') ?? 'update');
 
     if (intent === 'delete') {
+      if (!canDelete) return refuseDelete(Astro);
       await supabase.from('suppliers').delete().eq('id', id);
       return Astro.redirect('/admin/suppliers');
     }
@@ -222,10 +227,12 @@ function money(n: number | null | undefined, currency?: string | null): string {
         {supplierProducts.length === 0 && <p class="admin-empty">No models linked to this supplier yet.</p>}
       </div>
 
-      <form method="POST" style="margin-top:2rem;" onsubmit="return confirm('Delete this supplier? This cannot be undone.');">
+      {canDelete && (
+        <form method="POST" style="margin-top:2rem;" onsubmit="return confirm('Delete this supplier? This cannot be undone.');">
         <input type="hidden" name="_intent" value="delete" />
         <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Supplier</button>
-      </form>
+        </form>
+      )}
     </>
   )}
 </AdminLayout>
