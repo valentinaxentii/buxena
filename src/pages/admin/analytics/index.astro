@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 
 const from = Astro.url.searchParams.get('from') ?? '';
 const to = Astro.url.searchParams.get('to') ?? '';
@@ -57,12 +58,23 @@ function topEntries(obj: Record<string, number>, limit = 8): [string, number][] 
 
 try {
   const supabase = createSupabaseAdminClient();
+  // Archived records must not skew the numbers this page reports.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
 
-  let leadsQuery = supabase.from('leads').select('id, source, status, budget, product_id, created_at');
+  let leadsQuery = activeDb.from('leads').select('id, source, status, budget, product_id, created_at');
   if (from) leadsQuery = leadsQuery.gte('created_at', from);
   if (to) leadsQuery = leadsQuery.lte('created_at', `${to}T23:59:59`);
 
-  let quotesQuery = supabase.from('quotes').select('id, status, total, quote_date');
+  let quotesQuery = activeDb.from('quotes').select('id, status, total, quote_date');
   if (from) quotesQuery = quotesQuery.gte('quote_date', from);
   if (to) quotesQuery = quotesQuery.lte('quote_date', to);
 
@@ -76,9 +88,9 @@ try {
     leadsQuery.limit(5000),
     quotesQuery.limit(5000),
     ordersQuery.limit(5000),
-    supabase.from('products').select('id, model_name, cost'),
-    supabase.from('suppliers').select('id, name'),
-    supabase.from('inventory').select('in_stock, incoming, reserved, available, landed_cost, product_id'),
+    activeDb.from('products').select('id, model_name, cost'),
+    activeDb.from('suppliers').select('id, name'),
+    activeDb.from('inventory').select('in_stock, incoming, reserved, available, landed_cost, product_id'),
   ]);
 
   const leads = leadsRes.data ?? [];

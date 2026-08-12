@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
 
 const OPEN_QUOTE_STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating'];
@@ -15,11 +16,22 @@ let dbReady = true;
 
 try {
   const supabase = createSupabaseAdminClient();
+  // Archived records must not skew the numbers this page reports.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
   const [productsRes, inventoryRes, ordersRes, quotesRes, supplierProductsRes] = await Promise.all([
-    supabase.from('products').select('id, model_name, cost, is_active, supplier_id, suppliers(name, typical_lead_time_days)').order('model_name'),
-    supabase.from('inventory').select('product_id, in_stock, incoming'),
-    supabase.from('orders').select('product_id, selling_price, product_cost, gross_profit, created_at, status'),
-    supabase.from('quotes').select('product_id, status, total, created_at'),
+    activeDb.from('products').select('id, model_name, cost, is_active, supplier_id, suppliers(name, typical_lead_time_days)').order('model_name'),
+    activeDb.from('inventory').select('product_id, in_stock, incoming'),
+    activeDb.from('orders').select('product_id, selling_price, product_cost, gross_profit, created_at, status'),
+    activeDb.from('quotes').select('product_id, status, total, created_at'),
     supabase.from('supplier_products').select('supplier_id, product_id, lead_time_days'),
   ]);
 

@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import '../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../lib/archive';
 
 const PIPELINE_STAGES = ['New Lead', 'Contacted', 'Qualified', 'Quote Sent', 'Negotiating', 'Won', 'Lost'];
 const OPEN_QUOTE_STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating'];
@@ -64,6 +65,28 @@ try {
   const supabase = createSupabaseAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
+  // Archived records must not steer the business's read on itself. An archived
+  // lead still counting in the pipeline, or an archived invoice still inside
+  // the outstanding balance, would make archiving pointless — the record is
+  // hidden from its list but still driving decisions.
+  //
+  // `activeDb.from(...).select(...)` is `supabase.from(...).select(...)` with
+  // the active-records filter already applied, so every query below reads
+  // normally and none can forget it. A no-op until the migration is applied.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      // Cast to the real `select` signature rather than `any`: an `any` here
+      // propagates into every `.data` below and silently drops the row types
+      // that caught the Promise.all misalignment bug.
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
+
   const [
     leadRows,
     followUpRows,
@@ -85,16 +108,16 @@ try {
     newEnquiryCountRows,
     followUpCountRows,
   ] = await Promise.all([
-    supabase.from('leads').select('status, budget'),
-    supabase
+    activeDb.from('leads').select('status, budget'),
+    activeDb
       .from('leads')
       .select('id, name, follow_up_date')
       .lte('follow_up_date', today)
       .not('status', 'in', '("Won","Lost")')
       .order('follow_up_date', { ascending: true })
       .limit(4),
-    supabase.from('quotes').select('total').in('status', OPEN_QUOTE_STATUSES),
-    supabase
+    activeDb.from('quotes').select('total').in('status', OPEN_QUOTE_STATUSES),
+    activeDb
       .from('quotes')
       .select('id, quote_number, expiry_date, customers(name)')
       .in('status', OPEN_QUOTE_STATUSES)
@@ -102,32 +125,32 @@ try {
       .lte('expiry_date', daysFromNow(EXPIRY_SOON_DAYS))
       .order('expiry_date', { ascending: true })
       .limit(4),
-    supabase.from('orders').select('selling_price, status').not('status', 'in', '("Delivered","Installed")'),
-    supabase.from('inventory').select('in_stock, incoming'),
-    supabase
+    activeDb.from('orders').select('selling_price, status').not('status', 'in', '("Delivered","Installed")'),
+    activeDb.from('inventory').select('in_stock, incoming'),
+    activeDb
       .from('inventory')
       .select('id, available, products(model_name)')
       .lte('available', LOW_STOCK_THRESHOLD)
       .order('available', { ascending: true })
       .limit(4),
-    supabase
+    activeDb
       .from('inventory')
       .select('id, eta, products(model_name)')
       .gte('eta', today)
       .lte('eta', daysFromNow(ETA_SOON_DAYS))
       .order('eta', { ascending: true })
       .limit(4),
-    supabase.from('enquiries').select('id, name, source, created_at').eq('status', 'New').order('created_at', { ascending: false }).limit(4),
-    supabase.from('leads').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
-    supabase.from('quotes').select('id, quote_number, created_at').order('created_at', { ascending: false }).limit(6),
-    supabase.from('orders').select('id, order_number, created_at').order('created_at', { ascending: false }).limit(6),
-    supabase.from('customers').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
-    supabase.from('enquiries').select('id, name, source, created_at').order('created_at', { ascending: false }).limit(6),
-    supabase.from('orders').select('product_id, products(model_name)').not('product_id', 'is', null),
+    activeDb.from('enquiries').select('id, name, source, created_at').eq('status', 'New').order('created_at', { ascending: false }).limit(4),
+    activeDb.from('leads').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
+    activeDb.from('quotes').select('id, quote_number, created_at').order('created_at', { ascending: false }).limit(6),
+    activeDb.from('orders').select('id, order_number, created_at').order('created_at', { ascending: false }).limit(6),
+    activeDb.from('customers').select('id, name, created_at').order('created_at', { ascending: false }).limit(6),
+    activeDb.from('enquiries').select('id, name, source, created_at').order('created_at', { ascending: false }).limit(6),
+    activeDb.from('orders').select('product_id, products(model_name)').not('product_id', 'is', null),
     // NEW (read-only): outstanding invoice balances — drafts and voids excluded
-    supabase.from('invoices').select('balance_due, due_date, status').in('status', ['issued', 'partially_paid', 'overdue']),
+    activeDb.from('invoices').select('balance_due, due_date, status').in('status', ['issued', 'partially_paid', 'overdue']),
     // NEW (read-only): earliest inbound container not yet received/cancelled
-    supabase.from('shipments').select('eta, container_number, total_units, status').not('status', 'in', '("Received","Cancelled")').not('eta', 'is', null).order('eta', { ascending: true }).limit(1),
+    activeDb.from('shipments').select('eta, container_number, total_units, status').not('status', 'in', '("Received","Cancelled")').not('eta', 'is', null).order('eta', { ascending: true }).limit(1),
     // The two head:true count queries stay LAST, matching the final two names
     // in the destructuring above. They previously sat mid-array while their
     // names sat at the end, which silently shifted every result after
@@ -136,8 +159,8 @@ try {
     // always totalled 0, and both KPI counts fell back to their capped
     // limit(4) fetches. Order here is load-bearing: keep names and queries
     // in step.
-    supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
-    supabase
+    activeDb.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'New'),
+    activeDb
       .from('leads')
       .select('id', { count: 'exact', head: true })
       .lte('follow_up_date', today)

@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import ExportMenu from '../../../components/admin/ExportMenu.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import { getSettings } from '../../../lib/settings';
 import { toCSV } from '../../../lib/date-range';
 import { buildInventoryReportPdf } from '../../../lib/pdf/build-inventory-report-pdf';
@@ -20,7 +21,18 @@ let dbReady = true;
 
 try {
   const supabase = createSupabaseAdminClient();
-  const { data } = await supabase
+  // Archived records must not skew the numbers this page reports.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
+  const { data } = await activeDb
     .from('inventory')
     .select('product_id, in_stock, reserved, available, incoming, landed_cost, products(model_name, cost, selling_price, is_active)');
   // The client is untyped (no generated database types), so supabase-js infers

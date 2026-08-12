@@ -111,6 +111,22 @@ export function withArchiveFilter<T>(query: T, supported: boolean, includeArchiv
   return includeArchived ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
 }
 
+/**
+ * Active records only — for views that have no archived mode at all.
+ *
+ * The dashboard, analytics and the reports are the business's read on itself.
+ * An archived lead still counting in the pipeline, or an archived invoice still
+ * inside the outstanding balance, makes archiving pointless: the record is
+ * hidden from the list but still steering decisions. Sub-lists on a detail page
+ * (a customer's quotes, a supplier's models) are the same — you archived it so
+ * you would stop seeing it.
+ *
+ * A no-op when the migration has not been applied.
+ */
+export function activeOnly<T>(query: T, supported: boolean): T {
+  return withArchiveFilter(query, supported, false);
+}
+
 export type ArchiveResult = { ok: true } | { ok: false; error: string };
 
 /** Archive a record. Reversible — see restoreRecord. */

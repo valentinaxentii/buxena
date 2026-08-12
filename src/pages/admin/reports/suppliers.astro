@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
 
 const ACTIVE_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
@@ -15,9 +16,20 @@ let dbReady = true;
 
 try {
   const supabase = createSupabaseAdminClient();
+  // Archived records must not skew the numbers this page reports.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
   const [suppliersRes, shipmentsRes, supplierProductsRes] = await Promise.all([
-    supabase.from('suppliers').select('id, name').order('name'),
-    supabase.from('shipments').select('id, supplier_id, order_date, status, total_units, total_product_cost, shipment_items(quantity, quantity_received)'),
+    activeDb.from('suppliers').select('id, name').order('name'),
+    activeDb.from('shipments').select('id, supplier_id, order_date, status, total_units, total_product_cost, shipment_items(quantity, quantity_received)'),
     supabase.from('supplier_products').select('supplier_id, last_price_update'),
   ]);
   const suppliers = suppliersRes.data ?? [];

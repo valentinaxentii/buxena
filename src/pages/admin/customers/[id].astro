@@ -7,6 +7,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
 import { checkOptionalZip } from '../../../lib/zip';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 
@@ -63,11 +64,15 @@ try {
     }
   }
 
+  // Sub-lists follow the same rule as the main lists: archived records are
+  // out of sight. The customer record itself still opens when archived, so
+  // it can be restored.
+  const archiveOk = await archiveSupported(supabase);
   const [customerRow, quoteRows, orderRows, documentRows] = await Promise.all([
     supabase.from('customers').select('*').eq('id', id).single(),
-    supabase.from('quotes').select('id, quote_number, status, total, quote_date').eq('customer_id', id),
-    supabase.from('orders').select('id, order_number, status, selling_price').eq('customer_id', id),
-    supabase.from('documents').select('id, category, file_name').eq('customer_id', id),
+    activeOnly(supabase.from('quotes').select('id, quote_number, status, total, quote_date').eq('customer_id', id), archiveOk),
+    activeOnly(supabase.from('orders').select('id, order_number, status, selling_price').eq('customer_id', id), archiveOk),
+    activeOnly(supabase.from('documents').select('id, category, file_name').eq('customer_id', id), archiveOk),
   ]);
 
   if (customerRow.error || !customerRow.data) notFound = true;

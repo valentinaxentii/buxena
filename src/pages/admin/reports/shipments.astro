@@ -6,6 +6,7 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import DateRangeFilter from '../../../components/admin/DateRangeFilter.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import { resolveDateRange, inRange, toCSV } from '../../../lib/date-range';
 
 const ACTIVE_STATUSES = ['Ordered', 'In Production', 'Ready to Ship', 'In Transit', 'Arrived', 'Partially Received'];
@@ -16,7 +17,18 @@ let dbReady = true;
 
 try {
   const supabase = createSupabaseAdminClient();
-  const { data } = await supabase
+  // Archived records must not skew the numbers this page reports.
+  const archiveOk = await archiveSupported(supabase);
+  const activeDb = {
+    from: (table: string) => {
+      const builder = supabase.from(table);
+      return {
+        select: ((...args: Parameters<typeof builder.select>) =>
+          activeOnly(builder.select(...args), archiveOk)) as typeof builder.select,
+      };
+    },
+  };
+  const { data } = await activeDb
     .from('shipments')
     .select('id, shipment_number, status, order_date, eta, total_units, total_product_cost, total_landed_cost, suppliers(name), shipment_items(quantity, quantity_received)')
     .order('order_date', { ascending: false });

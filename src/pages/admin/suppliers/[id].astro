@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
+import { activeOnly, archiveSupported } from '../../../lib/archive';
 import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { COUNTRIES, FREQUENT_COUNTRIES } from '../../../lib/countries';
@@ -79,14 +80,18 @@ try {
     }
   }
 
+  const archiveOk = await archiveSupported(supabase);
   const [supplierRes, supplierProductsRes, shipmentsRes] = await Promise.all([
     supabase.from('suppliers').select('*').eq('id', id).single(),
-    supabase
-      .from('supplier_products')
-      .select('*, products(model_name, category, is_active)')
-      .eq('supplier_id', id)
-      .order('created_at', { ascending: false }),
-    supabase.from('shipments').select('id, order_date, status, shipment_items(quantity, quantity_received)').eq('supplier_id', id),
+    activeOnly(
+      supabase
+        .from('supplier_products')
+        .select('*, products(model_name, category, is_active)')
+        .eq('supplier_id', id)
+        .order('created_at', { ascending: false }),
+      archiveOk
+    ),
+    activeOnly(supabase.from('shipments').select('id, order_date, status, shipment_items(quantity, quantity_received)').eq('supplier_id', id), archiveOk),
   ]);
 
   if (supplierRes.error || !supplierRes.data) notFound = true;
