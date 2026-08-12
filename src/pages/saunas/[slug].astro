@@ -11,6 +11,7 @@ import QuoteBand from '../../components/QuoteBand.astro';
 import QuoteCompare from '../../components/QuoteCompare.astro';
 import NaturalWoodNote from '../../components/NaturalWoodNote.astro';
 import RitualKit from '../../components/RitualKit.astro';
+import ProductConfigurator from '../../components/ProductConfigurator.astro';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
 import { publicPrice } from '../../data/pricing';
@@ -371,83 +372,33 @@ const breadcrumbSchema = {
     </section>
 
     <!-- Configuration & system — real options only, confirmed at quote -->
-    <section class="band band--deep" id="configure">
+    <ProductConfigurator model={data} displayName={displayTitle(data.title)} />
+
+    <section class="band">
       <div class="shell">
-        <div class="sec-head">
-          <span class="eyebrow">Configure This Sauna</span>
-          <h2 class="h2 measure--tight">Built up as one system</h2>
-          <p class="lead measure">
-            Sauna, heater, controls, lighting and accessories are specified
-            together against your site — every choice below is confirmed
-            with you in the written quote before anything is ordered.
-          </p>
-        </div>
-
-        <div class="config">
-          {(data.options?.length || null) && (
-            <div class="config__block">
-              <h3 class="config__h">Configuration options</h3>
-              <ul class="config__list">
-                {data.options!.map((o) => <li>{o}</li>)}
-              </ul>
+            <div class="config__inc">
+              <div class="config__block">
+                <h3 class="config__h">What's included</h3>
+                <ul class="config__list">
+                  <li>The sauna in your chosen configuration</li>
+                  <li>Confirmed standard equipment for the model</li>
+                  <li>Every inclusion itemised line-by-line in your written quote</li>
+                </ul>
+              </div>
+              <div class="config__block">
+                <h3 class="config__h">What's not included</h3>
+                <ul class="config__list">
+                  <li>Foundation / base preparation</li>
+                  <li>Electrical connection work (a licensed electrician)</li>
+                  <li>Permits, where your municipality requires them</li>
+                  <li>Site preparation and access equipment</li>
+                </ul>
+                <p class="config__note">
+                  Nothing here should surprise you on delivery day — your quote
+                  states exactly where our scope ends and your site work begins.
+                </p>
+              </div>
             </div>
-          )}
-          {(data.heaterOptions?.length || null) && (
-            <div class="config__block">
-              <h3 class="config__h">Heater</h3>
-              <ul class="config__list">
-                {data.heaterOptions!.map((h) => <li>{h}</li>)}
-              </ul>
-              <p class="config__note">Controls and stones are matched to the heater you choose.</p>
-            </div>
-          )}
-          {(data.features?.length || null) && (
-            <div class="config__block">
-              <h3 class="config__h">Features</h3>
-              <ul class="config__list">
-                {data.features!.map((f) => <li>{f}</li>)}
-              </ul>
-            </div>
-          )}
-          {!data.options?.length && !data.heaterOptions?.length && !data.features?.length && (
-            <p class="config__fallback">
-              Configuration choices for this model — heater, controls,
-              lighting and options — are specified with you directly.
-            </p>
-          )}
-        </div>
-
-        <div class="config__inc">
-          <div class="config__block">
-            <h3 class="config__h">What's included</h3>
-            <ul class="config__list">
-              <li>The sauna in your chosen configuration</li>
-              <li>Confirmed standard equipment for the model</li>
-              <li>Every inclusion itemised line-by-line in your written quote</li>
-            </ul>
-          </div>
-          <div class="config__block">
-            <h3 class="config__h">What's not included</h3>
-            <ul class="config__list">
-              <li>Foundation / base preparation</li>
-              <li>Electrical connection work (a licensed electrician)</li>
-              <li>Permits, where your municipality requires them</li>
-              <li>Site preparation and access equipment</li>
-            </ul>
-            <p class="config__note">
-              Nothing here should surprise you on delivery day — your quote
-              states exactly where our scope ends and your site work begins.
-            </p>
-          </div>
-        </div>
-
-        <a
-          class="btn btn--bronze config__cta"
-          href="#enquire"
-          data-track="product_configure_click"
-          data-track-model={data.title}
-          data-track-cta="configure_pricing"
-        >Configure with a Specialist</a>
       </div>
     </section>
 

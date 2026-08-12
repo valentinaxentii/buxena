@@ -58,6 +58,12 @@ export type TrackEvent =
   | 'space_specialist_click'
   | 'product_gallery_view'
   | 'product_configure_click'
+  // Interactive configurator (components/ProductConfigurator.astro). These are
+  // the funnel steps between "looked at the model" and "asked for a quote", so
+  // they are what shows whether configuring actually converts.
+  | 'product_option_selected'
+  | 'product_zip_entered'
+  | 'product_quote_cta'
   | 'product_availability_click'
   | 'product_package_view'
   | 'product_package_selected'
