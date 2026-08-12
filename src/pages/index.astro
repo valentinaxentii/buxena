@@ -44,12 +44,21 @@ const chooseTiles = [
     blurb: 'Modern form, panoramic design',
     href: '/saunas/cube-saunas/',
     count: typeCount('Cube'),
-    image: '/images/collections/cube.png',
-    alt: 'Modern black-framed cube sauna with full-height glass walls and a warm timber interior, beside a swimming pool at dusk',
-    focus: 'center center',
-    // LICENSING: carries a stock watermark — PREVIEW ONLY, must not reach
-    // production. Tracked in docs/image-rights-register.md and guarded by
-    // scripts/prelaunch-check.mjs.
+    image: '/images/saunas/nord-cube-200-hero.jpg',
+    alt: 'NORD Cube 200 sauna clad in charred black timber with a full-height glass front and glowing cedar interior, on a boardwalk across a moss field at sunset',
+    // Square source: the cabin sits in the middle band with sky above and
+    // decking below. Bias the 4:5 crop slightly up so the portrait card holds
+    // the cabin and its lit interior rather than foreground boards.
+    focus: 'center 45%',
+    // Replaces collections/cube.png, which carried a visible Dreamstime
+    // watermark — a stock mark on the homepage of a premium brand costs more
+    // trust than any image gains. This is a real model we sell (NORD Cube
+    // 200), already used on its own product page and the Plan Your Sauna
+    // choose-tile, and it has no watermark.
+    // STILL UNLICENSED: registered as BLOCKED / REPLACE (supplier catalog, no
+    // permission on record) — the same status as the other three cards. This
+    // swap removes a visible watermark; it does NOT clear the licensing
+    // blocker. See docs/image-rights-register.md.
     note: 'Cube Saunas — flat-roofed panoramic form.',
   },
   {

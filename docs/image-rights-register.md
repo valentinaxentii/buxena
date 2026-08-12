@@ -338,9 +338,15 @@ remain in place everywhere, and the register stays the launch gate.
 | File | Placement | Status |
 |---|---|---|
 | `images/collections/outdoor.png` | Outdoor Saunas card | **UNVERIFIED** — provenance not documented; treat as BLOCKED until licensed |
-| `images/collections/cube.png` | Cube Saunas card | 🔴 **BLOCKED — VISIBLE STOCK WATERMARK** (Dreamstime). Founder-flagged. **PREVIEW ONLY, MUST NOT REACH PRODUCTION.** Replace with a licensed clean file |
+| ~~`images/collections/cube.png`~~ | ~~Cube Saunas card~~ | ✅ **RESOLVED 2026-08-12 — file deleted.** Carried a visible Dreamstime watermark. Removed from the repo entirely, not just unreferenced: everything under `public/` is served on the production domain whether or not a page links to it, so an unreferenced watermarked file is still a published one. Recoverable from git history if ever needed |
+| `images/saunas/nord-cube-200-hero.jpg` | Cube Saunas card (replacement, 2026-08-12) | 🟠 **UNLICENSED — BLOCKED / REPLACE** (supplier catalog, no permission on record). No watermark. Same blocked status as the other three cards; this swap removed a visible stock mark, it did **not** clear the licensing blocker. Already used on the NORD Cube 200 product page and the Plan Your Sauna choose-tile, so it adds no new permission exposure — it is covered by the same CAPRA ask |
 | `images/collections/barrel.png` | Barrel Saunas card | **UNVERIFIED** — provenance not documented; treat as BLOCKED until licensed |
 | `images/collections/indoor.jpg` | Indoor Saunas card | **UNVERIFIED** — provenance not documented; also low-resolution (540×360) |
 
 `scripts/prelaunch-check.mjs` fails the board while any watermarked file is
 still referenced, so this cannot be published by accident.
+
+**All four category cards remain unlicensed.** Removing the watermark fixed the
+part that was visible to customers; it did not change the permission position on
+any of them. The blocker clears only when the supplier permission emails
+(`docs/supplier-permission-wording.md`) come back in writing.
