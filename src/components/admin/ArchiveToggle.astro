@@ -1,0 +1,88 @@
+---
+/**
+ * Switches a list between its active records and its archived ones.
+ *
+ * Two separate views, never a merged list with a badge: an archived record
+ * sitting inline among live ones is exactly the kind of thing someone quotes
+ * from by mistake. Going to look at archived records should be a deliberate
+ * act, and it should be obvious you are somewhere else when you get there.
+ *
+ * Renders nothing at all until the archive migration has been applied, so a
+ * project without the columns sees the interface it had before.
+ */
+interface Props {
+  /** Has the archive migration been applied? */
+  supported: boolean;
+  /** Is this page currently showing archived records? */
+  showingArchived: boolean;
+  /** How many rows are in view — shown so an empty archive reads as empty, not broken. */
+  count?: number;
+}
+const { supported, showingArchived, count } = Astro.props;
+
+// Preserve whatever else is on the URL (search text, status filters, date
+// ranges) so switching views does not silently discard the filters someone
+// just set.
+const params = new URLSearchParams(Astro.url.search);
+if (showingArchived) params.delete('archived');
+else params.set('archived', '1');
+const href = `${Astro.url.pathname}${params.toString() ? `?${params}` : ''}`;
+---
+
+{supported && (
+  <div class="arch-toggle">
+    {showingArchived ? (
+      <>
+        <span class="arch-toggle__badge">Archived</span>
+        <span class="arch-toggle__text">
+          Showing archived records{typeof count === 'number' ? ` (${count})` : ''}. These are hidden
+          from the active list. Open one to restore it.
+        </span>
+        <a class="admin-btn admin-btn--ghost arch-toggle__link" href={href}>Back to active</a>
+      </>
+    ) : (
+      <a class="arch-toggle__link arch-toggle__link--quiet" href={href}>View archived</a>
+    )}
+  </div>
+)}
+
+<style>
+  .arch-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  /* Only the archived view gets a coloured frame — the active list is the
+     normal state and should not be decorated. */
+  .arch-toggle:has(.arch-toggle__badge) {
+    padding: 0.7rem 0.9rem;
+    background: rgba(201, 166, 104, 0.07);
+    border: 1px solid rgba(201, 166, 104, 0.3);
+    border-radius: 3px;
+  }
+  .arch-toggle__badge {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--admin-gold);
+    background: rgba(201, 166, 104, 0.14);
+    border: 1px solid rgba(201, 166, 104, 0.35);
+    border-radius: 2px;
+  }
+  .arch-toggle__text {
+    flex: 1 1 16rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--admin-muted);
+  }
+  .arch-toggle__link--quiet {
+    font-size: 0.78rem;
+    color: var(--admin-muted);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(212, 184, 140, 0.25);
+  }
+  .arch-toggle__link--quiet:hover { color: var(--admin-gold); }
+</style>

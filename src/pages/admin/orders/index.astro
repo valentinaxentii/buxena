@@ -5,6 +5,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
+import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 
 const STATUSES = [
   'Deposit Received', 'Ordered', 'In Production', 'Shipped', 'At Port',
@@ -18,6 +20,9 @@ const dir = Astro.url.searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
 
 let rows: any[] = [];
 let dbReady = true;
+// Archived records are hidden from the active list; ?archived=1 shows only them.
+const showArchived = Astro.url.searchParams.get('archived') === '1';
+let archiveOk = false;
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -25,6 +30,12 @@ try {
   let query = supabase
     .from('orders_with_margin')
     .select('id, order_number, status, selling_price, deposit, balance, gross_margin_pct, eta, created_at, customer_id, product_id, customers(name), products(model_name)');
+
+  // Archived orders drop out of the active list. The filter is applied to
+  // orders_with_margin, which the migration recreates so it exposes
+  // archived_at — a view's columns are fixed when it is created.
+  archiveOk = await archiveSupported(supabase);
+  query = withArchiveFilter(query, archiveOk, showArchived);
 
   if (statusFilter) query = query.eq('status', statusFilter);
 
@@ -84,6 +95,7 @@ function sortIndicator(col: string): string {
     </div>
   )}
 
+  <ArchiveToggle supported={archiveOk} showingArchived={showArchived} />
   <div class="admin-toolbar">
     <form class="admin-toolbar__filters" method="GET">
       <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search order # or customer…" value={search} />

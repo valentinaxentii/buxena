@@ -4,6 +4,8 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
+import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 
 const search = (Astro.url.searchParams.get('q') ?? '').trim();
 const view = Astro.url.searchParams.get('view') === 'pricing' ? 'pricing' : 'list';
@@ -11,6 +13,9 @@ const supplierFilter = (Astro.url.searchParams.get('supplier') ?? '').trim();
 
 let products: any[] = [];
 let dbReady = true;
+// Archived records are hidden from the active list; ?archived=1 shows only them.
+const showArchived = Astro.url.searchParams.get('archived') === '1';
+let archiveOk = false;
 let pricingError: string | null = null;
 let pricingNotice: string | null = null;
 let pricingTableMissing = false;
@@ -55,6 +60,10 @@ try {
     .select('id, model_name, category, cost, selling_price, is_active, images, suppliers(name)')
     .order('model_name');
   if (search && view === 'list') query = query.ilike('model_name', `%${search}%`);
+  // Archived rows drop out of the active list. A no-op until the migration
+  // is applied, so this cannot break the page in the meantime.
+  archiveOk = await archiveSupported(supabase);
+  query = withArchiveFilter(query, archiveOk, showArchived);
   const { data } = await query.limit(300);
   const raw = data ?? [];
 
@@ -143,6 +152,7 @@ function statusTone(s: string | undefined): string {
 ---
 
 <AdminLayout title="Products" subtitle="The BUXENA catalog — every sauna model BUXENA sells." parentLabel="Dashboard" parentHref="/admin">
+  <ArchiveToggle supported={archiveOk} showingArchived={showArchived} />
   <a slot="actions" class="admin-btn" href="/admin/products/new">+ New Product</a>
 
   {!dbReady && (

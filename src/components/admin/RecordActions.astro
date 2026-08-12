@@ -1,0 +1,154 @@
+---
+/**
+ * The archive / restore / permanent-delete controls for a record detail page.
+ *
+ * One component for all twelve record types, so a customer, a quote and a
+ * supplier all behave the same way and there is no per-type wording for anyone
+ * to get subtly wrong.
+ *
+ * What renders, and why:
+ *   - active record        → "Archive" only. The reversible action is the one
+ *                            on offer; permanent deletion is not reachable
+ *                            from here at all.
+ *   - archived record      → a banner saying so, "Restore", and — for admins
+ *                            only — "Delete Permanently".
+ *   - migration not applied → nothing but a short note. No half-working
+ *                            controls, no buttons that would error.
+ *
+ * The visibility rules mirror the server checks in lib/record-actions.ts. They
+ * do not replace them: this decides what is offered, that decides what works.
+ */
+interface Props {
+  /** Human label for this record type, e.g. "Customer". Used in button text. */
+  label: string;
+  /** Is this record currently archived? */
+  archived: boolean;
+  /** Has the archive migration been applied? */
+  supported: boolean;
+  /** Is the signed-in user an admin? Permanent deletion is admin-only. */
+  canDelete: boolean;
+  /** When the archive timestamp is known, shown in the banner. */
+  archivedAt?: string | null;
+}
+const { label, archived, supported, canDelete, archivedAt } = Astro.props;
+
+function fmt(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+const archivedOn = fmt(archivedAt);
+
+// Typed into the confirm box before a permanent delete can proceed. A browser
+// confirm() on its own is the dialog people dismiss reflexively; typing the
+// word is a deliberate act. The real controls are server-side — admin role,
+// and the record already being archived — this just makes the last step
+// something you cannot do by muscle memory.
+const DELETE_PHRASE = 'DELETE';
+---
+
+{!supported && (
+  <p class="ra-note">
+    Archiving is not available yet — the database migration
+    (<code>supabase/migrations/2026-08-12-archive-and-private-documents.sql</code>)
+    has not been applied to this project.
+  </p>
+)}
+
+{supported && archived && (
+  <div class="ra-banner" role="status">
+    <strong>This {label.toLowerCase()} is archived.</strong>
+    {archivedOn && <span> Archived {archivedOn}.</span>}
+    <span> It does not appear in the active list. Restoring puts it back exactly as it was.</span>
+  </div>
+)}
+
+{supported && (
+  <div class="ra-actions">
+    {!archived && (
+      <form method="POST" style="margin:0;">
+        <input type="hidden" name="_intent" value="archive" />
+        <button class="admin-btn admin-btn--ghost" type="submit">Archive {label}</button>
+      </form>
+    )}
+
+    {archived && (
+      <form method="POST" style="margin:0;">
+        <input type="hidden" name="_intent" value="restore" />
+        <button class="admin-btn" type="submit">Restore {label}</button>
+      </form>
+    )}
+
+    {archived && canDelete && (
+      <form method="POST" style="margin:0;" data-ra-delete>
+        <input type="hidden" name="_intent" value="delete" />
+        <button class="admin-btn admin-btn--ghost ra-danger" type="submit">Delete Permanently</button>
+      </form>
+    )}
+  </div>
+)}
+
+{supported && !archived && (
+  <p class="ra-hint">
+    Archiving is reversible and keeps the full record. Permanent deletion is
+    only offered once a record is archived{canDelete ? '' : ', and is limited to admin accounts'}.
+  </p>
+)}
+
+<script is:inline define:vars={{ DELETE_PHRASE }}>
+  // Typed confirmation, not a plain confirm(). Applied per form so a page with
+  // several forms cannot pick up the wrong one.
+  document.querySelectorAll('[data-ra-delete]').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      var typed = window.prompt(
+        'This permanently deletes the record and cannot be undone.\n\n' +
+          'Type ' + DELETE_PHRASE + ' to confirm.'
+      );
+      if (typed !== DELETE_PHRASE) {
+        event.preventDefault();
+      }
+    });
+  });
+</script>
+
+<style>
+  .ra-note {
+    margin: 1.5rem 0 0;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--admin-muted);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(212, 184, 140, 0.14);
+    border-radius: 3px;
+  }
+  .ra-note code { font-size: 0.72rem; }
+
+  .ra-banner {
+    margin: 0 0 1.25rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #e8cfa4;
+    background: rgba(201, 166, 104, 0.08);
+    border: 1px solid rgba(201, 166, 104, 0.32);
+    border-radius: 3px;
+  }
+  .ra-banner strong { color: #f2dfb8; }
+
+  .ra-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1.5rem;
+  }
+  .ra-danger { color: #e6b7a0; border-color: rgba(230, 130, 90, 0.35); }
+
+  .ra-hint {
+    margin: 0.6rem 0 0;
+    font-size: 0.76rem;
+    line-height: 1.6;
+    color: var(--admin-muted);
+  }
+</style>

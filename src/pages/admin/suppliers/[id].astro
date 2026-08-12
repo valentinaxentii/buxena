@@ -4,7 +4,9 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { COUNTRIES, FREQUENT_COUNTRIES } from '../../../lib/countries';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
@@ -23,6 +25,8 @@ let history = {
   lastPriceUpdate: null as string | null,
 };
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 
 try {
@@ -32,12 +36,23 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('suppliers').delete().eq('id', id);
-      return Astro.redirect('/admin/suppliers');
-    }
+    // Archive / restore / permanent delete, every authorisation check
+    // server-side. 'none' means an ordinary save; fall through.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'suppliers',
+      id: id!,
+      canDelete,
+      listPath: '/admin/suppliers',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
+    // Only an ordinary save reaches the update. Archive and restore must NOT
+    // fall through: this form body carries just the intent, so running the
+    // update would blank every field on the record.
+    if (outcome.kind === 'none') {
     const payload = {
       name: String(form.get('name') ?? ''),
       contact_name: String(form.get('contact_name') ?? '') || null,
@@ -60,6 +75,7 @@ try {
     } else {
       const { error: updateError } = await supabase.from('suppliers').update(payload).eq('id', id);
       if (updateError) error = updateError.message;
+    }
     }
   }
 
@@ -94,6 +110,13 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), supplier);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 
 function money(n: number | null | undefined, currency?: string | null): string {
   if (n == null) return '—';
@@ -104,6 +127,17 @@ function money(n: number | null | undefined, currency?: string | null): string {
 <AdminLayout title={supplier?.name ?? 'Supplier'} parentLabel="Suppliers" parentHref="/admin/suppliers">
   {notFound && <p class="admin-empty">Supplier not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {supplier && (
+    <RecordActions
+      label="Supplier"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={supplier?.archived_at}
+    />
+  )}
 
   {supplier && (
     <>
@@ -227,12 +261,6 @@ function money(n: number | null | undefined, currency?: string | null): string {
         {supplierProducts.length === 0 && <p class="admin-empty">No models linked to this supplier yet.</p>}
       </div>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:2rem;" onsubmit="return confirm('Delete this supplier? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Supplier</button>
-        </form>
-      )}
     </>
   )}
 </AdminLayout>

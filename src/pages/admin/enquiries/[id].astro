@@ -5,7 +5,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
 import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-templates';
 
@@ -21,6 +23,7 @@ let quote: any = null;
 let timeline: any[] = [];
 let notFound = false;
 let error: string | null = null;
+let actions = { supported: false, archived: false };
 let notice: string | null = null;
 
 try {
@@ -44,14 +47,30 @@ try {
       const result = await createQuoteFromEnquiry(supabase, id!, staffId);
       if (!result.ok && result.reason === 'ALREADY_CONVERTED') notice = 'A Quote already exists for this enquiry.';
       else if (!result.ok) error = 'Could not create Quote: ' + result.reason;
-    } else if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      const { data: current } = await supabase.from('enquiries').select('lead_id, quote_id').eq('id', id).single();
-      if (current?.lead_id || current?.quote_id) {
-        error = 'This enquiry is linked to a Lead or Quote and cannot be deleted — it must remain as the source record. Set status to Lost to close it instead.';
+    } else {
+      // Archive / restore / permanent delete. A converted enquiry keeps an
+      // extra rule of its own on top of the shared checks: it is the source
+      // record behind a Lead or Quote and must survive them, so it can be
+      // archived out of the way but never permanently deleted.
+      const linked = await (async () => {
+        if (String(form.get('_intent') ?? '') !== 'delete') return false;
+        const { data: current } = await supabase.from('enquiries').select('lead_id, quote_id').eq('id', id).single();
+        return Boolean(current?.lead_id || current?.quote_id);
+      })();
+
+      if (linked) {
+        error = 'This enquiry is linked to a Lead or Quote and cannot be deleted — it must remain as the source record. Archive it, or set its status to Lost, to close it instead.';
       } else {
-        await supabase.from('enquiries').delete().eq('id', id);
-        return Astro.redirect('/admin/enquiries');
+        const outcome = await handleRecordAction(Astro, form, {
+          supabase,
+          table: 'enquiries',
+          id: id!,
+          canDelete,
+          listPath: '/admin/enquiries',
+        });
+        if (outcome.kind === 'response') return outcome.response;
+        if (outcome.kind === 'error') error = outcome.message;
+        if (outcome.kind === 'notice') notice = outcome.message;
       }
     }
   }
@@ -73,6 +92,13 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), enquiry);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 
 // Suggested first response — a draft for the founder to review and edit.
 // Built server-side from the enquiry's own fields; nothing sends by itself.
@@ -93,6 +119,16 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
 
   {notFound && <p class="admin-empty">Enquiry not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {enquiry && (
+    <RecordActions
+      label="Enquiry"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={enquiry?.archived_at}
+    />
+  )}
   {notice && <p class="notice notice--ok" style="margin-bottom:1.25rem;">{notice}</p>}
 
   {enquiry && (
@@ -131,12 +167,6 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
           <button class="admin-btn admin-btn--ghost" type="submit">Update Status</button>
         </form>
 
-        {canDelete && !enquiry.lead_id && !enquiry.quote_id && (
-          <form method="POST" onsubmit="return confirm('Delete this enquiry? This cannot be undone.');" style="margin:0;">
-            <input type="hidden" name="_intent" value="delete" />
-            <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete</button>
-          </form>
-        )}
       </div>
 
       <div class="enq-grid">

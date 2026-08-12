@@ -6,7 +6,9 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { releaseInventoryUnit } from '../../../lib/inventory-reservation';
 import { assignUnitToOrder, unassignUnitFromOrder } from '../../../lib/inventory-units';
 
@@ -25,6 +27,8 @@ let customers: any[] = [];
 let products: any[] = [];
 let suppliers: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 let isUnitTrackedProduct = false;
 let assignedUnit: any = null;
@@ -38,18 +42,34 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      const { data: existing } = await supabase.from('orders').select('product_id, products(unit_tracked)').eq('id', id).single();
-      const isUnitTracked = !!(existing as any)?.products?.unit_tracked;
-      if (isUnitTracked) {
-        const { data: assignedUnit } = await supabase.from('inventory_units').select('id').eq('order_id', id).eq('status', 'RESERVED').maybeSingle();
-        if (assignedUnit) await unassignUnitFromOrder(supabase, assignedUnit.id, staffId);
-      }
-      await supabase.from('orders').delete().eq('id', id);
-      if (!isUnitTracked && existing?.product_id) await releaseInventoryUnit(supabase, existing.product_id);
-      return Astro.redirect('/admin/orders');
-    }
+    // Archive / restore / permanent delete. The stock this order was holding
+    // is released around the delete — the reserved unit is freed before the
+    // row goes, the pooled quantity after — and neither runs unless both the
+    // admin check and the already-archived check have passed.
+    let releaseProductId: string | null = null;
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'orders',
+      id: id!,
+      canDelete,
+      listPath: '/admin/orders',
+      beforeDelete: async () => {
+        const { data: existing } = await supabase.from('orders').select('product_id, products(unit_tracked)').eq('id', id).single();
+        const isUnitTracked = !!(existing as any)?.products?.unit_tracked;
+        if (isUnitTracked) {
+          const { data: assignedUnit } = await supabase.from('inventory_units').select('id').eq('order_id', id).eq('status', 'RESERVED').maybeSingle();
+          if (assignedUnit) await unassignUnitFromOrder(supabase, assignedUnit.id, staffId);
+        } else if (existing?.product_id) {
+          releaseProductId = existing.product_id;
+        }
+      },
+      afterDelete: async () => {
+        if (releaseProductId) await releaseInventoryUnit(supabase, releaseProductId);
+      },
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
     if (intent === 'assign_unit') {
       const unitId = String(form.get('unit_id') ?? '');
@@ -64,6 +84,10 @@ try {
       if (unitId) await unassignUnitFromOrder(supabase, unitId, staffId);
     }
 
+    // Only an ordinary save reaches the update. Archive and restore must NOT
+    // fall through: their form body carries just the intent, so running the
+    // update would blank every field on the order.
+    if (outcome.kind === 'none') {
     const accessories = String(form.get('accessories') ?? '')
       .split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -100,6 +124,7 @@ try {
     };
     const { error: updateError } = await supabase.from('orders').update(payload).eq('id', id);
     if (updateError) error = updateError.message;
+    }
   }
 
   const [orderRow, customerRows, productRows, supplierRows] = await Promise.all([
@@ -139,6 +164,13 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), order);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 
 function money(n: number | null | undefined): string {
   return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -148,6 +180,17 @@ function money(n: number | null | undefined): string {
 <AdminLayout title={order ? (order.order_number || 'Order') : 'Order'} parentLabel="Orders" parentHref="/admin/orders">
   {notFound && <p class="admin-empty">Order not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {order && (
+    <RecordActions
+      label="Order"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={order?.archived_at}
+    />
+  )}
 
   {order && (
     <>
@@ -257,12 +300,6 @@ function money(n: number | null | undefined): string {
         </div>
       </form>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this order? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Order</button>
-        </form>
-      )}
     </>
   )}
 </AdminLayout>

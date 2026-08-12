@@ -5,7 +5,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
@@ -18,6 +20,8 @@ let lead: any = null;
 let products: any[] = [];
 let staff: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 let SOURCES: string[] = FALLBACK_SETTINGS.lead_sources;
 
@@ -29,30 +33,43 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('leads').delete().eq('id', id);
-      return Astro.redirect('/admin/leads');
-    }
+    // Archive / restore / permanent delete, every authorisation check
+    // server-side. 'none' means an ordinary save; fall through.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'leads',
+      id: id!,
+      canDelete,
+      listPath: '/admin/leads',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
-    const payload = {
-      name: String(form.get('name') ?? ''),
-      email: String(form.get('email') ?? '') || null,
-      phone: String(form.get('phone') ?? '') || null,
-      state: String(form.get('state') ?? '') || null,
-      source: String(form.get('source') ?? 'Manual'),
-      product_id: String(form.get('product_id') ?? '') || null,
-      location_type: String(form.get('location_type') ?? '') || null,
-      budget: form.get('budget') ? Number(form.get('budget')) : null,
-      heater_preference: String(form.get('heater_preference') ?? '') || null,
-      timeline: String(form.get('timeline') ?? '') || null,
-      notes: String(form.get('notes') ?? '') || null,
-      follow_up_date: String(form.get('follow_up_date') ?? '') || null,
-      assigned_staff: String(form.get('assigned_staff') ?? '') || null,
-      status: String(form.get('status') ?? 'New Lead'),
-    };
-    const { error: updateError } = await supabase.from('leads').update(payload).eq('id', id);
-    if (updateError) error = updateError.message;
+    // Only an ordinary save reaches the update. Archive and restore must
+    // NOT fall through: this form body carries just the intent, so running
+    // the update would blank every field on the record.
+    if (outcome.kind === 'none') {
+
+      const payload = {
+        name: String(form.get('name') ?? ''),
+        email: String(form.get('email') ?? '') || null,
+        phone: String(form.get('phone') ?? '') || null,
+        state: String(form.get('state') ?? '') || null,
+        source: String(form.get('source') ?? 'Manual'),
+        product_id: String(form.get('product_id') ?? '') || null,
+        location_type: String(form.get('location_type') ?? '') || null,
+        budget: form.get('budget') ? Number(form.get('budget')) : null,
+        heater_preference: String(form.get('heater_preference') ?? '') || null,
+        timeline: String(form.get('timeline') ?? '') || null,
+        notes: String(form.get('notes') ?? '') || null,
+        follow_up_date: String(form.get('follow_up_date') ?? '') || null,
+        assigned_staff: String(form.get('assigned_staff') ?? '') || null,
+        status: String(form.get('status') ?? 'New Lead'),
+      };
+      const { error: updateError } = await supabase.from('leads').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
+    }
   }
 
   const [leadRow, productRows, staffRows] = await Promise.all([
@@ -80,11 +97,29 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), lead);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 ---
 
 <AdminLayout title={lead ? lead.name : 'Lead'} parentLabel="Leads" parentHref="/admin/leads">
   {notFound && <p class="admin-empty">Lead not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {lead && (
+    <RecordActions
+      label="Lead"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={lead?.archived_at}
+    />
+  )}
 
   {lead && (
     <>
@@ -138,12 +173,6 @@ try {
       </div>
     </form>
 
-    {canDelete && (
-      <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this lead? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Lead</button>
-      </form>
-    )}
     </>
   )}
 </AdminLayout>

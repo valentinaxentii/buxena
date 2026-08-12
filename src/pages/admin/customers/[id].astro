@@ -5,7 +5,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 
 const canDelete = await isAdminStaff(Astro);
 const { id } = Astro.params;
@@ -14,21 +16,31 @@ let quotes: any[] = [];
 let orders: any[] = [];
 let documents: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
 let notFound = false;
+let actions = { supported: false, archived: false };
 
 try {
   const supabase = createSupabaseAdminClient();
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
-    if (String(form.get('_intent')) === 'delete') {
-      // Permanent deletion is admin-only, enforced here on the server. The
-      // button is also hidden for staff, but that is presentation — this is
-      // the control.
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('customers').delete().eq('id', id);
-      return Astro.redirect('/admin/customers');
-    }
+
+    // Archive / restore / permanent delete, with every authorisation check
+    // server-side. Returns 'none' for an ordinary save, which falls through to
+    // the update below.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'customers',
+      id: id!,
+      canDelete,
+      listPath: '/admin/customers',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
+
+    if (outcome.kind === 'none') {
     const payload = {
       name: String(form.get('name') ?? ''),
       email: String(form.get('email') ?? '') || null,
@@ -42,6 +54,7 @@ try {
     };
     const { error: updateError } = await supabase.from('customers').update(payload).eq('id', id);
     if (updateError) error = updateError.message;
+    }
   }
 
   const [customerRow, quoteRows, orderRows, documentRows] = await Promise.all([
@@ -56,6 +69,7 @@ try {
   quotes = quoteRows.data ?? [];
   orders = orderRows.data ?? [];
   documents = documentRows.data ?? [];
+  actions = await recordActionState(supabase, customer);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
@@ -64,9 +78,18 @@ try {
 <AdminLayout title={customer ? customer.name : 'Customer'} parentLabel="Customers" parentHref="/admin/customers">
   {notFound && <p class="admin-empty">Customer not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
 
   {customer && (
     <>
+      <RecordActions
+        label="Customer"
+        archived={actions.archived}
+        supported={actions.supported}
+        canDelete={canDelete}
+        archivedAt={customer.archived_at}
+      />
+
       <form class="admin-form" method="POST">
         <label class="admin-field"><span>Name *</span><input type="text" name="name" value={customer.name} required /></label>
         <label class="admin-field"><span>Email</span><input type="email" name="email" value={customer.email ?? ''} /></label>
@@ -123,12 +146,6 @@ try {
         {documents.length === 0 && <p class="admin-empty">No documents yet.</p>}
       </div>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this customer? This cannot be undone.');">
-          <input type="hidden" name="_intent" value="delete" />
-          <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Customer</button>
-        </form>
-      )}
     </>
   )}
 </AdminLayout>

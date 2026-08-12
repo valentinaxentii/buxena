@@ -4,7 +4,9 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -13,6 +15,8 @@ const { id } = Astro.params;
 let product: any = null;
 let suppliers: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 
 try {
@@ -20,38 +24,51 @@ try {
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
-    if (String(form.get('_intent')) === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('products').delete().eq('id', id);
-      return Astro.redirect('/admin/products');
+    // Archive / restore / permanent delete, every authorisation check
+    // server-side. 'none' means an ordinary save; fall through.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'products',
+      id: id!,
+      canDelete,
+      listPath: '/admin/products',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
+
+    // Only an ordinary save reaches the update. Archive and restore must
+    // NOT fall through: this form body carries just the intent, so running
+    // the update would blank every field on the record.
+    if (outcome.kind === 'none') {
+      const width = form.get('width');
+      const depth = form.get('depth');
+      const height = form.get('height');
+      const payload = {
+        model_name: String(form.get('model_name') ?? ''),
+        supplier_id: String(form.get('supplier_id') ?? '') || null,
+        category: String(form.get('category') ?? '') || null,
+        cost: form.get('cost') ? Number(form.get('cost')) : null,
+        selling_price: form.get('selling_price') ? Number(form.get('selling_price')) : null,
+        dimensions: width || depth || height ? { width, depth, height, unit: 'in' } : null,
+        capacity: String(form.get('capacity') ?? '') || null,
+        timber_type: String(form.get('timber_type') ?? '') || null,
+        glass_configuration: String(form.get('glass_configuration') ?? '') || null,
+        heater_options: String(form.get('heater_options') ?? '')
+          .split(',').map((s) => s.trim()).filter(Boolean),
+        electrical_requirements: String(form.get('electrical_requirements') ?? '') || null,
+        weight_kg: form.get('weight_kg') ? Number(form.get('weight_kg')) : null,
+        shipping_dimensions: String(form.get('shipping_dimensions') ?? '') || null,
+        stock_quantity: form.get('stock_quantity') ? Number(form.get('stock_quantity')) : 0,
+        brochure_url: String(form.get('brochure_url') ?? '') || null,
+        installation_manual_url: String(form.get('installation_manual_url') ?? '') || null,
+        warranty_document_url: String(form.get('warranty_document_url') ?? '') || null,
+        is_active: form.get('is_active') === 'on',
+        unit_tracked: form.get('unit_tracked') === 'on',
+      };
+      const { error: updateError } = await supabase.from('products').update(payload).eq('id', id);
+      if (updateError) error = updateError.message;
     }
-    const width = form.get('width');
-    const depth = form.get('depth');
-    const height = form.get('height');
-    const payload = {
-      model_name: String(form.get('model_name') ?? ''),
-      supplier_id: String(form.get('supplier_id') ?? '') || null,
-      category: String(form.get('category') ?? '') || null,
-      cost: form.get('cost') ? Number(form.get('cost')) : null,
-      selling_price: form.get('selling_price') ? Number(form.get('selling_price')) : null,
-      dimensions: width || depth || height ? { width, depth, height, unit: 'in' } : null,
-      capacity: String(form.get('capacity') ?? '') || null,
-      timber_type: String(form.get('timber_type') ?? '') || null,
-      glass_configuration: String(form.get('glass_configuration') ?? '') || null,
-      heater_options: String(form.get('heater_options') ?? '')
-        .split(',').map((s) => s.trim()).filter(Boolean),
-      electrical_requirements: String(form.get('electrical_requirements') ?? '') || null,
-      weight_kg: form.get('weight_kg') ? Number(form.get('weight_kg')) : null,
-      shipping_dimensions: String(form.get('shipping_dimensions') ?? '') || null,
-      stock_quantity: form.get('stock_quantity') ? Number(form.get('stock_quantity')) : 0,
-      brochure_url: String(form.get('brochure_url') ?? '') || null,
-      installation_manual_url: String(form.get('installation_manual_url') ?? '') || null,
-      warranty_document_url: String(form.get('warranty_document_url') ?? '') || null,
-      is_active: form.get('is_active') === 'on',
-      unit_tracked: form.get('unit_tracked') === 'on',
-    };
-    const { error: updateError } = await supabase.from('products').update(payload).eq('id', id);
-    if (updateError) error = updateError.message;
   }
 
   const [productRow, supplierRows] = await Promise.all([
@@ -63,6 +80,13 @@ try {
   suppliers = supplierRows.data ?? [];
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), product);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
 }
 
 const dims = product?.dimensions ?? {};
@@ -103,6 +127,17 @@ const salesFlags = [
 <AdminLayout title={product ? product.model_name : 'Product'} parentLabel="Products" parentHref="/admin/products">
   {notFound && <p class="admin-empty">Product not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {product && (
+    <RecordActions
+      label="Product"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={product?.archived_at}
+    />
+  )}
 
   {product && (
     <div class="pd">
@@ -164,12 +199,6 @@ const salesFlags = [
         </div>
       </form>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this product? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Product</button>
-        </form>
-      )}
     </div>
 
     <aside class="pd__right">

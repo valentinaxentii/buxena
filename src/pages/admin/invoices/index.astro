@@ -4,6 +4,8 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
+import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 
 const search = (Astro.url.searchParams.get('q') ?? '').trim();
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
@@ -25,6 +27,9 @@ const TYPES = [
 
 let invoices: any[] = [];
 let dbReady = true;
+// Archived records are hidden from the active list; ?archived=1 shows only them.
+const showArchived = Astro.url.searchParams.get('archived') === '1';
+let archiveOk = false;
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -37,6 +42,10 @@ try {
   if (search) query = query.or(`invoice_number.ilike.%${search}%,bill_to_name.ilike.%${search}%`);
   if (statusFilter) query = query.eq('status', statusFilter);
   if (typeFilter) query = query.eq('document_type', typeFilter);
+  // Archived rows drop out of the active list. A no-op until the migration
+  // is applied, so this cannot break the page in the meantime.
+  archiveOk = await archiveSupported(supabase);
+  query = withArchiveFilter(query, archiveOk, showArchived);
   const { data } = await query.limit(200);
   invoices = data ?? [];
 } catch {
@@ -70,6 +79,7 @@ function money(n: number | null | undefined): string {
     </div>
   )}
 
+  <ArchiveToggle supported={archiveOk} showingArchived={showArchived} />
   <div class="admin-toolbar">
     <form class="admin-toolbar__filters" method="GET">
       <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search invoice # or customer…" value={search} />

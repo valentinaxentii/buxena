@@ -5,7 +5,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
 import { ensureExpectedUnitsForShipment } from '../../../lib/inventory-units';
 
@@ -29,6 +31,8 @@ let shipment: any = null;
 let items: any[] = [];
 let suppliers: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 
 try {
@@ -38,11 +42,18 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('shipments').delete().eq('id', id);
-      return Astro.redirect('/admin/shipments');
-    }
+    // Archive / restore / permanent delete, every authorisation check
+    // server-side. 'none' means an ordinary save; fall through.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'shipments',
+      id: id!,
+      canDelete,
+      listPath: '/admin/shipments',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
     if (intent === 'advance_status') {
       const nextStatus = String(form.get('next_status') ?? '');
@@ -116,7 +127,12 @@ try {
       await recomputeIncomingForShipment(supabase, id!);
     }
 
-    if (intent === 'update_header') {
+    // Belt and braces: this branch is already keyed to its own intent, so an
+    // archive POST cannot reach it today. The outcome check is kept anyway so
+    // every record page states the same invariant in the same way, and so that
+    // removing the intent guard later cannot silently reintroduce the
+    // blank-the-record bug.
+    if (intent === 'update_header' && outcome.kind === 'none') {
       const payload = {
         po_reference: String(form.get('po_reference') ?? '') || null,
         supplier_id: String(form.get('supplier_id') ?? '') || null,
@@ -146,6 +162,13 @@ try {
   suppliers = supplierRows.data ?? [];
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), shipment);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
 }
 
 function money(n: number | null | undefined): string {
@@ -180,6 +203,17 @@ const bulkReceiveItems = items.filter((i) => !i.products?.unit_tracked);
 
   {notFound && <p class="admin-empty">Shipment not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {shipment && (
+    <RecordActions
+      label="Shipment"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={shipment?.archived_at}
+    />
+  )}
 
   {shipment && (
     <>

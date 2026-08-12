@@ -6,7 +6,9 @@ import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -20,6 +22,8 @@ let customers: any[] = [];
 let products: any[] = [];
 let existingOrderId: string | null = null;
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 
 async function recomputeTotal(supabase: any, quoteId: string, deliveryCost: number, installationCost: number, discount: number, taxRate: number) {
@@ -37,11 +41,18 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      await supabase.from('quotes').delete().eq('id', id);
-      return Astro.redirect('/admin/quotes');
-    }
+    // Archive / restore / permanent delete, every authorisation check
+    // server-side. 'none' means an ordinary save; fall through.
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'quotes',
+      id: id!,
+      canDelete,
+      listPath: '/admin/quotes',
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
     if (intent === 'delete_item') {
       await supabase.from('quote_items').delete().eq('id', String(form.get('item_id')));
@@ -58,6 +69,10 @@ try {
       }
     }
 
+    // Only an ordinary save (or a line-item change) reaches the recalculation
+    // and update. Archive and restore must NOT fall through: their form body
+    // carries just the intent, so this would zero every total on the quote.
+    if (outcome.kind === 'none') {
     const deliveryCost = Number(form.get('delivery_cost') ?? 0) || 0;
     const installationCost = Number(form.get('installation_cost') ?? 0) || 0;
     const discount = Number(form.get('discount') ?? 0) || 0;
@@ -80,6 +95,7 @@ try {
     };
     const { error: updateError } = await supabase.from('quotes').update(payload).eq('id', id);
     if (updateError) error = updateError.message;
+    }
   }
 
   const [quoteRow, itemRows, customerRows, productRows] = await Promise.all([
@@ -113,6 +129,13 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), quote);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 
 const pdfMissingFields: string[] = [];
 if (quote) {
@@ -132,6 +155,17 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
 >
   {notFound && <p class="admin-empty">Quote not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {quote && (
+    <RecordActions
+      label="Quote"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={quote?.archived_at}
+    />
+  )}
   {pdfError && <p class="notice notice--error" style="margin-bottom:1.25rem;">{pdfError}</p>}
 
   {quote && (
@@ -214,12 +248,6 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
         <div class="admin-form__actions"><button class="admin-btn admin-btn--ghost" type="submit">+ Add Item</button></div>
       </form>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this quote? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Quote</button>
-        </form>
-      )}
     </>
   )}
 </AdminLayout>

@@ -4,6 +4,8 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
+import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 
 const STATUSES = [
   'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
@@ -27,10 +29,16 @@ const etaFilter = Astro.url.searchParams.get('eta') ?? '';
 let allRows: any[] = [];
 let suppliers: any[] = [];
 let dbReady = true;
+// Archived records are hidden from the active list; ?archived=1 shows only them.
+const showArchived = Astro.url.searchParams.get('archived') === '1';
+let archiveOk = false;
 
 try {
   const supabase = createSupabaseAdminClient();
-  const [shipmentRows, supplierRows] = await Promise.all([
+  // Archived shipments drop out of the active list. A no-op until the
+  // migration is applied, so this cannot break the page in the meantime.
+  archiveOk = await archiveSupported(supabase);
+  const shipmentQuery = withArchiveFilter(
     supabase
       .from('shipments')
       .select(
@@ -38,6 +46,12 @@ try {
       )
       .order('created_at', { ascending: false })
       .limit(300),
+    archiveOk,
+    showArchived
+  );
+
+  const [shipmentRows, supplierRows] = await Promise.all([
+    shipmentQuery,
     supabase.from('suppliers').select('id, name').order('name'),
   ]);
   allRows = shipmentRows.data ?? [];
@@ -131,6 +145,7 @@ const rows = allRows.filter((row) => {
 ---
 
 <AdminLayout title="Shipment Orders" subtitle="Track every BUXENA sauna from factory order to warehouse arrival." parentLabel="Dashboard" parentHref="/admin">
+  <ArchiveToggle supported={archiveOk} showingArchived={showArchived} />
   <a slot="actions" class="admin-btn" href="/admin/shipments/new">+ New Shipment Order</a>
 
   {!dbReady && (

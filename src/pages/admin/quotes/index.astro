@@ -5,12 +5,17 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
+import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
 const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
 
 let quotes: any[] = [];
 let dbReady = true;
+// Archived records are hidden from the active list; ?archived=1 shows only them.
+const showArchived = Astro.url.searchParams.get('archived') === '1';
+let archiveOk = false;
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -19,6 +24,10 @@ try {
     .select('id, quote_number, status, total, quote_date, expiry_date, customers(name)')
     .order('created_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
+  // Archived rows drop out of the active list. A no-op until the migration
+  // is applied, so this cannot break the page in the meantime.
+  archiveOk = await archiveSupported(supabase);
+  query = withArchiveFilter(query, archiveOk, showArchived);
   const { data } = await query.limit(200);
   quotes = data ?? [];
 } catch {
@@ -34,6 +43,7 @@ try {
     </div>
   )}
 
+  <ArchiveToggle supported={archiveOk} showingArchived={showArchived} />
   <div class="admin-toolbar">
     <form class="admin-toolbar__filters" method="GET">
       <select class="admin-select" name="status">

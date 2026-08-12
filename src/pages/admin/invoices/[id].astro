@@ -4,7 +4,9 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { issueInvoiceNumber } from '../../../lib/invoice-number';
 import { generateUnitQrDataUrl } from '../../../lib/qr';
 
@@ -22,6 +24,7 @@ const VOIDABLE = ['issued', 'partially_paid', 'overdue'];
 let invoice: any = null;
 let items: any[] = [];
 let error: string | null = null;
+let actions = { supported: false, archived: false };
 let notice: string | null = null;
 let notFound = false;
 let orderAssignedUnit: { id: string; unit_code: string; product_id: string } | null = null;
@@ -70,15 +73,24 @@ try {
         if (voidError) error = voidError.message;
         else return Astro.redirect(`/admin/invoices/${id}`);
       }
-    } else if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      if (current.status !== 'draft' || current.invoice_number) {
-        error = 'Only unnumbered drafts can be deleted — issued invoices are permanent.';
+    } else if (intent === 'archive' || intent === 'restore' || intent === 'delete') {
+      // An issued invoice is a permanent financial document: it can be
+      // archived out of the active list, and voided, but never deleted. Only
+      // an unnumbered draft consumes no number and can go entirely — and even
+      // then only via the shared checks (admin, and already archived).
+      if (intent === 'delete' && (current.status !== 'draft' || current.invoice_number)) {
+        error = 'Only unnumbered drafts can be deleted — issued invoices are permanent. Archive it instead.';
       } else {
-        const { error: delError } = await supabase
-          .from('invoices').delete().eq('id', id).eq('status', 'draft').is('invoice_number', null);
-        if (delError) error = delError.message;
-        else return Astro.redirect('/admin/invoices');
+        const outcome = await handleRecordAction(Astro, form, {
+          supabase,
+          table: 'invoices',
+          id: id!,
+          canDelete,
+          listPath: '/admin/invoices',
+        });
+        if (outcome.kind === 'response') return outcome.response;
+        if (outcome.kind === 'error') error = outcome.message;
+        if (outcome.kind === 'notice') notice = outcome.message;
       }
     } else if (intent === 'link_unit') {
       // Draft-only, by construction — issued invoices are immutable and this
@@ -140,6 +152,13 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), invoice);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
+}
 
 const justIssued = Astro.url.searchParams.get('issued');
 if (justIssued && !notice) notice = `Issued as ${justIssued}. This invoice is now immutable.`;
@@ -179,6 +198,16 @@ const numberLine = invoice ? (invoice.invoice_number ?? '— unassigned (draft)'
 
   {notFound && <p class="admin-empty">Invoice not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {invoice && (
+    <RecordActions
+      label="Invoice"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={invoice?.archived_at}
+    />
+  )}
   {notice && <p class="notice notice--ok" style="margin-bottom:1.25rem;">{notice}</p>}
   {totalsMismatch && (
     <p class="notice notice--error" style="margin-bottom:1.25rem;">
@@ -310,12 +339,6 @@ const numberLine = invoice ? (invoice.invoice_number ?? '— unassigned (draft)'
       )}
 
       <div class="inv-actions">
-        {isDraft && canDelete && (
-          <form method="POST" onsubmit="return confirm('Delete this draft? Drafts have no number, so nothing is consumed and no gap is created.');" style="margin:0;">
-            <input type="hidden" name="_intent" value="delete" />
-            <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Draft</button>
-          </form>
-        )}
         {VOIDABLE.includes(invoice.status) && (
           <form method="POST" class="inv-void-form" onsubmit="return confirm('Void this invoice? The invoice number is retained forever and the document stays on record marked VOID.');">
             <input type="hidden" name="_intent" value="void" />

@@ -4,7 +4,9 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
-import { isAdminStaff, refuseDelete } from '../../../lib/staff-access';
+import { isAdminStaff } from '../../../lib/staff-access';
+import RecordActions from '../../../components/admin/RecordActions.astro';
+import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { normalizeDocumentUrl, resolveDocumentHref, documentLinkLabel } from '../../../lib/document-url';
 import { signDocumentUrl, isStoredDocument } from '../../../lib/document-access';
 import { uploadDocumentFile, deleteDocumentFile, MAX_UPLOAD_BYTES } from '../../../lib/document-storage';
@@ -27,6 +29,8 @@ let products: any[] = [];
 let quotes: any[] = [];
 let orders: any[] = [];
 let error: string | null = null;
+let notice: string | null = null;
+let actions = { supported: false, archived: false };
 let notFound = false;
 
 try {
@@ -36,14 +40,33 @@ try {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? 'update');
 
-    if (intent === 'delete') {
-      if (!canDelete) return refuseDelete(Astro);
-      const { data: doomed } = await supabase.from('documents').select('file_url').eq('id', id).single();
-      await supabase.from('documents').delete().eq('id', id);
-      if (doomed?.file_url) await deleteDocumentFile(supabase, doomed.file_url);
-      return Astro.redirect('/admin/documents');
-    }
+    // Archive / restore / permanent delete. The stored file is removed only
+    // after the row is gone, and only once both the admin check and the
+    // already-archived check have passed — an archived document keeps its file
+    // so restoring it restores a working document.
+    let doomedFileUrl: string | null = null;
+    const outcome = await handleRecordAction(Astro, form, {
+      supabase,
+      table: 'documents',
+      id: id!,
+      canDelete,
+      listPath: '/admin/documents',
+      beforeDelete: async () => {
+        const { data: doomed } = await supabase.from('documents').select('file_url').eq('id', id).single();
+        doomedFileUrl = doomed?.file_url ?? null;
+      },
+      afterDelete: async () => {
+        if (doomedFileUrl) await deleteDocumentFile(supabase, doomedFileUrl);
+      },
+    });
+    if (outcome.kind === 'response') return outcome.response;
+    if (outcome.kind === 'error') error = outcome.message;
+    if (outcome.kind === 'notice') notice = outcome.message;
 
+    // Only an ordinary save reaches the update. Archive and restore must NOT
+    // fall through: their form body carries just the intent, so running the
+    // update would blank the row — including file_url, orphaning the file.
+    if (outcome.kind === 'none') {
     const uploadedFile = form.get('upload');
     const payload = {
       category: String(form.get('category') ?? ''),
@@ -83,6 +106,7 @@ try {
         await deleteDocumentFile(supabase, before.file_url);
       }
     }
+    }
   }
 
   const [docRow, customerRows, supplierRows, productRows, quoteRows, orderRows] = await Promise.all([
@@ -103,6 +127,13 @@ try {
   orders = orderRows.data ?? [];
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+}
+// Archive state for the actions block. Resolved after the record loads and
+// kept out of the main try so a failure here can never mask the record itself.
+try {
+  actions = await recordActionState(createSupabaseAdminClient(), doc);
+} catch {
+  /* leave defaults: unsupported + not archived, so no controls render */
 }
 
 // Render-time defense for rows saved before normalization existed: a stored
@@ -149,6 +180,17 @@ const previewIsSite =
 <AdminLayout title={doc?.file_name || 'Document'} parentLabel="Documents" parentHref="/admin/documents">
   {notFound && <p class="admin-empty">Document not found.</p>}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {doc && (
+    <RecordActions
+      label="Document"
+      archived={actions.archived}
+      supported={actions.supported}
+      canDelete={canDelete}
+      archivedAt={doc?.archived_at}
+    />
+  )}
 
   {doc && (
     <div class="doc-layout">
@@ -198,12 +240,6 @@ const previewIsSite =
         </div>
       </form>
 
-      {canDelete && (
-        <form method="POST" style="margin-top:1.5rem;" onsubmit="return confirm('Delete this document record? This cannot be undone.');">
-        <input type="hidden" name="_intent" value="delete" />
-        <button class="admin-btn admin-btn--ghost" type="submit" style="color:#e6b7a0; border-color:rgba(230,130,90,0.35);">Delete Record</button>
-        </form>
-      )}
       </div>
 
       <aside class="doc-preview" id="doc-preview" data-kind={previewKind}>
