@@ -12,6 +12,9 @@ import QuoteCompare from '../../components/QuoteCompare.astro';
 import NaturalWoodNote from '../../components/NaturalWoodNote.astro';
 import RitualKit from '../../components/RitualKit.astro';
 import ProductConfigurator from '../../components/ProductConfigurator.astro';
+import ProductGallery from '../../components/ProductGallery.astro';
+import { groupSpecs } from '../../lib/product-specs';
+import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
 import { publicPrice } from '../../data/pricing';
@@ -78,6 +81,12 @@ const pendingRows = [
 ];
 
 const specRows = showDev ? [...verifiedRows, ...pendingRows] : verifiedRows;
+
+// Grouped view of the same verified rows — DIMENSIONS / CONSTRUCTION /
+// DOOR & GLASS / INTERIOR / HEATING / VENTILATION / INSTALLATION. Derived
+// from labels already in the data: no frontmatter rewritten, no value
+// invented, and a category with no rows never renders.
+const specGroups = groupSpecs(specRows.filter((r) => r.value !== TBC), []);
 
 // Condensed key facts for the hero's right column — a subset of the full
 // specification sheet (still shown in full further down the page, unchanged).
@@ -175,23 +184,7 @@ const breadcrumbSchema = {
 
         <div class="prod-hero__grid">
           <div class="prod-hero__media">
-            <Figure
-              src={data.heroImage.src}
-              alt={data.heroImage.alt}
-              note={data.heroImage.note}
-              tone="dark"
-              priority={true}
-              fit="contain"
-              maxHeight="520px"
-            />
-
-            {data.gallery.length > 0 && (
-              <div class="prod-hero__thumbs">
-                {data.gallery.map((img) => (
-                  <Figure src={img.src} alt={img.alt} note={img.note} ratio="1 / 1" tone="mid" />
-                ))}
-              </div>
-            )}
+            <ProductGallery hero={data.heroImage} gallery={data.gallery} model={data.title} />
           </div>
 
           <div class="prod-hero__info">
@@ -287,14 +280,33 @@ const breadcrumbSchema = {
         {showSpecs && (
           <aside class="specs">
             <h2 class="specs__h">Specifications</h2>
-            <dl class="specs__list">
-              {specRows.map((row) => (
-                <div class="specs__row">
-                  <dt>{row.label}</dt>
-                  <dd class={row.value === TBC ? 'is-tbc' : ''}>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
+            {specGroups.map((group) => (
+              <div class="specs__group">
+                <h3 class="specs__cat">{group.title}</h3>
+                <dl class="specs__list">
+                  {group.rows.map((row) => (
+                    <div class="specs__row">
+                      <dt>{row.label}</dt>
+                      <dd>{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+
+            {showDev && pendingRows.length > 0 && (
+              <div class="specs__group">
+                <h3 class="specs__cat">Awaiting supplier confirmation</h3>
+                <dl class="specs__list">
+                  {pendingRows.map((row) => (
+                    <div class="specs__row">
+                      <dt>{row.label}</dt>
+                      <dd class="is-tbc">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
 
             {blocks.map((block) =>
               block.items?.length ? (
@@ -372,7 +384,15 @@ const breadcrumbSchema = {
     </section>
 
     <!-- Configuration & system — real options only, confirmed at quote -->
-    <ProductConfigurator model={data} displayName={displayTitle(data.title)} />
+    {/* Shown only where this model has verified choices. A configurator whose
+        one question is "how will you install it?" performs configurability
+        without asking anything about the product; those models get the quote
+        and project CTAs instead, and installation is asked once in the quote
+        form where EVERY model asks it. Turns itself on automatically when
+        verified options are added to the model's frontmatter. */}
+    {shouldShowConfigurator(data) && (
+      <ProductConfigurator model={data} displayName={displayTitle(data.title)} />
+    )}
 
     <section class="band">
       <div class="shell">
@@ -700,6 +720,15 @@ const breadcrumbSchema = {
   .specs__row dt { color: var(--muted); margin: 0; }
   .specs__row dd { margin: 0; text-align: right; }
 
+  .specs__group + .specs__group { margin-top: 1.5rem; }
+  .specs__cat {
+    margin: 0 0 0.6rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+  }
   .specs__sub {
     font-family: var(--font-sans);
     font-size: var(--t-label);

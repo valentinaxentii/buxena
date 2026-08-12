@@ -72,21 +72,20 @@ function toOption(raw: string): ConfigOption {
 }
 
 /**
- * How the customer intends to install. A preference, not a product claim, so
- * it is offered on every model. Wording matches the admin's installation_type.
+ * How the customer intends to install. A PREFERENCE, not a product claim.
+ *
+ * It lives in the quote form (components/QuoteForm.astro), not here, and is
+ * asked once for every model — including the models with no configurator at
+ * all. Exported so both surfaces read the same four values, which match the
+ * admin's `installation_type` vocabulary, so a staff member sees in the enquiry
+ * the same words they use in the back office.
  */
-const INSTALLATION_GROUP: ConfigGroup = {
-  key: 'installation',
-  label: 'Installation',
-  help: 'Tells us what to include in your quote. Nothing is committed at this stage.',
-  fromProductData: false,
-  options: [
-    { value: 'DIY', label: 'I will install it myself', hint: 'Flat-pack and self-assembly' },
-    { value: 'BUXENA', label: 'BUXENA installation team', hint: 'Subject to your location' },
-    { value: 'THIRD_PARTY', label: 'My own contractor', hint: 'We supply drawings and specifications' },
-    { value: 'UNDECIDED', label: 'Not decided yet', hint: 'We will talk it through' },
-  ],
-};
+export const INSTALLATION_PREFERENCES: ConfigOption[] = [
+  { value: 'DIY', label: 'I will install it myself', hint: 'Flat-pack and self-assembly' },
+  { value: 'BUXENA', label: 'BUXENA installation team', hint: 'Subject to your location' },
+  { value: 'THIRD_PARTY', label: 'My own contractor', hint: 'We supply drawings and specifications' },
+  { value: 'UNDECIDED', label: 'Not decided yet', hint: 'We will talk it through' },
+];
 
 export function buildConfigGroups(model: ConfigurableModel): ConfigGroup[] {
   const groups: ConfigGroup[] = [];
@@ -127,13 +126,58 @@ export function buildConfigGroups(model: ConfigurableModel): ConfigGroup[] {
     });
   }
 
-  groups.push(INSTALLATION_GROUP);
   return groups;
 }
 
-/** Does this model have anything real to configure, beyond the preference questions? */
+/** Does this model have anything real to configure? */
 export function hasProductOptions(model: ConfigurableModel): boolean {
   return buildConfigGroups(model).some((g) => g.fromProductData);
+}
+
+/**
+ * Should the product page render a configurator at all?
+ *
+ * Only when the model has real, verified choices. A configurator whose single
+ * question is "how will you install it?" is a fake configurator: it performs
+ * the appearance of configurability while asking nothing about the product,
+ * and on a premium page that reads as padding. Those models get the quote and
+ * project CTAs instead, and the installation question is asked once in the
+ * quote form where every model asks it.
+ *
+ * This is a pure function of the model's own data, so a model turns its
+ * configurator on automatically the moment verified options are added to its
+ * frontmatter — no code change, no page to remember to update.
+ */
+export function shouldShowConfigurator(model: ConfigurableModel): boolean {
+  return hasProductOptions(model);
+}
+
+/**
+ * How a model is classified for internal follow-up.
+ *
+ *   'configurable'  — verified choices exist; the configurator is shown.
+ *   'quote-only'    — no configurable dimension for this model; correct as-is.
+ *   'blocked-data'  — the model TYPE has options in the range, but this record
+ *                     has none recorded. Not a product fact, a data gap: chase
+ *                     the supplier rather than invent the options.
+ *
+ * The distinction between the last two matters commercially. 'quote-only' needs
+ * nothing; 'blocked-data' is a task with a supplier's name on it.
+ */
+export type ConfiguratorClass = 'configurable' | 'quote-only' | 'blocked-data';
+
+export function classifyModel(
+  model: ConfigurableModel,
+  /** Sibling models in the same series, used to spot a data gap. */
+  seriesPeers: ConfigurableModel[] = []
+): ConfiguratorClass {
+  if (hasProductOptions(model)) return 'configurable';
+  // A peer in the same series HAS verified options, so this one plausibly has
+  // them too and nobody has recorded them yet.
+  if (seriesPeers.some((peer) => peer.title !== model.title && hasProductOptions(peer))) {
+    return 'blocked-data';
+  }
+  return 'quote-only';
 }
 
 /**

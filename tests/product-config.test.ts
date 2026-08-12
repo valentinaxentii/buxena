@@ -10,21 +10,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildConfigGroups,
+  classifyModel,
   hasProductOptions,
+  INSTALLATION_PREFERENCES,
+  shouldShowConfigurator,
   summariseSelections,
 } from '../src/lib/product-config.ts';
 
-test('a model with no verified options exposes no product groups', () => {
-  const groups = buildConfigGroups({ title: 'BUH-TEST' });
-  assert.equal(hasProductOptions({ title: 'BUH-TEST' }), false);
-  assert.deepEqual(
-    groups.filter((g) => g.fromProductData),
-    [],
-    'nothing may be invented for a model with no data'
-  );
-  // The preference question is still safe to ask: it is about the customer,
-  // not a claim about the product.
-  assert.deepEqual(groups.map((g) => g.key), ['installation']);
+test('a model with no verified options exposes no groups at all', () => {
+  const model = { title: 'BUH-TEST' };
+  assert.deepEqual(buildConfigGroups(model), [], 'nothing may be invented for a model with no data');
+  assert.equal(hasProductOptions(model), false);
+  assert.equal(shouldShowConfigurator(model), false, 'the whole configurator is hidden');
 });
 
 test('supply format appears only when the model states it', () => {
@@ -72,12 +69,35 @@ test('a single material is a fact, not a choice', () => {
   assert.ok(two.find((g) => g.key === 'material'));
 });
 
-test('installation is offered on every model and marked as a preference', () => {
+test('installation is NOT a configurator group — it lives in the quote form', () => {
+  // A configurator whose single question is "how will you install it?" performs
+  // configurability while asking nothing about the product. Installation is a
+  // customer preference and is asked once, in the quote form, for every model.
   for (const model of [{ title: 'A' }, { title: 'B', options: ['Flat-pack kit'] }]) {
-    const install = buildConfigGroups(model).find((g) => g.key === 'installation');
-    assert.ok(install, 'installation must always be offered');
-    assert.equal(install!.fromProductData, false, 'it is a customer preference, not a product claim');
+    assert.equal(buildConfigGroups(model).some((g) => g.key === 'installation'), false);
   }
+  assert.equal(INSTALLATION_PREFERENCES.length, 4);
+  assert.deepEqual(
+    INSTALLATION_PREFERENCES.map((o) => o.value),
+    ['DIY', 'BUXENA', 'THIRD_PARTY', 'UNDECIDED'],
+    'values match the admin installation_type vocabulary'
+  );
+});
+
+test('a model with verified options shows the configurator', () => {
+  assert.equal(shouldShowConfigurator({ title: 'X', options: ['Flat-pack kit', 'Assembled'] }), true);
+  assert.equal(shouldShowConfigurator({ title: 'X', heaterOptions: ['Electric: Harvia'] }), true);
+});
+
+test('classification separates a real quote-only model from a data gap', () => {
+  const bare = { title: 'EDA-1' };
+  const richPeer = { title: 'EDA-2', heaterOptions: ['Electric: Harvia'] };
+  // No peer has options -> genuinely nothing to configure.
+  assert.equal(classifyModel(bare, [bare]), 'quote-only');
+  // A sibling in the same series HAS verified options, so this is a missing
+  // record, not a product fact — a task with a supplier's name on it.
+  assert.equal(classifyModel(bare, [bare, richPeer]), 'blocked-data');
+  assert.equal(classifyModel(richPeer, [bare, richPeer]), 'configurable');
 });
 
 test('the summary lists only answered groups, in page order', () => {
@@ -86,25 +106,17 @@ test('the summary lists only answered groups, in page order', () => {
     options: ['Flat-pack kit', 'Factory assembled'],
     heaterOptions: ['Electric: Harvia'],
   });
-  const lines = summariseSelections(groups, { supply: 'Factory assembled', installation: 'DIY' });
-  assert.deepEqual(lines, [
-    'Supply format: Factory assembled',
-    'Installation: I will install it myself',
-  ]);
-  // Heater was not answered — a blank is not a selection, and padding the note
-  // with "not selected" makes it harder for staff to read what was chosen.
-  assert.equal(lines.some((l) => l.startsWith('Heater')), false);
-});
-
-test('the summary resolves labels, never raw values', () => {
-  const groups = buildConfigGroups({ title: 'X' });
-  const lines = summariseSelections(groups, { installation: 'THIRD_PARTY' });
-  assert.deepEqual(lines, ['Installation: My own contractor']);
+  const lines = summariseSelections(groups, { supply: 'Factory assembled', heater: 'Electric' });
+  assert.deepEqual(lines, ['Supply format: Factory assembled', 'Heater: Electric']);
+  // An unanswered group is omitted — a blank is not a selection, and padding
+  // the note with "not selected" makes it harder for staff to read.
+  const partial = summariseSelections(groups, { supply: 'Flat-pack kit' });
+  assert.deepEqual(partial, ['Supply format: Flat-pack kit']);
 });
 
 test('an unknown selection falls back to its raw value rather than vanishing', () => {
   // Defensive: a stale value from an older page version must still reach staff.
-  const groups = buildConfigGroups({ title: 'X' });
-  const lines = summariseSelections(groups, { installation: 'LEGACY_VALUE' });
-  assert.deepEqual(lines, ['Installation: LEGACY_VALUE']);
+  const groups = buildConfigGroups({ title: 'X', heaterOptions: ['Electric: Harvia'] });
+  const lines = summariseSelections(groups, { heater: 'LEGACY_VALUE' });
+  assert.deepEqual(lines, ['Heater: LEGACY_VALUE']);
 });

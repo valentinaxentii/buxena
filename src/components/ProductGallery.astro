@@ -1,0 +1,254 @@
+---
+import Figure from './Figure.astro';
+
+/**
+ * Product gallery — main image, thumbnails, keyboard and touch.
+ *
+ * What was here before: a hero image and a row of thumbnails that were not
+ * clickable. The extra photography rendered at postage-stamp size and there
+ * was no way to see any of it larger — the gallery looked like a gallery
+ * without behaving like one. On a considered purchase, seeing the product
+ * properly IS the sales pitch.
+ *
+ * No carousel library. The whole behaviour is a list where one item is
+ * visible, which is a few lines of state; a dependency would cost more in
+ * bundle size and layout surprises than it saves.
+ */
+interface Slide {
+  src?: string;
+  alt: string;
+  note?: string;
+}
+interface Props {
+  hero: Slide;
+  gallery?: Slide[];
+  /** Model title, for analytics. */
+  model: string;
+}
+const { hero, gallery = [], model } = Astro.props;
+
+// The hero is always the first slide, so "back to the main shot" needs no
+// special case anywhere in the logic.
+const slides: Slide[] = [hero, ...gallery];
+const hasMultiple = slides.length > 1;
+---
+
+<div class="pgal" data-gallery data-model={model}>
+  <div
+    class="pgal__stage"
+    data-gal-stage
+    role="group"
+    aria-roledescription="carousel"
+    aria-label="Product images"
+  >
+    {slides.map((slide, i) => (
+      <div
+        class="pgal__slide"
+        data-gal-slide={i}
+        role="group"
+        aria-roledescription="slide"
+        aria-label={`Image ${i + 1} of ${slides.length}`}
+        hidden={i !== 0}
+      >
+        <Figure
+          src={slide.src}
+          alt={slide.alt}
+          note={slide.note}
+          tone="dark"
+          priority={i === 0}
+          fit="contain"
+          maxHeight="520px"
+        />
+      </div>
+    ))}
+
+    {hasMultiple && (
+      <>
+        <button class="pgal__nav pgal__nav--prev" type="button" data-gal-prev aria-label="Previous image">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button class="pgal__nav pgal__nav--next" type="button" data-gal-next aria-label="Next image">
+          <span aria-hidden="true">›</span>
+        </button>
+      </>
+    )}
+  </div>
+
+  {hasMultiple && (
+    <>
+      {/* Live region announces the change for screen readers; the visual
+          counter doubles as the mobile position indicator. */}
+      <p class="pgal__counter" data-gal-counter aria-live="polite">
+        1 / {slides.length}
+      </p>
+
+      <div class="pgal__thumbs" role="tablist" aria-label="Choose an image">
+        {slides.map((slide, i) => (
+          <button
+            class="pgal__thumb"
+            type="button"
+            role="tab"
+            data-gal-thumb={i}
+            aria-selected={i === 0}
+            aria-label={`Show image ${i + 1}: ${slide.alt}`}
+          >
+            <Figure src={slide.src} alt="" note={slide.note} ratio="1 / 1" tone="mid" />
+          </button>
+        ))}
+      </div>
+    </>
+  )}
+</div>
+
+<style>
+  .pgal { display: grid; gap: 0.85rem; min-width: 0; }
+
+  .pgal__stage { position: relative; min-width: 0; }
+  /* Slides are swapped with [hidden] rather than translated: no transform
+     means no horizontal overflow to police, and nothing to reflow on resize. */
+  .pgal__slide[hidden] { display: none; }
+
+  .pgal__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink);
+    background: rgba(246, 242, 234, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease);
+  }
+  .pgal__nav:hover { background: var(--linen); border-color: var(--bronze); }
+  .pgal__nav:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
+  .pgal__nav--prev { left: 0.6rem; }
+  .pgal__nav--next { right: 0.6rem; }
+
+  /* Touch devices get the swipe instead; arrows would sit over the photo. */
+  @media (hover: none) and (pointer: coarse) {
+    .pgal__nav { display: none; }
+  }
+
+  .pgal__counter {
+    margin: 0;
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .pgal__thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+  /* On a phone the thumbnails scroll horizontally INSIDE their own strip —
+     the strip scrolls, never the page. */
+  @media (max-width: 599.98px) {
+    .pgal__thumbs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      justify-content: flex-start;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 0.25rem;
+    }
+    .pgal__thumb { scroll-snap-align: start; }
+  }
+
+  .pgal__thumb {
+    flex: 0 0 auto;
+    width: 4.5rem;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease), opacity 0.25s var(--ease);
+    opacity: 0.65;
+  }
+  .pgal__thumb:hover { opacity: 1; }
+  .pgal__thumb[aria-selected='true'] { border-color: var(--bronze); opacity: 1; }
+  .pgal__thumb:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
+  @media (min-width: 600px) { .pgal__thumb { width: 5.5rem; } }
+</style>
+
+<script>
+  import { track } from '../lib/track';
+
+  document.querySelectorAll<HTMLElement>('[data-gallery]').forEach((root) => {
+    const slides = [...root.querySelectorAll<HTMLElement>('[data-gal-slide]')];
+    if (slides.length < 2) return;
+
+    const thumbs = [...root.querySelectorAll<HTMLButtonElement>('[data-gal-thumb]')];
+    const counter = root.querySelector<HTMLElement>('[data-gal-counter]');
+    const stage = root.querySelector<HTMLElement>('[data-gal-stage]')!;
+    const model = root.dataset.model ?? '';
+    let index = 0;
+
+    function show(next: number, reason: string) {
+      // Wrap: from the last image, "next" returns to the first. On a phone
+      // there is no visible end-stop, so stopping dead reads as broken.
+      const target = (next + slides.length) % slides.length;
+      if (target === index) return;
+
+      slides[index].hidden = true;
+      slides[target].hidden = false;
+      thumbs[index]?.setAttribute('aria-selected', 'false');
+      thumbs[target]?.setAttribute('aria-selected', 'true');
+      index = target;
+
+      if (counter) counter.textContent = `${index + 1} / ${slides.length}`;
+      track('product_gallery_view', { model, index: index + 1, reason });
+    }
+
+    root.querySelector('[data-gal-prev]')?.addEventListener('click', () => show(index - 1, 'arrow'));
+    root.querySelector('[data-gal-next]')?.addEventListener('click', () => show(index + 1, 'arrow'));
+    thumbs.forEach((thumb, i) => thumb.addEventListener('click', () => show(i, 'thumbnail')));
+
+    // Keyboard: arrows move within the gallery, Home/End jump to the ends.
+    // Scoped to the gallery so arrow keys still scroll the rest of the page.
+    root.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') { show(index - 1, 'keyboard'); event.preventDefault(); }
+      else if (event.key === 'ArrowRight') { show(index + 1, 'keyboard'); event.preventDefault(); }
+      else if (event.key === 'Home') { show(0, 'keyboard'); event.preventDefault(); }
+      else if (event.key === 'End') { show(slides.length - 1, 'keyboard'); event.preventDefault(); }
+    });
+
+    // --- swipe -------------------------------------------------------
+    // Pointer events, so it works for touch and pen alike. The listeners are
+    // passive: they never call preventDefault, so vertical scrolling through
+    // the page is untouched — a swipe gallery that blocks scrolling is worse
+    // than no swipe gallery.
+    const SWIPE_MIN = 45;      // px — below this it was a tap, not a swipe
+    const SWIPE_MAX_DRIFT = 60; // px — more vertical than this is a scroll
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    stage.addEventListener('pointerdown', (event: PointerEvent) => {
+      if (event.pointerType === 'mouse') return; // mouse users have the arrows
+      startX = event.clientX;
+      startY = event.clientY;
+      tracking = true;
+    }, { passive: true });
+
+    stage.addEventListener('pointerup', (event: PointerEvent) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (Math.abs(dy) > SWIPE_MAX_DRIFT) return;  // they were scrolling
+      if (Math.abs(dx) < SWIPE_MIN) return;        // they were tapping
+      show(dx < 0 ? index + 1 : index - 1, 'swipe');
+    }, { passive: true });
+
+    stage.addEventListener('pointercancel', () => { tracking = false; }, { passive: true });
+  });
+</script>

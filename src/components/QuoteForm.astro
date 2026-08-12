@@ -3,6 +3,7 @@ import { categories } from '../data/site';
 import { displayTitle } from '../data/catalog';
 import { getCollection } from 'astro:content';
 import ProjectUpload from './ProjectUpload.astro';
+import { INSTALLATION_PREFERENCES } from '../lib/product-config';
 
 interface Props {
   /** Pre-selects a model when the form is embedded on a product page. */
@@ -138,6 +139,17 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
       </div>
 
       <div class="field">
+        <label for="q-installation">Installation</label>
+        <select id="q-installation" name="installation">
+          <option value="">Not decided yet</option>
+          {INSTALLATION_PREFERENCES.map((o) => <option value={o.value}>{o.label}</option>)}
+        </select>
+        <span class="field__hint">
+          Tells us what to include in your quote. Nothing is committed at this stage.
+        </span>
+      </div>
+
+      <div class="field">
         <label for="q-foundation">Foundation / base</label>
         <select id="q-foundation" name="foundation">
           <option value="">Not sure yet</option>
@@ -256,6 +268,12 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
 </style>
 
 <script>
+  import { INSTALLATION_PREFERENCES } from '../lib/product-config';
+
+  // Staff read the label, not the stored code. The codes match the admin's
+  // installation_type vocabulary so the two systems stay in step.
+  const installationLabel = (value: string): string =>
+    INSTALLATION_PREFERENCES.find((o) => o.value === value)?.label ?? value;
   import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
 
   // Immediate inline feedback on every ZIP field, and a capture-phase
@@ -383,6 +401,9 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
         `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,
         get('capacity') && `People: ${get('capacity')}`,
         get('budget') && `Budget: ${get('budget')}`,
+        // Installation preference is asked here for EVERY model — including the
+        // ones with no configurator — so a specialist never has to ask twice.
+        get('installation') && `Installation: ${installationLabel(get('installation'))}`,
         get('foundation') && `Foundation: ${get('foundation')}`,
         get('electrical') && `Electrical: ${get('electrical')}`,
         get('message') && `Space/access: ${get('message')}`,

@@ -59,7 +59,12 @@ for (const p of pub) {
   // Accessibility / image hygiene
   for (const m of html.matchAll(/<img\b([^>]*)>/g)) {
     const tag = m[1];
-    if (!/\balt=/.test(tag)) issues.a11y.push(`${url}: <img> without alt`);
+    // `alt=""` is valid and meaningful: it marks an image as decorative, which
+    // is correct when a labelled control already names it (the gallery
+    // thumbnails sit inside buttons carrying an aria-label). Astro serializes
+    // an empty string as a BARE `alt`, so matching only `alt=` reported valid
+    // markup as missing. A genuinely absent alt attribute still fails.
+    if (!/\balt(=|\s|$)/.test(tag)) issues.a11y.push(`${url}: <img> without alt`);
     const aboveFold = /wordmark__logo|hero__img|hero__video/.test(tag);
     if (!/loading=/.test(tag) && !/fetchpriority="high"/.test(tag) && !aboveFold) {
       issues.perf.push(`${url}: <img> without loading attr`);
