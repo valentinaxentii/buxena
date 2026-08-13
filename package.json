@@ -10,6 +10,7 @@
     "astro": "astro",
     "check": "astro check",
     "security:audit": "node scripts/security-audit.mjs",
+    "sales:audit": "node scripts/sales-funnel-audit.mjs",
     "catalog:audit": "node scripts/sync-products-from-content.mjs"
   },
   "dependencies": {
