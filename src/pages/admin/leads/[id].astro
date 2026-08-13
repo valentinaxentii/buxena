@@ -131,7 +131,17 @@ try {
 
       <label class="admin-field">
         <span>Source</span>
-        <select name="source">{SOURCES.map((s) => <option value={s} selected={s === lead.source}>{s}</option>)}</select>
+        {/* The lead's OWN source is always an option, even when it is not one
+            of the configured lead_sources. Without this the select rendered
+            with nothing selected, so the browser picked the first entry and an
+            ordinary save silently rewrote the source to "Website" — losing the
+            fact that the lead came from the trade form or a warranty claim,
+            which is exactly what decides who handles it. */}
+        <select name="source">
+          {(lead.source && !SOURCES.includes(lead.source) ? [lead.source, ...SOURCES] : SOURCES).map((s) => (
+            <option value={s} selected={s === lead.source}>{s}</option>
+          ))}
+        </select>
       </label>
       <label class="admin-field">
         <span>Sauna Model of Interest</span>

@@ -57,7 +57,11 @@ const webSiteSchema = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {/* A page we are asking search engines to ignore has no business naming a
+        preferred URL — the two tags say opposite things. It also fixed a real
+        oddity: /404.html advertised a canonical of /404/, a URL that is not
+        where the page lives. */}
+    {!noindex && <link rel="canonical" href={canonical} />}
     {noindex && <meta name="robots" content="noindex, nofollow" />}
 
     <meta property="og:type" content="website" />

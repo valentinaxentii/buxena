@@ -297,6 +297,36 @@ if (devLive) {
   record('forms', 'every form source can be written to enquiries', ok, detail);
 }
 
+// ------------------------- 5b. noindex and the sitemap must agree
+// Submitting a URL you also tell Google not to index is a contradictory
+// signal, and the two lists live in different files — the page sets its own
+// `noindex`, while astro.config.mjs filters the sitemap by URL and cannot see
+// it. /my-project/ was in both for exactly that reason.
+{
+  const sitemapPath = path.join(DIST, 'sitemap-0.xml');
+  if (!existsSync(sitemapPath)) {
+    record('sitemap', 'noindex pages stay out of the sitemap', false, 'sitemap-0.xml missing');
+  } else {
+    const locs = new Set(
+      [...readFileSync(sitemapPath, 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1])
+    );
+    const leaks = [];
+    for (const file of htmls) {
+      const text = readFileSync(file, 'utf8');
+      if (!/content="noindex/.test(text)) continue;
+      const rel = path.relative(DIST, file).split(path.sep).join('/');
+      const url = 'https://buxena.com/' + rel.replace(/index\.html$/, '');
+      if (locs.has(url)) leaks.push(url);
+    }
+    record(
+      'sitemap',
+      'noindex pages stay out of the sitemap',
+      leaks.length === 0,
+      leaks.length ? `also listed in sitemap: ${leaks.join(', ')} — add to the filter in astro.config.mjs` : ''
+    );
+  }
+}
+
 // -------------------------------- 7d. no raw JSON.stringify inside a <script>
 // JSON.stringify does not escape `<`, so a stored value containing
 // `</script>` closes the tag and the remainder is parsed as markup. Public

@@ -59,9 +59,16 @@ try {
         <option value="">All statuses</option>
         {STATUSES.map((s) => <option value={s} selected={s === statusFilter}>{s}</option>)}
       </select>
+      {/* Configured sources PLUS any source actually present in the rows.
+          Converted enquiries now carry their own source (For Trade, Warranty
+          Claim, Check Availability…), none of which is in the configurable
+          list — so without this the one filter a founder actually wants,
+          "show me the trade projects", was not offered at all. */}
       <select class="admin-select" name="source">
         <option value="">All sources</option>
-        {SOURCES.map((s) => <option value={s} selected={s === sourceFilter}>{s}</option>)}
+        {Array.from(new Set([...SOURCES, ...leads.map((l) => l.source).filter(Boolean), ...(sourceFilter ? [sourceFilter] : [])]))
+          .sort()
+          .map((s) => <option value={s} selected={s === sourceFilter}>{s}</option>)}
       </select>
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>

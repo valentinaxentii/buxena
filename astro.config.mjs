@@ -19,8 +19,14 @@ export default defineConfig({
       // Google not to index is a contradictory signal. /collections/ is the
       // legacy category route, superseded by /saunas/*-saunas/. /admin and
       // /login are private and must never be indexed or listed.
+      //
+      // EVERY PAGE THAT SETS `noindex` MUST BE LISTED HERE. The sitemap
+      // integration only ever sees a URL, so it cannot read the page's own
+      // meta tag — the two lists are kept in step by hand, and by the
+      // "noindex pages stay out of the sitemap" check on the pre-launch board,
+      // which is what caught /my-project/ being in both.
       filter: (page) =>
-        !['/thank-you/'].some((p) => page.endsWith(p)) &&
+        !['/thank-you/', '/my-project/'].some((p) => page.endsWith(p)) &&
         !page.includes('/collections/') &&
         !page.includes('/admin') &&
         !page.includes('/login'),

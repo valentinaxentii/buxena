@@ -10,8 +10,13 @@ import { checkRateLimit } from '../lib/rate-limit';
 // an external URL smuggled into `next` is rejected.
 function safeNext(raw: string | null): string {
   const v = (raw ?? '').trim();
-  if (v.startsWith('/admin') && !v.includes('\\') && !v.startsWith('//')) return v;
-  return '/admin';
+  if (!v.startsWith('/admin') || v.includes('\\') || v.startsWith('//')) return '/admin';
+  // `/admin/../../somewhere` passes the prefix test but the browser resolves
+  // it away from /admin before requesting it. Same-origin either way, so this
+  // was never a redirect out of the site — it just meant a sign-in link could
+  // land someone somewhere they did not expect. Resolve it here and re-check.
+  const resolved = new URL(v, 'http://placeholder.invalid').pathname;
+  return resolved.startsWith('/admin') ? resolved : '/admin';
 }
 const nextParam = Astro.url.searchParams.get('next');
 let redirectTo = safeNext(nextParam);

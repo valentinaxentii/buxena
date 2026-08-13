@@ -68,7 +68,14 @@ export async function convertEnquiryToLead(supabase: SupabaseClient, enquiryId: 
       name: enquiry.name || enquiry.email || enquiry.phone || 'Website enquiry',
       email: enquiry.email,
       phone: enquiry.phone,
-      source: 'Website',
+      // Carry the enquiry's OWN source through. Every converted lead used to
+      // arrive as a flat 'Website', which threw away the single most useful
+      // fact for deciding who picks it up and how fast: a For Trade project
+      // and a Warranty Claim are not the same work as a chat transcript. The
+      // leads.source constraint accepts any non-empty value (see schema.sql),
+      // and the lead edit form now keeps an unlisted source rather than
+      // silently resetting it.
+      source: enquiry.source || 'Website',
       product_id: match?.id ?? null,
       notes: enquiry.message || null,
     })
@@ -109,7 +116,9 @@ async function resolveOrCreateCustomer(supabase: SupabaseClient, enquiry: any) {
       email: enquiry.email,
       phone: enquiry.phone,
       zip: enquiry.location || null,
-      lead_source: 'Website',
+      // Same reasoning as the lead above. customers.lead_source is plain text
+      // with no CHECK, so this cannot fail an insert and lose the quote.
+      lead_source: enquiry.source || 'Website',
     })
     .select('id')
     .single();

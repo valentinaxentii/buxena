@@ -49,7 +49,12 @@ for (const p of pub) {
     if (descs.has(desc)) issues.seo.push(`${url}: DUPLICATE description with ${descs.get(desc)}`);
     else descs.set(desc, url);
   }
-  if (/<link rel="canonical"/.test(html)) withCanonical++; else issues.seo.push(`${url}: no canonical`);
+  // A noindex page deliberately has no canonical: naming a preferred URL for a
+  // page you are asking search engines to ignore is two tags contradicting
+  // each other. BaseLayout emits one or the other, never both.
+  const isNoindex = /content="noindex/.test(html);
+  if (/<link rel="canonical"/.test(html)) withCanonical++;
+  else if (!isNoindex) issues.seo.push(`${url}: no canonical`);
   if (/property="og:title"/.test(html)) withOG++; else issues.seo.push(`${url}: no Open Graph`);
   if (/property="og:image"/.test(html)) withOGImage++;
   if (/"@type":\s*"BreadcrumbList"/.test(html)) withBreadcrumb++;
