@@ -200,18 +200,48 @@ try {
     .reduce((s: number, r: any) => s + Number(r.balance_due ?? 0), 0);
   nextShipment = nextShipmentRows.data?.[0] ?? null;
 
+  // ATTENTION ORDER IS COMMERCIAL, NOT ARBITRARY.
+  //
+  // Only six of these render. Unhandled enquiries used to be built LAST, so
+  // four overdue follow-ups plus four expiring quotes pushed every one of them
+  // off the board — a customer who submitted a pricing request an hour ago
+  // could be entirely invisible on the dashboard while a low-stock notice held
+  // their place. Response time is the one thing on this page that decays by
+  // the hour, so the two entries where a real person is waiting on a reply now
+  // come first, and logistics comes last.
+  //
+  // Enquiries also deep-link to the enquiry itself rather than to the list.
+  // The id is already in hand; sending the founder to a list to hunt for the
+  // row they just clicked cost two extra steps on the most time-critical
+  // item here.
   needsAttention = [
+    // 1 — a person is waiting for a first reply.
+    ...(newEnquiryRows.data ?? []).map((e: any) => {
+      const ageHours = (Date.now() - new Date(e.created_at).getTime()) / 3_600_000;
+      return {
+        label: `Unanswered enquiry — ${e.name || e.source}`,
+        detail: `waiting ${timeAgo(e.created_at).replace(' ago', '')}`,
+        href: `/admin/enquiries/${e.id}`,
+        // Turns the age red once it has been sitting for a day. A display
+        // emphasis only — BUXENA has published no response-time promise, and
+        // this must not become one.
+        overdue: ageHours >= 24,
+      };
+    }),
+    // 2 — a person we already promised to come back to.
     ...(followUpRows.data ?? []).map((l: any) => ({
       label: `Follow-up — ${l.name}`,
       detail: l.follow_up_date ? `Due ${l.follow_up_date}` : '',
       href: `/admin/leads/${l.id}`,
       overdue: true,
     })),
+    // 3 — money already on the table, with a deadline.
     ...(expiringQuoteRows.data ?? []).map((q: any) => ({
       label: `Quote expiring — ${q.quote_number || 'Quote'}`,
       detail: `Expires ${q.expiry_date}`,
       href: `/admin/quotes/${q.id}`,
     })),
+    // 4 — logistics. Important, but nobody is waiting on a reply.
     ...(lowStockRows.data ?? []).map((i: any) => ({
       label: `Low stock — ${i.products?.model_name ?? 'Unknown model'}`,
       detail: `${i.available ?? 0} available`,
@@ -222,11 +252,6 @@ try {
       detail: `ETA ${i.eta}`,
       href: `/admin/inventory/${i.id}`,
     })),
-    ...(newEnquiryRows.data ?? []).map((e: any) => ({
-      label: `Unhandled enquiry — ${e.name || e.source}`,
-      detail: timeAgo(e.created_at),
-      href: `/admin/enquiries`,
-    })),
   ];
 
   recentActivity = [
@@ -234,7 +259,8 @@ try {
     ...(recentQuotes.data ?? []).map((q: any) => ({ label: 'Quote created', detail: q.quote_number || 'Quote', href: `/admin/quotes/${q.id}`, when: q.created_at, kind: 'quote' })),
     ...(recentOrders.data ?? []).map((o: any) => ({ label: 'Order created', detail: o.order_number || 'Order', href: `/admin/orders/${o.id}`, when: o.created_at, kind: 'order' })),
     ...(recentCustomers.data ?? []).map((c: any) => ({ label: 'New customer', detail: c.name, href: `/admin/customers/${c.id}`, when: c.created_at, kind: 'customer' })),
-    ...(recentEnquiries.data ?? []).map((e: any) => ({ label: 'Website enquiry', detail: e.name || e.source, href: `/admin/enquiries`, when: e.created_at, kind: 'enquiry' })),
+    // Deep-linked, like every other row here — the id is already selected.
+    ...(recentEnquiries.data ?? []).map((e: any) => ({ label: 'Website enquiry', detail: e.name || e.source, href: `/admin/enquiries/${e.id}`, when: e.created_at, kind: 'enquiry' })),
   ]
     .filter((r) => r.when)
     .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
@@ -471,6 +497,17 @@ const deniedUnverified = denied === 'settings-unverified';
             </li>
           );
         })}
+        {/* Six rows render. Saying so is the difference between "that is
+            everything" and "that is the top of a longer list" — silent
+            truncation on the panel that decides what gets worked next reads
+            as an all-clear it has not earned. */}
+        {needsAttention.length > 6 && (
+          <li class="dx-row dx-row--more">
+            <span class="dx-row__text">
+              <span class="dx-row__secondary">+{needsAttention.length - 6} more needing attention</span>
+            </span>
+          </li>
+        )}
         {Array.from({ length: Math.max(0, 5 - needsAttention.length) }).map(() => (
           <li class="dx-row dx-row--ghost dx-row--task" aria-hidden="true" />
         ))}
@@ -758,6 +795,10 @@ const deniedUnverified = denied === 'settings-unverified';
   .dx-row__meta { flex: 0 0 auto; font-size: 10px; color: var(--admin-muted); white-space: nowrap; }
   .dx-row__meta--gold { color: var(--admin-gold); }
   .dx-row__meta--overdue { color: #d98a66; }
+
+  /* Overflow marker for the Attention list — the panel shows six, and this
+     says how many it did not. Muted: it is a footnote, not another task. */
+  .dx-row--more { padding: 8px 0 0; border-bottom: none; opacity: 0.75; }
 
   /* ghost rows: empty slots preserving the list rhythm — no content, just the
      divider at the correct row height. Not data. */

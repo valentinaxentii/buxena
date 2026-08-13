@@ -45,8 +45,20 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   try {
     const body = await request.json();
-    const { name, email, phone, location, zip, message, chatTranscript, saunaInterest, source, attribution, botField } =
-      body ?? {};
+    const {
+      name, email, phone, location, zip, message, chatTranscript, saunaInterest, source, attribution, botField,
+      appendToEnquiryId,
+    } = body ?? {};
+
+    // The id of an enquiry this submission should be MERGED INTO rather than
+    // recorded beside. Only the quote form's optional second step sends it,
+    // carrying the id step 1 returned. Validated as a uuid here so a malformed
+    // or hostile value is ignored outright rather than reaching a query.
+    const appendId =
+      typeof appendToEnquiryId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(appendToEnquiryId)
+        ? appendToEnquiryId
+        : null;
 
     // Honeypot: a real visitor never fills the hidden field. Bots that blindly
     // complete every input do. Pretend success and drop it — don't record, don't
@@ -102,8 +114,10 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       );
       // A synthetic id so the browser exercises the same follow-up path it
       // uses in production; /api/project-files also short-circuits in dev.
+      // An append echoes the id back, so the dev run models production: the
+      // detail step and its files land on the enquiry step 1 created.
       return new Response(
-        JSON.stringify({ ok: true, devMode: true, enquiryId: 'dev-mode-enquiry' }),
+        JSON.stringify({ ok: true, devMode: true, enquiryId: appendId ?? 'dev-mode-enquiry' }),
         { status: 200 }
       );
     }
@@ -121,34 +135,94 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // request continues either way.
     let recorded = false;
     let inserted: { id: string } | null = null;
+    let appendedId: string | null = null;
     let supabase: ReturnType<typeof createSupabaseAdminClient> | null = null;
     try {
       supabase = createSupabaseAdminClient();
-      const { data, error } = await supabase
-        .from('enquiries')
-        .insert({
-          name: name || null,
-          email: email || null,
-          phone: phone || null,
-          location: location || null,
-          message: message || null,
-          chat_transcript: chatTranscript || null,
-          sauna_interest: saunaInterest || null,
-          source: source || 'Sauna Advisor',
-          status: 'New',
-        })
-        .select('id')
-        .single();
 
-      if (error) {
-        // Log the real cause server-side; the visitor never sees it. Supabase
-        // error text names tables, columns and constraints — free schema
-        // reconnaissance for anyone probing a public endpoint, and meaningless
-        // to the person who triggered it.
-        console.error('[enquiries] insert failed, falling back to notifications:', error.message);
-      } else {
-        recorded = true;
-        inserted = data as { id: string };
+      // MERGE, don't duplicate.
+      //
+      // The quote form captures the lead at step 1 and then offers an optional
+      // step 2 for budget, capacity, installation, foundation, electrical, the
+      // description of the space and the customer's photos and plans. Both
+      // steps used to INSERT, so one buyer arrived in the CRM as two rows with
+      // nothing joining them but a matching email address.
+      //
+      // That cost real money three ways. A salesperson opening the first row —
+      // the one the staff notification points at — saw a bare pricing request
+      // and none of the qualification the customer had just spent two minutes
+      // providing. The customer's uploaded photos and plans attached to the
+      // SECOND row, so the primary lead showed no files at all. And the
+      // enquiry list showed two entries per buyer, which reads as two people.
+      //
+      // Merging keeps step 1's row as the single record for the whole journey.
+      // Nothing about step 1's guarantees changes: the lead is already
+      // captured and acknowledged before this runs.
+      if (appendId) {
+        const { data: existing, error: findError } = await supabase
+          .from('enquiries')
+          .select('id, message, phone, location, sauna_interest')
+          .eq('id', appendId)
+          .maybeSingle();
+
+        if (findError) {
+          console.error('[enquiries] append lookup failed, recording separately:', findError.message);
+        } else if (existing) {
+          const { error: updateError } = await supabase
+            .from('enquiries')
+            .update({
+              message: [existing.message, message].filter(Boolean).join('\n\n'),
+              // Only ever fill a blank. The detail step re-sends the contact
+              // fields, and step 1's values are the ones the customer typed
+              // first — an overwrite could replace a good value with an empty
+              // one if a field were cleared between steps.
+              phone: existing.phone || phone || null,
+              location: existing.location || location || null,
+              sauna_interest: existing.sauna_interest || saunaInterest || null,
+            })
+            .eq('id', appendId);
+
+          if (updateError) {
+            console.error('[enquiries] append failed, recording separately:', updateError.message);
+          } else {
+            recorded = true;
+            appendedId = existing.id;
+          }
+        }
+        // No row, or the update failed? Fall through to the insert below. A
+        // second row is far better than silently discarding what the customer
+        // wrote, so every failure here degrades to the old behaviour.
+      }
+
+      // Skipped when the merge above already placed this submission on an
+      // existing enquiry.
+      if (!recorded) {
+        const { data, error } = await supabase
+          .from('enquiries')
+          .insert({
+            name: name || null,
+            email: email || null,
+            phone: phone || null,
+            location: location || null,
+            message: message || null,
+            chat_transcript: chatTranscript || null,
+            sauna_interest: saunaInterest || null,
+            source: source || 'Sauna Advisor',
+            status: 'New',
+          })
+          .select('id')
+          .single();
+
+        if (error) {
+          // Log the real cause server-side; the visitor never sees it. Supabase
+          // error text names tables, columns and constraints — free schema
+          // reconnaissance for anyone probing a public endpoint, and meaningless
+          // to the person who triggered it.
+          console.error('[enquiries] insert failed, falling back to notifications:', error.message);
+        } else {
+          recorded = true;
+          inserted = data as { id: string };
+        }
       }
     } catch (e) {
       // Covers createSupabaseAdminClient() throwing on missing env vars, and
@@ -162,7 +236,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // Audit trail entry. Awaited (not fire-and-forget) so the serverless
     // function doesn't freeze before the write lands, but its failure is
     // swallowed — it must never turn a recorded enquiry into an error.
-    if (inserted && supabase) {
+    if ((inserted || appendedId) && supabase) {
       const cleanAttribution = (key: string) => {
         const value = attribution && typeof attribution === 'object' ? (attribution as Record<string, unknown>)[key] : null;
         return typeof value === 'string' ? value.trim().slice(0, 300) : '';
@@ -176,13 +250,19 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         ['utm content', cleanAttribution('utmContent')],
         ['utm term', cleanAttribution('utmTerm')],
       ].filter(([, value]) => Boolean(value)).map(([label, value]) => `${label}: ${value}`);
+      // A merge is a second event on an existing enquiry, not a new arrival —
+      // the timeline should read "the customer came back and told us more",
+      // which is a buying signal worth seeing. Attribution belongs only on the
+      // arrival entry; on the merge it would just repeat step 1's.
       await supabase
         .from('activities')
         .insert({
           entity_type: 'enquiry',
-          entity_id: inserted.id,
+          entity_id: appendedId ?? inserted!.id,
           activity_type: 'note',
-          description: `Enquiry received — ${source || 'Sauna Advisor'}${attributionDetails.length ? ` | ${attributionDetails.join(' · ')}` : ''}`,
+          description: appendedId
+            ? `Customer added project details — ${source || 'Quote Form — details'}`
+            : `Enquiry received — ${source || 'Sauna Advisor'}${attributionDetails.length ? ` | ${attributionDetails.join(' · ')}` : ''}`,
         })
         .then(
           () => {},
@@ -258,7 +338,10 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // second request. Returning it is safe: it is a random uuid, it grants
     // no read access, and /api/project-files still verifies the enquiry
     // exists before accepting anything against it.
-    return new Response(JSON.stringify({ ok: true, enquiryId: inserted?.id ?? null }), {
+    //
+    // On a merge this is the ORIGINAL enquiry's id, which is what puts the
+    // customer's photos and plans on the record a salesperson actually opens.
+    return new Response(JSON.stringify({ ok: true, enquiryId: appendedId ?? inserted?.id ?? null }), {
       status: decision.status,
     });
   } catch (e) {

@@ -11,6 +11,7 @@ import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
 import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-templates';
+import { parseEnquiryDetails } from '../../../lib/enquiry-details';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -30,6 +31,8 @@ let error: string | null = null;
 let projectFiles: { name: string; url: string | null; created: string | null }[] = [];
 let actions = { supported: false, archived: false };
 let notice: string | null = null;
+/** Other enquiries sharing this email — returning buyer, or a duplicate. */
+let alsoFromContact: any[] = [];
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -95,6 +98,28 @@ try {
     timeline = activityRows.data ?? [];
   }
 
+  // OTHER ENQUIRIES FROM THE SAME PERSON.
+  //
+  // Two things a salesperson could not previously see. First, whether this is
+  // a returning buyer — somebody who checked availability last week and has
+  // now asked for pricing is the warmest lead in the system, and answering
+  // them as a stranger wastes that. Second, whether this record is a duplicate
+  // of one a colleague already replied to, which is how a customer ends up
+  // with two different people quoting them.
+  //
+  // Matched on email because that is the field every form requires. One
+  // indexed query on a table already open; no new table, no new column.
+  if (enquiry?.email) {
+    const { data: siblingRows } = await supabase
+      .from('enquiries')
+      .select('id, source, status, sauna_interest, created_at')
+      .eq('email', enquiry.email)
+      .neq('id', id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    alsoFromContact = siblingRows ?? [];
+  }
+
   // Customer project files, newest first.
   if (enquiry) {
     const { data: fileRows } = await supabase
@@ -133,6 +158,10 @@ const reply = enquiry
     })
   : null;
 const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, reply) : null;
+
+// The customer's own answers, lifted out of the message blob so the reply can
+// be written from them without reading a paragraph first. Read-only.
+const details = parseEnquiryDetails(enquiry?.message);
 ---
 
 <AdminLayout title="Enquiry" subtitle={enquiry ? `Received ${new Date(enquiry.created_at).toLocaleString()}` : undefined} parentLabel="Website Enquiries" parentHref="/admin/enquiries">
@@ -235,9 +264,35 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
             <h2 class="enq-sec__h">Request</h2>
             <dl class="enq-kv">
               <div><dt>Requested Sauna / Model</dt><dd>{enquiry.sauna_interest || '—'}</dd></div>
+              <div><dt>Requested Service</dt><dd>{enquiry.source || '—'}</dd></div>
             </dl>
+
+            {details.fields.length > 0 && (
+              <Fragment>
+                <p class="enq-label">Project Answers</p>
+                <dl class="enq-kv enq-kv--answers">
+                  {details.fields.map((f) => (
+                    <div><dt>{f.label}</dt><dd>{f.value}</dd></div>
+                  ))}
+                </dl>
+              </Fragment>
+            )}
+
             <p class="enq-label">Customer Message</p>
-            <p class="enq-message">{enquiry.message || '—'}</p>
+            {details.prose.length > 0 ? (
+              details.prose.map((p) => <p class="enq-message">{p}</p>)
+            ) : (
+              <p class="enq-message">{details.fields.length ? '— (answers above)' : enquiry.message || '—'}</p>
+            )}
+
+            {/* The unedited capture stays available. The panels above are a
+                reading aid; this is the record, and it must remain checkable. */}
+            {enquiry.message && (
+              <details class="enq-raw">
+                <summary>Show raw submission</summary>
+                <p class="enq-message">{enquiry.message}</p>
+              </details>
+            )}
           </section>
 
           {reply && (
@@ -276,6 +331,28 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
               {enquiry.contacted_at && <div><dt>Contacted</dt><dd>{new Date(enquiry.contacted_at).toLocaleString()}</dd></div>}
             </dl>
           </section>
+
+          {alsoFromContact.length > 0 && (
+            <section class="admin-panel enq-sec">
+              <h2 class="enq-sec__h">Also From This Contact ({alsoFromContact.length})</h2>
+              <p class="enq-files__note" style="margin-bottom:0.7rem;">
+                Same email address. A returning enquirer is a strong buying
+                signal — check what was already answered before replying.
+              </p>
+              <ul class="enq-also">
+                {alsoFromContact.map((s) => (
+                  <li>
+                    <a href={`/admin/enquiries/${s.id}`}>
+                      <span class="enq-also__src">{s.sauna_interest || s.source}</span>
+                      <span class="enq-also__meta">
+                        {new Date(s.created_at).toLocaleDateString()} · {s.status}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section class="admin-panel enq-sec">
             <h2 class="enq-sec__h">Activity Timeline</h2>
@@ -325,7 +402,42 @@ const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, rep
   .enq-kv dd { margin: 0.15rem 0 0; font-size: 0.85rem; color: var(--admin-cream); }
 
   .enq-label { margin: 0.9rem 0 0.3rem; font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--admin-muted); }
-  .enq-message { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--admin-cream); white-space: pre-wrap; }
+  .enq-message { margin: 0 0 0.5rem; font-size: 0.85rem; line-height: 1.55; color: var(--admin-cream); white-space: pre-wrap; }
+  .enq-message:last-child { margin-bottom: 0; }
+
+  /* The customer's answers, as a scannable grid rather than a paragraph. */
+  .enq-kv--answers {
+    padding: 0.7rem 0.8rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+  }
+
+  .enq-raw { margin-top: 0.9rem; }
+  .enq-raw summary {
+    cursor: pointer;
+    font-size: 0.62rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+  }
+  .enq-raw summary:hover { color: var(--admin-gold); }
+  .enq-raw .enq-message { margin-top: 0.5rem; }
+
+  .enq-also { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+  .enq-also a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.5rem 0.7rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+    text-decoration: none;
+  }
+  .enq-also a:hover { border-color: var(--admin-gold); }
+  .enq-also__src { font-size: 0.82rem; color: var(--admin-cream); }
+  .enq-also__meta { font-size: 0.68rem; color: var(--admin-muted); }
 
   .enq-timeline { list-style: none; margin: 0; padding: 0; }
   .enq-timeline li {

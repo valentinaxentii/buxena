@@ -88,6 +88,31 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         timeline: 'Timeline',
         projectType: 'Project type',
       };
+      /**
+       * The six forms that reach this page store their <select> values, which
+       * are slugs — "1-3-months", "asap", "need-guidance", "outdoor". Those are
+       * the right thing to store (analytics below reads them, and they must
+       * stay stable) and the wrong thing to show: the buyer was reading
+       * "1–3 months" a second ago and this page echoed "1-3-months" back at
+       * them, on the one screen whose whole job is to feel like a confirmation.
+       *
+       * Rendering-only, and applied to the display copy — the stored object is
+       * untouched, so `lead_confirmed` still carries the stable slug.
+       * Deliberately no invented meaning: the ranges are re-spaced and the two
+       * known shorthands are spelled out, nothing else.
+       */
+      const prettify = (value: string): string =>
+        value
+          .replace(/^(\d+)-(\d+)-months$/, '$1–$2 months')
+          .replace(/^under-(\d+)k$/, 'Under $$$1,000')
+          .replace(/^(\d+)-(\d+)k$/, '$$$1,000 – $$$2,000')
+          .replace(/^(\d+)k-plus$/, '$$$1,000+')
+          .replace(/^asap$/, 'As soon as possible')
+          .replace(/^researching$/, 'Still researching')
+          .replace(/^(\d+)-(\d+)$/, '$1–$2')
+          .replace(/-/g, ' ')
+          .replace(/^./, (c) => c.toUpperCase());
+
       const rows = Object.entries(summary)
         .filter(([k, v]) => LABELS[k] && v)
         .map(([k, v]) => {
@@ -95,7 +120,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           const dt = document.createElement('dt');
           dt.textContent = LABELS[k];
           const dd = document.createElement('dd');
-          dd.textContent = k === 'model' ? v.replace(/^BUH-/i, '') : v;
+          // ZIP is digits and the model carries its own casing — neither wants
+          // slug treatment.
+          dd.textContent =
+            k === 'model' ? v.replace(/^BUH-/i, '') : k === 'zip' ? v : prettify(v);
           div.append(dt, dd);
           return div;
         });

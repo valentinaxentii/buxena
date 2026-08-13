@@ -9,31 +9,66 @@
  * quantity = preorder), that's the true state of every model today, since
  * zero inventory data is connected yet. Once real inventory/shipment data
  * exists, the caller can pass a real status instead of the default.
+ *
+ * WHY EACH STATUS CARRIES A LINE OF EXPLANATION (founder direction,
+ * 2026-08-13): "Preorder" on its own, set in muted grey, read as "you can't
+ * have one" — the single most negative thing on an otherwise confident
+ * product page, and it sat directly above the Request Pricing button. The
+ * word is accurate and stays; what was missing was what it means for the
+ * buyer. The line says when they will learn availability and an estimated
+ * lead time, and nothing more.
+ *
+ * CLAIM SAFETY — the notes below state PROCESS, never fact. No lead time, no
+ * date, no stock quantity, no supplier commitment, no "ships in N weeks". A
+ * date may only ever appear via `etaNote`, which the caller passes when a
+ * real confirmed ETA exists. This is deliberately consistent with the claim
+ * rules already audited into /how-buying-works and /quote, which withhold
+ * delivery timelines and availability: saying "we confirm it with your
+ * quote" commits to a conversation, not to a timeline.
  */
 interface Props {
   status?: 'in-stock' | 'in-transit' | 'preorder';
   etaNote?: string; // e.g. "Expected arrival: Aug 18" — only ever passed when a real ETA exists
+  /** Overrides the standard explanation. Omit unless a model genuinely differs. */
+  note?: string;
 }
-const { status = 'preorder', etaNote } = Astro.props;
+const { status = 'preorder', etaNote, note } = Astro.props;
 
 const LABELS: Record<string, string> = {
   'in-stock': 'In Stock',
   'in-transit': 'In Transit',
   preorder: 'Preorder',
 };
+
+/**
+ * Process, not promises. Each line answers "what does this mean for me?"
+ * without stating a single fact BUXENA has not confirmed.
+ */
+const NOTES: Record<string, string> = {
+  'in-stock': 'Available now. We confirm your configuration and delivery with your quote.',
+  'in-transit': 'On its way to the U.S. We confirm the arrival window and delivery with your quote.',
+  preorder:
+    'Ordered for you from our European makers. We confirm current availability and an estimated lead time when we prepare your quote — before you commit to anything.',
+};
+
+const explanation = note ?? NOTES[status];
 ---
 
 <div class="avail">
-  {status === 'preorder' ? (
-    <a class="avail__badge avail__badge--preorder" href="#enquire">{LABELS[status]}</a>
-  ) : (
-    <span class={`avail__badge avail__badge--${status}`}>{LABELS[status]}</span>
-  )}
-  {etaNote && <span class="avail__eta">{etaNote}</span>}
+  <div class="avail__row">
+    {status === 'preorder' ? (
+      <a class="avail__badge avail__badge--preorder" href="#enquire">{LABELS[status]}</a>
+    ) : (
+      <span class={`avail__badge avail__badge--${status}`}>{LABELS[status]}</span>
+    )}
+    {etaNote && <span class="avail__eta">{etaNote}</span>}
+  </div>
+  {explanation && <p class="avail__note">{explanation}</p>}
 </div>
 
 <style>
-  .avail { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+  .avail { display: grid; gap: 0.5rem; justify-items: start; }
+  .avail__row { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
 
   .avail__badge {
     display: inline-block;
@@ -60,14 +95,26 @@ const LABELS: Record<string, string> = {
     background: rgba(156, 122, 74, 0.12);
     border-color: var(--bronze-soft);
   }
+  /* Bronze rather than the former muted grey on a hairline border. Grey is
+     the palette's disabled register — on the one state every model currently
+     carries, it made the whole catalog look switched off. Outlined keeps it
+     distinct from the filled in-transit chip. */
   .avail__badge--preorder {
-    color: var(--muted);
+    color: var(--bronze-ink);
     background: transparent;
-    border-color: var(--line);
+    border-color: var(--bronze-soft);
   }
 
   .avail__eta {
     font-size: var(--t-small);
     color: var(--muted);
+  }
+
+  .avail__note {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 42em;
   }
 </style>

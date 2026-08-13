@@ -936,6 +936,43 @@ end $$;
 alter table enquiries add constraint enquiries_status_check
   check (status in ('New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'));
 
+-- Enquiry sources are owned by the application, not frozen in the schema —
+-- the same relaxation already applied to leads.source above, and for the same
+-- reason. The original fixed list admitted five values; the site submits
+-- twelve, so nine of them (Check Availability, For Trade, Project Intake,
+-- See It In My Space, Warranty Claim, Consultation Request, Plan Your Sauna,
+-- Quote Comparison and the quote form's detail step) had their INSERT rejected
+-- outright. /api/enquiries fell back to the staff email + Telegram so the lead
+-- itself survived, but the enquiry never reached the CRM: no admin row, no
+-- status, no follow-up, invisible to the dashboard and reports.
+--
+-- Dynamic lookup because the original was declared inline in `create table`
+-- and carries a Postgres-generated name. The filter excludes the status
+-- constraint on the same table, which is set immediately above.
+--
+-- Also shipped standalone as
+-- supabase/migrations/2026-08-13-enquiry-source-constraint.sql for a database
+-- that already exists. Adding a form must never again require a migration.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname
+      from pg_constraint
+     where conrelid = 'enquiries'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%source%'
+       and pg_get_constraintdef(oid) not ilike '%status%'
+  loop
+    execute format('alter table enquiries drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+alter table enquiries drop constraint if exists enquiries_source_check;
+alter table enquiries add constraint enquiries_source_check
+  check (source is not null and length(trim(source)) > 0);
+
 -- Linked Quote (linked Lead already exists: enquiries.lead_id).
 alter table enquiries add column if not exists quote_id uuid references quotes(id) on delete set null;
 

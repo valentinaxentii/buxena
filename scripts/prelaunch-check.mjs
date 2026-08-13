@@ -237,6 +237,66 @@ if (devLive) {
   record('images', 'no watermarked image referenced on any page', used.length === 0, detail);
 }
 
+// ---------------------------------- 7c. every form source is writable to the DB
+// The check the board did not have on 2026-08-13, when nine of the site's
+// twelve enquiry sources could not be inserted at all: enquiries.source still
+// carried its original five-value CHECK constraint. Every one of those leads
+// fell back to the staff email and survived — but none reached the CRM.
+//
+// It cannot be caught by submitting forms, which is why "all 10 form sources
+// accepted in dev test mode" passed throughout: `astro dev` short-circuits
+// before Supabase, so no local submission ever meets the constraint. This is a
+// static cross-check of the two files that have to agree — the forms that name
+// a source, and the schema that decides what a source may be.
+{
+  const srcDir = path.join(ROOT, 'src');
+  const sourceLiterals = new Set();
+  (function walk(d) {
+    for (const f of readdirSync(d)) {
+      const p = path.join(d, f);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(astro|ts)$/.test(f)) {
+        const text = readFileSync(p, 'utf8');
+        // `source: 'X'` and the ternary form `source: cond ? 'X' : 'Y'`.
+        for (const m of text.matchAll(/\bsource:\s*(?:[^,;{}\n]*?\?\s*)?'([^']+)'(?:\s*:\s*'([^']+)')?/g)) {
+          for (const value of [m[1], m[2]]) {
+            // Skip settings-vocabulary matches (warranty_start_source) and
+            // anything that is plainly a variable rather than a form source.
+            if (value && !/^(delivery_date|installation_date|invoice_date|manual)$/.test(value)) {
+              sourceLiterals.add(value);
+            }
+          }
+        }
+      }
+    }
+  })(srcDir);
+
+  const schemaText = readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8');
+  // The LAST source constraint in the file wins — schema.sql deliberately
+  // replaces the inline create-table constraint further down.
+  const constraints = [...schemaText.matchAll(/check\s*\(\s*source\s+in\s*\(([^)]*)\)/gi)];
+  const relaxed = /enquiries_source_check\s*\n?\s*check\s*\(source is not null/i.test(schemaText);
+
+  let ok = true;
+  let detail = '';
+  if (relaxed) {
+    detail = `${sourceLiterals.size} form sources, constraint accepts any non-empty value`;
+  } else if (constraints.length) {
+    const allowed = new Set(
+      [...constraints[constraints.length - 1][1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+    );
+    const rejected = [...sourceLiterals].filter((s) => !allowed.has(s));
+    ok = rejected.length === 0;
+    detail = ok
+      ? `${sourceLiterals.size} form sources all permitted`
+      : `enquiries.source CHECK would REJECT ${rejected.length} of ${sourceLiterals.size}: ${rejected.join(', ')} — these leads never reach the CRM (apply supabase/migrations/2026-08-13-enquiry-source-constraint.sql)`;
+  } else {
+    ok = false;
+    detail = 'could not find a source constraint in supabase/schema.sql to check against';
+  }
+  record('forms', 'every form source can be written to enquiries', ok, detail);
+}
+
 // ------------------------------------------- 8. model presentation system
 console.log('\n■ 8/8 Model presentations');
 {

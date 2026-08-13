@@ -42,7 +42,11 @@ const offeredCategories = categories.filter((c) =>
   Step 1 captures the lead with seven fields and GET MY PRICING — the
   enquiry is submitted the moment step 1 succeeds, so an abandoned step 2
   never loses the lead. Step 2 then collects optional project detail and
-  sends it as a follow-up note attached to the same email address.
+  MERGES it into that same enquiry, carrying step 1's id back to the server
+  (2026-08-13). It previously created a second enquiry row joined to the
+  first by nothing but a matching email address, which split one buyer into
+  two CRM records and, worse, attached the customer's photos and plans to the
+  second one — so the row a salesperson opened showed no files.
   Both submissions go through /api/enquiries (Supabase + email + Telegram
   in production; safe local test mode in dev — see src/lib/enquiry-client.ts).
 -->
@@ -348,9 +352,37 @@ const offeredCategories = categories.filter((c) =>
       return (data.get(key) || '').toString().trim();
     };
 
+    /**
+     * The wording the customer actually saw, for a <select>.
+     *
+     * The stored values are slugs — "10-20k", "1-3-months", "need-guidance" —
+     * which is right for analytics and wrong for a human. They used to reach
+     * the CRM and the staff notification verbatim, so a salesperson opening a
+     * fully-qualified lead read "Budget: 10-20k · Foundation: need-guidance"
+     * and had to translate before replying.
+     *
+     * Read from the chosen option's own text rather than a lookup table, so
+     * there is no second vocabulary to drift out of step with the markup.
+     * Falls back to the raw value for inputs and for anything unmatched.
+     * Deliberately NOT used for `model`, whose full BUH- title is what admin
+     * and CRM match on, nor for the track() calls, which keep the stable slugs.
+     */
+    const getLabel = (key: string) => {
+      const field = form.elements.namedItem(key);
+      if (field instanceof HTMLSelectElement) {
+        const option = field.selectedOptions[0];
+        if (option && option.value) return (option.textContent ?? '').trim() || option.value;
+        return '';
+      }
+      return get(key);
+    };
+
     let capturedEmail = '';
     let capturedModel = '';
     let wasDevMode = false;
+    // Step 1's enquiry id. Step 2 sends it so its answers are merged into that
+    // same enquiry instead of creating a second row for the same buyer.
+    let capturedEnquiryId: string | null = null;
 
     form.addEventListener(
       'focusin',
@@ -366,8 +398,8 @@ const offeredCategories = categories.filter((c) =>
       const zip = get('zip');
       const extras = [
         zip && `ZIP: ${zip}`,
-        get('placement') && `Placement: ${get('placement')}`,
-        get('timeline') && `Timeline: ${get('timeline')}`,
+        get('placement') && `Placement: ${getLabel('placement')}`,
+        get('timeline') && `Timeline: ${getLabel('timeline')}`,
         urlPackage && `Package interest: ${urlPackage}`,
       ].filter(Boolean).join(' · ');
 
@@ -412,6 +444,7 @@ const offeredCategories = categories.filter((c) =>
 
       capturedEmail = get('email');
       capturedModel = get('model');
+      capturedEnquiryId = result.enquiryId ?? null;
       wasDevMode = Boolean(result.devMode);
 
       // Lead is captured — progressive step appears, capture step collapses.
@@ -438,13 +471,13 @@ const offeredCategories = categories.filter((c) =>
     detailsBtn.addEventListener('click', async () => {
       const details = [
         `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,
-        get('capacity') && `People: ${get('capacity')}`,
-        get('budget') && `Budget: ${get('budget')}`,
+        get('capacity') && `People: ${getLabel('capacity')}`,
+        get('budget') && `Budget: ${getLabel('budget')}`,
         // Installation preference is asked here for EVERY model — including the
         // ones with no configurator — so a specialist never has to ask twice.
         get('installation') && `Installation: ${installationLabel(get('installation'))}`,
-        get('foundation') && `Foundation: ${get('foundation')}`,
-        get('electrical') && `Electrical: ${get('electrical')}`,
+        get('foundation') && `Foundation: ${getLabel('foundation')}`,
+        get('electrical') && `Electrical: ${getLabel('electrical')}`,
         get('message') && `Space/access: ${get('message')}`,
         get('uploadMeta'),
       ].filter(Boolean).join('\n');
@@ -463,6 +496,10 @@ const offeredCategories = categories.filter((c) =>
         saunaInterest: capturedModel,
         source: 'Quote Form — details',
         botField: get('bot-field'),
+        // Merge into step 1's enquiry rather than opening a second one. Null
+        // (step 1 recorded to notifications only, because the database was
+        // down) simply means the server records this separately, as before.
+        appendToEnquiryId: capturedEnquiryId,
       });
 
       detailsBtn.disabled = false;

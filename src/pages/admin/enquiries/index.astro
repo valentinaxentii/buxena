@@ -13,6 +13,31 @@ const statusFilter = Astro.url.searchParams.get('status') ?? '';
 
 const STATUSES = ['New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'];
 
+/**
+ * How long an enquiry has been sitting unanswered.
+ *
+ * The list used to show only a raw locale timestamp, which makes the reader do
+ * date arithmetic on every row to find the one that has been waiting longest —
+ * on the screen whose entire job is deciding who to call next. "waiting 3d"
+ * needs no arithmetic.
+ *
+ * Shown only while the status is still New: once somebody has replied, age
+ * stops being the thing that matters and the status carries the story.
+ *
+ * The 24-hour threshold is a display emphasis, not a service-level promise.
+ * BUXENA publishes no response time anywhere and this must not become one.
+ */
+const WAITING_URGENT_HOURS = 24;
+function waitingFor(createdAt: string): { text: string; urgent: boolean } | null {
+  const ms = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.floor(ms / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  const text = mins < 60 ? `${mins}m` : hours < 24 ? `${hours}h` : `${days}d`;
+  return { text: `waiting ${text}`, urgent: hours >= WAITING_URGENT_HOURS };
+}
+
 let enquiries: any[] = [];
 let dbReady = true;
 // Archived records are hidden from the active list; ?archived=1 shows only them.
@@ -73,7 +98,14 @@ try {
         <tbody>
           {enquiries.map((e) => (
             <tr class="enq-row" data-href={`/admin/enquiries/${e.id}`}>
-              <td>{new Date(e.created_at).toLocaleString()}</td>
+              <td>
+                {new Date(e.created_at).toLocaleString()}
+                {e.status === 'New' && waitingFor(e.created_at) && (
+                  <span class={`enq-wait ${waitingFor(e.created_at)!.urgent ? 'enq-wait--urgent' : ''}`}>
+                    {waitingFor(e.created_at)!.text}
+                  </span>
+                )}
+              </td>
               <td>
                 <a href={`/admin/enquiries/${e.id}`}>{e.name || e.email || e.phone || '—'}</a>
                 {e.name && (e.email || e.phone) && <span class="enq-sub">{e.email || e.phone}</span>}
@@ -104,6 +136,8 @@ try {
 <style>
   .enq-row { cursor: pointer; }
   .enq-sub { display: block; font-size: 0.72rem; color: var(--admin-muted); }
+  .enq-wait { display: block; font-size: 0.72rem; color: var(--admin-gold); }
+  .enq-wait--urgent { color: #d98a66; }
   .enq-req { max-width: 20rem; white-space: normal; }
   .admin-btn--sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
 </style>
