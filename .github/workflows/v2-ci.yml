@@ -1,0 +1,33 @@
+name: BUXENA V2 CI
+
+on:
+  push:
+    branches: [buxena-v2]
+  pull_request:
+    branches: [buxena-v2]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Astro check
+        run: npx astro check
+
+      - name: Production build
+        run: npm run build
