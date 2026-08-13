@@ -1,0 +1,281 @@
+---
+/**
+ * Heater guide — which heater goes in which BUXENA sauna.
+ *
+ * WHAT THIS PAGE DELIBERATELY IS NOT: a heater catalogue. BUXENA holds no
+ * heater SKUs — `products.heater_options` is empty on every row, there is no
+ * heater table, and no heater carries an approved price. A brand/model/kW/price
+ * grid is the obvious page to build here and it could only be invented, so it
+ * is not built.
+ *
+ * What the catalogue genuinely holds is per-model heater compatibility taken
+ * from supplier sheets, and that answers the question a non-expert actually
+ * arrives with: "what can I put in THIS sauna, and does one come with it?"
+ * Every cell below is read from that data by lib/heater-options.ts; a model we
+ * hold nothing for says so plainly rather than being given a plausible default.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import QuoteBand from '../components/QuoteBand.astro';
+import { getCollection } from 'astro:content';
+import { displayTitle } from '../data/catalog';
+import { byPhotographedThenOrder } from '../data/catalog';
+import { readHeaterFacts, heaterSummary, type HeaterFacts } from '../lib/heater-options';
+
+const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(byPhotographedThenOrder);
+
+type Row = { slug: string; name: string; location: string; facts: HeaterFacts };
+const rows: Row[] = models.map((m) => ({
+  slug: m.id,
+  name: displayTitle(m.data.title),
+  location: m.data.location === 'indoor' ? 'Indoor' : 'Outdoor',
+  facts: readHeaterFacts(m.data.heaterOptions),
+}));
+
+const known = rows.filter((r) => !r.facts.unknown);
+const pending = rows.filter((r) => r.facts.unknown);
+
+// Brands are listed only where a model names them. This is a roll-up of what
+// the catalogue states, not a claim about what BUXENA stocks.
+const allBrands = [...new Set(known.flatMap((r) => r.facts.brands))].sort((a, b) => a.localeCompare(b));
+
+const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
+---
+
+<BaseLayout
+  title="Heater Guide"
+  description="Which sauna heater suits which BUXENA model — fuel type, output range and what is confirmed for each sauna."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Choosing a Heater</span>
+      <h1 class="display measure--tight">The heater decides how your sauna feels</h1>
+      <p class="lead measure">
+        Output, fuel and controls are the choices that change the experience
+        most — and the ones customers most often ask us to explain. Below is
+        what is confirmed for each model we sell.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell">
+      <div class="hg-basics">
+        <div class="hg-basic">
+          <span class="slats" aria-hidden="true"></span>
+          <h2 class="h3">Electric</h2>
+          <p>
+            Heats on a timer or a control panel, needs no flue, and suits
+            indoor rooms and most garden cabins. Output is matched to the
+            volume of the sauna room, which is why the kW range differs by
+            model.
+          </p>
+        </div>
+        <div class="hg-basic">
+          <span class="slats" aria-hidden="true"></span>
+          <h2 class="h3">Wood-burning</h2>
+          <p>
+            The traditional heat, and the reason many people want a sauna at
+            all. Needs a chimney or flue and a safe clearance, so it suits
+            free-standing outdoor cabins rather than indoor rooms.
+          </p>
+        </div>
+        <div class="hg-basic">
+          <span class="slats" aria-hidden="true"></span>
+          <h2 class="h3">Controls and stones</h2>
+          <p>
+            Some heaters pair with an app or a separate control unit, and some
+            models list stones as standard. Where a model confirms either, it
+            is shown in the table below. Where it does not, we confirm it with
+            your quote rather than assume.
+          </p>
+        </div>
+      </div>
+
+      {allBrands.length > 0 && (
+        <p class="hg-brands">
+          Heater brands named in our model specifications: <strong>{allBrands.join(', ')}</strong>.
+          The exact heater for your sauna is confirmed in your written quote.
+        </p>
+      )}
+    </div>
+  </section>
+
+  <section class="band band--tight" id="by-model">
+    <div class="shell">
+      <div class="sec-head">
+        <span class="eyebrow">By Model</span>
+        <h2 class="h2 measure--tight">What each sauna takes</h2>
+      </div>
+
+      <div class="hg-table-wrap">
+        <table class="hg-table">
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Placement</th>
+              <th scope="col">Fuel</th>
+              <th scope="col">Output</th>
+              <th scope="col">Heater included</th>
+              <th scope="col">Stones</th>
+              <th scope="col">App control</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {known.map((r) => (
+              <tr>
+                <th scope="row" data-label="Model"><a href={`/saunas/${r.slug}/`}>{r.name}</a></th>
+                <td data-label="Placement">{r.location}</td>
+                <td data-label="Fuel">
+                  {r.facts.fuels.includes('electric') && r.facts.fuels.includes('wood')
+                    ? 'Electric or wood'
+                    : r.facts.fuels.includes('electric')
+                      ? 'Electric'
+                      : r.facts.fuels.includes('wood')
+                        ? 'Wood-burning'
+                        : '—'}
+                  {r.facts.woodExplicitlyIncompatible && <span class="hg-note"> (wood not compatible)</span>}
+                </td>
+                <td data-label="Output">{r.facts.kwRange ?? '—'}</td>
+                <td data-label="Heater included">{yesNo(r.facts.heaterIncluded)}</td>
+                <td data-label="Stones">{yesNo(r.facts.stonesIncluded)}</td>
+                <td data-label="App control">{yesNo(r.facts.appControl)}</td>
+                <td data-label="" class="hg-act">
+                  <a
+                    class="link"
+                    href={`/quote/?model=${encodeURIComponent(r.name)}`}
+                    data-track="pricing_request_started"
+                    data-track-model={r.name}
+                    data-track-form-type="heater_guide"
+                  >Request Pricing <span class="arrow" aria-hidden="true">→</span></a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="hg-legend">
+        “—” means the specification does not state it. It is not a limitation of
+        the sauna — it is something we confirm with you rather than guess.
+      </p>
+
+      {pending.length > 0 && (
+        <div class="hg-pending">
+          <h3 class="h3">Confirmed with your quote</h3>
+          <p>
+            We have not yet published heater specifications for these models.
+            Tell us which one interests you and we will confirm the heater
+            options for it directly.
+          </p>
+          <ul class="hg-pending__list">
+            {pending.map((r) => (
+              <li><a href={`/saunas/${r.slug}/`}>{r.name}</a></li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell shell--narrow">
+      <h2 class="prop-h hg-h">Before you order</h2>
+      <ul class="hg-prep">
+        <li><strong>Electrical.</strong> An electric heater is connected by your licensed electrician to the model's stated requirement. We provide the specification; the supply work is arranged locally.</li>
+        <li><strong>Flue.</strong> A wood-burning stove needs a chimney and safe clearances. We confirm what the model requires before the order.</li>
+        <li><strong>Sizing.</strong> Output is matched to the sauna room's volume, not to floor area — which is why two saunas of similar footprint can need different heaters.</li>
+      </ul>
+      <p class="hg-foot">
+        Not sure which suits your project? Tell us the model and your site, and
+        we will set out the options in your written quote.
+      </p>
+    </div>
+  </section>
+
+  <QuoteBand
+    heading="Tell us about your space"
+    body="Send the model you are considering and where it is going. We will confirm the heater options, the electrical requirement and what your site needs."
+  />
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .page-head .lead { margin-top: 1.3rem; }
+
+  .hg-basics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: clamp(1.4rem, 1rem + 2vw, 2.6rem);
+  }
+  .hg-basic .slats { color: var(--bronze-soft); margin-bottom: 1rem; }
+  .hg-basic .h3 { margin-bottom: 0.6rem; }
+  .hg-basic p { font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); }
+
+  .hg-brands {
+    margin-top: clamp(1.6rem, 1rem + 2vw, 2.4rem);
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    font-size: var(--t-small);
+    color: var(--muted-dark);
+  }
+
+  /* The table scrolls inside its own box so a long model name can never make
+     the page scroll sideways. */
+  .hg-table-wrap { overflow-x: auto; }
+  .hg-table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+  .hg-table th, .hg-table td { padding: 0.75rem 0.9rem 0.75rem 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .hg-table thead th {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .hg-table tbody th { font-weight: 500; }
+  .hg-table tbody th a { text-decoration: none; }
+  .hg-table tbody th a:hover { text-decoration: underline; }
+  .hg-note { color: var(--muted); }
+  .hg-act { white-space: nowrap; }
+
+  .hg-legend { margin-top: 1.1rem; font-size: 0.8125rem; color: var(--muted); font-style: italic; }
+
+  .hg-pending { margin-top: clamp(1.9rem, 1.2rem + 2vw, 3rem); padding-top: 1.6rem; border-top: 1px solid var(--line); }
+  .hg-pending p { font-size: var(--t-small); color: var(--muted-dark); max-width: 46em; }
+  .hg-pending__list { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.9rem; padding: 0; list-style: none; font-size: var(--t-small); }
+
+  .hg-h { color: var(--muted); }
+  .hg-prep { margin: 0; padding-left: 1.1rem; }
+  .hg-prep li { font-size: var(--t-small); line-height: 1.8; color: var(--muted-dark); margin-bottom: 0.7rem; }
+  .hg-foot { margin-top: 1.2rem; font-size: var(--t-small); color: var(--muted-dark); }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* Below 720px the table becomes stacked cards — eight columns cannot be read
+     on a phone, and a horizontally-scrolling comparison is a comparison
+     nobody makes. */
+  @media (max-width: 720px) {
+    .hg-table thead { display: none; }
+    .hg-table, .hg-table tbody, .hg-table tr, .hg-table th, .hg-table td { display: block; width: 100%; }
+    .hg-table tr {
+      border: 1px solid var(--line);
+      padding: 0.9rem 1rem;
+      margin-bottom: 0.9rem;
+    }
+    .hg-table th, .hg-table td { border: none; padding: 0.28rem 0; }
+    .hg-table tbody th { font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .hg-table td[data-label]::before {
+      content: attr(data-label) ": ";
+      color: var(--muted);
+      font-size: var(--t-label);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hg-table td[data-label=""]::before { content: none; }
+    .hg-act { padding-top: 0.6rem !important; }
+  }
+</style>

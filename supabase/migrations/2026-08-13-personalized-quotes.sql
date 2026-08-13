@@ -141,6 +141,36 @@ alter table quotes add constraint quotes_status_check
 
 
 -- ----------------------------------------------------------------------------
+-- 4b. Two comparable options for the same customer
+-- ----------------------------------------------------------------------------
+-- A customer weighing two models should receive ONE proposal showing both, not
+-- two unrelated quotes they have to hold side by side themselves — and a
+-- salesperson should not re-key the customer, the enquiry, the project answers
+-- and the notes to produce the second one.
+--
+-- Modelled as a shared group rather than a new table: each option stays a
+-- complete `quotes` row, so every existing behaviour — line items, totals, the
+-- approved-price floor, the share token, acceptance — works on it unchanged. A
+-- quote with no group is simply a single-option proposal, which is what every
+-- existing row already is.
+--
+-- option_group  a uuid shared by the options of one proposal.
+-- option_label  what the customer sees: "Option A", "Option B".
+-- option_rank   display order, so A precedes B deterministically.
+alter table quotes add column if not exists option_group uuid;
+alter table quotes add column if not exists option_label text;
+alter table quotes add column if not exists option_rank integer;
+
+create index if not exists quotes_option_group_idx
+  on quotes (option_group) where option_group is not null;
+
+-- Which option the customer said they prefer. Deliberately SEPARATE from
+-- accepted_at: preferring an option is not accepting a proposal, and conflating
+-- them would let a comparison click read as a commitment to buy.
+alter table quotes add column if not exists preferred_at timestamptz;
+
+
+-- ----------------------------------------------------------------------------
 -- 5. Margin floor — configurable, NOT invented
 -- ----------------------------------------------------------------------------
 -- BUXENA has no approved margin floor yet. The column therefore defaults to

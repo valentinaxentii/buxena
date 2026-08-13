@@ -1,0 +1,44 @@
+---
+import type { ApprovedPrice } from '../data/pricing';
+import { genericCustomerResponsibilities, genericOptionalServices, projectCostSummary, type ModelSalesFacts } from '../data/customer-answer-system';
+
+interface Props { price: ApprovedPrice | null; facts?: ModelSalesFacts; compact?: boolean; }
+const { price, facts, compact = false } = Astro.props;
+const cost = projectCostSummary(price);
+const inclusions = facts?.inclusions?.length ? facts.inclusions : ['Your selected sauna configuration and only the equipment itemized in your written quote'];
+const exclusions = facts?.exclusions?.length ? facts.exclusions : ['Anything not listed as an included or priced line in your written quote'];
+const siteRequirements = facts?.siteRequirements?.length ? facts.siteRequirements : genericCustomerResponsibilities;
+const services = facts?.optionalServices?.length ? facts.optionalServices : genericOptionalServices;
+---
+
+<section class:list={['answer-system', { 'answer-system--compact': compact }]} aria-label="Your project, clearly answered">
+  <div class="answer-system__intro">
+    <span class="eyebrow">Your project, clearly answered</span>
+    <h2 class="h2">Know the full picture before you decide.</h2>
+    <p>We separate the product, delivery, installation and site work so you can see what is included and what still needs confirming.</p>
+  </div>
+  <div class="answer-system__costs">
+    <div><span>Sauna package price</span><strong>{cost.saunaPackage}</strong></div>
+    <div><span>Installation allowance</span><strong>{cost.installationAllowance}</strong></div>
+    <div><span>Total project range</span><strong>{cost.totalProjectRange}</strong></div>
+  </div>
+  {!compact && (
+    <div class="answer-system__grid">
+      <div><h3>Included in your proposal</h3><ul>{inclusions.map((item) => <li>{item}</li>)}</ul></div>
+      <div><h3>Customer responsibilities / exclusions</h3><ul>{exclusions.map((item) => <li>{item}</li>)}</ul><p class="answer-system__note">Your proposal also confirms the site work and access requirements that apply to this project.</p></div>
+      <div><h3>Site, foundation & electrical</h3><ul>{siteRequirements.map((item) => <li>{item}</li>)}</ul>{facts?.electrical && <p class="answer-system__note">Electrical: {facts.electrical}</p>}</div>
+      <div><h3>Delivery, assembly & services</h3><p>{facts?.deliveryTiming ?? 'Delivery timing is confirmed when the selected configuration, location and availability are reviewed.'}</p><p>{facts?.assembly ?? 'Assembly expectations are confirmed for the selected model and site before order.'}</p><ul>{services.map((item) => <li>{item}</li>)}</ul></div>
+      <div><h3>Warranty boundaries</h3><p>{facts?.warranty ?? 'Applicable manufacturer warranty documents and coverage boundaries are provided for the selected products before purchase.'}</p></div>
+    </div>
+  )}
+  <p class="answer-system__foot">Model-specific information appears here only after it has been verified and approved. Until then, your written proposal is the source for final scope.</p>
+</section>
+
+<style>
+  .answer-system { border-top: 2px solid var(--ink); padding-top: clamp(1.6rem, 1rem + 2vw, 2.75rem); }
+  .answer-system__intro { max-width: 48rem; }.answer-system__intro p,.answer-system__grid p { color: var(--muted-dark); line-height: 1.7; }
+  .answer-system__costs { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin-top:1.75rem; background:var(--line); border:1px solid var(--line); }
+  .answer-system__costs div { display:grid; gap:.55rem; padding:1.1rem; background:var(--linen); }.answer-system__costs span,.answer-system__grid h3 { font-size:var(--t-label); font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }.answer-system__costs strong { font-family:var(--font-display); font-size:clamp(1.15rem,1rem + .65vw,1.5rem); font-weight:500; line-height:1.2; }
+  .answer-system__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.6rem 2.5rem; margin-top:2rem; }.answer-system__grid > div { padding-top:1.1rem; border-top:1px solid var(--line); }.answer-system__grid h3 { margin:0 0 .8rem; }.answer-system__grid ul { margin:0; padding-left:1.1rem; color:var(--muted-dark); font-size:var(--t-small); line-height:1.7; }.answer-system__grid p { margin:.7rem 0 0; font-size:var(--t-small); }.answer-system__note { font-style:italic; }.answer-system__foot { margin:1.5rem 0 0; font-size:var(--t-small); color:var(--muted); }.answer-system--compact .answer-system__intro .h2 { font-size:var(--t-h3); }
+  @media (max-width:720px) { .answer-system__costs,.answer-system__grid { grid-template-columns:1fr; } }
+</style>

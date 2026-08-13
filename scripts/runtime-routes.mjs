@@ -62,6 +62,7 @@ const STATIC_ROUTES = [
   '/consultation/',
   '/for-trade/',
   '/how-buying-works/',
+  '/heater-guide/',
   '/thank-you/',
   '/contact/',
   '/faq/',

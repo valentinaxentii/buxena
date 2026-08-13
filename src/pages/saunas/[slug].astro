@@ -15,6 +15,7 @@ import ProductConfigurator from '../../components/ProductConfigurator.astro';
 import ProductGallery from '../../components/ProductGallery.astro';
 import ProductConfigPending from '../../components/ProductConfigPending.astro';
 import ProductResources from '../../components/ProductResources.astro';
+import CustomerAnswerSystem from '../../components/CustomerAnswerSystem.astro';
 import { groupSpecs } from '../../lib/product-specs';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
@@ -355,6 +356,21 @@ const breadcrumbSchema = {
                 <Fragment>
                   <h3 class="specs__sub">{block.title}</h3>
                   <ul class="specs__ul">{block.items.map((i) => <li>{i}</li>)}</ul>
+                  {/* The heater is the choice buyers ask about most and
+                      understand least. Where this model states anything about
+                      it, offer the cross-model comparison — the guide is built
+                      from these same statements, so it can never contradict
+                      the list directly above. */}
+                  {block.title === 'Heater options' && (
+                    <p class="specs__heaterlink">
+                      <a
+                        class="link"
+                        href="/heater-guide/#by-model"
+                        data-track="heater_guide_click"
+                        data-track-model={data.title}
+                      >Compare heaters across models <span class="arrow" aria-hidden="true">→</span></a>
+                    </p>
+                  )}
                 </Fragment>
               ) : showDev ? (
                 <Fragment>
@@ -440,29 +456,7 @@ const breadcrumbSchema = {
 
     <section class="band">
       <div class="shell">
-            <div class="config__inc">
-              <div class="config__block">
-                <h3 class="config__h">What's included</h3>
-                <ul class="config__list">
-                  <li>The sauna in your chosen configuration</li>
-                  <li>Confirmed standard equipment for the model</li>
-                  <li>Every inclusion itemised line-by-line in your written quote</li>
-                </ul>
-              </div>
-              <div class="config__block">
-                <h3 class="config__h">What's not included</h3>
-                <ul class="config__list">
-                  <li>Foundation / base preparation</li>
-                  <li>Electrical connection work (a licensed electrician)</li>
-                  <li>Permits, where your municipality requires them</li>
-                  <li>Site preparation and access equipment</li>
-                </ul>
-                <p class="config__note">
-                  Nothing here should surprise you on delivery day — your quote
-                  states exactly where our scope ends and your site work begins.
-                </p>
-              </div>
-            </div>
+        <CustomerAnswerSystem price={approved} facts={data.salesFacts} />
       </div>
     </section>
 
@@ -793,6 +787,7 @@ const breadcrumbSchema = {
 
   .dl { color: var(--bronze-ink); }
 
+  .specs__heaterlink { margin: 0.4rem 0 1.1rem; font-size: 0.8125rem; }
   .specs__docnote { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.9rem; }
   .specs__docreq { display: inline-flex; margin: 0 1.5rem 0.6rem 0; font-size: 0.8125rem; }
 

@@ -194,6 +194,21 @@ const saunas = defineCollection({
     capacityMax: z.number().optional(),
     options: z.array(z.string()).optional(),   // available options / upgrades
     delivery: z.string().optional(),           // delivery / installation information
+    /**
+     * Sales clarity record. Fields remain absent until verified for this
+     * specific model; the public page then uses safe proposal fallbacks.
+     */
+    salesFacts: z.object({
+      inclusions: z.array(z.string()).optional(),
+      exclusions: z.array(z.string()).optional(),
+      deliveryTiming: z.string().optional(),
+      assembly: z.string().optional(),
+      siteRequirements: z.array(z.string()).optional(),
+      electrical: z.string().optional(),
+      warranty: z.string().optional(),
+      optionalServices: z.array(z.string()).optional(),
+      source: z.string().optional(), // internal audit reference; never rendered
+    }).optional(),
   }),
 });
 
