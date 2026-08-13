@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { PROJECT_FILE_PREFIX, uploadProjectFile } from '../../lib/project-file-storage';
 import { isAllowedProjectFile, MAX_BYTES, MAX_FILES } from '../../lib/project-upload-files';
+import { isLeadSafeMode } from '../../lib/safe-mode';
 
 export const prerender = false;
 
@@ -35,7 +36,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   // Local dev never touches production storage — same contract as the
   // enquiries endpoint, so the whole form is testable with no .env at all.
-  const devTestMode = import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true';
+  const devTestMode = isLeadSafeMode();
 
   let form: FormData;
   try {

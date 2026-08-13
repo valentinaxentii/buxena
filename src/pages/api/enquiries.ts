@@ -6,6 +6,7 @@ import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { decideEnquiryOutcome, wasDelivered } from '../../lib/enquiry-capture';
 import { checkOptionalZip } from '../../lib/zip';
+import { isLeadSafeMode, safeModeReason } from '../../lib/safe-mode';
 import { FALLBACK_SOURCE, isSourceConstraintError, withFormLine } from '../../lib/enquiry-source';
 
 export const prerender = false;
@@ -33,7 +34,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   // headroom while still cutting off a script hammering the endpoint.
   // Skipped in local dev-mode testing (which never reaches production
   // services anyway) so a founder can click through every form in a row.
-  const devTestMode = import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true';
+  const devTestMode = isLeadSafeMode();
   if (!devTestMode) {
     const { allowed, retryAfterSeconds } = checkRateLimit(`enquiries:${clientAddress}`, 5, 10 * 60_000);
     if (!allowed) {
@@ -132,17 +133,20 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       return new Response(JSON.stringify({ ok: false, error: zipCheck.message }), { status: 400 });
     }
 
-    // LOCAL DEV MODE — never touches production services. In `astro dev`
-    // the submission is validated, logged locally (never the secrets — there
-    // are none in this payload), and acknowledged with devMode:true so the
-    // UI can show its "local test mode" success state. Forms stay fully
-    // testable with no .env at all. To exercise the real pipeline from a dev
-    // server against an explicitly-chosen safe environment, set
-    // ENQUIRIES_DEV_LIVE=true alongside the Supabase vars.
-    if (import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true') {
-      // The CAPPED values, not the raw body — dev has to show what production
-      // would actually store, or it quietly stops being a rehearsal.
-      console.log('[enquiries][dev] captured local test submission:', safe);
+    // SAFE MODE — never touches production services. The submission is
+    // validated, logged (never a secret; there are none in this payload), and
+    // acknowledged with devMode:true so the UI shows its "test mode" success
+    // state instead of redirecting.
+    //
+    // Two ways in: a local `astro dev` server, or a hosted build with
+    // BUXENA_SAFE_MODE=true — which is what makes a staging preview walkable
+    // end to end without writing a real row or sending a real email. See
+    // lib/safe-mode.ts. ENQUIRIES_DEV_LIVE=true opts a dev server back into
+    // the live pipeline for a deliberate integration test.
+    if (isLeadSafeMode()) {
+      // The CAPPED values, not the raw body — safe mode has to show what
+      // production would actually store, or it stops being a rehearsal.
+      console.log(`[enquiries][safe-mode: ${safeModeReason()}] captured test submission:`, safe);
       // Preview the customer acknowledgment this submission would trigger in
       // production (nothing is sent in dev — this is the generated content).
       const ackPreview = buildCustomerAckEmail({
