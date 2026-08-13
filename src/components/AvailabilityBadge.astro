@@ -1,25 +1,23 @@
 ---
 /**
- * Product availability badge — IN STOCK / IN TRANSIT / PREORDER.
+ * Product availability badge.
  *
- * There is currently no live connection between this public catalog and
- * Supabase inventory (that's the unit/shipment system discussed separately,
- * not yet built). Until that exists, every model honestly gets "preorder":
- * per the same rule that system will use (no available stock + no incoming
- * quantity = preorder), that's the true state of every model today, since
- * zero inventory data is connected yet. Once real inventory/shipment data
- * exists, the caller can pass a real status instead of the default.
+ * `preorder` remains accepted as a LEGACY internal content value so existing
+ * frontmatter does not need a risky catalogue-wide rewrite. Publicly it is
+ * rendered as "Check Availability" unless real inventory data supports the
+ * stronger In Stock / In Transit states. We never infer a preorder program,
+ * inventory promise or ETA from missing data.
  */
 interface Props {
   status?: 'in-stock' | 'in-transit' | 'preorder';
-  etaNote?: string; // e.g. "Expected arrival: Aug 18" — only ever passed when a real ETA exists
+  etaNote?: string; // only pass when a real, current ETA exists
 }
 const { status = 'preorder', etaNote } = Astro.props;
 
 const LABELS: Record<string, string> = {
   'in-stock': 'In Stock',
   'in-transit': 'In Transit',
-  preorder: 'Preorder',
+  preorder: 'Check Availability',
 };
 ---
 
@@ -43,9 +41,6 @@ const LABELS: Record<string, string> = {
     text-transform: uppercase;
     padding: 0.4rem 0.75rem;
     border: 1px solid transparent;
-    /* neutralizes browser default <a> styling (underline, visited color) so
-       the now-clickable preorder badge looks identical to the plain <span>
-       it replaces for the other two states — no visual change, just a fix. */
     text-decoration: none;
   }
   a.avail__badge:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
