@@ -5,6 +5,34 @@
 [build.environment]
   NODE_VERSION = "22.12.0"
 
+# ---------------------------------------------------------------------------
+# EVERY NON-PRODUCTION DEPLOY IS SAFE BY DEFAULT
+# ---------------------------------------------------------------------------
+# A branch deploy is the thing you publish precisely BECAUSE it is not
+# production — yet it runs the same production build, against the same live
+# Supabase and the same live Zoho mailbox. Without this, walking a preview on a
+# phone writes real enquiries into the CRM and sends real email to real people.
+#
+# BUXENA_SAFE_MODE makes lead capture validate and confirm while touching
+# nothing (see src/lib/safe-mode.ts). Setting it HERE rather than in the
+# Netlify UI matters:
+#
+#   - it is version-controlled and reviewable, so the protection cannot be
+#     silently removed or scoped to the wrong context in a dashboard;
+#   - it cannot be forgotten when someone triggers a branch deploy in a hurry;
+#   - `context.production` is deliberately NOT given this variable, so the
+#     production site is completely unaffected and still captures leads for
+#     real. Adding it there would silently break the business.
+#
+# To run a deliberate end-to-end test against live services on a preview,
+# override BUXENA_SAFE_MODE=false for that one deploy in the Netlify UI —
+# a conscious act, which is the point.
+[context.branch-deploy.environment]
+  BUXENA_SAFE_MODE = "true"
+
+[context.deploy-preview.environment]
+  BUXENA_SAFE_MODE = "true"
+
 # Long-cache Astro's fingerprinted assets
 [[headers]]
   for = "/_astro/*"
