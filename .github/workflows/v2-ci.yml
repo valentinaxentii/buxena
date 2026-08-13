@@ -32,6 +32,9 @@ jobs:
       - name: Security regression audit
         run: npm run security:audit
 
+      - name: Sales funnel regression audit
+        run: npm run sales:audit
+
       - name: Production build
         run: npm run build
 
