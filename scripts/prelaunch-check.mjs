@@ -358,6 +358,29 @@ if (devLive) {
   );
 }
 
+// -------------------------------------------- 7e. catalogue readiness
+// Every PUBLISHED model, checked for the things a visitor would notice: a
+// hero image that is missing from disk or has no alt text, a placeholder
+// notice that would render, absent capacity/dimensions/materials/summary,
+// a category that contradicts its own productType or location, and — the one
+// that must never regress — a price or a non-preorder availability claim
+// sitting in frontmatter.
+{
+  let out = '';
+  let ok = false;
+  try {
+    out = execSync('node scripts/catalogue-readiness.mjs', { encoding: 'utf8' });
+    ok = true;
+  } catch (e) {
+    out = String(e.stdout ?? e);
+  }
+  const summary = (out.match(/PUBLISHED MODELS: .*/) ?? ['?'])[0];
+  const findings = out.includes('PER MODEL')
+    ? out.split('PER MODEL (only those with findings)')[1]?.replace(/\s+/g, ' ').trim().slice(0, 260)
+    : '';
+  record('catalogue', summary.toLowerCase() || 'catalogue readiness', ok, ok ? '' : findings);
+}
+
 // ------------------------------------------- 8. model presentation system
 console.log('\n■ 8/8 Model presentations');
 {
