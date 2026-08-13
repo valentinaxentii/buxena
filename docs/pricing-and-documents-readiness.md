@@ -1,134 +1,138 @@
 # BUXENA V2 — Pricing & Technical-Document Readiness
 
-Internal worksheet. **Nothing in this file is customer-facing, and no
-number here may be published without explicit founder approval.**
+Internal worksheet. **Nothing here is customer-facing, and no number may be
+published without explicit founder approval.**
 
-## 1. Pricing readiness — launch models
+## 1. Pricing architecture
 
-The public architecture is DONE and waiting: `fromPrice`,
-`completeFromPrice`, `projectPricing`, `deliveryEstimate`, `availability`
-fields exist on every model (`src/content.config.ts`); cards, product
-pages, package tiers and the compare table all render prices the moment a
-value is set, and show Request Pricing when absent.
+The public architecture is complete: model frontmatter supports `fromPrice`,
+`completeFromPrice`, `projectPricing`, `deliveryEstimate` and `availability`.
+Cards, product pages, packages and compare surfaces can display approved values,
+and fall back to Request Pricing when those values are absent.
 
-**Classification — every model in the catalog is currently:
-`PRICE MISSING INPUTS`.** No pricing data of any kind exists in this
-repository (the admin/Supabase `products` table has EXW/selling-price
-columns, but no `.env` exists locally to read live data, and no exported
-price list is committed). Nothing is even at "needs approval" stage yet.
+The public pricing register remains intentionally empty until founder-approved
+retail numbers exist.
 
-### Missing inputs per model (identical for all launch candidates today)
+## 2. Correction to the older “zero pricing inputs” status
 
-| Input | ELLA H2 | ILLI H2 | EDA barrels | VIRU barrels | NORD cubes |
-|---|---|---|---|---|---|
-| Supplier EXW | ❌ | ❌ | ❌ | ❌ | ❌ (supplier wholesale pricelist referenced in commit history but not committed) |
-| FX assumption (EUR→USD) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Duty / tariff rate | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Ocean freight allocation | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Port + inland trucking | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Heater cost | ❌ | ❌ | ❌ | ❌ | ❌ (HUUM 9kW standard per catalog — cost unknown) |
-| Controls cost | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Stones cost | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Lighting cost | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Accessories (Ritual Kit ~€94/unit is the ONLY committed cost datum, commit `478486b`) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
-| Delivery allowance model | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Target gross margin | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Consumer markup policy | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Sales-tax treatment | ❌ | ❌ | ❌ | ❌ | ❌ |
+The earlier version of this document said no pricing inputs existed. That is no
+longer the correct project record. Original BUXENA source workbooks recovered in
+Google Drive contain historical planning inputs and landed-cost models, including:
 
-### Internal pricing data structure (ready to fill)
+- `Buxena Sauna Order Landed Cost.xlsx` (prepared 2026-07-24).
+- `Buxena UKU160 Installed Unit Economics.xlsx`.
+- `Copy of WoodArchitects_Landed_Cost_Analysis`.
+- Capra landed-cost / first-order analysis in the migration package.
 
-The admin already stores per-product `EXW/cost`, `selling price`, and full
-landed-cost fields (`orders`: freight, customs, port, inland, warehouse,
-installation, other → generated `landed_cost` / `gross_profit` /
-`gross_margin_pct`). **Use that existing system as the single source of
-internal pricing truth** — do not build a second one. Public display
-prices are then set per model in content frontmatter after approval:
+These sources are **planning models, not automatic approval to publish or order**.
+Some cells explicitly say they are estimates/placeholders and must be replaced by
+supplier quotes before purchasing.
 
-```yaml
-fromPrice: "From $18,900"          # sauna alone — approved retail
-completeFromPrice: "Complete packages from $23,400"
-projectPricing: true               # shows "Project Pricing"
-```
+Examples of recovered planning inputs:
 
-**Path to first public prices:** supplier EXW pricelists → landed-cost
-worksheet in admin → founder-approved retail per launch model → one
-frontmatter line each. Recommend starting with the 3 featured models
-(ELLA H2, ILLI H2, EDA Nordic Spruce 2.5m).
+- The opening-order workbook includes estimated EXW planning values for ELLA H2,
+  ILLI H2 and UKU 160, while explicitly stating that no supplier price list was
+  provided for that model and that the estimates must be replaced before a
+  purchase decision.
+- The UKU 160 unit-economics workbook models EUR→USD, container freight, kits per
+  40HC, landed kit cost, heater, local delivery and assembly; multiple inputs are
+  marked for verification.
+- The Capra first-container analysis contains a separate 20-unit planning model
+  based on the historical supplier discussions and should be reconciled against
+  the latest written supplier quote/PI before use.
 
----
+Therefore the correct classification is:
 
-## FEATURED-MODEL PRICING WORKSHEET (fill and approve — 2026-08-10)
+**PRICING MODEL EXISTS — CURRENT SUPPLIER / LOGISTICS INPUTS STILL NEED
+VERIFICATION.**
 
-The three homepage featured models, audited individually. Repo/local
-status: **zero pricing inputs available** — no price appears in any
-committed file for any of the three, and with no local `.env` the live
-admin `products` table (which has EXW/selling-price columns) cannot be
-read from here. If EXW values were already entered in the live admin,
-half of this worksheet may already be done — check Admin → Products
-first.
+Do not treat estimated workbook values as supplier-confirmed EXW.
 
-Shared inputs (decide once, apply to all models):
-- [ ] EUR→USD FX assumption + revision policy (e.g. quarterly)
-- [ ] Duty/tariff rate for prefabricated wooden sauna cabins (confirm the
-      HS classification with the customs broker — do not assume)
-- [ ] Ocean freight per container + how it allocates across units in a
-      mixed load
-- [ ] Port handling + inland trucking to warehouse
-- [ ] Delivery allowance policy (flat allowance in price vs. quoted by ZIP)
-- [ ] Target gross margin / consumer markup policy
-- [ ] Sales-tax display treatment (price ex-tax is the US norm — confirm)
+## 3. What is still required before public pricing
 
-Per-model inputs:
+### Shared commercial inputs
 
-**ELLA H2 (indoor, 1–2 person)** — `PRICE MISSING INPUTS`
-- [ ] Supplier EXW for the H2 configuration
-- [ ] Compatible heater model + cost (spec sheet says "contact us" — the
-      heater choice itself is unconfirmed, blocking Complete pricing)
-- [ ] Controls, stones, lighting costs for that heater
-- [ ] Crate/volumetric shipping data (affects freight allocation)
+- [ ] Current supplier EXW / dealer price for each launch model.
+- [ ] Written confirmation of currency and payment terms.
+- [ ] Current EUR→USD assumption and revision policy.
+- [ ] Customs-broker-confirmed HS classification and duty/tariff treatment.
+- [ ] Current ocean freight quote and allocation methodology.
+- [ ] Port/terminal/broker/inland trucking costs.
+- [ ] Warehouse handling/storage allowance.
+- [ ] Heater, controls, stones, lighting and accessory costs for the default
+      Complete package.
+- [ ] Delivery/install allowance policy by ZIP/project.
+- [ ] Warranty/repair/contingency allowance.
+- [ ] CAC / sales commission allowance used for profitability decisions.
+- [ ] Founder-approved target gross margin and minimum deal margin.
 
-**ILLI H2 (indoor)** — `PRICE MISSING INPUTS`
-- [ ] Same list as ELLA H2 (same supplier line, same unknowns)
+### Featured model priorities
 
-**EDA Nordic Spruce 2.5m (outdoor barrel, 4–6 person)** — `PRICE MISSING INPUTS`
-- [ ] Supplier EXW for the 2.5m Nordic Spruce configuration
-- [ ] Heater options + costs (frontmatter: "sold separately — compatible
-      with wood-fired or electric" — need at least one priced default for
-      a Complete package)
-- [ ] Wood-fired vs electric package variants decision
-- [ ] Crate/volumetric shipping data
+Start with the smallest set of high-intent launch models rather than pricing the
+entire catalogue at once:
 
-Approval flow once inputs exist: enter costs in Admin (landed-cost
-fields) → founder signs off a retail "From" number per model → set
-`fromPrice` / `completeFromPrice` in that model's frontmatter → the card,
-product page, packages and compare table display it automatically.
+1. ELLA H2.
+2. ILLI H2.
+3. One high-confidence outdoor model with verified supplier rights/specs/costs.
 
-## 2. Technical-document matrix — launch products
+For each: current EXW + packed dimensions/weight + default compliant heater
+package + landed allocation + approved retail price are required before setting
+`fromPrice` or `completeFromPrice`.
 
-Full-repository audit (public/, src/, data/): **zero technical documents
-of any kind exist** — no PDFs, no manuals, no drawings, no brochures.
-Every cell below is therefore MISSING or NEEDS SUPPLIER; nothing was
-invented, and every product page shows the polished "Technical documents
-are being prepared" fallback with the Request Specifications CTA
-(tracked). The `downloads:` frontmatter auto-links real files per model
-the moment they're added.
+## 4. Internal pricing source of truth
 
-| Document | ELLA/ILLI/ALLA | EDA/AURA/ITI | VIRU | NORD |
-|---|---|---|---|---|
-| Spec sheet | NEEDS SUPPLIER | NEEDS SUPPLIER | NEEDS SUPPLIER | NEEDS SUPPLIER (2026 collection catalog exists at supplier) |
-| Installation manual | NEEDS SUPPLIER | NEEDS SUPPLIER | NEEDS SUPPLIER | NEEDS SUPPLIER |
-| Assembly instructions | NEEDS SUPPLIER | NEEDS SUPPLIER (flat-pack kits exist) | NEEDS SUPPLIER (flat-pack option) | NEEDS SUPPLIER (flat-pack option) |
-| Foundation / base requirements | MISSING | MISSING | MISSING | NEEDS SUPPLIER (steel base documented in specs) |
-| Electrical requirements | NEEDS SUPPLIER | n/a for wood-fired configs | NEEDS SUPPLIER per heater | NEEDS SUPPLIER (single/three-phase noted) |
-| Heater manual | NEEDS SUPPLIER (heater TBD per model) | NEEDS SUPPLIER | NEEDS SUPPLIER (Harvia/HUUM/Cozy/Narvi listed) | NEEDS SUPPLIER (HUUM 9kW standard) |
-| Control manual | NEEDS SUPPLIER | NEEDS SUPPLIER | NEEDS SUPPLIER (HUUM app control listed) | NEEDS SUPPLIER (HUUM Wi-Fi listed) |
-| Warranty document | NEEDS SUPPLIER — no real warranty terms exist anywhere (PDF quote uses placeholder boilerplate, flagged in HANDOFF) | same | same | same |
-| Drawings | MISSING — never claim CAD/BIM/Revit until files exist | MISSING | MISSING | MISSING |
+Use the existing BUXENA admin/Supabase commercial structure as the operational
+source of truth once current figures are verified. It already has product/supplier
+cost fields and order landed-cost / gross-profit / margin architecture.
 
-**Single highest-leverage ask to suppliers:** spec sheet + installation
-manual + warranty terms per launch model. That fills Downloads, the trade
-"Request Specifications" fulfilment, and the PDF quote's warranty
-placeholder in one request.
+Do **not** build a second parallel pricing system in the website content.
 
-*Last updated 2026-08-10.*
+Flow:
+
+supplier quote/PI → verified internal cost inputs → landed-cost calculation →
+founder margin approval → approved retail number → public frontmatter value.
+
+The website should never reverse this flow by inventing a retail price first.
+
+## 5. Public pricing governance
+
+No public price should be inserted unless the supporting economics are current and
+approved. The prelaunch audit is designed to keep the site price-free while the
+approval register is empty.
+
+Use `BUXENA Recommended`, not Best Seller / Most Popular, until actual sales data
+supports those claims.
+
+## 6. Technical-document readiness
+
+The website architecture for downloads is ready, but technical documents must be
+matched to the exact model and rights/usage terms before publication.
+
+Priority documents per launch model:
+
+- supplier specification sheet;
+- assembly / installation manual;
+- foundation/base requirements;
+- electrical requirements;
+- heater/control manuals for the actual U.S.-compliant package;
+- written warranty terms;
+- packing dimensions / weight;
+- drawings where genuinely supplied.
+
+Do not claim CAD/BIM/Revit availability until those files actually exist.
+
+## 7. External source material now available
+
+The migrated/connected sources also contain competitor technical packages and
+warranties (for example SaunaLife/HUUM materials received during competitor
+research). Those are useful for competitive analysis and buyer-experience design,
+but they are **not BUXENA supplier documentation** and must not be republished as
+BUXENA product documentation.
+
+## 8. Current decision
+
+The website does not need another pricing architecture rebuild. The commercial
+bottleneck is obtaining and reconciling **current, written supplier and logistics
+inputs** against the existing landed-cost models.
+
+*Updated 2026-08-12.*
