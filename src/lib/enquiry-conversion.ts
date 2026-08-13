@@ -20,14 +20,20 @@ export function matchProductBySaunaInterest(
   return products.find((p) => normalizeModelName(p.model_name) === target) ?? null;
 }
 
+/**
+ * Audit logging is deliberately best-effort: a CRM state write is the source
+ * of truth and must not be reported as failed merely because the secondary
+ * activity timeline write had a transient error.
+ */
 async function logEnquiryActivity(supabase: SupabaseClient, enquiryId: string, description: string, staffId: string | null | undefined) {
-  await supabase.from('activities').insert({
+  const { error } = await supabase.from('activities').insert({
     entity_type: 'enquiry',
     entity_id: enquiryId,
     activity_type: 'status_change',
     description,
     staff_id: staffId ?? null,
   });
+  if (error) console.error('[enquiry-conversion] activity log failed:', error);
 }
 
 function enquiryOrigin(enquiry: any): string {
@@ -36,15 +42,20 @@ function enquiryOrigin(enquiry: any): string {
 }
 
 export async function markEnquiryContacted(supabase: SupabaseClient, enquiryId: string, staffId?: string | null) {
-  const { data: enquiry } = await supabase.from('enquiries').select('status, contacted_at').eq('id', enquiryId).single();
-  if (!enquiry) return { ok: false as const, reason: 'NOT_FOUND' as const };
+  const { data: enquiry, error: readError } = await supabase
+    .from('enquiries')
+    .select('status, contacted_at')
+    .eq('id', enquiryId)
+    .single();
+  if (readError || !enquiry) throw new Error('Could not load the enquiry. Please try again.');
 
   const patch: Record<string, unknown> = {};
   if (!enquiry.contacted_at) patch.contacted_at = new Date().toISOString();
   if (enquiry.status === 'New') patch.status = 'Contacted';
 
   if (Object.keys(patch).length > 0) {
-    await supabase.from('enquiries').update(patch).eq('id', enquiryId);
+    const { error: updateError } = await supabase.from('enquiries').update(patch).eq('id', enquiryId);
+    if (updateError) throw new Error('Could not mark the enquiry as contacted. Please try again.');
     await logEnquiryActivity(supabase, enquiryId, 'Contacted', staffId);
   }
   return { ok: true as const };
@@ -52,7 +63,7 @@ export async function markEnquiryContacted(supabase: SupabaseClient, enquiryId: 
 
 export async function changeEnquiryStatus(supabase: SupabaseClient, enquiryId: string, status: string, staffId?: string | null) {
   const { error } = await supabase.from('enquiries').update({ status }).eq('id', enquiryId);
-  if (error) return { ok: false as const, reason: error.message };
+  if (error) throw new Error('Could not update the enquiry status. Please try again.');
   await logEnquiryActivity(supabase, enquiryId, `Status changed to ${status}`, staffId);
   return { ok: true as const };
 }
@@ -117,7 +128,7 @@ async function resolveOrCreateCustomer(supabase: SupabaseClient, enquiry: any) {
     })
     .select('id')
     .single();
-  if (error || !created) throw new Error(error?.message ?? 'Could not create customer for quote');
+  if (error || !created) throw new Error('Could not create the customer record for this quote. Please try again.');
   return created.id as string;
 }
 
@@ -143,7 +154,7 @@ export async function createQuoteFromEnquiry(supabase: SupabaseClient, enquiryId
     })
     .select('id')
     .single();
-  if (error || !quote) return { ok: false as const, reason: error?.message ?? 'INSERT_FAILED' };
+  if (error || !quote) return { ok: false as const, reason: 'QUOTE_CREATE_FAILED' as const };
 
   const { data: updated } = await supabase
     .from('enquiries')
