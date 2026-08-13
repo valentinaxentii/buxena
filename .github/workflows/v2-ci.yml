@@ -38,5 +38,8 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Image rights audit
+        run: npm run rights:audit
+
       - name: Full prelaunch audit
         run: node scripts/prelaunch-check.mjs --skip-build
