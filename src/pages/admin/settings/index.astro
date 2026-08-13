@@ -4,7 +4,13 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { verifyAdminAccess } from '../../../lib/verify-admin-access';
 import { FALLBACK_SETTINGS, type BuxenaSettings } from '../../../lib/settings';
+
+// Defense in depth: never rely on middleware alone for service-role operations.
+if (!(await verifyAdminAccess(Astro.request, Astro.cookies))) {
+  return Astro.redirect('/admin?denied=settings');
+}
 
 let settings: BuxenaSettings = FALLBACK_SETTINGS;
 let error: string | null = null;
@@ -39,7 +45,7 @@ try {
     };
 
     const { error: upsertError } = await supabase.from('settings').upsert(payload);
-    if (upsertError) error = upsertError.message;
+    if (upsertError) error = 'Settings could not be saved. Please try again.';
     else saved = true;
   }
 
@@ -49,47 +55,35 @@ try {
   } else if (data) {
     settings = { ...FALLBACK_SETTINGS, ...data };
   }
-} catch (e) {
+} catch {
   dbReady = false;
-  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+  error = 'Settings are temporarily unavailable.';
 }
 ---
 
 <AdminLayout title="Settings" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
-      <h2>Settings table not found</h2>
-      <p>
-        Re-run <code>supabase/schema.sql</code> in the Supabase SQL editor — it added a new
-        <code>settings</code> table this session and is safe to re-run (every statement is
-        idempotent). The form below is showing built-in defaults until then.
-      </p>
+      <h2>Settings unavailable</h2>
+      <p>The settings data could not be loaded. Check the server configuration or database before retrying.</p>
     </div>
   )}
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
   {saved && <p class="notice notice--success" style="margin-bottom:1.25rem;">Settings saved.</p>}
 
   <form class="admin-form" method="POST">
-    <div class="admin-form__full">
-      <h2 class="admin-section-title">Company Information</h2>
-    </div>
+    <div class="admin-form__full"><h2 class="admin-section-title">Company Information</h2></div>
     <label class="admin-field"><span>Company Name</span><input type="text" name="company_name" value={settings.company_name} required /></label>
     <label class="admin-field"><span>Email</span><input type="email" name="company_email" value={settings.company_email} required /></label>
     <label class="admin-field"><span>Phone</span><input type="tel" name="company_phone" value={settings.company_phone ?? ''} /></label>
     <label class="admin-field"><span>Website</span><input type="text" name="company_website" value={settings.company_website ?? ''} /></label>
     <label class="admin-field admin-form__full"><span>Address</span><input type="text" name="company_address" value={settings.company_address ?? ''} /></label>
     <label class="admin-field admin-form__full">
-      <span>PDF Quote Tagline</span>
-      <input type="text" name="pdf_tagline" value={settings.pdf_tagline} />
-      <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">
-        Shown on generated quote PDFs. Company name, email and website above are also pulled
-        directly into every PDF quote's cover and closing page.
-      </span>
+      <span>PDF Quote Tagline</span><input type="text" name="pdf_tagline" value={settings.pdf_tagline} />
+      <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">Shown on generated quote PDFs. Company name, email and website above are also pulled directly into every PDF quote's cover and closing page.</span>
     </label>
 
-    <div class="admin-form__full">
-      <h2 class="admin-section-title" style="margin-top:1rem;">Quote & Order Defaults</h2>
-    </div>
+    <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Quote & Order Defaults</h2></div>
     <label class="admin-field"><span>Currency (ISO code)</span><input type="text" name="currency" value={settings.currency} maxlength="3" /></label>
     <label class="admin-field"><span>Default Sales Tax Rate (%)</span><input type="number" step="0.01" name="default_tax_rate" value={settings.default_tax_rate} /></label>
     <label class="admin-field"><span>Default Quote Validity (days)</span><input type="number" name="default_quote_validity_days" value={settings.default_quote_validity_days} /></label>
@@ -99,28 +93,18 @@ try {
     <label class="admin-field"><span>Quote Number Prefix</span><input type="text" name="quote_number_prefix" value={settings.quote_number_prefix} /></label>
     <label class="admin-field"><span>Order Number Prefix</span><input type="text" name="order_number_prefix" value={settings.order_number_prefix} /></label>
 
-    <div class="admin-form__full">
-      <h2 class="admin-section-title" style="margin-top:1rem;">Lead Sources</h2>
-    </div>
+    <div class="admin-form__full"><h2 class="admin-section-title" style="margin-top:1rem;">Lead Sources</h2></div>
     <label class="admin-field admin-form__full">
-      <span>Available Lead Sources (comma-separated)</span>
-      <input type="text" name="lead_sources" value={settings.lead_sources.join(', ')} />
-      <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">
-        Drives the Source dropdown on the Leads form — add or remove sources here rather than in code.
-      </span>
+      <span>Available Lead Sources (comma-separated)</span><input type="text" name="lead_sources" value={settings.lead_sources.join(', ')} />
+      <span style="text-transform:none; letter-spacing:normal; font-size:0.78rem;">Drives the Source dropdown on the Leads form — add or remove sources here rather than in code.</span>
     </label>
 
-    <div class="admin-form__actions">
-      <button class="admin-btn" type="submit">Save Settings</button>
-    </div>
+    <div class="admin-form__actions"><button class="admin-btn" type="submit">Save Settings</button></div>
   </form>
 
   <div class="admin-panel" style="margin-top:2rem; padding:1.25rem 1.4rem;">
     <h2 class="admin-section-title">Staff Accounts</h2>
-    <p style="margin:0 0 1rem; font-size:0.85rem; color:var(--admin-muted); line-height:1.6;">
-      Invite staff, set names and roles. Admins can change Settings and manage accounts; staff
-      can use everything else.
-    </p>
+    <p style="margin:0 0 1rem; font-size:0.85rem; color:var(--admin-muted); line-height:1.6;">Invite staff, set names and roles. Admins can change Settings and manage accounts; staff can use everything else.</p>
     <a class="admin-btn admin-btn--ghost" href="/admin/settings/staff">Manage Staff Accounts</a>
   </div>
 </AdminLayout>
