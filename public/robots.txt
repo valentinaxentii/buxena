@@ -2,5 +2,9 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /login
+# Personalized customer proposals — one named customer's pricing, reachable
+# only by a private token. The page already sends noindex; this is the belt to
+# that brace, so a token pasted into a public forum is never crawled.
+Disallow: /proposal
 
 Sitemap: https://buxena.com/sitemap-index.xml

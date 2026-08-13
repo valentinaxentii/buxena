@@ -6,6 +6,7 @@ import ModelSelect from '../../../components/admin/ModelSelect.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
+import { approvedQuoteFloor, belowApprovedFloor, quoteNetBeforeTax } from '../../../lib/quote-margin-guard';
 
 const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
 let customers: any[] = [];
@@ -46,6 +47,14 @@ try {
     const taxRate = Number(form.get('tax_rate') ?? 0) || 0;
     const taxableBase = subtotal + deliveryCost + installationCost - discount;
     const total = taxableBase + taxableBase * (taxRate / 100);
+    const productId = String(form.get('product_id') ?? '') || null;
+    const floor = await approvedQuoteFloor(supabase, productId);
+
+    if (discount < 0) {
+      error = 'Discount cannot be negative.';
+    } else if (floor.enforced && belowApprovedFloor(taxableBase, floor.floor)) {
+      error = 'This discount would place the quote below its approved minimum selling price. Review the private Product Pricing record before issuing it.';
+    } else {
 
     const quoteDate = String(form.get('quote_date') ?? '') || new Date().toISOString().slice(0, 10);
     const defaultExpiry = new Date(quoteDate);
@@ -54,7 +63,7 @@ try {
     const quotePayload = {
       quote_number: `${settings.quote_number_prefix}${Date.now().toString(36).toUpperCase()}`,
       customer_id: String(form.get('customer_id') ?? '') || null,
-      product_id: String(form.get('product_id') ?? '') || null,
+      product_id: productId,
       heater: String(form.get('heater') ?? '') || null,
       delivery_cost: deliveryCost,
       installation_cost: installationCost,
@@ -77,6 +86,7 @@ try {
         await supabase.from('quote_items').insert(items.map((item) => ({ ...item, quote_id: quote.id })));
       }
       return Astro.redirect(`/admin/quotes/${quote.id}`);
+    }
     }
   }
 } catch (e) {
@@ -122,7 +132,7 @@ try {
 
     <label class="admin-field"><span>Delivery Cost</span><input type="number" step="0.01" name="delivery_cost" value="0" class="calc-input" /></label>
     <label class="admin-field"><span>Installation Cost</span><input type="number" step="0.01" name="installation_cost" value="0" class="calc-input" /></label>
-    <label class="admin-field"><span>Discount</span><input type="number" step="0.01" name="discount" value="0" class="calc-input" /></label>
+    <label class="admin-field"><span>Discount</span><input type="number" min="0" step="0.01" name="discount" value="0" class="calc-input" /><small>Checked against an approved private price floor when one is set.</small></label>
     <label class="admin-field"><span>Tax Rate (%)</span><input type="number" step="0.01" name="tax_rate" value={settings.default_tax_rate} class="calc-input" /></label>
 
     <div class="admin-form__full" id="totals">

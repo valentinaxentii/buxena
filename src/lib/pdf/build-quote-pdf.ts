@@ -245,8 +245,8 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
       ['Sauna', data.product?.model_name ?? '—'],
       ['Heater', data.quote.heater || '—'],
       ['Accessories', accessoriesText],
-      ['Delivery', Number(data.quote.delivery_cost) > 0 ? 'Included' : 'Not included'],
-      ['Installation', Number(data.quote.installation_cost) > 0 ? 'Included' : 'Not included'],
+      ['Delivery', Number(data.quote.delivery_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal — confirm before order'],
+      ['Installation', Number(data.quote.installation_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal — confirm before order'],
     ];
     for (const [label, value] of rows) {
       y = labelValueRow(page, label, value, y);
@@ -359,6 +359,14 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
 
     y = sectionHeading(page, 'Payment Terms', y);
     for (const line of wrapText(paymentTerms(data.company.name), regular, 9.5, PAGE_W - MARGIN * 2)) {
+      page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
+      y -= 14;
+    }
+
+    y -= 16;
+    y = sectionHeading(page, 'Before You Proceed', y);
+    const decisionNote = 'Review the itemized configuration, site requirements and expiry date with your BUXENA representative. The order is confirmed only after both sides agree the final specifications, availability and order agreement.';
+    for (const line of wrapText(decisionNote, regular, 9.5, PAGE_W - MARGIN * 2)) {
       page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
       y -= 14;
     }
