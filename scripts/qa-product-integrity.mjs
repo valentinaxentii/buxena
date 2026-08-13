@@ -62,9 +62,16 @@ for (const p of published) {
     }
   }
 
-  // alt text: every img must have an alt attribute (empty allowed = decorative)
+  // Every img must CARRY an alt attribute. An empty one is not a defect: the
+  // gallery thumbnails use alt="" while their button holds a full aria-label,
+  // and alt text there would announce the same image twice. Astro emits an
+  // empty alt as the bare attribute `alt`, so match both forms — an earlier
+  // version of this check matched only `alt=` and reported 13 correct
+  // thumbnails as broken.
   for (const img of full.matchAll(/<img\b[^>]*>/g)) {
-    if (!/\balt=/.test(img[0])) problems.push(`${p.slug}: <img> with no alt attribute`);
+    if (!/\salt(=|[\s>])/.test(img[0])) {
+      problems.push(`${p.slug}: <img> with no alt attribute — ${img[0].slice(0, 80)}`);
+    }
   }
 }
 
