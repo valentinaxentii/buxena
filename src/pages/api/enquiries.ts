@@ -6,6 +6,7 @@ import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { decideEnquiryOutcome, wasDelivered } from '../../lib/enquiry-capture';
 import { checkOptionalZip } from '../../lib/zip';
+import { FALLBACK_SOURCE, isSourceConstraintError, withFormLine } from '../../lib/enquiry-source';
 
 export const prerender = false;
 
@@ -244,21 +245,56 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       // Skipped when the merge above already placed this submission on an
       // existing enquiry.
       if (!recorded) {
-        const { data, error } = await supabase
-          .from('enquiries')
-          .insert({
-            name: safe.name,
-            email: safe.email,
-            phone: safe.phone,
-            location: safe.location,
-            message: safe.message,
-            chat_transcript: safeTranscript,
-            sauna_interest: safe.saunaInterest,
-            source: safe.source ?? 'Sauna Advisor',
-            status: 'New',
-          })
-          .select('id')
-          .single();
+        const row = {
+          name: safe.name,
+          email: safe.email,
+          phone: safe.phone,
+          location: safe.location,
+          message: safe.message,
+          chat_transcript: safeTranscript,
+          sauna_interest: safe.saunaInterest,
+          source: safe.source ?? 'Sauna Advisor',
+          status: 'New',
+        };
+
+        let { data, error } = await supabase.from('enquiries').insert(row).select('id').single();
+
+        // THE SOURCE CONSTRAINT FALLBACK.
+        //
+        // enquiries.source still admits only five values while the site sends
+        // twelve; nine are refused outright (verified against the live
+        // database, 2026-08-13). Refused meant the lead reached the inbox but
+        // never became a record anybody could assign, chase or report on.
+        //
+        // Retry once with a source the column accepts, moving the true form
+        // name into the message as a `Form:` line. Nothing invented, nothing
+        // lost — the fact moves to a column the schema will hold, and
+        // effectiveSource() reads it back so the admin still shows the real
+        // form and still picks the right reply template.
+        //
+        // Narrow on purpose: only THIS constraint is retried, so an insert
+        // failing for any other reason still falls through to the notification
+        // path rather than being silently rewritten.
+        //
+        // supabase/migrations/2026-08-13-enquiry-source-constraint.sql removes
+        // the need for this. Once applied the first insert succeeds and none
+        // of the above runs.
+        if (error && isSourceConstraintError(error)) {
+          console.warn(
+            `[enquiries] source "${row.source}" rejected by enquiries_source_check — ` +
+              'recording as ' + FALLBACK_SOURCE + ' with the form named in the message. ' +
+              'Apply supabase/migrations/2026-08-13-enquiry-source-constraint.sql to stop this.'
+          );
+          ({ data, error } = await supabase
+            .from('enquiries')
+            .insert({
+              ...row,
+              source: FALLBACK_SOURCE,
+              message: withFormLine(row.message, row.source).slice(0, 8000),
+            })
+            .select('id')
+            .single());
+        }
 
         if (error) {
           // Log the real cause server-side; the visitor never sees it. Supabase

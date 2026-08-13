@@ -19,7 +19,7 @@ import { groupSpecs } from '../../lib/product-specs';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
-import { publicPrice } from '../../data/pricing';
+import { publicPrice, priceAmount, displayFromPrice } from '../../data/pricing';
 import { publicNameFor, codeFor, presentationPath } from '../../data/model-identity';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -119,6 +119,31 @@ const showSpecs = showDev || hasVerifiedDetail;
 // that is published, and none should be invented.
 const productImage = data.heroImage.src ? new URL(data.heroImage.src, Astro.site).href : undefined;
 
+/**
+ * Offers appear ONLY once a price is approved in src/data/pricing.ts, and are
+ * built from that same approved string — so the figure Google quotes is by
+ * construction the figure on the page. AggregateOffer with lowPrice, because
+ * the register's wording is "From $X": a plain Offer would state that number
+ * as the price, which it is not.
+ *
+ * Every model is preorder today and the page says so in words; PreOrder here
+ * is the machine-readable form of the same fact, not a new claim. If the
+ * amount cannot be read back with certainty, no offer is emitted at all.
+ */
+const offerAmount = priceAmount(approved?.fromPrice ?? null);
+const offers =
+  approved && !approved.projectPricing && offerAmount
+    ? {
+        offers: {
+          '@type': 'AggregateOffer',
+          priceCurrency: 'USD',
+          lowPrice: offerAmount,
+          availability: 'https://schema.org/PreOrder',
+          seller: { '@type': 'Organization', name: site.name },
+        },
+      }
+    : {};
+
 const productSchema = {
   '@context': 'https://schema.org',
   '@type': 'Product',
@@ -127,6 +152,7 @@ const productSchema = {
   ...(productImage ? { image: [productImage] } : {}),
   brand: { '@type': 'Brand', name: site.name },
   ...(data.materials?.length ? { material: data.materials.join(', ') } : {}),
+  ...offers,
 };
 
 const locationLabel = data.location === 'outdoor' ? 'Outdoor Saunas' : data.location === 'indoor' ? 'Indoor Saunas' : null;
@@ -559,7 +585,7 @@ const breadcrumbSchema = {
 
   <QuoteBand model={data.title} heading={`Start your ${displayTitle(data.title)} project`} />
 
-  <StickySalesBar model={data.title} />
+  <StickySalesBar model={data.title} fromPrice={data.fromPrice} />
 
   <script
     is:inline

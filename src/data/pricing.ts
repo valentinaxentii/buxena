@@ -93,3 +93,23 @@ export function displayFromPrice(
   if (p.projectPricing) return 'Project Pricing';
   return p.fromPrice ?? null;
 }
+
+/**
+ * The numeric dollars inside an approved display string, for structured data.
+ *
+ * Search engines need a number; the register stores the customer-facing
+ * wording ("From $5,600") because that is what a person reads. This reads the
+ * figure back out rather than asking a founder to enter the same price twice
+ * in two formats — two fields would eventually disagree, and the one a
+ * customer sees is not the one Google would then be quoting.
+ *
+ * Returns null on anything it cannot read with certainty, and the caller then
+ * emits no offer at all. A guessed number in structured data is a published
+ * price, with all the same consequences.
+ */
+export function priceAmount(display: string | null | undefined): number | null {
+  const match = (display ?? '').match(/\$\s*([\d,]+(?:\.\d{1,2})?)/);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ''));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}

@@ -8,21 +8,37 @@
  * appears/disappears without the slide.
  */
 import { displayTitle } from '../data/catalog';
+import { displayFromPrice } from '../data/pricing';
 
 interface Props {
   /** Full internal title (BUH-…) — tracking keeps it; the visible label is stripped. */
   model: string;
   /** Anchor the CTA scrolls to — the enquiry form section. */
   target?: string;
+  /** Legacy per-model frontmatter price; the central register always wins. */
+  fromPrice?: string;
 }
-const { model, target = '#enquire' } = Astro.props;
+const { model, target = '#enquire', fromPrice } = Astro.props;
 const shownName = displayTitle(model);
+
+/**
+ * The bar reads the same central register as the product page, the cards and
+ * the compare table, so publishing a price stays the one-line change
+ * src/data/pricing.ts promises. It previously hard-coded "Pricing &
+ * availability on request", which would have quietly become the one place on
+ * the site still asking for a price the customer could already see above it.
+ *
+ * Null — the state of every model today — keeps the original wording.
+ */
+const price = displayFromPrice(model, fromPrice);
 ---
 
 <div class="salesbar" data-salesbar hidden>
   <div class="salesbar__inner">
     <span class="salesbar__model">{shownName}</span>
-    <span class="salesbar__note">Pricing &amp; availability on request</span>
+    <span class={`salesbar__note ${price ? 'salesbar__note--price' : ''}`}>
+      {price ?? 'Pricing & availability on request'}
+    </span>
     <a
       class="btn btn--bronze salesbar__cta"
       href={target}
@@ -72,6 +88,12 @@ const shownName = displayTitle(model);
     font-size: var(--t-small);
     color: var(--muted-dark);
     margin-right: auto;
+  }
+  /* An actual figure is the reason someone reads this bar — give it the
+     weight the generic note does not need. */
+  .salesbar__note--price {
+    color: var(--linen);
+    font-weight: 600;
   }
 
   .salesbar__cta { padding: 0.75rem 1.5rem; font-size: 0.75rem; white-space: nowrap; }

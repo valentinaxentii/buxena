@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { effectiveSource } from './enquiry-source.ts';
 
 /**
  * Website Enquiries -> Lead -> Quote conversion logic, centralized here
@@ -75,7 +76,12 @@ export async function convertEnquiryToLead(supabase: SupabaseClient, enquiryId: 
       // leads.source constraint accepts any non-empty value (see schema.sql),
       // and the lead edit form now keeps an unlisted source rather than
       // silently resetting it.
-      source: enquiry.source || 'Website',
+      //
+      // effectiveSource() rather than enquiry.source: while the enquiries
+      // source constraint is un-migrated the true form lives in the message,
+      // and a lead that says "Website" when the customer used the trade form
+      // is the same lost context one table along.
+      source: effectiveSource(enquiry) || 'Website',
       product_id: match?.id ?? null,
       notes: enquiry.message || null,
     })
@@ -118,7 +124,7 @@ async function resolveOrCreateCustomer(supabase: SupabaseClient, enquiry: any) {
       zip: enquiry.location || null,
       // Same reasoning as the lead above. customers.lead_source is plain text
       // with no CHECK, so this cannot fail an insert and lose the quote.
-      lead_source: enquiry.source || 'Website',
+      lead_source: effectiveSource(enquiry) || 'Website',
     })
     .select('id')
     .single();

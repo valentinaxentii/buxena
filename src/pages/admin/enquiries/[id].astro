@@ -12,6 +12,7 @@ import { handleRecordAction, recordActionState } from '../../../lib/record-actio
 import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
 import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-templates';
 import { parseEnquiryDetails } from '../../../lib/enquiry-details';
+import { effectiveSource } from '../../../lib/enquiry-source';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -148,13 +149,19 @@ try {
 
 // Suggested first response — a draft for the founder to review and edit.
 // Built server-side from the enquiry's own fields; nothing sends by itself.
+// The form this enquiry really came from. Differs from enquiry.source only
+// while the source CHECK constraint is un-migrated, when the API records the
+// true form in the message instead — see lib/enquiry-source.ts. Used for the
+// reply template so a trade project never gets the general-enquiry draft.
+const formSource = enquiry ? effectiveSource(enquiry) : '';
+
 const reply = enquiry
   ? buildEnquiryReply({
       name: enquiry.name,
       phone: enquiry.phone,
       location: enquiry.location,
       saunaInterest: enquiry.sauna_interest,
-      source: enquiry.source,
+      source: formSource,
     })
   : null;
 const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, reply) : null;
@@ -264,7 +271,7 @@ const details = parseEnquiryDetails(enquiry?.message);
             <h2 class="enq-sec__h">Request</h2>
             <dl class="enq-kv">
               <div><dt>Requested Sauna / Model</dt><dd>{enquiry.sauna_interest || '—'}</dd></div>
-              <div><dt>Requested Service</dt><dd>{enquiry.source || '—'}</dd></div>
+              <div><dt>Requested Service</dt><dd>{formSource || '—'}</dd></div>
             </dl>
 
             {details.fields.length > 0 && (
@@ -326,7 +333,17 @@ const details = parseEnquiryDetails(enquiry?.message);
             <h2 class="enq-sec__h">Enquiry Information</h2>
             <dl class="enq-kv enq-kv--1col">
               <div><dt>Received</dt><dd>{new Date(enquiry.created_at).toLocaleString()}</dd></div>
-              <div><dt>Source</dt><dd>{enquiry.source}</dd></div>
+              <div><dt>Source</dt><dd>{formSource || enquiry.source}</dd></div>
+              {formSource && formSource !== enquiry.source && (
+                <div>
+                  <dt>Stored as</dt>
+                  <dd class="enq-stored-as">
+                    {enquiry.source} — the database will not yet accept
+                    "{formSource}". Apply the 2026-08-13 enquiry-source
+                    migration and new enquiries will store it directly.
+                  </dd>
+                </div>
+              )}
               <div><dt>Status</dt><dd><StatusBadge status={enquiry.status} /></dd></div>
               {enquiry.contacted_at && <div><dt>Contacted</dt><dd>{new Date(enquiry.contacted_at).toLocaleString()}</dd></div>}
             </dl>
@@ -438,6 +455,8 @@ const details = parseEnquiryDetails(enquiry?.message);
   .enq-also a:hover { border-color: var(--admin-gold); }
   .enq-also__src { font-size: 0.82rem; color: var(--admin-cream); }
   .enq-also__meta { font-size: 0.68rem; color: var(--admin-muted); }
+
+  .enq-stored-as { font-size: 0.72rem; line-height: 1.5; color: var(--admin-muted); }
 
   .enq-timeline { list-style: none; margin: 0; padding: 0; }
   .enq-timeline li {

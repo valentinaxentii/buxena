@@ -7,6 +7,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
 import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
+import { effectiveSource } from '../../../lib/enquiry-source';
 
 const search = Astro.url.searchParams.get('q') ?? '';
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
@@ -111,7 +112,11 @@ try {
                 {e.name && (e.email || e.phone) && <span class="enq-sub">{e.email || e.phone}</span>}
               </td>
               <td class="enq-req">{e.sauna_interest || e.message || '—'}</td>
-              <td>{e.source}</td>
+              {/* The real form, which lives in the message while the source
+                  CHECK constraint is un-migrated — see lib/enquiry-source.ts.
+                  Without this the list showed nine of the twelve forms as a
+                  flat "Website", which is the whole problem restated. */}
+              <td>{effectiveSource(e) || e.source}</td>
               <td><StatusBadge status={e.status} /></td>
               <td><a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/enquiries/${e.id}`}>View</a></td>
             </tr>
