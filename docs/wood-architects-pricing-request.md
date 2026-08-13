@@ -1,4 +1,4 @@
-# Wood Architects — Dealer Pricing, Permissions & U.S. Distribution (v2)
+# Wood Architects — Dealer Economics & U.S. Terms (FINAL, concise)
 
 Revised 2026-08-13 for founder review. **NOT SENT.**
 
@@ -7,127 +7,77 @@ Revised 2026-08-13 for founder review. **NOT SENT.**
 **Covers:** 4 BUXENA models — NORD Cube 200, NORD Cube 240,
 VIRU Thermowood 3.0m, VIRU Grand 6.0m
 
-**Territory looks open.** Their distributor page states that "several European
-territories currently have exclusive rights" but makes **no mention of the USA
-or North America**. Ask anyway — and ask for the volume attached to any
-territory offer before committing to one.
+**What this email is actually for.** Workbook EXW for the cubes is
+EUR 8,960–11,140 — several times what Capra charges for a UKU cube, and far
+above the U.S. 4-person cube market median. These may simply not be sellable at
+a viable U.S. margin. The email is therefore built to answer one commercial
+question: **can these products work economically in the United States?** That is
+why it asks directly whether a better dealer tier exists — the documented level
+is a distributor list price, and if there is nothing beneath it, that is the
+answer.
 
-**Commercial warning before ordering.** Workbook EXW for the cubes is
-€8,960–11,140 — several times the €1,930–2,240 we pay Capra for the UKU cubes,
-and landing far above the U.S. 4-person cube median. These are premium
-architectural products, not mainstream stock. **Confirm dealer pricing before
-assuming they can be sold profitably**, and be prepared for the answer to be
-that they cannot at our launch volumes.
+**Territory looks open.** Their distributor page names European exclusives only,
+with no mention of the USA or North America.
 
-**Permission status going in:** nothing on record. The NORD Cube photography
-currently on our site was extracted from their 2026 collection catalog with no
-granted licence, so §12 is a genuine ask, not a confirmation.
-
-**Deliberate exclusions:** no "startup" framing, no competitor research, no
-intended retail markup, no internal BUH- codes.
+**Permission status going in:** nothing on record. The NORD Cube photography on
+our site was extracted from their 2026 collection catalog with no granted
+licence, so item 6 is a genuine request.
 
 ---
 
-**Subject:** BUXENA — U.S. distribution, dealer pricing and image permissions
+**Subject:** BUXENA — U.S. dealer terms and pricing
 
 ---
 
 Dear Pijus,
 
-BUXENA is preparing its U.S. launch and planning a first 40HC container order
-for **fall 2026**, shipping to the **Port of New York/New Jersey, USA**. We are
-particularly interested in your panoramic cube range and your barrel line.
+BUXENA is preparing its U.S. launch and planning a first 40HC container for
+**autumn 2026**, shipping to the **Port of New York/New Jersey**. We are
+interested in your panoramic cube range and your barrel line, and want to
+establish quickly whether the numbers work for a U.S. retail business.
 
-**1 · U.S. territory**
-Please confirm whether the United States is available, and what territorial or
-exclusive arrangements you would consider for the U.S. market — including the
-minimum annual volumes attached to them.
+**1 · Best available dealer pricing**
+Your current dealer EXW price list for Cube 200 and Cube 240 (flat-pack and
+assembled) and Barrel XS/S/M/L/XL in pine and thermo-treated timber.
 
-**2 · Models you manufacture**
-Please confirm exactly which models Wood Architects manufactures and send your
-current model list with the correct designation for each — we want to be certain
-we are referring to your products accurately.
+Directly: **is there a dealer or distributor tier below the pricing you would
+normally quote** — for container volume, an annual commitment, or a territory
+agreement? We ask plainly because the U.S. market for this category is well
+served at a price point we need to be able to reach, and we would rather know
+now than discover it after a container.
 
-**3 · Dealer / distributor price list**
-Your current dealer EXW price list for the full range: Cube 200 and Cube 240
-(flat-pack and assembled), and Barrel XS/S/M/L/XL in both pine and
-thermo-treated timber.
+Please also state per model **what the base price includes and excludes** —
+heater, controls, stones, lighting, chimney or flue.
 
-Please state clearly, per model, **what the base price includes and excludes** —
-specifically whether the heater, controls, stones, lighting and any chimney or
-flue are in or out of the quoted figure.
+**2 · Minimum order quantity** — per model, and for a first container.
 
-**4 · Minimum order quantity**
-Your MOQ — per model, per order, and for a first container.
+**3 · Production lead time** — by model.
 
-**5 · Dealer discount structure**
-Terms for a first container, recurring container orders and annual volume.
+**4 · Crate dimensions and gross weight** — per model, with units per 40HC.
+Cube volume drives our freight cost per unit, so this bears directly on
+whether these models work.
 
-**6 · Payment terms**
-Deposit requirement, balance terms, accepted payment methods, and any terms
-available to an established distributor.
+**5 · U.S. territory and pricing conditions**
+Is the United States available, and what territorial arrangements would you
+consider — including the minimum annual volumes attached to them? Do you impose
+any **minimum advertised price (MAP), recommended retail price (MSRP) or other
+resale-price condition** on U.S. dealers?
 
-**7 · Heater and options pricing**
-Recommended heater per model with dealer pricing for heater, controls, stones,
-lighting and heater guard. Please confirm whether heaters supplied are
-**UL-listed for the U.S. market**, or whether we should source certified heaters
-locally.
+**6 · Warranty** — terms per product, and how a distributor handles a claim.
 
-**8 · Packing, weights and container loading**
-Crated dimensions and gross weight per model; units of each model per 40HC;
-whether models can be mixed, the most efficient combinations, and approximate
-total units in a mixed 40HC.
-
-**9 · EXW scope**
-Exactly what your EXW price includes — export packing, crating, loading, export
-documentation — and any other origin charges.
-
-**10 · Lead times and current availability**
-Current production lead time by model, and how you handle availability: is
-production made to order against a confirmed PO, or do you hold finished stock?
-If you hold stock, how do we check what is available when ordering, and how long
-is it held once reserved?
-
-**11 · Warranty**
-Warranty terms per product — length and what is covered — and how claims are
-handled through a distributor, including parts and replacements.
-
-**12 · Image and marketing permissions**
-Please confirm **in writing** whether BUXENA may use your product photography,
-renders and technical drawings:
+**7 · Image permission**
+May we use your product photography and renders, in writing:
 
 - on the **BUXENA website**
-- on **BUXENA social media accounts**
-- in **organic marketing** — email, newsletters, blog and printed brochures
-- in **paid advertising** — Google, Meta, Pinterest and similar platforms
-- in **customer proposals and quotes**
+- on **BUXENA social media**
+- in **organic marketing** — email, newsletters, brochures
+- in **paid advertising** — Google, Meta, Pinterest and similar
 
-And that we may make ordinary **presentational adjustments** for those
-placements: **cropping, resizing, and colour or exposure correction**, and
-placing the BUXENA logo on the image. We would not alter the product itself, and
-we would only ever use an image of a model to represent that same model.
-
-If any of this needs to be limited — particular images excluded, a credit line
-required, or paid advertising treated differently — please say so and we will
-follow it exactly. Where you have a dealer media pack or high-resolution
-originals, those would be very welcome.
-
-**13 · Resale-price conditions**
-Please confirm whether you impose any **minimum advertised price (MAP),
-recommended retail price (MSRP) or other resale-price condition** on
-distributors in the United States, and whether you require prior approval before
-we publish a retail price.
-
-**14 · Spare parts**
-Availability and dealer pricing for glass, doors, benches and hardware.
-
-**15 · Technical documents**
-Where available: dimension drawings, floor plans, installation manuals,
-electrical guides (kW, phase and recommended breaker), foundation and
-site-preparation requirements, heater manuals and warranty documents.
-
-Once we have this we can confirm model selection, container composition and
-order timing.
+and make ordinary presentational adjustments for those placements —
+**cropping, resizing, colour correction**, and placing the BUXENA logo on the
+image? We would not alter the product itself, and would only ever use an image
+of a model to represent that same model. A dealer media pack or high-resolution
+originals would be very welcome.
 
 With respect,
 
@@ -139,13 +89,11 @@ info@buxena.com | buxena.com
 
 ## When the reply arrives
 
-1. Confirm which of our models are genuinely theirs — our matching is by
-   specification, not their confirmation.
-2. Enter dealer EXW into Admin → Pricing for BUH-12, 13, 39, 44.
-3. **Check the cube economics before ordering.** If dealer EXW confirms the
-   workbook level, these models may not be sellable at a viable margin in the
-   U.S. — that is a decision to take deliberately, not by default.
-4. Update `docs/master-supplier-product-status.md`.
-5. Record image permission in `docs/image-rights-register.md`, split by use.
-6. If territory terms are offered, note the minimum annual volume before
-   committing.
+1. **Check the economics before anything else.** If dealer EXW confirms the
+   workbook level and no better tier exists, these four models likely do not
+   belong in the launch catalogue — a decision to take deliberately, not by
+   default.
+2. If viable: dealer EXW → Admin → Pricing for BUH-12, 13, 39, 44.
+3. Image permission → `docs/image-rights-register.md`, split by use. This
+   clears the four NORD Cube photographs and two VIRU photographs.
+4. Note any minimum annual volume before committing to a territory.
