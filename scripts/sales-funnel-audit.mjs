@@ -22,6 +22,9 @@ check('Search Console verification is opt-in', layout.includes('PUBLIC_GOOGLE_SI
 check('analytics env vars are documented', env.includes('PUBLIC_GTM_ID=') && env.includes('PUBLIC_GOOGLE_SITE_VERIFICATION='));
 check('lead conversion preserves original enquiry source', conversion.includes('Original website enquiry source:'));
 check('customer conversion preserves original enquiry source', conversion.includes('notes: enquiryOrigin(enquiry)'));
+check('contact mutation surfaces database failure', conversion.includes("throw new Error('Could not mark the enquiry as contacted. Please try again.')"));
+check('status mutation surfaces database failure', conversion.includes("throw new Error('Could not update the enquiry status. Please try again.')"));
+check('activity audit failure is best-effort', conversion.includes("console.error('[enquiry-conversion] activity log failed:'"));
 check('enquiry workflow migration includes Quoted state', workflowMigration.includes("'Quoted'"));
 check('enquiry workflow migration includes quote_id', workflowMigration.includes('quote_id uuid references public.quotes'));
 check('enquiry workflow migration includes contacted_at', workflowMigration.includes('contacted_at timestamptz'));
