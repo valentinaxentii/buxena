@@ -45,7 +45,7 @@ features:
   - "Integrated Bluetooth audio (one or two speakers)"
   - "Door hinged left or right, at no extra cost"
 options: ["Smoked or reflective glass tint", "Left- or right-hinged door", "Factory assembled (metal base)", "Flat-pack kit (wooden base)"]
-delivery: "Preorder — lead time confirmed with your written quote."
+delivery: "Availability and lead time confirmed with your written quote."
 ---
 
 The NORD Cube 240 takes the flagship cube and gives it width: 241 cm
