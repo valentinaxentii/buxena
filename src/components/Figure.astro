@@ -83,8 +83,20 @@ const srcset = webpSrcset(src);
 const labelled = showDev;
 ---
 
+{/* `fig--empty` exists because of a genuine collapse.
+
+    `fit="contain"` sets `aspect-ratio: auto` so a photograph can size itself.
+    But the placeholder is `position: absolute`, so with no image the box has
+    no in-flow child at all and its height falls to just the padding. On the
+    product page — which uses contain WITHOUT fixedRatio — that rendered the
+    hero of all sixteen image-less models as a ~50px sliver rather than a
+    520px frame. It read as broken, and it was.
+
+    Restoring the ratio only when there is nothing to contain gives those
+    pages a properly proportioned frame, and changes nothing for any figure
+    that has an image. */}
 <figure
-  class={`fig fig--${tone} ${fit === 'contain' ? 'fig--contain' : ''} ${fit === 'contain' && fixedRatio ? 'fig--contain-fixed' : ''} ${className}`}
+  class={`fig fig--${tone} ${fit === 'contain' ? 'fig--contain' : ''} ${fit === 'contain' && fixedRatio ? 'fig--contain-fixed' : ''} ${!src ? 'fig--empty' : ''} ${className}`}
   style={`--fig-ratio:${ratio}; --fig-max-h:${maxHeight}${focus ? `; --fig-pos:${focus}` : ''}`}
 >
   {
@@ -157,6 +169,11 @@ const labelled = showDev;
      the same height), the image still only ever contains within it. */
   .fig--contain-fixed { aspect-ratio: var(--fig-ratio); }
   .fig--contain-fixed img { max-height: 100%; }
+
+  /* Declared AFTER .fig--contain so it wins the `aspect-ratio: auto` there —
+     same technique, and same specificity, as .fig--contain-fixed above.
+     Only ever applies when there is no image to size the box. */
+  .fig--empty { aspect-ratio: var(--fig-ratio); }
 
   .fig__ph {
     position: absolute;
