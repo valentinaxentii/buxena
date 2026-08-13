@@ -117,8 +117,13 @@ included. Inside the draft worksheets:
    $2,383 — and its worksheet flags a **spec mismatch on the public
    page** (site dimensions match no catalog variant) that should be
    corrected before selling it.
-5. **UKU 230 half-moon** is a separate supplier SKU at €2,590 — decide:
-   option surcharge or its own price.
+5. ~~**UKU 230 half-moon** is a separate supplier SKU at €2,590 — decide:
+   option surcharge or its own price.~~ **DECIDED 2026-08-13 (founder): treat
+   as a separate commercial SKU. Its pricing must never be combined with the
+   standard UKU 230 (€2,240).** Enforced in `src/data/pricing.ts` via
+   `SEPARATE_SKU_VARIANTS` — the product page renders the caveat automatically,
+   but only once a price is actually published, so it cannot be forgotten on
+   the day a figure is entered.
 6. ELLA H1 / ALLA H1 / EDA 2.5m EXW prices and the AURA supplier are
    open questions in the drafted Capra email.
 

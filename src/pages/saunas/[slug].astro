@@ -19,7 +19,7 @@ import { groupSpecs } from '../../lib/product-specs';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
-import { publicPrice, priceAmount, displayFromPrice } from '../../data/pricing';
+import { publicPrice, priceAmount, displayFromPrice, separateSkuNote } from '../../data/pricing';
 import { publicNameFor, codeFor, presentationPath } from '../../data/model-identity';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -237,6 +237,14 @@ const breadcrumbSchema = {
                   <div><dt>BUXENA Project</dt><dd>Project Pricing</dd></div>
                 )}
                 {approved.note && <p class="prod-hero__pricing-note">{approved.note}</p>}
+                {/* Renders only alongside a published price, and only for a
+                    model whose variant is a separate supplier SKU at a
+                    separate cost. Without it, a "From" figure sitting above an
+                    options list containing "Half-moon glass back wall" reads as
+                    though the half-moon is included. */}
+                {separateSkuNote(data.title) && (
+                  <p class="prod-hero__pricing-note">{separateSkuNote(data.title)}</p>
+                )}
               </dl>
             )}
             <p class="lead">{data.summary}</p>
