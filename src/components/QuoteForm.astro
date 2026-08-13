@@ -15,6 +15,26 @@ const { preselect, compact = false } = Astro.props;
 const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
   a.data.title.localeCompare(b.data.title)
 );
+
+/**
+ * Broad categories offered above the specific models, for the buyer who
+ * knows the shape they want but not the model.
+ *
+ * Only categories the catalog can actually satisfy are listed. `categories`
+ * in site.ts declares six, but two of them — Heaters and Accessories — carry
+ * no model, so offering them invited an enquiry for a product line BUXENA
+ * does not sell. That reaches the customer as an implied catalog and reaches
+ * the CRM as a lead nobody can quote.
+ *
+ * Matched on either axis the content uses: `category` covers barrel, cube
+ * and indoor; `location` covers outdoor, which is a placement rather than a
+ * category and so has no model filed under it. This is the same live-model
+ * test /collections/[category] already builds its pages by — add the first
+ * heater model and the Heaters option appears here on its own.
+ */
+const offeredCategories = categories.filter((c) =>
+  saunas.some((s) => s.data.category === c.id || s.data.location === c.id)
+);
 ---
 
 <!--
@@ -74,7 +94,7 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
         <label for="q-model">Model, if known</label>
         <select id="q-model" name="model">
           <option value="">Undecided — please advise</option>
-          {categories.map((c) => (
+          {offeredCategories.map((c) => (
             <option value={c.name} selected={preselect === c.name}>{c.name}</option>
           ))}
           {saunas.length > 0 && (
