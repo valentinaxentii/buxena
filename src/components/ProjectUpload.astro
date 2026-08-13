@@ -13,11 +13,9 @@
  *   never gallery content.
  *
  * Accepts JPG / PNG / WEBP / PDF. The consuming form reads the hidden
- * input `name="uploadMeta"` (a human-readable summary string) and appends
- * it to the enquiry message so staff know exactly what to request.
+ * input `name="uploadMeta"` and appends it to the enquiry message.
  */
 interface Props {
-  /** Unique per page — keeps label/input ids valid if used twice. */
   id?: string;
   label?: string;
 }
@@ -26,90 +24,63 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
 
 <div class="pupload" data-pupload>
   <span class="pupload__label">{label}</span>
-  <label class="pupload__drop" for={id}>
-    <input
-      id={id}
-      type="file"
-      accept="image/jpeg,image/png,image/webp,application/pdf"
-      multiple
-      capture="environment"
-      data-pupload-input
-    />
+  <label class="pupload__drop" for={id} data-pupload-drop>
+    <input id={id} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple data-pupload-input />
     <span class="pupload__cta">Add photos or plans</span>
-    <span class="pupload__hint">JPG, PNG, WEBP or PDF — kept private, never public</span>
+    <span class="pupload__hint">Choose files or drag them here · JPG, PNG, WEBP or PDF</span>
   </label>
+  <p class="pupload__status" data-pupload-status aria-live="polite"></p>
   <ul class="pupload__list" data-pupload-list></ul>
   <input type="hidden" name="uploadMeta" data-pupload-meta />
 </div>
 
 <style>
   .pupload { display: grid; gap: 0.55rem; }
-
-  .pupload__label {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-
-  .pupload__drop {
-    display: grid;
-    justify-items: center;
-    gap: 0.35rem;
-    border: 1.5px dashed var(--bronze-soft);
-    padding: clamp(1.1rem, 0.8rem + 1.2vw, 1.75rem);
-    cursor: pointer;
-    text-align: center;
-    transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease);
-  }
-  .pupload__drop:hover { border-color: var(--bronze); background: var(--linen-deep); }
+  .pupload__label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+  .pupload__drop { display: grid; justify-items: center; gap: 0.35rem; border: 1.5px dashed var(--bronze-soft); padding: clamp(1.1rem, 0.8rem + 1.2vw, 1.75rem); cursor: pointer; text-align: center; transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease), transform 0.2s var(--ease); }
+  .pupload__drop:hover, .pupload__drop[data-drag-active="true"] { border-color: var(--bronze); background: var(--linen-deep); }
+  .pupload__drop[data-drag-active="true"] { transform: scale(1.005); }
   .pupload__drop:focus-within { outline: 2px solid var(--bronze); outline-offset: 3px; }
   .pupload__drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-
-  .pupload__cta {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--bronze-ink);
-  }
-  .pupload__hint { font-size: 0.8125rem; color: var(--muted); }
-
+  .pupload__cta { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bronze-ink); }
+  .pupload__hint, .pupload__status { font-size: 0.8125rem; color: var(--muted); }
+  .pupload__status { min-height: 1.1em; margin: 0; }
+  .pupload__status[data-error="true"] { color: #8b3a2d; }
   .pupload__list { display: grid; gap: 0.3rem; }
-  .pupload__list li {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    font-size: 0.8125rem;
-    color: var(--muted);
-    padding: 0.35rem 0;
-    border-bottom: 1px solid var(--line);
-  }
+  .pupload__list li { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.8125rem; color: var(--muted); padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
 </style>
 
 <script>
   import { track } from '../lib/track';
 
+  const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+  const MAX_FILES = 10;
+  const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
   document.querySelectorAll<HTMLElement>('[data-pupload]').forEach((root) => {
     const input = root.querySelector<HTMLInputElement>('[data-pupload-input]')!;
+    const drop = root.querySelector<HTMLElement>('[data-pupload-drop]')!;
     const list = root.querySelector<HTMLElement>('[data-pupload-list]')!;
     const meta = root.querySelector<HTMLInputElement>('[data-pupload-meta]')!;
+    const status = root.querySelector<HTMLElement>('[data-pupload-status]')!;
     let started = false;
 
-    input.addEventListener('change', () => {
-      const files = Array.from(input.files ?? []);
-      list.innerHTML = '';
+    const fmtSize = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
 
-      if (!started && files.length > 0) {
+    const renderFiles = (files: File[]) => {
+      list.innerHTML = '';
+      status.textContent = '';
+      status.removeAttribute('data-error');
+
+      const accepted = files.filter((f) => ALLOWED_TYPES.has(f.type) && f.size <= MAX_FILE_BYTES).slice(0, MAX_FILES);
+      const rejected = files.length - accepted.length;
+
+      if (!started && accepted.length > 0) {
         started = true;
-        track('project_upload_started', { fileCount: files.length });
+        track('project_upload_started', { fileCount: accepted.length });
       }
 
-      const fmtSize = (bytes: number) =>
-        bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
-
-      files.forEach((f) => {
+      accepted.forEach((f) => {
         const li = document.createElement('li');
         const name = document.createElement('span');
         name.textContent = f.name;
@@ -119,14 +90,57 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
         list.appendChild(li);
       });
 
-      // Metadata only — the enquiry tells staff what to request by email.
-      meta.value = files.length
-        ? `Customer prepared ${files.length} file(s): ${files.map((f) => `${f.name} (${fmtSize(f.size)})`).join(', ')} — PRIVATE project data, request by email reply; files were not transmitted.`
+      meta.value = accepted.length
+        ? `Customer prepared ${accepted.length} file(s): ${accepted.map((f) => `${f.name} (${fmtSize(f.size)})`).join(', ')} — PRIVATE project data, request by email reply; files were not transmitted.`
         : '';
 
-      if (files.length > 0) {
-        track('project_upload_completed', { fileCount: files.length });
+      if (accepted.length > 0) {
+        status.textContent = `${accepted.length} file${accepted.length === 1 ? '' : 's'} selected. Files stay on this device until we add secure private upload.`;
+        track('project_upload_completed', { fileCount: accepted.length });
+      }
+      if (rejected > 0) {
+        status.dataset.error = 'true';
+        status.textContent = `${status.textContent ? `${status.textContent} ` : ''}${rejected} file${rejected === 1 ? ' was' : 's were'} skipped. Use JPG, PNG, WEBP or PDF, max 20 MB each, up to 10 files.`;
+      }
+      return accepted;
+    };
+
+    input.addEventListener('change', () => renderFiles(Array.from(input.files ?? [])));
+
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      drop.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        drop.dataset.dragActive = 'true';
+      });
+    });
+
+    ['dragleave', 'dragend'].forEach((eventName) => {
+      drop.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        drop.removeAttribute('data-drag-active');
+      });
+    });
+
+    drop.addEventListener('drop', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      drop.removeAttribute('data-drag-active');
+      const dropped = Array.from(event.dataTransfer?.files ?? []);
+      const accepted = renderFiles(dropped);
+      try {
+        const transfer = new DataTransfer();
+        accepted.forEach((file) => transfer.items.add(file));
+        input.files = transfer.files;
+      } catch {
+        // Some browsers do not allow assigning FileList; rendering/meta still works.
       }
     });
+
+    // Prevent a file dragged onto the component's child elements from being
+    // opened/navigated by the browser instead of being handled by the control.
+    root.addEventListener('dragover', (event) => event.preventDefault());
+    root.addEventListener('drop', (event) => event.preventDefault());
   });
 </script>
