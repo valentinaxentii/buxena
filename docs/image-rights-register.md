@@ -350,3 +350,43 @@ still referenced, so this cannot be published by accident.
 part that was visible to customers; it did not change the permission position on
 any of them. The blocker clears only when the supplier permission emails
 (`docs/supplier-permission-wording.md`) come back in writing.
+
+---
+
+## Founder-provided editorial photography (2026-08-13)
+
+Two photographs supplied directly by the founder on 2026-08-13, each inside a
+one-page PDF, with the explicit written instruction: *"This image was
+explicitly provided by me for use on the BUXENA website."*
+
+These are recorded as a **distinct provenance class**. They are not supplier
+photography and must not be folded into the Capra permission above — that
+permission covers Capra's shared-drive images only, and stretching it to cover
+unrelated assets is exactly the assumption this register exists to prevent.
+
+Each replaces a placeholder left by the 2026-08-13 rights audit. Neither is a
+previously-blocked file returning: both are new assets, extracted losslessly
+from the founder's PDFs (the embedded streams were `DCTDecode`, i.e. already
+JPEG, so the original bytes were written out unchanged rather than re-encoded).
+
+| Field | Value |
+|---|---|
+| Status | **FOUNDER-PROVIDED — APPROVED (website)** |
+| Supplied by | BUXENA founder, direct to the build, 2026-08-13 |
+| Scope granted | BUXENA website. Paid ads / social / third-party syndication **NOT** stated — treat as NEEDS CONFIRMATION for those uses. |
+
+| Asset | Placement | Source PDF | Dimensions |
+|---|---|---|---|
+| `images/editorial/sauna-interior-bench-heater.jpg` | `/our-story/` — "A northern habit, moved south" split media | `sauna-interior-图片.pdf` | 1024×1461 |
+| `images/editorial/sauna-glass-lounge.jpg` | `/wellness/` — "The Ritual / Heat, cold, rest — and then again" | `sauna-glass-lounge-图片.pdf` | 2048×1082 |
+| `images/editorial/sauna-corner-bench-heater.jpg` | `/wellness/` — "Etiquette / A few conventions worth keeping" | `sauna-corner-v2-图片.pdf` | 1024×1461 |
+
+**Open point for the founder — third-party heater branding.** The Our Story
+photograph shows a heater carrying a visible **TYLÖ** wordmark on its casing.
+Tylö is a third-party manufacturer and is not among the heater brands named in
+the BUXENA catalogue specifications. Nothing on the page claims the heater is a
+BUXENA product, and the page is editorial rather than a product listing, so this
+is not a factual misstatement. It is flagged because putting another
+manufacturer's mark on the brand story page is a commercial decision, not a
+technical one. Options: keep as is, crop tighter to exclude the wordmark, or
+substitute a different photograph.

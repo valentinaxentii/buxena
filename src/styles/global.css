@@ -61,7 +61,87 @@
   --gutter: clamp(1.25rem, 0.6rem + 2.8vw, 3.5rem);
   --band: clamp(2.5rem, 1.45rem + 4.4vw, 5.2rem);   /* vertical section rhythm, ~45% tighter than original */
 
+  /* --- vertical rhythm, as tokens ----------------------------------------
+     These were hardcoded clamps inside Hero.astro, Footer.astro and the
+     section-head rule. They are lifted to :root so the compression pass below
+     can retune them in ONE place — and, critically, so it can retune them for
+     every page EXCEPT the homepage.
+
+     :root always holds the ORIGINAL values. The homepage reads them from here
+     and is therefore untouched by the compression. */
+  /* Hero.astro is NOT tokenised: it is imported by index.astro and nowhere
+     else, so it is homepage-only and therefore entirely out of scope for the
+     compression. Its clamps stay literal in the component. */
+  --footer-pad: clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem);  /* Footer.astro vertical pad   */
+  --footer-col-gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
+  --footer-row-gap: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+  --sec-head-gap: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); /* section head → content     */
+  --card-body-pad: 1.1rem;                             /* ProductCard text block        */
+  --form-row-gap: 1.25rem;                             /* between form rows             */
+  --form-label-gap: 0.55rem;                           /* label → input                 */
+  --form-foot-gap: 1.9rem;                             /* last field → submit           */
+
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+
+/* ==========================================================================
+   VERTICAL COMPRESSION PASS — 2026-08-13
+   Every public page EXCEPT the homepage tightens by ~15%.
+
+   WHY IT IS SCOPED THIS WAY
+   -------------------------
+   The founder's instruction was explicit: compress everything by ~15%, and
+   leave Home at exactly its current dimensions. Home is built almost entirely
+   from SHARED components — Hero, ProductCard, CollectionCard, QuoteBand, plus
+   the global Header and Footer — so retuning the tokens in :root would have
+   compressed Home along with everything else.
+
+   Redefining the custom properties on `body:not(.is-home)` solves it without
+   forking a single component: custom properties inherit, so every descendant
+   on a non-home page picks up the tightened value, while Home keeps inheriting
+   the originals from :root. BaseLayout.astro sets the `is-home` class.
+
+   The multiplier is ~0.85 applied to each part of the clamp, so the reduction
+   holds across the whole 360px → 1440px range rather than only at one width.
+
+   NOT compressed here, deliberately:
+     · font sizes and line-height of body copy — the brief called for whitespace
+       reduction, not smaller type
+     · form input padding and control heights — those are tap targets
+     · image aspect ratios — product photography is what sells
+   ========================================================================== */
+body:not(.is-home) {
+  /* --- oversized display headings, -20% --------------------------------
+     Founder direction 2026-08-13, from a screenshot of /wellness/ where
+     "Heat, cold, rest — and then again" (an h1.display at 80px) took most of
+     the viewport before a single line of content appeared.
+
+     Only the two DISPLAY steps move. --t-h3, --t-lead, --t-body, --t-small and
+     --t-label are all left exactly as they are: the brief was explicit that
+     eyebrow labels, body copy, nav, form labels, product metadata and buttons
+     must not shrink. This is a display-heading correction, not a font pass.
+
+     --t-hero is untouched because it is used only by the homepage hero.
+
+     desktop:  h1 80px → 64px   ·  h2 54.4px → 43.5px
+     mobile:   h1 38.4px → 30.7px ·  h2 30.4px → 24.3px */
+  --t-h1: clamp(1.92rem, 1.2rem + 3.12vw, 4rem);
+  --t-h2: clamp(1.52rem, 1.08rem + 1.92vw, 2.72rem);
+
+  --hdr-h: clamp(4.14rem, 4rem + 0.68vw, 4.68rem);
+  --band: clamp(2.13rem, 1.23rem + 3.74vw, 4.42rem);
+
+  --footer-pad: clamp(2.21rem, 1.28rem + 3.19vw, 3.83rem);
+  --footer-col-gap: clamp(1.62rem, 0.64rem + 3.19vw, 3.83rem);
+  --footer-row-gap: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
+
+  --sec-head-gap: clamp(1.19rem, 0.68rem + 1.45vw, 2.17rem);
+  --card-body-pad: 0.94rem;
+
+  --form-row-gap: 1.06rem;
+  --form-label-gap: 0.47rem;
+  --form-foot-gap: 1.62rem;
 }
 
 
@@ -276,7 +356,7 @@ button { font: inherit; color: inherit; }
 /* ==========================================================================
    Section heading block
    ========================================================================== */
-.sec-head { margin-bottom: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); }
+.sec-head { margin-bottom: var(--sec-head-gap); }
 .sec-head .lead { margin-top: 1.2rem; }
 
 /* The hidden attribute must always win. Without this, any element whose
@@ -530,4 +610,47 @@ body:has(.salesbar.is-shown) .chat-fab {
 input.is-zip-invalid {
   border-color: #9a3d1c;
   outline-color: #9a3d1c;
+}
+
+/* ---------------------------------------------------------------------------
+   Card placeholder for browser-built cards (src/lib/card-media.ts)
+
+   Visually identical to Figure.astro's production placeholder, but usable from
+   client-side `innerHTML` where Astro's scoped styles cannot reach. Used by the
+   Sauna Advisor shortlist and See It In My Space for the sixteen models that
+   have no licensed photography yet.
+
+   Absolutely positioned to fill the card's media box, which already carries the
+   aspect-ratio — so a placeholder card is exactly the same height as a
+   photographed one and the grid never jumps.
+--------------------------------------------------------------------------- */
+.card-ph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4%, 2.25rem);
+  text-align: center;
+  background: linear-gradient(150deg, var(--wood-1) 0%, var(--wood-2) 55%, var(--wood-3) 100%);
+  color: #fdf8f0;
+}
+.card-ph__grain {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.16) 0 1px,
+    transparent 1px 9px
+  );
+  opacity: 0.55;
+  pointer-events: none;
+}
+.card-ph__label {
+  position: relative;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }

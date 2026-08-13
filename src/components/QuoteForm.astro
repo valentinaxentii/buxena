@@ -210,14 +210,14 @@ const offeredCategories = categories.filter((c) =>
   .qform__step { border: none; margin: 0; padding: 0; }
   .qform__captured { font-size: var(--t-small); color: var(--muted); border-left: 3px solid var(--bronze); background: var(--linen-deep); padding: 0.9rem 1.2rem; margin: 0 0 1.5rem; }
   .qform__captured strong { color: var(--ink); font-weight: 600; }
-  .qform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem 1.75rem; }
-  .field { display: grid; gap: 0.55rem; }.field--full { grid-column: 1 / -1; }
+  .qform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--form-row-gap) 1.75rem; }
+  .field { display: grid; gap: var(--form-label-gap); }.field--full { grid-column: 1 / -1; }
   .field label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }.field label span { color: var(--bronze-ink); font-weight: 700; }
   .field input,.field select,.field textarea { font-family: var(--font-sans); font-size: 1.0625rem; font-weight: 400; color: var(--ink); background: transparent; border: none; border-bottom: 1.5px solid var(--line); padding: 0.7rem 0; width: 100%; border-radius: 0; transition: border-color 0.4s var(--ease); }
   .field textarea { border: 1.5px solid var(--line); padding: 0.9rem 1rem; resize: vertical; line-height: 1.6; }.field select { appearance: none; cursor: pointer; }
   .field input:hover,.field select:hover,.field textarea:hover { border-color: var(--muted); }.field input:focus,.field select:focus,.field textarea:focus { border-color: var(--bronze); }
   .field__hint { font-size: 0.875rem; color: var(--muted); opacity: 1; }
-  .qform__foot { margin-top: 1.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem 2rem; }.qform__note { font-size: var(--t-small); color: var(--muted); margin: 0; }.qform__skip { color: var(--bronze-ink); letter-spacing: 0.08em; }.qform__skip:hover { color: var(--ink); }
+  .qform__foot { margin-top: var(--form-foot-gap); display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem 2rem; }.qform__note { font-size: var(--t-small); color: var(--muted); margin: 0; }.qform__skip { color: var(--bronze-ink); letter-spacing: 0.08em; }.qform__skip:hover { color: var(--ink); }
   @media (max-width: 640px) { .qform__grid { grid-template-columns: 1fr; } }
 </style>
 

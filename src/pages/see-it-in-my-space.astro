@@ -27,6 +27,7 @@ const catalog = models.map((m) => ({
   tagline: m.data.tagline,
   location: m.data.location,
   productType: m.data.productType,
+  series: m.data.series,
   capacity: m.data.capacity,
   capacityMin: m.data.capacityMin,
   capacityMax: m.data.capacityMax,
@@ -228,7 +229,7 @@ const TOTAL_STEPS = 5;
     display: flex;
     align-items: center;
     gap: 1.25rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.7rem;
     font-size: var(--t-label);
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -239,8 +240,8 @@ const TOTAL_STEPS = 5;
   .space__bar-fill { display: block; height: 100%; width: 20%; background: var(--bronze); transition: width 0.4s var(--ease); }
 
   .space__step { border: none; margin: 0; padding: 0; }
-  .space__q { font-family: var(--font-display); font-size: var(--t-h3); padding: 0; margin-bottom: 0.9rem; }
-  .space__note { font-size: var(--t-small); color: var(--muted); margin-bottom: 1.4rem; max-width: 44em; }
+  .space__q { font-family: var(--font-display); font-size: var(--t-h3); padding: 0; margin-bottom: 0.77rem; }
+  .space__note { font-size: var(--t-small); color: var(--muted); margin-bottom: 1.19rem; max-width: 44em; }
 
   .space__hp { position: absolute; left: -9999px; }
 
@@ -269,7 +270,7 @@ const TOTAL_STEPS = 5;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
     gap: 0.6rem;
-    margin-top: 1rem;
+    margin-top: 0.85rem;
   }
   .space__thumbs li { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--birch); }
   .space__thumbs img { width: 100%; height: 100%; object-fit: cover; }
@@ -285,7 +286,7 @@ const TOTAL_STEPS = 5;
     text-align: center;
   }
 
-  .space__options { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.4rem; }
+  .space__options { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.19rem; }
   .space__opt {
     border: 1px solid var(--line);
     background: transparent;
@@ -323,7 +324,7 @@ const TOTAL_STEPS = 5;
   .space__field select { appearance: none; cursor: pointer; }
   .space__field input:focus, .space__field select:focus { border-color: var(--bronze); }
 
-  .space__nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; }
+  .space__nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.7rem; }
 
   .space-results__grid { display: grid; gap: 1.25rem; }
 
@@ -335,7 +336,16 @@ const TOTAL_STEPS = 5;
     padding: 1.1rem;
     align-items: center;
   }
-  .space-card__media { display: block; background: var(--linen-deep); }
+  /* `position: relative` + a floor height so the .card-ph placeholder (inset:0)
+     fills the box, and so a placeholder card is the same height as a
+     photographed one instead of collapsing the grid row. */
+  .space-card__media {
+    display: grid;
+    place-items: center;
+    position: relative;
+    min-height: 12rem;
+    background: var(--linen-deep);
+  }
   .space-card__media img { width: 100%; height: auto; max-height: 12rem; object-fit: contain; }
   .space-card__rank {
     display: inline-block;
@@ -346,24 +356,24 @@ const TOTAL_STEPS = 5;
     color: var(--bronze-ink);
     border: 1px solid var(--bronze-soft);
     padding: 0.3rem 0.7rem;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.51rem;
   }
   .space-card__title { font-family: var(--font-display); font-size: var(--t-h3); margin: 0 0 0.4rem; }
   .space-card__meta { font-size: 0.875rem; color: var(--bronze-ink); margin: 0 0 0.5rem; }
   .space-card__why { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.8rem; }
   .space-card__actions { display: flex; flex-wrap: wrap; gap: 0.6rem 1.5rem; align-items: center; }
 
-  .space-results__next { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+  .space-results__next { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.49rem; }
   .space-results__empty { color: var(--muted); font-style: italic; }
 
-  .space-compare { margin-top: 1.75rem; border: 1px solid var(--line); padding: 1.25rem; overflow-x: auto; }
+  .space-compare { margin-top: 1.49rem; border: 1px solid var(--line); padding: 1.25rem; overflow-x: auto; }
   .space-compare :global(table) { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
   .space-compare :global(th), .space-compare :global(td) {
     text-align: left; padding: 0.55rem 0.9rem 0.55rem 0; border-bottom: 1px solid var(--line); vertical-align: top;
   }
 
-  .space-capture { margin-top: 2rem; border-top: 2px solid var(--ink); padding-top: 1.5rem; }
-  .space-capture__submit { margin-top: 1.4rem; }
+  .space-capture { margin-top: 1.7rem; border-top: 2px solid var(--ink); padding-top: 1.27rem; }
+  .space-capture__submit { margin-top: 1.19rem; }
 
   @media (max-width: 640px) {
     .space__fields { grid-template-columns: 1fr; }
@@ -379,6 +389,7 @@ const TOTAL_STEPS = 5;
   // Immediate inline feedback on every ZIP field, and a capture-phase
   // submit guard so an invalid ZIP cannot reach the network.
   initZipValidation();
+  import { cardMediaHtml, attachImageFallback } from '../lib/card-media';
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
@@ -597,7 +608,7 @@ const TOTAL_STEPS = 5;
           card.className = 'space-card';
           card.innerHTML = `
             <a class="space-card__media" href="/saunas/${model.slug}/">
-              <img src="${model.heroImage?.src ?? ''}" alt="${model.heroImage?.alt ?? shownName(model.title)}" loading="lazy" decoding="async" />
+              ${cardMediaHtml(model)}
             </a>
             <div>
               <span class="space-card__rank">${RANKS[i] ?? 'Option'}</span>
@@ -611,6 +622,8 @@ const TOTAL_STEPS = 5;
           `;
           resultsGrid.appendChild(card);
         });
+
+        attachImageFallback(resultsGrid);
 
         // capture form model options — matched models first, full title values
         captureModel.innerHTML = matches

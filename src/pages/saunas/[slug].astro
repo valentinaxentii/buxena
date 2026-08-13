@@ -17,6 +17,8 @@ import ProductConfigPending from '../../components/ProductConfigPending.astro';
 import ProductResources from '../../components/ProductResources.astro';
 import CustomerAnswerSystem from '../../components/CustomerAnswerSystem.astro';
 import { groupSpecs } from '../../lib/product-specs';
+import { relatedModels } from '../../lib/related-models';
+import { readHeaterFacts, heaterSummary } from '../../lib/heater-options';
 import { shouldShowConfigurator } from '../../lib/product-config';
 import { categoryMap, showDev, site, publicEmail } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
@@ -53,11 +55,53 @@ const { Content } = await render(entry);
 
 const cat = categoryMap[data.category];
 
-// Sibling models in the same collection
 const all = await getCollection('saunas', ({ data: d }) => !d.draft);
-const related = all
-  .filter((s) => s.data.category === data.category && s.id !== entry.id)
-  .slice(0, 3);
+
+/**
+ * Alternatives, chosen for relevance rather than catalogue order.
+ *
+ * Was: `filter(same category).slice(0, 3)` — the first three siblings, with no
+ * relationship to the model being viewed and no reason shown. See
+ * lib/related-models.ts for what replaced it and why.
+ */
+const relatedPicks = relatedModels(
+  {
+    slug: entry.id,
+    title: data.title,
+    location: data.location,
+    productType: data.productType,
+    series: data.series,
+    category: data.category,
+    capacityMin: data.capacityMin,
+    capacityMax: data.capacityMax,
+    materials: data.materials,
+    order: data.order,
+  },
+  all.map((s) => ({
+    slug: s.id,
+    title: s.data.title,
+    location: s.data.location,
+    productType: s.data.productType,
+    series: s.data.series,
+    category: s.data.category,
+    capacityMin: s.data.capacityMin,
+    capacityMax: s.data.capacityMax,
+    materials: s.data.materials,
+    order: s.data.order,
+    hasPhoto: Boolean(s.data.heroImage?.src),
+  }))
+);
+const relatedEntries = relatedPicks
+  .map((p) => ({ reason: p.reason, entry: all.find((s) => s.id === p.model.slug)! }))
+  .filter((r) => r.entry);
+
+/**
+ * Heater facts for THIS model, parsed from the verified per-model prose by the
+ * same reader that builds /heater-guide/. Silence stays silence: a model with
+ * nothing published says "confirmed with your quote" rather than being given a
+ * plausible default. See lib/heater-options.ts.
+ */
+const heaterFacts = readHeaterFacts(data.heaterOptions);
 
 const TBC = 'To be confirmed';
 
@@ -96,8 +140,15 @@ const specGroups = groupSpecs(specRows.filter((r) => r.value !== TBC), []);
 // specification sheet (still shown in full further down the page, unchanged).
 const heroSpecRows = [
   ...(data.capacity ? [{ label: 'Capacity', value: data.capacity }] : []),
+  ...(data.location ? [{ label: 'Placement', value: data.location === 'outdoor' ? 'Outdoor' : 'Indoor' }] : []),
   ...(data.dimensions ?? []),
   ...(data.materials?.length ? [{ label: 'Material', value: data.materials.join(', ') }] : []),
+  // Heater ALWAYS renders — but never as a guess. Where the catalogue states
+  // compatibility it is summarised here; where it does not, the row says
+  // "Confirmed with your quote", which is the honest answer and is also the
+  // answer that starts a conversation. A silently absent heater row left the
+  // most-asked question on a product page unaddressed.
+  { label: 'Heater', value: heaterSummary(heaterFacts) },
   ...(data.specs ?? []).slice(0, 2),
 ];
 
@@ -293,6 +344,16 @@ const breadcrumbSchema = {
                 data-track-model={data.title}
                 data-track-form-type="product_page"
               >See It In My Space <span class="arrow" aria-hidden="true">→</span></a>
+              {/* The heater is the choice customers most often ask about, and
+                  the guide already holds every verified per-model fact. Linking
+                  to this model's row means the question is answered without
+                  leaving BUXENA to research it. */}
+              <a
+                class="link"
+                href={`/heater-guide/#${entry.id}`}
+                data-track="heater_guide_click"
+                data-track-model={data.title}
+              >Compare Heaters <span class="arrow" aria-hidden="true">→</span></a>
               {publicEmail && (
                 <a class="link" href={`mailto:${publicEmail}?subject=${encodeURIComponent(`Question about the ${displayTitle(data.title)}`)}`}>
                   Talk to BUXENA <span class="arrow" aria-hidden="true">→</span>
@@ -558,32 +619,58 @@ const breadcrumbSchema = {
       </div>
     </section>
 
-    {related.length > 0 && (
+    {relatedEntries.length > 0 && (
       <section class="band">
         <div class="shell">
           <div class="sec-head">
-            <span class="eyebrow">Also in {cat?.name}</span>
+            <span class="eyebrow">If this one isn't quite right</span>
+            <h2 class="h2 measure--tight">Closest alternatives</h2>
           </div>
           <div class="grid cols-3">
-            {related.map((s) => (
-              <ProductCard
-                slug={s.id}
-                title={s.data.title}
-                tagline={s.data.tagline}
-                category={s.data.category}
-                placeholder={s.data.placeholder}
-                image={s.data.heroImage}
-                location={s.data.location}
-                productType={s.data.productType}
-                series={s.data.series}
-                capacity={s.data.capacity}
-                capacityMin={s.data.capacityMin}
-                capacityMax={s.data.capacityMax}
-                materials={s.data.materials}
-                dimensions={s.data.dimensions}
-            fromPrice={s.data.fromPrice}
-              />
+            {relatedEntries.map(({ entry: s, reason }) => (
+              <div class="alt-card">
+                {/* The reason is generated by the same comparison that selected
+                    the model, so it can never contradict the specification on
+                    the card beneath it. */}
+                <span class="alt-card__why">{reason}</span>
+                <ProductCard
+                  slug={s.id}
+                  title={s.data.title}
+                  tagline={s.data.tagline}
+                  category={s.data.category}
+                  placeholder={s.data.placeholder}
+                  image={s.data.heroImage}
+                  location={s.data.location}
+                  productType={s.data.productType}
+                  series={s.data.series}
+                  capacity={s.data.capacity}
+                  capacityMin={s.data.capacityMin}
+                  capacityMax={s.data.capacityMax}
+                  materials={s.data.materials}
+                  dimensions={s.data.dimensions}
+                  fromPrice={s.data.fromPrice}
+                />
+              </div>
             ))}
+          </div>
+
+          {/* The escape route. A visitor who has rejected this model and its
+              alternatives is about to leave and research elsewhere; this hands
+              them to the Advisor instead, carrying the model they were looking
+              at so the wizard opens with context rather than from zero. */}
+          <div class="alt-escape">
+            <p class="alt-escape__q">Still not sure this is the right sauna?</p>
+            <p class="alt-escape__a">
+              Answer a few questions about your space and we'll narrow the range
+              for you — it takes a couple of minutes.
+            </p>
+            <a
+              class="btn btn--outline"
+              href={`/plan-your-sauna/?from=${encodeURIComponent(entry.id)}`}
+              data-track="find_my_sauna_click"
+              data-track-model={data.title}
+              data-track-form-type="product_page"
+            >Find My Sauna</a>
           </div>
         </div>
       </section>
@@ -652,7 +739,7 @@ const breadcrumbSchema = {
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: clamp(1.3rem, 0.75rem + 1.5vw, 2.25rem);
+    margin-bottom: clamp(1.11rem, 0.64rem + 1.27vw, 1.91rem);
   }
   .crumbs a { text-decoration: none; }
   .crumbs a:hover { color: var(--ink); }
@@ -681,8 +768,8 @@ const breadcrumbSchema = {
     color: var(--bronze-ink);
     margin: 0.6rem 0 1rem;
   }
-  .prod-hero__info :global(.avail) { margin-bottom: 1.1rem; }
-  .prod-hero__info .lead { margin-bottom: 1.5rem; }
+  .prod-hero__info :global(.avail) { margin-bottom: 0.94rem; }
+  .prod-hero__info .lead { margin-bottom: 1.27rem; }
 
   .prod-hero__pricing { margin: 0 0 1.25rem; }
   .prod-hero__pricing div {
@@ -721,7 +808,7 @@ const breadcrumbSchema = {
     padding: 1.15rem 1.5rem;
     font-size: var(--t-small);
     color: var(--muted);
-    margin-top: 1.9rem;
+    margin-top: 1.62rem;
   }
   .notice strong { color: var(--ink); font-weight: 500; }
 
@@ -739,7 +826,7 @@ const breadcrumbSchema = {
 
   .specs {
     border-top: 2px solid var(--ink);
-    padding-top: 1.75rem;
+    padding-top: 1.49rem;
   }
   .specs__h {
     font-family: var(--font-sans);
@@ -761,7 +848,7 @@ const breadcrumbSchema = {
   .specs__row dt { color: var(--muted); margin: 0; }
   .specs__row dd { margin: 0; text-align: right; }
 
-  .specs__group + .specs__group { margin-top: 1.5rem; }
+  .specs__group + .specs__group { margin-top: 1.27rem; }
   .specs__cat {
     margin: 0 0 0.6rem;
     font-size: 0.6875rem;
@@ -795,9 +882,42 @@ const breadcrumbSchema = {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem 1.75rem;
-    margin-top: 1.1rem;
+    margin-top: 0.94rem;
   }
   .prod-hero__more .link { font-size: 0.8125rem; }
+
+  /* Alternatives — the reason sits above the card, so it reads as a label on
+     the recommendation rather than as a claim by the product itself. */
+  .alt-card { display: flex; flex-direction: column; }
+  .alt-card__why {
+    align-self: flex-start;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    border-bottom: 1px solid var(--bronze-soft);
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .alt-escape {
+    margin-top: clamp(1.7rem, 1.2rem + 1.6vw, 2.6rem);
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+  .alt-escape__q {
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    margin: 0 0 0.35rem;
+  }
+  .alt-escape__a {
+    font-size: var(--t-small);
+    color: var(--muted);
+    margin: 0 auto 1.1rem;
+    max-width: 42ch;
+  }
 
   .config { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: clamp(1.25rem, 0.8rem + 1.5vw, 2.25rem); }
   .config__h {
@@ -823,15 +943,15 @@ const breadcrumbSchema = {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     gap: clamp(1.25rem, 0.8rem + 1.5vw, 2.25rem);
-    margin-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
-    padding-top: clamp(1.25rem, 0.9rem + 1vw, 1.9rem);
+    margin-top: clamp(1.27rem, 0.85rem + 1.27vw, 2.13rem);
+    padding-top: clamp(1.06rem, 0.77rem + 0.85vw, 1.62rem);
     border-top: 1px solid var(--line);
   }
 
-  .config__cta { margin-top: clamp(1.6rem, 1.1rem + 1.5vw, 2.5rem); }
+  .config__cta { margin-top: clamp(1.36rem, 0.94rem + 1.27vw, 2.13rem); }
 
   .sitecards { align-items: stretch; }
-  .sitecard { border-top: 1px solid var(--line); padding-top: 1.1rem; }
+  .sitecard { border-top: 1px solid var(--line); padding-top: 0.94rem; }
   .sitecard p { font-size: var(--t-small); color: var(--muted); line-height: 1.7; margin: 0; }
 
   .sitefoot {
@@ -840,8 +960,8 @@ const breadcrumbSchema = {
     align-items: center;
     justify-content: space-between;
     gap: 1.25rem 2rem;
-    margin-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
-    padding-top: clamp(1.1rem, 0.8rem + 1vw, 1.75rem);
+    margin-top: clamp(1.27rem, 0.85rem + 1.27vw, 2.13rem);
+    padding-top: clamp(0.94rem, 0.68rem + 0.85vw, 1.49rem);
     border-top: 1px solid var(--line);
   }
   .sitefoot__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin: 0; max-width: 38em; }
@@ -867,6 +987,6 @@ const breadcrumbSchema = {
        always exactly matches the header's real height at any mobile width,
        never over- or under-shooting. Desktop is untouched — the header is
        sticky there too, but this rule only applies inside this breakpoint. */
-    #enquire { scroll-margin-top: clamp(5.75rem, 5.4rem + 2vw, 7.5rem); }
+    #enquire { scroll-margin-top: clamp(4.89rem, 4.59rem + 1.7vw, 6.38rem); }
   }
 </style>

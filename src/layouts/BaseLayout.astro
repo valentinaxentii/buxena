@@ -30,6 +30,23 @@ const {
 const pageTitle =
   fullTitle ?? (title === 'home' ? `${site.name} — ${site.tagline}` : `${title} · ${site.name}`);
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+/**
+ * The homepage opts OUT of the 2026-08-13 vertical compression pass.
+ *
+ * Founder direction: every public page tightens by ~15%, but Home keeps its
+ * current rhythm exactly. Home is built almost entirely from SHARED components
+ * (Hero, ProductCard, CollectionCard, QuoteBand, Header, Footer), so
+ * compressing the global tokens would have moved it too.
+ *
+ * Marking the body instead lets `body:not(.is-home)` in global.css redefine the
+ * spacing custom properties for everywhere else, while Home continues to
+ * inherit the original values from :root. The alternative — forking every
+ * shared component — would have duplicated the design system.
+ *
+ * Trailing slash tolerated so `/` and `` both count as home.
+ */
+const isHome = Astro.url.pathname.replace(/\/+$/, '') === '';
 const socialImage = new URL(image, Astro.site).href;
 
 // Marketing measurement is opt-in via environment variables. The site already
@@ -114,7 +131,7 @@ const webSiteSchema = {
     </noscript>
   </head>
 
-  <body>
+  <body class={isHome ? 'is-home' : undefined}>
     {gtmId && (
       <noscript>
         <iframe

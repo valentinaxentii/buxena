@@ -131,7 +131,7 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     padding: 0.4rem 0.7rem;
   }
 
-  .pcard__body { padding-top: 1.1rem; flex: 1 1 auto; }
+  .pcard__body { padding-top: var(--card-body-pad); flex: 1 1 auto; }
 
   .pcard__title {
     font-family: var(--font-display);

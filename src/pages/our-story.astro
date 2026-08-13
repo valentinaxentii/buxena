@@ -59,15 +59,23 @@ const values = [
         </p>
       </div>
       <div class="split__media reveal">
-        {/* IMAGE RIGHTS 2026-08-13 — src removed. The photograph has no
-            identifiable source, so no permission can be obtained for it.
-            Figure keeps the 4/5 frame and renders its quiet toned ground, so
-            the split layout is unchanged. Restore `src` when licensed or
-            BUXENA-owned photography exists. File untouched on disk. */}
+        {/* IMAGE RIGHTS 2026-08-13 — RESOLVED. Founder-provided photograph
+            (supplied 2026-08-13, extracted from the founder's one-page PDF).
+            Registered in docs/image-rights-register.md as FOUNDER-PROVIDED —
+            APPROVED. This replaces the unsourced photograph removed earlier
+            the same day; it is not that file returning.
+
+            Crop: the source is 1024×1461 (0.70), the frame is 4/5 (0.80), so
+            `cover` trims ~12% of the height. `focus` biases the crop slightly
+            downward, which keeps the heater and the wooden bucket — the two
+            things that read instantly as a real sauna — while trimming plain
+            upper wall rather than the subjects. */}
         <Figure
-          alt="Sauna interior, empty and quiet, with heater, rocks and a wooden bucket on the bench"
+          src="/images/editorial/sauna-interior-bench-heater.jpg"
+          alt="Sauna interior in warm thermowood: a black stone heater piled with sauna rocks, a wooden bucket and ladle resting on the bench, and tiered benches along the back wall"
           ratio="4 / 5"
           tone="mid"
+          focus="center 55%"
         />
       </div>
     </div>
@@ -95,7 +103,7 @@ const values = [
 
 <style>
   .page-head { padding-bottom: 0; }
-  .page-head .lead { margin-top: 1.3rem; }
+  .page-head .lead { margin-top: 1.11rem; }
   .page-head .display { margin-top: 0; }
 
   .split {
@@ -104,10 +112,10 @@ const values = [
     gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: center;
   }
-  .split__text .h2 { margin-bottom: 1.3rem; }
+  .split__text .h2 { margin-bottom: 1.11rem; }
 
-  .value .slats { color: var(--bronze-soft); margin-bottom: 1.3rem; }
-  .value__title { margin-bottom: 0.85rem; }
+  .value .slats { color: var(--bronze-soft); margin-bottom: 1.11rem; }
+  .value__title { margin-bottom: 0.72rem; }
   .value__body { font-size: var(--t-small); color: var(--muted-dark); line-height: 1.75; }
 
   @media (max-width: 900px) {

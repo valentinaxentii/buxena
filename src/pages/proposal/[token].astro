@@ -317,14 +317,14 @@ if (notFound) Astro.response.status = 404;
   .prop-missing .lead { margin: 1.2rem auto 1.75rem; }
 
   .prop-head { padding-bottom: 0; }
-  .prop-head .display { margin-top: 0.5rem; }
+  .prop-head .display { margin-top: 0.43rem; }
 
   .prop-meta {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     gap: 1rem 2rem;
-    margin-top: clamp(1.5rem, 1rem + 2vw, 2.5rem);
-    padding-top: 1.4rem;
+    margin-top: clamp(1.27rem, 0.85rem + 1.7vw, 2.13rem);
+    padding-top: 1.19rem;
     border-top: 1px solid var(--line);
   }
   .prop-meta dt {
@@ -369,12 +369,12 @@ if (notFound) Astro.response.status = 404;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--bronze-ink);
-    padding-top: 1.4rem;
+    padding-top: 1.19rem;
   }
   .prop-amount { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .prop-qty { color: var(--muted); }
 
-  .prop-fulfil { display: grid; gap: 0.5rem; margin-top: 1.5rem; }
+  .prop-fulfil { display: grid; gap: 0.5rem; margin-top: 1.27rem; }
   .prop-fulfil div { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--t-small); }
   .prop-fulfil dt { color: var(--muted); }
   .prop-fulfil dd { margin: 0; }
@@ -384,7 +384,7 @@ if (notFound) Astro.response.status = 404;
   .prop-totals dd { margin: 0; font-variant-numeric: tabular-nums; }
   .prop-discount { color: var(--bronze-ink); }
   .prop-total {
-    padding-top: 0.8rem;
+    padding-top: 0.68rem;
     border-top: 2px solid var(--ink);
     font-family: var(--font-display);
     font-size: var(--t-h3);
@@ -396,7 +396,7 @@ if (notFound) Astro.response.status = 404;
 
   .prop-accept { background: var(--linen-deep); }
   .prop-accept__note { font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); max-width: 46em; }
-  .prop-accept__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.9rem; margin-top: 1.25rem; }
+  .prop-accept__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.9rem; margin-top: 1.06rem; }
   .prop-accept__field { display: grid; gap: 0.35rem; flex: 1 1 16rem; }
   .prop-accept__field span {
     font-size: var(--t-label);
@@ -418,9 +418,9 @@ if (notFound) Astro.response.status = 404;
   .prop-accept__field input:focus { border-color: var(--bronze); outline: none; }
 
   .prop-next { margin: 0 0 1.5rem; padding-left: 1.1rem; font-size: var(--t-small); line-height: 1.8; color: var(--muted-dark); }
-  .prop-contact { margin-top: 1.5rem; font-size: var(--t-small); line-height: 1.7; }
+  .prop-contact { margin-top: 1.27rem; font-size: var(--t-small); line-height: 1.7; }
   .prop-contact p { margin: 0; }
-  .prop-print { margin-top: 1.75rem; }
+  .prop-print { margin-top: 1.49rem; }
 
   @media (max-width: 560px) {
     .prop-meta { grid-template-columns: 1fr; gap: 0.9rem; }
@@ -435,7 +435,7 @@ if (notFound) Astro.response.status = 404;
     :global(header), :global(footer), :global(.chat-fab), :global(.chat-panel),
     :global(.salesbar), .prop-print, .prop-accept { display: none !important; }
     :global(body) { background: #fff; color: #000; }
-    .band { padding-block: 0.6rem !important; }
+    .band { padding-block: 0.51rem !important; }
     .prop-table td, .prop-table th { border-color: #ccc; }
     .prop-total { border-top-color: #000; }
     .prop-accepted { border-left-color: #000; background: #f5f5f5; }

@@ -115,15 +115,15 @@ const year = new Date().getFullYear();
   .ftr {
     background: var(--ember);
     color: var(--muted-dark);
-    padding-block: clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) 1.5rem;
+    padding-block: var(--footer-pad) 1.5rem;
     font-size: var(--t-small);
   }
 
   .ftr__top {
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
-    gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
-    margin-bottom: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+    gap: var(--footer-col-gap);
+    margin-bottom: var(--footer-row-gap);
   }
 
   .ftr__logo {

@@ -123,7 +123,9 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
           </thead>
           <tbody>
             {known.map((r) => (
-              <tr>
+              /* id = model slug, so a product page can deep-link straight to
+                 its own row (/heater-guide/#viru-thermowood-4-0m). */
+              <tr id={r.slug}>
                 <th scope="row" data-label="Model"><a href={`/saunas/${r.slug}/`}>{r.name}</a></th>
                 <td data-label="Placement">{r.location}</td>
                 <td data-label="Fuel">
@@ -170,7 +172,7 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
           </p>
           <ul class="hg-pending__list">
             {pending.map((r) => (
-              <li><a href={`/saunas/${r.slug}/`}>{r.name}</a></li>
+              <li id={r.slug}><a href={`/saunas/${r.slug}/`}>{r.name}</a></li>
             ))}
           </ul>
         </div>
@@ -201,20 +203,20 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
 
 <style>
   .page-head { padding-bottom: 0; }
-  .page-head .lead { margin-top: 1.3rem; }
+  .page-head .lead { margin-top: 1.11rem; }
 
   .hg-basics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
     gap: clamp(1.4rem, 1rem + 2vw, 2.6rem);
   }
-  .hg-basic .slats { color: var(--bronze-soft); margin-bottom: 1rem; }
-  .hg-basic .h3 { margin-bottom: 0.6rem; }
+  .hg-basic .slats { color: var(--bronze-soft); margin-bottom: 0.85rem; }
+  .hg-basic .h3 { margin-bottom: 0.51rem; }
   .hg-basic p { font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); }
 
   .hg-brands {
-    margin-top: clamp(1.6rem, 1rem + 2vw, 2.4rem);
-    padding-top: 1.4rem;
+    margin-top: clamp(1.36rem, 0.85rem + 1.7vw, 2.04rem);
+    padding-top: 1.19rem;
     border-top: 1px solid var(--line);
     font-size: var(--t-small);
     color: var(--muted-dark);
@@ -239,16 +241,16 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
   .hg-note { color: var(--muted); }
   .hg-act { white-space: nowrap; }
 
-  .hg-legend { margin-top: 1.1rem; font-size: 0.8125rem; color: var(--muted); font-style: italic; }
+  .hg-legend { margin-top: 0.94rem; font-size: 0.8125rem; color: var(--muted); font-style: italic; }
 
-  .hg-pending { margin-top: clamp(1.9rem, 1.2rem + 2vw, 3rem); padding-top: 1.6rem; border-top: 1px solid var(--line); }
+  .hg-pending { margin-top: clamp(1.62rem, 1.02rem + 1.7vw, 2.55rem); padding-top: 1.36rem; border-top: 1px solid var(--line); }
   .hg-pending p { font-size: var(--t-small); color: var(--muted-dark); max-width: 46em; }
-  .hg-pending__list { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.9rem; padding: 0; list-style: none; font-size: var(--t-small); }
+  .hg-pending__list { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.77rem; padding: 0; list-style: none; font-size: var(--t-small); }
 
   .hg-h { color: var(--muted); }
   .hg-prep { margin: 0; padding-left: 1.1rem; }
-  .hg-prep li { font-size: var(--t-small); line-height: 1.8; color: var(--muted-dark); margin-bottom: 0.7rem; }
-  .hg-foot { margin-top: 1.2rem; font-size: var(--t-small); color: var(--muted-dark); }
+  .hg-prep li { font-size: var(--t-small); line-height: 1.8; color: var(--muted-dark); margin-bottom: 0.6rem; }
+  .hg-foot { margin-top: 1.02rem; font-size: var(--t-small); color: var(--muted-dark); }
 
   .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -264,7 +266,7 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
     .hg-table tr {
       border: 1px solid var(--line);
       padding: 0.9rem 1rem;
-      margin-bottom: 0.9rem;
+      margin-bottom: 0.77rem;
     }
     .hg-table th, .hg-table td { border: none; padding: 0.28rem 0; }
     .hg-table tbody th { font-size: 1.0625rem; font-weight: 600; margin-bottom: 0.35rem; }
@@ -276,6 +278,6 @@ const yesNo = (v: boolean | null) => (v === true ? 'Yes' : '—');
       text-transform: uppercase;
     }
     .hg-table td[data-label=""]::before { content: none; }
-    .hg-act { padding-top: 0.6rem !important; }
+    .hg-act { padding-top: 0.51rem !important; }
   }
 </style>

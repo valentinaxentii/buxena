@@ -17,7 +17,9 @@
     "claims:audit": "node scripts/claims-audit.mjs",
     "compliance:audit": "node scripts/compliance-claims-audit.mjs",
     "catalog:audit": "node scripts/sync-products-from-content.mjs",
-    "verify": "npm run check && npm test && npm run prelaunch"
+    "verify": "npm run check && npm test && npm run images:audit && npm run prelaunch",
+    "images:audit": "node scripts/image-integrity.mjs",
+    "routes:runtime": "node scripts/runtime-routes.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^8.1.2",
@@ -33,6 +35,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@types/nodemailer": "^8.0.1",
+    "playwright": "^1.62.1",
     "typescript": "^6.0.3"
   }
 }

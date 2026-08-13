@@ -41,11 +41,20 @@ const rounds = [
       </p>
 
       <div class="ritual-photo reveal">
-        {/* IMAGE RIGHTS 2026-08-13 — src removed, no identifiable source.
-            Frame and ratio preserved; restore `src` when licensed or
-            BUXENA-owned photography exists. File untouched on disk. */}
+        {/* IMAGE RIGHTS 2026-08-13 — RESOLVED. Founder-provided photograph
+            (supplied 2026-08-13, extracted from the founder's one-page PDF).
+            Registered in docs/image-rights-register.md as FOUNDER-PROVIDED —
+            APPROVED.
+
+            Crop: the source is 2048×1082 (1.89) against a 16/9 frame (1.78),
+            so `cover` trims only ~6% horizontally — 3% from each edge. Every
+            element the founder asked to keep survives at every width: bench
+            left, bucket, stone heater centre, glass wall and the lounge chair
+            beyond it right. Default centre focus is correct here; biasing it
+            either way would push one of those out of frame. */}
         <Figure
-          alt="Sauna bench and stone heater beside a glass wall, with a lounge area visible beyond"
+          src="/images/editorial/sauna-glass-lounge.jpg"
+          alt="Tiered sauna benches and a black bucket on the left, a tall stone-filled heater at the centre, and a full-height glass wall on the right looking through to a lounge chair and trees beyond"
           ratio="16 / 9"
           tone="dark"
           priority={true}
@@ -73,11 +82,23 @@ const rounds = [
   <section class="band band--birch">
     <div class="shell split">
       <div class="split__media reveal">
-        {/* IMAGE RIGHTS 2026-08-13 — src removed, no identifiable source. */}
+        {/* IMAGE RIGHTS 2026-08-13 — RESOLVED. Founder-provided photograph
+            (supplied 2026-08-13, extracted losslessly from the founder's
+            one-page PDF). Registered in docs/image-rights-register.md as
+            FOUNDER-PROVIDED — APPROVED.
+
+            Crop: source is 1024×1461 (0.70) in a 4/5 frame (0.80), so `cover`
+            trims ~12% of the height. Centred, that would clip the folded towel
+            at the bottom edge; `center 65%` takes the trim almost entirely from
+            the plain upper wall instead, so heater, bucket, ladle, towel and
+            bench all stay in frame at every width. Ratio unchanged, so the
+            section is exactly as tall as it was under the compression pass. */}
         <Figure
-          alt="Sauna interior corner with cedar benches, a stone heater and a water bucket with ladle"
+          src="/images/editorial/sauna-corner-bench-heater.jpg"
+          alt="Sauna interior with wooden benches, stone heater, bucket and ladle"
           ratio="4 / 5"
           tone="dark"
+          focus="center 65%"
         />
       </div>
       <div class="split__text reveal">
@@ -124,13 +145,13 @@ const rounds = [
 
 <style>
   .page-head { padding-bottom: 0; }
-  .page-head .lead { margin-top: 1.3rem; }
+  .page-head .lead { margin-top: 1.11rem; }
 
   .ritual-photo {
     max-width: 800px;
     margin-inline: auto;
-    margin-top: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
-    margin-bottom: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+    margin-top: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
+    margin-bottom: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
   }
 
   .rounds {
@@ -141,7 +162,7 @@ const rounds = [
     display: grid;
     grid-template-columns: minmax(0, 5rem) minmax(0, 1fr);
     gap: clamp(0.94rem, 0.4rem + 1.9vw, 2.6rem);
-    padding-block: clamp(0.75rem, 0.44rem + 0.87vw, 1.22rem);
+    padding-block: clamp(0.64rem, 0.44rem + 0.74vw, 1.04rem);
     border-top: 1px solid var(--line);
     align-items: center;
   }
@@ -153,7 +174,7 @@ const rounds = [
     line-height: 1;
     color: var(--bronze);
   }
-  .round__title { margin-bottom: 0.5rem; }
+  .round__title { margin-bottom: 0.43rem; }
   .round__body { color: var(--muted); max-width: 42em; }
 
   .split {
@@ -162,11 +183,11 @@ const rounds = [
     gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
     align-items: center;
   }
-  .split__text .h2 { margin-bottom: 1.3rem; }
+  .split__text .h2 { margin-bottom: 1.11rem; }
 
   .disclaimer {
     border-top: 2px solid var(--ink);
-    padding-top: 1.5rem;
+    padding-top: 1.27rem;
   }
   .disclaimer p { font-size: var(--t-small); color: var(--muted); line-height: 1.8; }
 
