@@ -381,6 +381,28 @@ if (devLive) {
   record('catalogue', summary.toLowerCase() || 'catalogue readiness', ok, ok ? '' : findings);
 }
 
+// ------------------------------- 7f. every public route, actually requested
+// The check that was missing when /saunas/ threw a ReferenceError at runtime
+// and shipped as "launch-ready". Static analysis of dist/ cannot see a page
+// that fails to render, and the previous journey check hit a handful of
+// routes rather than all 32 product pages. This asks a live server for every
+// one of them.
+{
+  let out = '';
+  let ok = false;
+  try {
+    out = execSync('node scripts/runtime-routes.mjs', { encoding: 'utf8', timeout: 300_000 });
+    ok = /all routes rendered successfully/.test(out);
+  } catch (e) {
+    out = String(e.stdout ?? e);
+  }
+  const count = (out.match(/routes checked: (\d+)/) ?? [])[1] ?? '?';
+  const detail = ok
+    ? ''
+    : (out.split('RUNTIME FAILURES:')[1] ?? out).replace(/\s+/g, ' ').trim().slice(0, 260);
+  record('runtime', `all ${count} public routes render on a live server`, ok, detail);
+}
+
 // ------------------------------------------- 8. model presentation system
 console.log('\n■ 8/8 Model presentations');
 {

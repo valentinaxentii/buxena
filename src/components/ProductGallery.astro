@@ -24,8 +24,10 @@ interface Props {
   gallery?: Slide[];
   /** Model title, for analytics. */
   model: string;
+  /** Shown inside the frame when a slide has no photograph. Facts only. */
+  label?: string;
 }
-const { hero, gallery = [], model } = Astro.props;
+const { hero, gallery = [], model, label } = Astro.props;
 
 // The hero is always the first slide, so "back to the main shot" needs no
 // special case anywhere in the logic.
@@ -54,6 +56,7 @@ const hasMultiple = slides.length > 1;
           src={slide.src}
           alt={slide.alt}
           note={slide.note}
+          label={label}
           tone="dark"
           priority={i === 0}
           fit="contain"

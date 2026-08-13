@@ -47,10 +47,16 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
 >
   <a class="pcard__link" href={`/saunas/${slug}/`}>
     <div class="pcard__media">
+      {/* `label` only ever shows when there is no photograph. Series and form
+          are both facts already on the card, so it states nothing new — it
+          exists so a card without a photo reads as a designed tile instead of
+          a failed image, and so the sixteen models awaiting supplier
+          photography are not sixteen identical blocks. */}
       <Figure
         src={image?.src}
         alt={image?.alt ?? title}
         note={image?.note}
+        label={[series, productType].filter(Boolean).join(' · ')}
         ratio="4 / 3"
         tone="mid"
         fit="contain"

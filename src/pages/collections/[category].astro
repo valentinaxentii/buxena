@@ -4,6 +4,7 @@ import ProductCard from '../../components/ProductCard.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import { categories } from '../../data/site';
 import { getCollection } from 'astro:content';
+import { byPhotographedThenOrder } from '../../data/catalog';
 
 export async function getStaticPaths() {
   const models = await getCollection('saunas', ({ data }) => !data.draft);
@@ -17,7 +18,7 @@ export async function getStaticPaths() {
 const { category } = Astro.props;
 
 const models = (await getCollection('saunas', ({ data }) => !data.draft && data.category === category.id))
-  .sort((a, b) => a.data.order - b.data.order);
+  .sort(byPhotographedThenOrder);
 
 const allModels = await getCollection('saunas', ({ data }) => !data.draft);
 const others = categories.filter(

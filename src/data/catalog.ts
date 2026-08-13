@@ -32,3 +32,26 @@ export function capacityBuckets(min?: number, max?: number): CapacityBucket[] {
     return lo <= bHi && hi >= bLo;
   });
 }
+
+/**
+ * Catalogue order: photographed models first, then the curated `order`.
+ *
+ * Sixteen of the thirty-two models lost their photography to the image-rights
+ * audit — their only picture had no identifiable owner, so it could not be
+ * licensed and had to go. Sorted purely by `order`, those sixteen scattered
+ * through every grid, and the first screen of the catalogue became mostly
+ * cards with no product visible. A visitor decides whether this is a serious
+ * shop on that first screen.
+ *
+ * Within each group the curated `order` is preserved exactly, so this is a
+ * tie-break and not a re-ranking. It also undoes itself: as supplier
+ * photography arrives, models rejoin the front automatically and the original
+ * sequence returns with the last one. Nothing to remember to revert.
+ */
+export function byPhotographedThenOrder(
+  a: { data: { order: number; heroImage?: { src?: string } } },
+  b: { data: { order: number; heroImage?: { src?: string } } }
+): number {
+  const pictured = Number(Boolean(b.data.heroImage?.src)) - Number(Boolean(a.data.heroImage?.src));
+  return pictured !== 0 ? pictured : a.data.order - b.data.order;
+}

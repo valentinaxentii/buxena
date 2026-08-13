@@ -5,10 +5,11 @@ import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import CategoryViewTrack from '../../components/CategoryViewTrack.astro';
 import { getCollection } from 'astro:content';
+import { byPhotographedThenOrder } from '../../data/catalog';
 
 const models = (
   await getCollection('saunas', ({ data }) => !data.draft && data.location === 'outdoor')
-).sort((a, b) => a.data.order - b.data.order);
+).sort(byPhotographedThenOrder);
 
 function uniqueOptions(values: (string | undefined)[]) {
   return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();

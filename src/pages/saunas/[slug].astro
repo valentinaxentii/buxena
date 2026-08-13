@@ -213,7 +213,12 @@ const breadcrumbSchema = {
 
         <div class="prod-hero__grid">
           <div class="prod-hero__media">
-            <ProductGallery hero={data.heroImage} gallery={data.gallery} model={data.title} />
+            <ProductGallery
+              hero={data.heroImage}
+              gallery={data.gallery}
+              model={data.title}
+              label={[data.series, data.productType].filter(Boolean).join(' · ')}
+            />
           </div>
 
           <div class="prod-hero__info">

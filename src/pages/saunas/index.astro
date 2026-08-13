@@ -4,10 +4,11 @@ import ProductCard from '../../components/ProductCard.astro';
 import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import { getCollection } from 'astro:content';
+import { byPhotographedThenOrder } from '../../data/catalog';
 
-const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
-  (a, b) => a.data.order - b.data.order
-);
+// Photographed models lead, curated order preserved within each group —
+// see byPhotographedThenOrder in src/data/catalog.ts for why.
+const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort(byPhotographedThenOrder);
 
 /** Build each facet's option list from whatever is actually in the catalog today. */
 function uniqueOptions(values: (string | undefined)[]) {
