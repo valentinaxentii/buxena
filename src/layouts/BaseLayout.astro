@@ -31,6 +31,13 @@ const pageTitle =
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const socialImage = new URL(image, Astro.site).href;
 
+// Marketing measurement is opt-in via environment variables. The site already
+// pushes conversion events to window.dataLayer; GTM is loaded only when a
+// syntactically valid BUXENA container ID is supplied at build time.
+const rawGtmId = import.meta.env.PUBLIC_GTM_ID?.trim() ?? '';
+const gtmId = /^GTM-[A-Z0-9]+$/i.test(rawGtmId) ? rawGtmId : '';
+const googleSiteVerification = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() ?? '';
+
 const orgSchema = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
@@ -58,6 +65,7 @@ const webSiteSchema = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {googleSiteVerification && <meta name="google-site-verification" content={googleSiteVerification} />}
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={site.name} />
@@ -86,6 +94,10 @@ const webSiteSchema = {
     <script type="application/ld+json" set:html={JSON.stringify(orgSchema)} />
     <script type="application/ld+json" set:html={JSON.stringify(webSiteSchema)} />
 
+    {gtmId && (
+      <script is:inline set:html={`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${gtmId}');`} />
+    )}
+
     <!-- pages can inject page-specific structured data here -->
     <slot name="head" />
     <!-- Reveal animations depend on a script adding .is-in; without any
@@ -98,6 +110,17 @@ const webSiteSchema = {
   </head>
 
   <body>
+    {gtmId && (
+      <noscript>
+        <iframe
+          src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
+          height="0"
+          width="0"
+          style="display:none;visibility:hidden"
+          title="Google Tag Manager"
+        ></iframe>
+      </noscript>
+    )}
     <a class="skip-link" href="#main">Skip to content</a>
     <Header overHero={overHero} />
     <main id="main">
