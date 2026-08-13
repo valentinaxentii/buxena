@@ -6,13 +6,13 @@
  * Pixel, no Pinterest tag. Nothing here sends a network request on its own.
  *
  * Events are pushed onto `window.dataLayer` — the same queue GTM/GA4 read
- * from. When a real property/pixel ID is approved, adding the vendor's own
- * snippet in BaseLayout is the ONLY change needed: every event below is
- * already firing and will be picked up retroactively from the queue, because
- * dataLayer is a persistent array, not a live stream.
+ * from. When a real GTM container is approved, the existing event wiring can
+ * be consumed without rewriting every component. Events that occurred before
+ * GTM was enabled in earlier page views/sessions are NOT historical analytics
+ * data and must never be described as retroactively collected.
  *
- * Until then this is a self-contained, zero-third-party audit trail that can
- * be inspected in the browser console via `window.dataLayer`.
+ * Until a vendor is enabled this is a self-contained, zero-third-party event
+ * queue that can be inspected in the browser console via `window.dataLayer`.
  */
 
 /** Every conversion-relevant event the site can emit. */
@@ -86,8 +86,10 @@ export type TrackEvent =
   | 'consultation_request_submitted'
   | 'compare_view'
   | 'compare_pricing_click'
-  // THE conversion event — fired on /thank-you/ when an enquiry completes.
-  // This is what GA4/Meta should count as a lead, not the submit click.
+  // THE durable-lead conversion event. Most journeys fire it from /thank-you/
+  // after a successful submission. The progressive Quote Form fires it as soon
+  // as Step 1 has been durably stored because Step 2 is optional; thank-you then
+  // suppresses the duplicate. This is the event GA4/Ads should count as a lead.
   | 'lead_confirmed'
   | 'thank_you_direct_visit'
   | 'trade_specification_request'

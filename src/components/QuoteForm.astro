@@ -60,7 +60,6 @@ const offeredCategories = categories.filter((c) =>
     <label>Leave this field empty <input name="bot-field" tabindex="-1" autocomplete="off" /></label>
   </p>
 
-  <!-- STEP 1 — lead capture -->
   <fieldset class="qform__step" data-quote-step="capture">
     <div class="qform__grid">
       <div class="field">
@@ -129,16 +128,11 @@ const offeredCategories = categories.filter((c) =>
       <button class="btn btn--bronze" type="submit">Get My Pricing</button>
       <p class="qform__note">We use your details to answer this enquiry. Nothing else.</p>
     </div>
+    <div class="qform__foot"><button class="btn btn--bronze" type="submit">Get My Pricing</button><p class="qform__note">We use your details to answer this enquiry. Nothing else.</p></div>
   </fieldset>
 
-  <!-- STEP 2 — optional qualification, shown after the lead is captured -->
   <fieldset class="qform__step qform__detail" data-quote-step="detail" hidden>
-    <p class="qform__captured" data-quote-captured>
-      <strong>Your pricing request is in.</strong> Two more minutes of detail
-      helps us quote the right system first time — or skip and we'll ask as
-      we go.
-    </p>
-
+    <p class="qform__captured" data-quote-captured><strong>Your pricing request is in.</strong> Two more minutes of detail helps us quote the right system first time — or skip and we'll ask as we go.</p>
     <div class="qform__grid">
       <div class="field">
         <label for="q-capacity">People it should seat</label>
@@ -207,88 +201,24 @@ const offeredCategories = categories.filter((c) =>
       <button class="btn btn--bronze" type="button" data-quote-details-send>Add Project Details</button>
       <button class="btn btn--ghost qform__skip" type="button" data-quote-skip>Skip for now →</button>
     </div>
+    <div class="qform__foot"><button class="btn btn--bronze" type="button" data-quote-details-send>Add Project Details</button><button class="btn btn--ghost qform__skip" type="button" data-quote-skip>Skip for now →</button></div>
   </fieldset>
 </form>
 
 <style>
   .qform__hp { position: absolute; left: -9999px; }
-
   .qform__step { border: none; margin: 0; padding: 0; }
-
-  .qform__captured {
-    font-size: var(--t-small);
-    color: var(--muted);
-    border-left: 3px solid var(--bronze);
-    background: var(--linen-deep);
-    padding: 0.9rem 1.2rem;
-    margin: 0 0 1.5rem;
-  }
+  .qform__captured { font-size: var(--t-small); color: var(--muted); border-left: 3px solid var(--bronze); background: var(--linen-deep); padding: 0.9rem 1.2rem; margin: 0 0 1.5rem; }
   .qform__captured strong { color: var(--ink); font-weight: 600; }
-
-  .qform__grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem 1.75rem;
-  }
-
-  .field { display: grid; gap: 0.55rem; }
-  .field--full { grid-column: 1 / -1; }
-
-  .field label {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .field label span { color: var(--bronze-ink); font-weight: 700; }
-
-  .field input,
-  .field select,
-  .field textarea {
-    font-family: var(--font-sans);
-    font-size: 1.0625rem;
-    font-weight: 400;
-    color: var(--ink);
-    background: transparent;
-    border: none;
-    border-bottom: 1.5px solid var(--line);
-    padding: 0.7rem 0;
-    width: 100%;
-    border-radius: 0;
-    transition: border-color 0.4s var(--ease);
-  }
-  .field textarea {
-    border: 1.5px solid var(--line);
-    padding: 0.9rem 1rem;
-    resize: vertical;
-    line-height: 1.6;
-  }
-  .field select { appearance: none; cursor: pointer; }
-
-  .field input:hover,
-  .field select:hover,
-  .field textarea:hover { border-color: var(--muted); }
-  .field input:focus,
-  .field select:focus,
-  .field textarea:focus { border-color: var(--bronze); }
-
+  .qform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem 1.75rem; }
+  .field { display: grid; gap: 0.55rem; }.field--full { grid-column: 1 / -1; }
+  .field label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }.field label span { color: var(--bronze-ink); font-weight: 700; }
+  .field input,.field select,.field textarea { font-family: var(--font-sans); font-size: 1.0625rem; font-weight: 400; color: var(--ink); background: transparent; border: none; border-bottom: 1.5px solid var(--line); padding: 0.7rem 0; width: 100%; border-radius: 0; transition: border-color 0.4s var(--ease); }
+  .field textarea { border: 1.5px solid var(--line); padding: 0.9rem 1rem; resize: vertical; line-height: 1.6; }.field select { appearance: none; cursor: pointer; }
+  .field input:hover,.field select:hover,.field textarea:hover { border-color: var(--muted); }.field input:focus,.field select:focus,.field textarea:focus { border-color: var(--bronze); }
   .field__hint { font-size: 0.875rem; color: var(--muted); opacity: 1; }
-
-  .qform__foot {
-    margin-top: 1.9rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1.25rem 2rem;
-  }
-  .qform__note { font-size: var(--t-small); color: var(--muted); margin: 0; }
-  .qform__skip { color: var(--bronze-ink); letter-spacing: 0.08em; }
-  .qform__skip:hover { color: var(--ink); }
-
-  @media (max-width: 640px) {
-    .qform__grid { grid-template-columns: 1fr; }
-  }
+  .qform__foot { margin-top: 1.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem 2rem; }.qform__note { font-size: var(--t-small); color: var(--muted); margin: 0; }.qform__skip { color: var(--bronze-ink); letter-spacing: 0.08em; }.qform__skip:hover { color: var(--ink); }
+  @media (max-width: 640px) { .qform__grid { grid-template-columns: 1fr; } }
 </style>
 
 <script>
@@ -325,19 +255,11 @@ const offeredCategories = categories.filter((c) =>
   import { track } from '../lib/track';
   import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
-  // ?model= pre-selects; ?package= is carried into the submission.
-  // ?intent=compare marks the lead as a quote-comparison request (arrived
-  // via the "Compare My Quote" CTA) — same form, same pipeline, only the
-  // free-text source value differs so admin/CRM can see why they came.
   const urlParams = new URLSearchParams(window.location.search);
   const urlModel = urlParams.get('model');
   const urlPackage = urlParams.get('package');
   const isCompare = urlParams.get('intent') === 'compare';
-  if (urlModel) {
-    document.querySelectorAll<HTMLSelectElement>('form[name="quote"] select[name="model"]').forEach((sel) => {
-      if ([...sel.options].some((o) => o.value === urlModel)) sel.value = urlModel;
-    });
-  }
+  if (urlModel) document.querySelectorAll<HTMLSelectElement>('form[name="quote"] select[name="model"]').forEach((sel) => { if ([...sel.options].some((o) => o.value === urlModel)) sel.value = urlModel; });
 
   document.querySelectorAll('form[name="quote"]').forEach((formEl) => {
     const form = formEl as HTMLFormElement;
@@ -384,17 +306,11 @@ const offeredCategories = categories.filter((c) =>
     // same enquiry instead of creating a second row for the same buyer.
     let capturedEnquiryId: string | null = null;
 
-    form.addEventListener(
-      'focusin',
-      () => track('quote_started', { formType: 'quote_form' }),
-      { once: true }
-    );
+    form.addEventListener('focusin', () => track('quote_started', { formType: 'quote_form' }), { once: true });
 
-    // STEP 1 — capture the lead immediately.
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!form.reportValidity()) return;
-
       const zip = get('zip');
       const extras = [
         zip && `ZIP: ${zip}`,
@@ -404,12 +320,8 @@ const offeredCategories = categories.filter((c) =>
       ].filter(Boolean).join(' · ');
 
       const originalLabel = captureBtn.textContent ?? '';
-      captureBtn.disabled = true;
-      captureBtn.textContent = 'Sending…';
-      const restore = () => {
-        captureBtn.disabled = false;
-        captureBtn.textContent = originalLabel || 'Get My Pricing';
-      };
+      captureBtn.disabled = true; captureBtn.textContent = 'Sending…';
+      const restore = () => { captureBtn.disabled = false; captureBtn.textContent = originalLabel || 'Get My Pricing'; };
 
       const result = await submitEnquiry({
         name: get('name'),
@@ -441,6 +353,20 @@ const offeredCategories = categories.filter((c) =>
         ...(urlPackage ? { package: urlPackage } : {}),
       });
       track('pricing_request_submitted', { formType: 'quote_form', model: get('model'), zip });
+      // Step 1 is already a durable lead in Supabase. Count the conversion here
+      // so abandoning optional Step 2 cannot disappear from CAC reporting.
+      // Step 1 is already a durable lead in Supabase, so the conversion is
+      // counted HERE rather than on /thank-you/ — step 2 is optional, and an
+      // abandoned step 2 must not vanish from acquisition reporting. The
+      // summary below carries conversionTracked so /thank-you/ does not
+      // count the same lead a second time. (From the remote line of work.)
+      const leadPayload = {
+        model: get('model'),
+        formType: 'quote_form',
+        zip,
+        timeline: get('timeline'),
+      };
+      if (!result.devMode) track('lead_confirmed', leadPayload);
 
       capturedEmail = get('email');
       capturedModel = get('model');
@@ -457,17 +383,10 @@ const offeredCategories = categories.filter((c) =>
     });
 
     const finish = () => {
-      rememberEnquiry({
-        request: 'Pricing request',
-        model: capturedModel,
-        zip: get('zip'),
-        timeline: get('timeline'),
-        projectType: get('placement'),
-      });
+      rememberEnquiry({ request: 'Pricing request', model: capturedModel, zip: get('zip'), timeline: get('timeline'), projectType: get('placement'), conversionTracked: 'true' });
       if (!wasDevMode) window.location.assign('/thank-you/');
     };
 
-    // STEP 2 — optional detail, sent as a follow-up note.
     detailsBtn.addEventListener('click', async () => {
       const details = [
         `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,

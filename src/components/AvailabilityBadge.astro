@@ -1,6 +1,6 @@
 ---
 /**
- * Product availability badge — IN STOCK / IN TRANSIT / PREORDER.
+ * Product availability badge.
  *
  * There is currently no live connection between this public catalog and
  * Supabase inventory (that's the unit/shipment system discussed separately,
@@ -9,6 +9,12 @@
  * quantity = preorder), that's the true state of every model today, since
  * zero inventory data is connected yet. Once real inventory/shipment data
  * exists, the caller can pass a real status instead of the default.
+ *
+ * LABEL (from the remote line of work, 2026-08-13): the preorder state is
+ * shown as "Check Availability", not "Preorder". "Preorder" implies a
+ * preorder programme — deposit, queue, allocation — that BUXENA does not run,
+ * and that is a claim we cannot support. "Check Availability" is an action the
+ * buyer can actually take, and it is true.
  *
  * WHY EACH STATUS CARRIES A LINE OF EXPLANATION (founder direction,
  * 2026-08-13): "Preorder" on its own, set in muted grey, read as "you can't
@@ -37,7 +43,7 @@ const { status = 'preorder', etaNote, note } = Astro.props;
 const LABELS: Record<string, string> = {
   'in-stock': 'In Stock',
   'in-transit': 'In Transit',
-  preorder: 'Preorder',
+  preorder: 'Check Availability',
 };
 
 /**
@@ -78,9 +84,6 @@ const explanation = note ?? NOTES[status];
     text-transform: uppercase;
     padding: 0.4rem 0.75rem;
     border: 1px solid transparent;
-    /* neutralizes browser default <a> styling (underline, visited color) so
-       the now-clickable preorder badge looks identical to the plain <span>
-       it replaces for the other two states — no visual change, just a fix. */
     text-decoration: none;
   }
   a.avail__badge:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }

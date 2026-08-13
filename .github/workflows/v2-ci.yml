@@ -1,0 +1,51 @@
+name: BUXENA V2 CI
+
+on:
+  push:
+    branches: [buxena-v2]
+  pull_request:
+    branches: [buxena-v2]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Astro check
+        run: npm run check
+
+      - name: Security regression audit
+        run: npm run security:audit
+
+      - name: Sales funnel regression audit
+        run: npm run sales:audit
+
+      - name: Electrical compliance claims audit
+        run: npm run compliance:audit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Image rights audit
+        run: npm run rights:audit
+
+      - name: Public claims audit
+        run: npm run claims:audit
+
+      - name: Full prelaunch audit
+        run: node scripts/prelaunch-check.mjs --skip-build

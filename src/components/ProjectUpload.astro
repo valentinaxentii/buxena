@@ -13,11 +13,9 @@
  *   never gallery content.
  *
  * Accepts JPG / PNG / WEBP / PDF. The consuming form reads the hidden
- * input `name="uploadMeta"` (a human-readable summary string) and appends
- * it to the enquiry message so staff know exactly what to request.
+ * input `name="uploadMeta"` and appends it to the enquiry message.
  */
 interface Props {
-  /** Unique per page — keeps label/input ids valid if used twice. */
   id?: string;
   label?: string;
 }
@@ -39,6 +37,7 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
       JPG, PNG, WEBP or PDF — drag them here or click to browse. Kept private, never public.
     </span>
   </label>
+  <p class="pupload__status" data-pupload-status aria-live="polite"></p>
   <ul class="pupload__list" data-pupload-list></ul>
   <p class="pupload__status" data-pupload-status role="status" aria-live="polite"></p>
   <input type="hidden" name="uploadMeta" data-pupload-meta />
@@ -46,26 +45,10 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
 
 <style>
   .pupload { display: grid; gap: 0.55rem; }
-
-  .pupload__label {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-
-  .pupload__drop {
-    display: grid;
-    justify-items: center;
-    gap: 0.35rem;
-    border: 1.5px dashed var(--bronze-soft);
-    padding: clamp(1.1rem, 0.8rem + 1.2vw, 1.75rem);
-    cursor: pointer;
-    text-align: center;
-    transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease);
-  }
-  .pupload__drop:hover { border-color: var(--bronze); background: var(--linen-deep); }
+  .pupload__label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+  .pupload__drop { display: grid; justify-items: center; gap: 0.35rem; border: 1.5px dashed var(--bronze-soft); padding: clamp(1.1rem, 0.8rem + 1.2vw, 1.75rem); cursor: pointer; text-align: center; transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease), transform 0.2s var(--ease); }
+  .pupload__drop:hover, .pupload__drop[data-drag-active="true"] { border-color: var(--bronze); background: var(--linen-deep); }
+  .pupload__drop[data-drag-active="true"] { transform: scale(1.005); }
   .pupload__drop:focus-within { outline: 2px solid var(--bronze); outline-offset: 3px; }
   .pupload__drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
@@ -301,5 +284,8 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
       zone.classList.remove('is-dragover');
       addFiles(Array.from(event.dataTransfer?.files ?? []));
     });
+
+    root.addEventListener('dragover', (event) => event.preventDefault());
+    root.addEventListener('drop', (event) => event.preventDefault());
   });
 </script>

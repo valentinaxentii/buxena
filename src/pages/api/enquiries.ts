@@ -10,6 +10,22 @@ import { isLeadSafeMode, safeModeReason } from '../../lib/safe-mode';
 import { FALLBACK_SOURCE, isSourceConstraintError, withFormLine } from '../../lib/enquiry-source';
 
 export const prerender = false;
+const INTERNAL_ERROR = 'We could not submit your request right now. Please try again shortly.';
+const MAX_BODY_BYTES = 64 * 1024;
+
+type EnquiryDbSource = 'Website' | 'Sauna Advisor' | 'Contact Form' | 'Quote Form' | 'Other';
+
+function normalizeDbSource(source: unknown): EnquiryDbSource {
+  const label = typeof source === 'string' ? source.trim() : '';
+  if (label === 'Website') return 'Website';
+  if (label === 'Sauna Advisor') return 'Sauna Advisor';
+  if (label === 'Contact Form' || label.toLowerCase().includes('contact')) return 'Contact Form';
+  if (label === 'Quote Form' || label.startsWith('Quote Form') || label === 'Quote Comparison') return 'Quote Form';
+  return 'Other';
+}
+
+const text = (value: unknown, max: number) =>
+  typeof value === 'string' ? value.trim().slice(0, max) : '';
 
 /**
  * The single message any server-side failure returns to the public. Never
@@ -29,6 +45,18 @@ const SUBMISSION_FAILED =
  * never breaks the visitor-facing chat experience.
  */
 export const POST: APIRoute = async ({ request, clientAddress }) => {
+  // Reject an oversized body BEFORE parsing it. The field caps further down
+  // truncate after JSON.parse has already built the value in memory, so
+  // without this a single huge post still had to be read and parsed first.
+  // From the remote line of work, which reached this independently.
+  const declaredLength = Number(request.headers.get('content-length') ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return new Response(JSON.stringify({ ok: false, error: 'Request is too large.' }), {
+      status: 413,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // A real visitor sends this at most once or twice per visit (one chat
   // conversation, maybe the quote form too). 5 per 10 minutes leaves that
   // headroom while still cutting off a script hammering the endpoint.
@@ -40,7 +68,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     if (!allowed) {
       return new Response(JSON.stringify({ ok: false, error: 'Too many requests. Please try again shortly.' }), {
         status: 429,
-        headers: { 'Retry-After': String(retryAfterSeconds) },
+        headers: { 'Retry-After': String(retryAfterSeconds), 'Content-Type': 'application/json' },
       });
     }
   }
@@ -75,7 +103,11 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
     const safe = {
       name: cap(name, 200),
-      email: cap(email, 320), // RFC 5321 maximum
+      // Lower-cased so a returning customer matches themselves: the admin's
+      // "Also from this contact" panel, duplicate detection and customer
+      // lookup all key on this, and Jane@x.com would otherwise be a
+      // different person from jane@x.com. From the remote line.
+      email: cap(email, 320)?.toLowerCase() ?? null, // RFC 5321 maximum
       phone: cap(phone, 50),
       location: cap(location, 200),
       message: cap(message, 8000),
@@ -106,13 +138,9 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         ? appendToEnquiryId
         : null;
 
-    // Honeypot: a real visitor never fills the hidden field. Bots that blindly
-    // complete every input do. Pretend success and drop it — don't record, don't
-    // email, don't tip off the bot. Replaces the spam filtering Netlify Forms
-    // used to provide before this became the single submission path.
-    if (botField) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }
+    if (botField) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (!message && !(chatTranscript && chatTranscript.length)) return new Response(JSON.stringify({ ok: false, error: 'Nothing to record.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return new Response(JSON.stringify({ ok: false, error: 'Please enter a valid email address.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
     if (!message && !(chatTranscript && chatTranscript.length)) {
       return new Response(JSON.stringify({ ok: false, error: 'Nothing to record.' }), { status: 400 });
