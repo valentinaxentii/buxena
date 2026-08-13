@@ -4,66 +4,38 @@ export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { verifyAdminAccess } from '../../../lib/verify-admin-access';
 
-/**
- * Staff account management — admin-only (the middleware gates all of
- * /admin/settings to role='admin').
- *
- * Invites go through Supabase's email invite flow: the invited address gets a
- * one-time link that lands on /login/reset-password, where they set their own
- * password. Nobody ever types someone else's password anywhere. That page's
- * URL must be listed in Supabase → Authentication → URL Configuration →
- * Redirect URLs (already required by the password-reset flow).
- *
- * Deliberately no delete button: removing a person's access is rare enough,
- * and destructive enough, that it stays a deliberate act in the Supabase
- * dashboard (Authentication → Users) rather than one click here.
- */
-
-const ROLES = ['staff', 'admin'];
-
-interface StaffRow {
-  id: string;
-  email: string;
-  full_name: string;
-  role: string;
-  last_sign_in_at: string | null;
-  created_at: string;
-  invited_pending: boolean;
+// Defense in depth: this page can invoke Supabase auth.admin APIs and must
+// independently prove admin access even if middleware is changed later.
+if (!(await verifyAdminAccess(Astro.request, Astro.cookies))) {
+  return Astro.redirect('/admin?denied=settings');
 }
 
+const ROLES = ['staff', 'admin'];
+interface StaffRow { id: string; email: string; full_name: string; role: string; last_sign_in_at: string | null; created_at: string; invited_pending: boolean; }
 let rows: StaffRow[] = [];
 let error: string | null = null;
 let notice: string | null = null;
-
 const selfId = Astro.locals.staffUser?.id ?? null;
 
 try {
   const supabase = createSupabaseAdminClient();
-
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
     const intent = String(form.get('_intent') ?? '');
-
     if (intent === 'invite') {
       const email = String(form.get('email') ?? '').trim().toLowerCase();
       const fullName = String(form.get('full_name') ?? '').trim();
       const role = ROLES.includes(String(form.get('role'))) ? String(form.get('role')) : 'staff';
-
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         error = 'Enter a valid email address to invite.';
       } else {
-        const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-          email,
-          { redirectTo: `${Astro.url.origin}/login/reset-password` }
-        );
-        if (inviteError) {
-          error = inviteError.message;
-        } else if (invited?.user) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({ id: invited.user.id, full_name: fullName || null, role });
-          if (profileError) error = `Invited, but saving the profile failed: ${profileError.message}`;
+        const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, { redirectTo: `${Astro.url.origin}/login/reset-password` });
+        if (inviteError) error = 'The invitation could not be sent. Please try again.';
+        else if (invited?.user) {
+          const { error: profileError } = await supabase.from('profiles').upsert({ id: invited.user.id, full_name: fullName || null, role });
+          if (profileError) error = 'The invitation was created, but the staff profile could not be saved. Check Supabase before retrying.';
           else notice = `Invitation sent to ${email}. They'll set their own password from the emailed link.`;
         }
       }
@@ -71,111 +43,60 @@ try {
       const userId = String(form.get('user_id') ?? '');
       const fullName = String(form.get('full_name') ?? '').trim();
       const role = ROLES.includes(String(form.get('role'))) ? String(form.get('role')) : 'staff';
-
       if (userId === selfId && role !== 'admin') {
-        // Only admins can reach this page, so keeping self-demotion off the
-        // table also guarantees at least one admin always remains.
         error = "You can't remove your own admin role — ask another admin to change it.";
       } else if (userId) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .upsert({ id: userId, full_name: fullName || null, role });
-        if (updateError) error = updateError.message;
+        const { error: updateError } = await supabase.from('profiles').upsert({ id: userId, full_name: fullName || null, role });
+        if (updateError) error = 'The staff account could not be updated. Please try again.';
         else notice = 'Saved.';
       }
     }
   }
 
-  const [{ data: userList, error: listError }, { data: profiles }] = await Promise.all([
+  const [{ data: userList, error: listError }, { data: profiles, error: profilesError }] = await Promise.all([
     supabase.auth.admin.listUsers({ page: 1, perPage: 200 }),
     supabase.from('profiles').select('id, full_name, role'),
   ]);
-  if (listError) throw listError;
-
+  if (listError || profilesError) throw new Error('staff-list-unavailable');
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
-  rows = (userList?.users ?? [])
-    .map((u) => {
-      const profile = profileById.get(u.id);
-      return {
-        id: u.id,
-        email: u.email ?? '—',
-        full_name: profile?.full_name ?? '',
-        role: profile?.role ?? 'staff',
-        last_sign_in_at: u.last_sign_in_at ?? null,
-        created_at: u.created_at,
-        invited_pending: !u.last_sign_in_at && !!u.invited_at && !u.email_confirmed_at,
-      };
-    })
-    .sort((a, b) => a.email.localeCompare(b.email));
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+  rows = (userList?.users ?? []).map((u) => {
+    const profile = profileById.get(u.id);
+    return { id: u.id, email: u.email ?? '—', full_name: profile?.full_name ?? '', role: profile?.role ?? 'staff', last_sign_in_at: u.last_sign_in_at ?? null, created_at: u.created_at, invited_pending: !u.last_sign_in_at && !!u.invited_at && !u.email_confirmed_at };
+  }).sort((a, b) => a.email.localeCompare(b.email));
+} catch {
+  error = 'Staff accounts are temporarily unavailable.';
 }
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+function fmtDate(iso: string | null): string { if (!iso) return '—'; return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 ---
 
 <AdminLayout title="Staff Accounts" parentLabel="Settings" parentHref="/admin/settings">
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
   {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
-
   <div class="admin-panel" style="margin-bottom:1.5rem;">
     <div class="staff-list">
-      <div class="staff-row staff-row--head" aria-hidden="true">
-        <span>Name</span><span>Email</span><span>Role</span><span>Last Sign-In</span><span></span>
-      </div>
+      <div class="staff-row staff-row--head" aria-hidden="true"><span>Name</span><span>Email</span><span>Role</span><span>Last Sign-In</span><span></span></div>
       {rows.map((row) => (
         <form method="POST" class="staff-row">
-          <input type="hidden" name="_intent" value="update" />
-          <input type="hidden" name="user_id" value={row.id} />
-          <span class="staff-row__cell">
-            <input class="staff-input" type="text" name="full_name" value={row.full_name} placeholder="Full name" aria-label={`Full name for ${row.email}`} />
-          </span>
-          <span class="staff-row__cell staff-row__email">
-            {row.email}
-            {row.id === selfId && <em class="staff-tag">you</em>}
-            {row.invited_pending && <em class="staff-tag staff-tag--pending">invite pending</em>}
-          </span>
-          <span class="staff-row__cell">
-            <select class="staff-input" name="role" aria-label={`Role for ${row.email}`}>
-              {ROLES.map((r) => (
-                <option value={r} selected={r === row.role}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-              ))}
-            </select>
-          </span>
+          <input type="hidden" name="_intent" value="update" /><input type="hidden" name="user_id" value={row.id} />
+          <span class="staff-row__cell"><input class="staff-input" type="text" name="full_name" value={row.full_name} placeholder="Full name" aria-label={`Full name for ${row.email}`} /></span>
+          <span class="staff-row__cell staff-row__email">{row.email}{row.id === selfId && <em class="staff-tag">you</em>}{row.invited_pending && <em class="staff-tag staff-tag--pending">invite pending</em>}</span>
+          <span class="staff-row__cell"><select class="staff-input" name="role" aria-label={`Role for ${row.email}`}>{ROLES.map((r) => <option value={r} selected={r === row.role}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}</select></span>
           <span class="staff-row__cell staff-row__signin">{fmtDate(row.last_sign_in_at)}</span>
-          <span class="staff-row__cell">
-            <button class="admin-btn admin-btn--ghost" type="submit">Save</button>
-          </span>
+          <span class="staff-row__cell"><button class="admin-btn admin-btn--ghost" type="submit">Save</button></span>
         </form>
       ))}
     </div>
     {rows.length === 0 && !error && <p class="admin-empty">No staff accounts found.</p>}
   </div>
-
   <div class="admin-panel" style="padding:1.25rem 1.4rem;">
     <h2 class="admin-section-title">Invite a Staff Member</h2>
-    <p style="margin:0 0 1rem; font-size:0.82rem; color:var(--admin-muted); line-height:1.6;">
-      They'll receive an email with a one-time link to set their own password — no passwords are
-      ever typed or shared here. <strong>Staff</strong> can use everything except Settings;
-      <strong>Admin</strong> can also change Settings and manage accounts. Removing someone's
-      access entirely is done in the Supabase dashboard (Authentication → Users).
-    </p>
+    <p style="margin:0 0 1rem; font-size:0.82rem; color:var(--admin-muted); line-height:1.6;">They'll receive an email with a one-time link to set their own password — no passwords are ever typed or shared here. <strong>Staff</strong> can use everything except Settings; <strong>Admin</strong> can also change Settings and manage accounts. Removing someone's access entirely is done in the Supabase dashboard (Authentication → Users).</p>
     <form class="admin-form" method="POST">
       <input type="hidden" name="_intent" value="invite" />
       <label class="admin-field"><span>Email *</span><input type="email" name="email" required placeholder="name@buxena.com" /></label>
       <label class="admin-field"><span>Full Name</span><input type="text" name="full_name" /></label>
-      <label class="admin-field">
-        <span>Role</span>
-        <select name="role">
-          {ROLES.map((r) => <option value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
-        </select>
-      </label>
-      <div class="admin-form__actions">
-        <button class="admin-btn" type="submit">Send Invitation</button>
-      </div>
+      <label class="admin-field"><span>Role</span><select name="role">{ROLES.map((r) => <option value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}</select></label>
+      <div class="admin-form__actions"><button class="admin-btn" type="submit">Send Invitation</button></div>
     </form>
   </div>
 </AdminLayout>
@@ -183,57 +104,12 @@ function fmtDate(iso: string | null): string {
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
   .notice--success { padding: 0.85rem 1rem; font-size: 0.85rem; color: #a8d3a0; background: rgba(143, 191, 138, 0.08); border: 1px solid rgba(143, 191, 138, 0.35); border-radius: 2px; }
-
   .staff-list { display: flex; flex-direction: column; }
-  /* one form per row; header and rows share the same grid so columns line up */
-  .staff-row {
-    display: grid;
-    grid-template-columns: 1.2fr 1.6fr 0.8fr 0.9fr 4.5rem;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.55rem 0.9rem;
-    margin: 0;
-    border-bottom: 1px solid rgba(212, 184, 140, 0.07);
-  }
+  .staff-row { display: grid; grid-template-columns: 1.2fr 1.6fr 0.8fr 0.9fr 4.5rem; gap: 0.75rem; align-items: center; padding: 0.55rem 0.9rem; margin: 0; border-bottom: 1px solid rgba(212, 184, 140, 0.07); }
   .staff-row:last-child { border-bottom: none; }
-  .staff-row--head {
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--admin-muted);
-    border-bottom: 1px solid rgba(212, 184, 140, 0.14);
-  }
-  .staff-row__cell { min-width: 0; font-size: 0.85rem; }
-  .staff-row__email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .staff-row__signin { color: var(--admin-muted); }
-  .staff-input {
-    width: 100%;
-    padding: 0.4rem 0.55rem;
-    font-family: inherit;
-    font-size: 0.82rem;
-    color: var(--admin-cream);
-    background: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(212, 184, 140, 0.14);
-    border-radius: 3px;
-  }
-  .staff-input:focus { outline: none; border-color: var(--admin-gold); }
-  .staff-tag {
-    margin-left: 0.45rem;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.62rem;
-    font-style: normal;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--admin-gold);
-    background: rgba(201, 166, 104, 0.12);
-    border: 1px solid rgba(201, 166, 104, 0.3);
-    border-radius: 2px;
-  }
-  .staff-tag--pending { color: #a8c8e0; background: rgba(130, 170, 230, 0.08); border-color: rgba(130, 170, 230, 0.3); }
-
-  @media (max-width: 767.98px) {
-    .staff-row { grid-template-columns: 1fr; gap: 0.4rem; }
-    .staff-row--head { display: none; }
-    .staff-row__signin::before { content: 'Last sign-in: '; }
-  }
+  .staff-row--head { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--admin-muted); border-bottom: 1px solid rgba(212, 184, 140, 0.14); }
+  .staff-row__cell { min-width: 0; font-size: 0.85rem; }.staff-row__email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.staff-row__signin { color: var(--admin-muted); }
+  .staff-input { width: 100%; padding: 0.4rem 0.55rem; font-family: inherit; font-size: 0.82rem; color: var(--admin-cream); background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(212, 184, 140, 0.14); border-radius: 3px; }.staff-input:focus { outline: none; border-color: var(--admin-gold); }
+  .staff-tag { margin-left: 0.45rem; padding: 0.1rem 0.4rem; font-size: 0.62rem; font-style: normal; letter-spacing: 0.06em; text-transform: uppercase; color: var(--admin-gold); background: rgba(201, 166, 104, 0.12); border: 1px solid rgba(201, 166, 104, 0.3); border-radius: 2px; }.staff-tag--pending { color: #a8c8e0; background: rgba(130, 170, 230, 0.08); border-color: rgba(130, 170, 230, 0.3); }
+  @media (max-width: 767.98px) { .staff-row { grid-template-columns: 1fr; gap: 0.4rem; }.staff-row--head { display: none; }.staff-row__signin::before { content: 'Last sign-in: '; } }
 </style>
