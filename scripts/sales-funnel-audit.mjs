@@ -5,6 +5,7 @@ const checks = [];
 const check = (name, ok) => checks.push({ name, ok: Boolean(ok) });
 
 const quote = read('src/components/QuoteForm.astro');
+const availability = read('src/components/CheckAvailability.astro');
 const thankYou = read('src/pages/thank-you.astro');
 const tracking = read('src/lib/track.ts');
 const layout = read('src/layouts/BaseLayout.astro');
@@ -15,6 +16,8 @@ const workflowMigration = read('supabase/enquiry-workflow-alignment.sql');
 check('lead_confirmed event exists', tracking.includes("| 'lead_confirmed'"));
 check('quote step 1 counts durable lead', quote.includes("track('lead_confirmed', leadPayload)"));
 check('quote summary marks conversion already counted', quote.includes("conversionTracked: 'true'"));
+check('availability inline success counts durable lead', availability.includes("track('lead_confirmed', payload)"));
+check('availability does not count dev-mode test as lead', availability.includes("if (!result.devMode) track('lead_confirmed', payload)"));
 check('thank-you suppresses duplicate quote conversion', thankYou.includes("s.conversionTracked !== 'true'"));
 check('direct thank-you visits are not leads', thankYou.includes("track('thank_you_direct_visit'"));
 check('GTM is opt-in, not hard-coded', layout.includes('PUBLIC_GTM_ID') && layout.includes("/^GTM-[A-Z0-9]+$/i"));
