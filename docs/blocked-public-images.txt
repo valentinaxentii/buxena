@@ -1,0 +1,26 @@
+# BUXENA V2 — machine-readable launch blocklist
+# One site-root path per line. These assets are explicitly BLOCKED / REPLACE in
+# docs/image-rights-register.md or are known watermarked preview assets.
+# Remove a path only after the rights register records written commercial-use
+# permission for that exact asset/use, or the site has stopped referencing it.
+
+# Homepage collection tiles — rights unresolved; cube also watermarked.
+/images/collections/outdoor.png
+/images/collections/cube.png
+/images/collections/barrel.png
+/images/collections/indoor.jpg
+
+# VIRU supplier-gallery imagery — written website permission not on file.
+/images/saunas/viru-thermowood-2-4m-hero.jpg
+/images/saunas/viru-thermowood-3-0m-hero.jpg
+/images/saunas/viru-thermowood-3-6m-hero.jpg
+/images/saunas/viru-thermowood-4-0m-hero.jpg
+/images/saunas/viru-vertical-2-6m-hero.jpg
+/images/saunas/viru-panorama-5-0m-hero.jpg
+/images/saunas/viru-grand-6-0m-hero.jpg
+
+# NORD catalog imagery — written website permission not on file.
+/images/saunas/nord-cube-200-hero.jpg
+/images/saunas/nord-cube-200-interior.jpg
+/images/saunas/nord-cube-240-hero.jpg
+/images/saunas/nord-cube-240-interior.jpg
