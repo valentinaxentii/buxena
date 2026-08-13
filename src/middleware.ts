@@ -45,15 +45,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   context.locals.staffUser = user;
 
-  // Role enforcement for admin-only routes. A missing profiles row counts as
-  // 'staff' (least privilege) — run scripts/seed-profiles.mjs after adding an
-  // auth user, and promote via Settings → Staff (or SQL) as needed. If the
-  // role lookup itself fails (schema not applied yet), fall back to allowing
-  // the request so a half-configured project can still reach Settings to see
-  // its own setup notices.
+  // Admin-only routes fail closed. Missing profiles, lookup errors, missing
+  // schema/configuration, and any other role-resolution failure are denied.
+  // Sensitive pages also perform their own independent authorization check.
   if (user && ADMIN_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     let role: string | null = null;
-    let lookupFailed = false;
     try {
       const admin = createSupabaseAdminClient();
       const { data: profile, error } = await admin
@@ -61,13 +57,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
         .select('role')
         .eq('id', user.id)
         .maybeSingle();
-      if (error) lookupFailed = true;
-      else role = profile?.role ?? null;
+      if (!error) role = profile?.role ?? null;
     } catch {
-      lookupFailed = true;
+      role = null;
     }
     context.locals.staffRole = role;
-    if (!lookupFailed && role !== 'admin') {
+    if (role !== 'admin') {
       return context.redirect('/admin?denied=settings');
     }
   }
