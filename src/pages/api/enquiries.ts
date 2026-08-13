@@ -7,6 +7,7 @@ import { checkRateLimit } from '../../lib/rate-limit';
 
 export const prerender = false;
 const INTERNAL_ERROR = 'We could not submit your request right now. Please try again shortly.';
+const MAX_BODY_BYTES = 64 * 1024;
 
 type EnquiryDbSource = 'Website' | 'Sauna Advisor' | 'Contact Form' | 'Quote Form' | 'Other';
 
@@ -19,7 +20,18 @@ function normalizeDbSource(source: unknown): EnquiryDbSource {
   return 'Other';
 }
 
+const text = (value: unknown, max: number) =>
+  typeof value === 'string' ? value.trim().slice(0, max) : '';
+
 export const POST: APIRoute = async ({ request, clientAddress }) => {
+  const declaredLength = Number(request.headers.get('content-length') ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return new Response(JSON.stringify({ ok: false, error: 'Request is too large.' }), {
+      status: 413,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const devTestMode = import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true';
   if (!devTestMode) {
     const { allowed, retryAfterSeconds } = checkRateLimit(`enquiries:${clientAddress}`, 5, 10 * 60_000);
@@ -33,13 +45,23 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   try {
     const body = await request.json();
-    const { name, email, phone, location, message, chatTranscript, saunaInterest, source, attribution, botField } = body ?? {};
-    const sourceLabel = typeof source === 'string' && source.trim() ? source.trim().slice(0, 120) : 'Sauna Advisor';
+    const name = text(body?.name, 160);
+    const email = text(body?.email, 320).toLowerCase();
+    const phone = text(body?.phone, 80);
+    const location = text(body?.location, 160);
+    const message = text(body?.message, 12_000);
+    const saunaInterest = text(body?.saunaInterest, 240);
+    const sourceLabel = text(body?.source, 120) || 'Sauna Advisor';
+    const botField = text(body?.botField, 200);
+    const attribution = body?.attribution;
+    const chatTranscript = Array.isArray(body?.chatTranscript)
+      ? body.chatTranscript.slice(0, 100)
+      : null;
     const dbSource = normalizeDbSource(sourceLabel);
 
     if (botField) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     if (!message && !(chatTranscript && chatTranscript.length)) return new Response(JSON.stringify({ ok: false, error: 'Nothing to record.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email))) return new Response(JSON.stringify({ ok: false, error: 'Please enter a valid email address.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return new Response(JSON.stringify({ ok: false, error: 'Please enter a valid email address.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
     if (import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true') {
       console.log('[enquiries][dev] captured local test submission:', { name, email, phone, location, saunaInterest, source: sourceLabel, dbSource, message });
@@ -55,7 +77,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       phone: phone || null,
       location: location || null,
       message: message || null,
-      chat_transcript: chatTranscript || null,
+      chat_transcript: chatTranscript,
       sauna_interest: saunaInterest || null,
       source: dbSource,
       status: 'New',
