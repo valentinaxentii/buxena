@@ -297,6 +297,37 @@ if (devLive) {
   record('forms', 'every form source can be written to enquiries', ok, detail);
 }
 
+// -------------------------------- 7d. no raw JSON.stringify inside a <script>
+// JSON.stringify does not escape `<`, so a stored value containing
+// `</script>` closes the tag and the remainder is parsed as markup. Public
+// enquiry names reach customers.name and are embedded this way on the
+// new-invoice page — stored XSS in the admin panel, authored from a public
+// form. Every payload goes through jsonForScript(); this is the rule's guard.
+{
+  const srcDir = path.join(ROOT, 'src');
+  const offenders = [];
+  (function walk(d) {
+    for (const f of readdirSync(d)) {
+      const p = path.join(d, f);
+      if (statSync(p).isDirectory()) walk(p);
+      // json-script.ts quotes the unsafe pattern in its own docstring to
+      // explain what it prevents; matching that would fail the build forever.
+      else if (/\.(astro|ts)$/.test(f) && f !== 'json-script.ts') {
+        const text = readFileSync(p, 'utf8');
+        if (/set:html=\{\s*JSON\.stringify\(/.test(text)) {
+          offenders.push(path.relative(ROOT, p));
+        }
+      }
+    }
+  })(srcDir);
+  record(
+    'security',
+    'no <script> payload bypasses the JSON escaper',
+    offenders.length === 0,
+    offenders.length ? `use jsonForScript() in: ${offenders.join(', ')}` : ''
+  );
+}
+
 // ------------------------------------------- 8. model presentation system
 console.log('\n■ 8/8 Model presentations');
 {

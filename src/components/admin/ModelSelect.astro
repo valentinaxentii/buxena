@@ -1,4 +1,6 @@
 ---
+import { jsonForScript } from '../../lib/json-script';
+
 export interface ModelSelectProduct {
   id: string;
   model_name: string;
@@ -34,7 +36,7 @@ const selected = products.find((p: ModelSelectProduct) => p.id === value) ?? nul
   <input type="hidden" name={name} id={id} value={selected?.id ?? ''} data-model-select-value />
   <div class="model-select__menu" id={`${id}-menu`} role="listbox" hidden></div>
 </div>
-<script type="application/json" data-model-select-data={id} set:html={JSON.stringify(products)} />
+<script type="application/json" data-model-select-data={id} set:html={jsonForScript(products)} />
 
 <style>
   .model-select {

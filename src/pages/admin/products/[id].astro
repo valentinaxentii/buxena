@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
 import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
+import { jsonForScript } from '../../../lib/json-script';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -244,7 +245,7 @@ const salesFlags = [
       </figure>
     </div>
 
-    <script type="application/json" id="pd-images" set:html={JSON.stringify(images)} />
+    <script type="application/json" id="pd-images" set:html={jsonForScript(images)} />
     </div>
   )}
 </AdminLayout>

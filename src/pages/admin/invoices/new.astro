@@ -5,6 +5,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { INVOICE_LINE_TYPES, parseInvoiceItems, computeInvoiceTotals } from '../../../lib/invoice-totals';
+import { jsonForScript } from '../../../lib/json-script';
 
 const LINE_TYPES = INVOICE_LINE_TYPES;
 
@@ -207,7 +208,7 @@ const initialLines: PrefillLine[] = prefill.lines.length
         {customers.map((c) => <option value={c.id} selected={c.id === prefill.customer_id}>{c.name}</option>)}
       </select>
     </label>
-    <script type="application/json" id="customers-data" set:html={JSON.stringify(customers)} />
+    <script type="application/json" id="customers-data" set:html={jsonForScript(customers)} />
 
     <div class="inv-parties admin-form__full">
       <fieldset class="inv-party">

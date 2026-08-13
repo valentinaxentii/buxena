@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import QuoteBand from '../components/QuoteBand.astro';
 import { showDev } from '../data/site';
+import { jsonForScript } from '../lib/json-script';
 
 /**
  * Answers marked `pending: true` are policy questions we cannot answer until
@@ -121,7 +122,7 @@ const faqSchema = {
   title="FAQ"
   description="Common questions about choosing, siting, installing and living with a home sauna."
 >
-  <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} slot="head" />
+  <script type="application/ld+json" set:html={jsonForScript(faqSchema)} slot="head" />
 
   <section class="band band--tight page-head">
     <div class="shell">

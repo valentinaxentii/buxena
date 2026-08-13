@@ -50,6 +50,50 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       appendToEnquiryId,
     } = body ?? {};
 
+    /**
+     * Field length ceilings.
+     *
+     * Nothing enforced a length on any field: `message`, `name` and `source`
+     * went to the database exactly as posted, so a single request could store
+     * megabytes and the 5-per-10-minutes rate limit was the only bound on how
+     * often. `source` mattered most — it used to be pinned to five values by a
+     * CHECK constraint, and relaxing that constraint (so the nine forms it was
+     * silently rejecting could record at all) also removed the only thing
+     * keeping it short.
+     *
+     * Generous on purpose: these are far above anything a real customer types,
+     * so they cost a genuine enquiry nothing. Truncating beats rejecting — a
+     * long message is still a lead, and a 400 here would lose it.
+     */
+    const cap = (value: unknown, max: number): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed.slice(0, max) : null;
+    };
+
+    const safe = {
+      name: cap(name, 200),
+      email: cap(email, 320), // RFC 5321 maximum
+      phone: cap(phone, 50),
+      location: cap(location, 200),
+      message: cap(message, 8000),
+      saunaInterest: cap(saunaInterest, 200),
+      source: cap(source, 60),
+    };
+
+    /**
+     * The chat transcript is jsonb, so it had no ceiling at all — the widest
+     * opening here, since the browser controls both how many messages it sends
+     * and how long each one is. Kept whole for any real conversation; a
+     * conversation longer than 200 turns is not a lead.
+     */
+    const safeTranscript = Array.isArray(chatTranscript)
+      ? chatTranscript.slice(0, 200).map((entry: any) => ({
+          role: entry?.role === 'user' ? 'user' : 'bot',
+          text: cap(entry?.text, 2000) ?? '',
+        }))
+      : null;
+
     // The id of an enquiry this submission should be MERGED INTO rather than
     // recorded beside. Only the quote form's optional second step sends it,
     // carrying the id step 1 returned. Validated as a uuid here so a malformed
@@ -95,18 +139,19 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // server against an explicitly-chosen safe environment, set
     // ENQUIRIES_DEV_LIVE=true alongside the Supabase vars.
     if (import.meta.env.DEV && process.env.ENQUIRIES_DEV_LIVE !== 'true') {
-      console.log('[enquiries][dev] captured local test submission:', {
-        name,
-        email,
-        phone,
-        location,
-        saunaInterest,
-        source,
-        message,
-      });
+      // The CAPPED values, not the raw body — dev has to show what production
+      // would actually store, or it quietly stops being a rehearsal.
+      console.log('[enquiries][dev] captured local test submission:', safe);
       // Preview the customer acknowledgment this submission would trigger in
       // production (nothing is sent in dev — this is the generated content).
-      const ackPreview = buildCustomerAckEmail({ name, email, location, message, saunaInterest, source });
+      const ackPreview = buildCustomerAckEmail({
+        name: safe.name,
+        email: safe.email,
+        location: safe.location,
+        message: safe.message,
+        saunaInterest: safe.saunaInterest,
+        source: safe.source ?? undefined,
+      });
       console.log(
         ackPreview
           ? `[enquiries][dev] customer ack would send — subject: "${ackPreview.subject}"\n${ackPreview.text}`
@@ -171,14 +216,16 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           const { error: updateError } = await supabase
             .from('enquiries')
             .update({
-              message: [existing.message, message].filter(Boolean).join('\n\n'),
+              // Capped again after joining: two capped halves still make one
+              // oversized whole, and this column grows with every merge.
+              message: [existing.message, safe.message].filter(Boolean).join('\n\n').slice(0, 16000),
               // Only ever fill a blank. The detail step re-sends the contact
               // fields, and step 1's values are the ones the customer typed
               // first — an overwrite could replace a good value with an empty
               // one if a field were cleared between steps.
-              phone: existing.phone || phone || null,
-              location: existing.location || location || null,
-              sauna_interest: existing.sauna_interest || saunaInterest || null,
+              phone: existing.phone || safe.phone,
+              location: existing.location || safe.location,
+              sauna_interest: existing.sauna_interest || safe.saunaInterest,
             })
             .eq('id', appendId);
 
@@ -200,14 +247,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         const { data, error } = await supabase
           .from('enquiries')
           .insert({
-            name: name || null,
-            email: email || null,
-            phone: phone || null,
-            location: location || null,
-            message: message || null,
-            chat_transcript: chatTranscript || null,
-            sauna_interest: saunaInterest || null,
-            source: source || 'Sauna Advisor',
+            name: safe.name,
+            email: safe.email,
+            phone: safe.phone,
+            location: safe.location,
+            message: safe.message,
+            chat_transcript: safeTranscript,
+            sauna_interest: safe.saunaInterest,
+            source: safe.source ?? 'Sauna Advisor',
             status: 'New',
           })
           .select('id')
@@ -280,7 +327,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // `unrecorded` tells both messages to stop claiming the enquiry is "also
     // in Admin" and to say plainly that they are the only copy — a staff
     // notification that lies about where the data is, is worse than none.
-    const notify = { name, email, phone, location, message, saunaInterest, source };
+    const notify = { ...safe, source: safe.source ?? undefined };
     const staffNotify = { ...notify, unrecorded: !recorded };
 
     // The customer acknowledgment promises a human will follow up, so it may

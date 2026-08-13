@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { jsonForScript } from '../lib/json-script';
 
 /**
  * SEE IT IN MY SPACE — sales MVP.
@@ -218,7 +219,7 @@ const TOTAL_STEPS = 5;
   </section>
 </BaseLayout>
 
-<script type="application/json" id="space-catalog" set:html={JSON.stringify(catalog)} />
+<script type="application/json" id="space-catalog" set:html={jsonForScript(catalog)} />
 
 <style>
   .page-head { padding-bottom: 0; }

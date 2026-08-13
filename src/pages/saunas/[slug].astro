@@ -24,6 +24,7 @@ import { publicNameFor, codeFor, presentationPath } from '../../data/model-ident
 import fs from 'node:fs';
 import path from 'node:path';
 import { getCollection, render } from 'astro:content';
+import { jsonForScript } from '../../lib/json-script';
 
 export async function getStaticPaths() {
   const saunas = await getCollection('saunas', ({ data }) => !data.draft);
@@ -166,8 +167,8 @@ const breadcrumbSchema = {
   ].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 160)}
   image={data.heroImage.src}
 >
-  <script type="application/ld+json" set:html={JSON.stringify(productSchema)} slot="head" />
-  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} slot="head" />
+  <script type="application/ld+json" set:html={jsonForScript(productSchema)} slot="head" />
+  <script type="application/ld+json" set:html={jsonForScript(breadcrumbSchema)} slot="head" />
   <article>
     <!-- Hero: product image + key info, side by side -->
     <section class="band band--tight prod-hero">

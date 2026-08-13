@@ -7,6 +7,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings } from '../../../lib/settings';
 import { recomputeIncomingForShipment } from '../../../lib/shipment-inventory';
+import { jsonForScript } from '../../../lib/json-script';
 
 const STATUSES = [
   'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
@@ -128,8 +129,8 @@ try {
     <label class="admin-field"><span>Currency</span><input type="text" name="currency" id="shipment-currency" value={settings.currency} maxlength="3" /></label>
     <p class="ship-hint-inline">Model choices below narrow to this supplier's linked models once one is selected — models with no supplier link yet still show up, so this never blocks you.</p>
 
-    <script type="application/json" id="supplier-products-data" set:html={JSON.stringify(supplierProducts)} />
-    <script type="application/json" id="suppliers-data" set:html={JSON.stringify(suppliers)} />
+    <script type="application/json" id="supplier-products-data" set:html={jsonForScript(supplierProducts)} />
+    <script type="application/json" id="suppliers-data" set:html={jsonForScript(suppliers)} />
 
     <div class="admin-form__full">
       <h2 class="admin-section-title" style="margin-top:1rem;">Add Models</h2>
