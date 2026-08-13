@@ -52,67 +52,13 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 </details>
 
 <style>
-  .avail-check {
-    border: 1px solid var(--line);
-    margin-top: 0.9rem;
-  }
-
-  .avail-check__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    cursor: pointer;
-    list-style: none;
-    padding: 0.85rem 1.15rem;
-    font-family: var(--font-sans);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--bronze-ink);
-    transition: color 0.35s var(--ease);
-  }
-  .avail-check__summary::-webkit-details-marker { display: none; }
-  .avail-check__summary:hover { color: var(--ink); }
-
-  .avail-check__chev { transition: transform 0.35s var(--ease); }
-  .avail-check[open] .avail-check__chev { transform: rotate(180deg); }
-
-  .avail-check__form { padding: 0.35rem 1.15rem 1.25rem; }
-
-  .avail-check__hp { position: absolute; left: -9999px; }
-
-  .avail-check__fields { display: grid; gap: 0.9rem; }
-
-  .avail-check__field { display: grid; gap: 0.4rem; }
-  .avail-check__field label {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .avail-check__field label span { color: var(--bronze-ink); font-weight: 700; }
-
-  .avail-check__field input {
-    font-family: var(--font-sans);
-    font-size: 1.0625rem;
-    color: var(--ink);
-    background: transparent;
-    border: none;
-    border-bottom: 1.5px solid var(--line);
-    padding: 0.55rem 0;
-    width: 100%;
-    border-radius: 0;
-    transition: border-color 0.4s var(--ease);
-  }
-  .avail-check__field input:hover { border-color: var(--muted); }
-  .avail-check__field input:focus { border-color: var(--bronze); }
-
-  .avail-check__submit { margin-top: 1.1rem; padding: 0.87rem 1.73rem; font-size: 0.78rem; }
-
-  .avail-check__note { font-size: var(--t-small); color: var(--bronze-ink); margin: 0.9rem 0 0; }
+  .avail-check { border: 1px solid var(--line); margin-top: 0.9rem; }
+  .avail-check__summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; list-style: none; padding: 0.85rem 1.15rem; font-family: var(--font-sans); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bronze-ink); transition: color 0.35s var(--ease); }
+  .avail-check__summary::-webkit-details-marker { display: none; }.avail-check__summary:hover { color: var(--ink); }.avail-check__chev { transition: transform 0.35s var(--ease); }.avail-check[open] .avail-check__chev { transform: rotate(180deg); }
+  .avail-check__form { padding: 0.35rem 1.15rem 1.25rem; }.avail-check__hp { position: absolute; left: -9999px; }.avail-check__fields { display: grid; gap: 0.9rem; }.avail-check__field { display: grid; gap: 0.4rem; }
+  .avail-check__field label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }.avail-check__field label span { color: var(--bronze-ink); font-weight: 700; }
+  .avail-check__field input { font-family: var(--font-sans); font-size: 1.0625rem; color: var(--ink); background: transparent; border: none; border-bottom: 1.5px solid var(--line); padding: 0.55rem 0; width: 100%; border-radius: 0; transition: border-color 0.4s var(--ease); }.avail-check__field input:hover { border-color: var(--muted); }.avail-check__field input:focus { border-color: var(--bronze); }
+  .avail-check__submit { margin-top: 1.1rem; padding: 0.87rem 1.73rem; font-size: 0.78rem; }.avail-check__note { font-size: var(--t-small); color: var(--bronze-ink); margin: 0.9rem 0 0; }
 </style>
 
 <script>
@@ -131,7 +77,6 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const get = (key: string) => (data.get(key) || '').toString().trim();
       const model = get('model');
       const zip = get('zip');
-
       const originalLabel = submitBtn.textContent ?? '';
       submitBtn.disabled = true;
       submitBtn.textContent = 'Sending…';
@@ -154,7 +99,11 @@ const idSlug = model.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         return;
       }
 
-      track('availability_request', { formType: 'check_availability', model, zip });
+      const payload = { formType: 'check_availability', model, zip };
+      track('availability_request', payload);
+      // This journey stays inline instead of redirecting to /thank-you/, so the
+      // durable database success must count the lead here.
+      if (!result.devMode) track('lead_confirmed', payload);
 
       if (result.devMode) {
         submitBtn.disabled = false;
