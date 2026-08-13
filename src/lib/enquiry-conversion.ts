@@ -1,11 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Website Enquiries -> Lead -> Quote conversion logic, centralized here
- * rather than inline in the page files (same pattern as inventory-units.ts).
+ * Website Enquiries -> Lead -> Quote conversion logic, centralized here.
  * Every write path re-checks lead_id/quote_id server-side immediately before
- * inserting, so duplicate conversion is blocked even under a double-submit,
- * not just hidden by disabling a button in the UI.
+ * inserting, so duplicate conversion is blocked even under a double-submit.
  */
 
 function normalizeModelName(s: string | null | undefined): string {
@@ -30,6 +28,11 @@ async function logEnquiryActivity(supabase: SupabaseClient, enquiryId: string, d
     description,
     staff_id: staffId ?? null,
   });
+}
+
+function enquiryOrigin(enquiry: any): string {
+  const source = typeof enquiry?.source === 'string' && enquiry.source.trim() ? enquiry.source.trim() : 'Website';
+  return `Original website enquiry source: ${source}`;
 }
 
 export async function markEnquiryContacted(supabase: SupabaseClient, enquiryId: string, staffId?: string | null) {
@@ -61,6 +64,7 @@ export async function convertEnquiryToLead(supabase: SupabaseClient, enquiryId: 
 
   const { data: products } = await supabase.from('products').select('id, model_name');
   const match = matchProductBySaunaInterest(products ?? [], enquiry.sauna_interest);
+  const leadNotes = [enquiryOrigin(enquiry), enquiry.message || ''].filter(Boolean).join('\n\n');
 
   const { data: lead, error } = await supabase
     .from('leads')
@@ -68,15 +72,16 @@ export async function convertEnquiryToLead(supabase: SupabaseClient, enquiryId: 
       name: enquiry.name || enquiry.email || enquiry.phone || 'Website enquiry',
       email: enquiry.email,
       phone: enquiry.phone,
+      // Keep the broad acquisition channel stable for reporting; preserve the
+      // exact form/advisor origin in notes and the linked source enquiry.
       source: 'Website',
       product_id: match?.id ?? null,
-      notes: enquiry.message || null,
+      notes: leadNotes || null,
     })
     .select('id')
     .single();
   if (error || !lead) return { ok: false as const, reason: error?.message ?? 'INSERT_FAILED' };
 
-  // Re-guard: refuse to overwrite lead_id if a concurrent request already set it.
   const { data: updated } = await supabase
     .from('enquiries')
     .update({ lead_id: lead.id })
@@ -85,8 +90,6 @@ export async function convertEnquiryToLead(supabase: SupabaseClient, enquiryId: 
     .select('id')
     .maybeSingle();
   if (!updated) {
-    // Lost the race — the lead we just created is an orphan; remove it rather
-    // than leaving a duplicate dangling off the same enquiry.
     await supabase.from('leads').delete().eq('id', lead.id);
     const { data: current } = await supabase.from('enquiries').select('lead_id').eq('id', enquiryId).single();
     return { ok: false as const, reason: 'ALREADY_CONVERTED' as const, leadId: current?.lead_id ?? null };
@@ -110,6 +113,7 @@ async function resolveOrCreateCustomer(supabase: SupabaseClient, enquiry: any) {
       phone: enquiry.phone,
       zip: enquiry.location || null,
       lead_source: 'Website',
+      notes: enquiryOrigin(enquiry),
     })
     .select('id')
     .single();
