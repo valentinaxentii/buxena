@@ -1,6 +1,7 @@
 import fs from 'node:fs';
+import path from 'node:path';
 
-const read = (path) => fs.readFileSync(path, 'utf8');
+const read = (file) => fs.readFileSync(file, 'utf8');
 const checks = [];
 const check = (name, condition, detail = '') => checks.push({ name, ok: Boolean(condition), detail });
 
@@ -29,6 +30,35 @@ check('security-definer view hardened', hardening.includes('alter view public.or
 check('anon cannot execute document numbering', hardening.includes('issue_document_number(uuid) from public, anon, authenticated'));
 check('anon cannot execute inventory issuance', hardening.includes('issue_inventory_unit(uuid, uuid, uuid, numeric, text) from public, anon, authenticated'));
 check('anon cannot execute service-case numbering', hardening.includes('issue_service_case_number() from public, anon, authenticated'));
+
+// Service-role containment: the full-access key may only be named in the
+// dedicated server client. Components, layouts and shared browser libraries
+// must never import the admin client or reference the key directly.
+const sourceFiles = [];
+(function walk(dir) {
+  for (const name of fs.readdirSync(dir)) {
+    const file = path.join(dir, name);
+    const stat = fs.statSync(file);
+    if (stat.isDirectory()) walk(file);
+    else if (/\.(astro|ts|js|mjs)$/.test(name)) sourceFiles.push(file);
+  }
+})('src');
+
+const serviceKeyRefs = sourceFiles.filter((file) => read(file).includes('SUPABASE_SERVICE_ROLE_KEY'));
+check(
+  'service-role key is named only by dedicated server client',
+  serviceKeyRefs.length === 1 && serviceKeyRefs[0].replace(/\\/g, '/') === 'src/lib/supabase-admin.ts',
+  serviceKeyRefs.join(', ')
+);
+
+const browserRoots = ['src/components', 'src/layouts'];
+const sharedClientFiles = sourceFiles.filter((file) =>
+  browserRoots.some((root) => file.replace(/\\/g, '/').startsWith(root + '/')) ||
+  file.replace(/\\/g, '/') === 'src/lib/enquiry-client.ts' ||
+  file.replace(/\\/g, '/') === 'src/lib/track.ts'
+);
+const adminClientLeaks = sharedClientFiles.filter((file) => /supabase-admin/.test(read(file)));
+check('browser-shipping code never imports supabase-admin', adminClientLeaks.length === 0, adminClientLeaks.join(', '));
 
 for (const item of checks) {
   console.log(`${item.ok ? 'PASS' : 'FAIL'}  ${item.name}${item.detail ? ` — ${item.detail}` : ''}`);
