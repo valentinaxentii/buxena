@@ -10,6 +10,27 @@
 /images/collections/barrel.png
 /images/collections/indoor.jpg
 
+# EDA / AURA / ITI imagery — not covered by the recorded Capra website grant.
+# AURA and ITI are currently held/draft, but remain blocked if restored later.
+/images/saunas/aura-thermowood-1-3m-hero.jpeg
+/images/saunas/iti-thermowood-2-3m-hero.png
+/images/saunas/eda-nordic-spruce-1-6m-hero.png
+/images/saunas/eda-nordic-spruce-2-0m-hero.png
+/images/saunas/eda-nordic-spruce-2-35m-hero.jpeg
+/images/saunas/eda-nordic-spruce-2-5m-hero.png
+/images/saunas/eda-nordic-spruce-2-8m-hero.png
+/images/saunas/eda-nordic-spruce-3-0m-hero.png
+/images/saunas/eda-nordic-spruce-3-3m-hero.png
+/images/saunas/eda-nordic-spruce-4-0m-hero.png
+/images/saunas/eda-thermowood-1-3m-hero.png
+/images/saunas/eda-thermowood-1-6m-hero.png
+/images/saunas/eda-thermowood-2-35m-hero.jpeg
+/images/saunas/eda-thermowood-2-5m-hero.png
+/images/saunas/eda-thermowood-2-8m-hero.png
+/images/saunas/eda-thermowood-3-0m-hero.png
+/images/saunas/eda-thermowood-3-3m-hero.png
+/images/saunas/eda-thermowood-4-0m-hero.png
+
 # VIRU supplier-gallery imagery — written website permission not on file.
 /images/saunas/viru-thermowood-2-4m-hero.jpg
 /images/saunas/viru-thermowood-3-0m-hero.jpg
