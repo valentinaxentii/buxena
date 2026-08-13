@@ -12,6 +12,7 @@
     "security:audit": "node scripts/security-audit.mjs",
     "sales:audit": "node scripts/sales-funnel-audit.mjs",
     "rights:audit": "node scripts/image-rights-audit.mjs",
+    "claims:audit": "node scripts/claims-audit.mjs",
     "catalog:audit": "node scripts/sync-products-from-content.mjs"
   },
   "dependencies": {
