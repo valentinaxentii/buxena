@@ -23,64 +23,73 @@ const trustItems = [
   'Delivery Coordination',
 ];
 
-// IMAGE RIGHTS: all four tile images below are BLOCKED / REPLACE in
-// docs/image-rights-register.md (§"Homepage placements") — kept in the
-// local preview for visual review only, per the founders' instruction.
+/**
+ * IMAGE RIGHTS — rebuilt 2026-08-13 on cleared assets only.
+ *
+ * Three of these four tiles previously used images with NO identifiable source
+ * at all (`collections/outdoor.png`, `collections/barrel.png`,
+ * `collections/indoor.jpg` — bundled in 9562ea1 with no sourcing note). They
+ * sat on the homepage, which is the page every share and every future ad lands
+ * on. Nobody can grant rights to an image whose owner is unknown, so they were
+ * not replaceable by asking — only by swapping.
+ *
+ * Every tile now points at an image whose provenance is documented:
+ *   Outdoor · Cube · Indoor — Capra dealer-pack renders, WEBSITE APPROVED in
+ *     writing (docs/image-rights-register.md §7). Exact-model rule respected:
+ *     UKU 230 is an outdoor model, UKU 160 is a cube, ELLA H2 is indoor.
+ *   Barrel — a Baltresto VIRU photograph. Supplier-owned and identifiable, so
+ *     it is a PAID-ADVERTISING blocker rather than a launch blocker per the
+ *     founder's 2026-08-13 ruling. It is the only barrel imagery we hold with
+ *     a known owner; the unsourced alternative was strictly worse.
+ *
+ * The Cube tile also improves: it was a NORD Cube catalogue extraction
+ * (supplier-owned, no permission on record) and is now Capra dealer-pack with
+ * written website permission.
+ *
+ * BEFORE PAID ADVERTISING the Barrel tile still needs Baltresto's written
+ * permission, and the three Capra tiles need their grant extended from website
+ * to ads/social. Both are asked in the outreach drafts in docs/.
+ */
 const chooseTiles = [
   {
     name: 'Outdoor Saunas',
     blurb: 'Architectural backyard sauna systems',
     href: '/saunas/outdoor-saunas/',
     count: locationCount('outdoor'),
-    image: '/images/collections/outdoor.png',
-    alt: 'Outdoor sauna cabin in thermo-treated timber with a black flat roof, glass doors and a wooden hot tub on a paved terrace among pine trees',
-    // Subject sits in the lower-middle band of a square source; bias the
-    // portrait crop downward so the cabin and hot tub stay in frame.
-    focus: 'center 58%',
-    note: 'Outdoor Saunas — representative exterior image.',
+    image: '/images/catalog/uku-230-glass-front.jpg',
+    alt: 'UKU 230 outdoor rounded-cube sauna in Nordic spruce with a full glass front',
+    focus: 'center center',
+    note: 'Outdoor Saunas — UKU 230, an outdoor model we sell.',
   },
   {
     name: 'Cube Saunas',
     blurb: 'Modern form, panoramic design',
     href: '/saunas/cube-saunas/',
     count: typeCount('Cube'),
-    image: '/images/saunas/nord-cube-200-hero.jpg',
-    alt: 'NORD Cube 200 sauna clad in charred black timber with a full-height glass front and glowing cedar interior, on a boardwalk across a moss field at sunset',
-    // Square source: the cabin sits in the middle band with sky above and
-    // decking below. Bias the 4:5 crop slightly up so the portrait card holds
-    // the cabin and its lit interior rather than foreground boards.
-    focus: 'center 45%',
-    // Replaces collections/cube.png, which carried a visible Dreamstime
-    // watermark — a stock mark on the homepage of a premium brand costs more
-    // trust than any image gains. This is a real model we sell (NORD Cube
-    // 200), already used on its own product page and the Plan Your Sauna
-    // choose-tile, and it has no watermark.
-    // STILL UNLICENSED: registered as BLOCKED / REPLACE (supplier catalog, no
-    // permission on record) — the same status as the other three cards. This
-    // swap removes a visible watermark; it does NOT clear the licensing
-    // blocker. See docs/image-rights-register.md.
-    note: 'Cube Saunas — flat-roofed panoramic form.',
+    image: '/images/catalog/uku-160-glass-front.jpg',
+    alt: 'UKU 160 rounded-cube sauna in Nordic spruce with a full glass front',
+    focus: 'center center',
+    note: 'Cube Saunas — UKU 160, a cube model we sell.',
   },
   {
     name: 'Barrel Saunas',
     blurb: 'Traditional shape, efficient footprint',
     href: '/saunas/barrel-saunas/',
     count: typeCount('Barrel'),
-    image: '/images/collections/barrel.png',
-    alt: 'Cedar barrel sauna with a black shingled roof and glass door on a stone terrace, in front of a contemporary timber-clad house',
-    // The barrel sits left of centre in the source; hold the crop on it.
-    focus: '38% center',
-    note: 'Barrel Saunas — traditional curved form.',
+    image: '/images/saunas/viru-thermowood-2-4m-hero.jpg',
+    alt: 'VIRU Thermowood 2.4m barrel sauna in thermo-treated timber with a glass door',
+    focus: 'center center',
+    note: 'Barrel Saunas — VIRU Thermowood 2.4m, a barrel model we sell.',
   },
   {
     name: 'Indoor Saunas',
     blurb: 'Integrated wellness for the home',
     href: '/saunas/indoor-saunas/',
     count: locationCount('indoor'),
-    image: '/images/collections/indoor.jpg',
-    alt: 'Interior of a luxury indoor sauna with tiered timber benches, glass front and warm concealed lighting, with folded towels alongside',
+    image: '/images/catalog/ella-h2-interior.jpg',
+    alt: 'Interior of the ELLA H2 indoor sauna with timber benches and warm lighting',
     focus: 'center center',
-    note: 'Indoor Saunas — representative interior image.',
+    note: 'Indoor Saunas — ELLA H2, an indoor model we sell.',
   },
 ];
 
@@ -421,24 +430,35 @@ const wellnessPillars = [
       </div>
 
       <div class="grid cols-3 reveal" data-reveal-stagger>
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-01-loyly.jpg" alt="Water being poured onto hot sauna stones with steam rising" ratio="3 / 4" tone="dark" />
-          <p class="ritual-shot__caption">{wellnessPillars[0].label}</p>
-          <p class="ritual-shot__line">{wellnessPillars[0].line}</p>
-          <a class="ritual-shot__tag ritual-shot__tag--link" href={wellnessPillars[0].href}>{wellnessPillars[0].tag}</a>
-        </div>
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-02-cooling.jpg" alt="A snow-covered cabin in a winter forest at dusk" ratio="3 / 4" tone="mid" />
-          <p class="ritual-shot__caption">{wellnessPillars[1].label}</p>
-          <p class="ritual-shot__line">{wellnessPillars[1].line}</p>
-          <span class="ritual-shot__tag">{wellnessPillars[1].tag}</span>
-        </div>
-        <div class="ritual-shot">
-          <Figure src="/images/ritual-03-rest.jpg" alt="Quiet sauna interior with a bucket and ladle on the bench" ratio="3 / 4" tone="light" />
-          <p class="ritual-shot__caption">{wellnessPillars[2].label}</p>
-          <p class="ritual-shot__line">{wellnessPillars[2].line}</p>
-          <span class="ritual-shot__tag">{wellnessPillars[2].tag}</span>
-        </div>
+        {/* IMAGE RIGHTS, 2026-08-13 — the three photographs that were here
+            (ritual-01-loyly, ritual-02-cooling, ritual-03-rest) have no
+            identifiable source, so no permission can ever be obtained for
+            them. This is the homepage, so three empty tone blocks were not an
+            acceptable answer either.
+
+            The band is now typographic: the same three pillars, the same
+            copy, the same links, carried by the brand's own slat motif and a
+            large serif numeral instead of a photograph. Nothing is claimed
+            that isn't true, and the section reads as an intentional editorial
+            device rather than as missing content.
+
+            When licensed or BUXENA-owned ritual photography exists, this can
+            go back to <Figure> — the pillar data and layout are unchanged. */}
+        {wellnessPillars.map((pillar, i) => (
+          <div class="ritual-shot ritual-shot--type">
+            <div class="ritual-card">
+              <span class="slats" aria-hidden="true"></span>
+              <span class="ritual-card__n" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+            </div>
+            <p class="ritual-shot__caption">{pillar.label}</p>
+            <p class="ritual-shot__line">{pillar.line}</p>
+            {pillar.href ? (
+              <a class="ritual-shot__tag ritual-shot__tag--link" href={pillar.href}>{pillar.tag}</a>
+            ) : (
+              <span class="ritual-shot__tag">{pillar.tag}</span>
+            )}
+          </div>
+        ))}
       </div>
 
       <div class="wellness__foot reveal">
@@ -635,6 +655,28 @@ const wellnessPillars = [
     align-items: center;
     gap: 0.75rem 1.75rem;
   }
+
+  /* Typographic ritual card — stands in for photography we cannot license.
+     Same 3/4 footprint as the <Figure> it replaced, so the grid rhythm and
+     the reveal timing are untouched. */
+  .ritual-card {
+    aspect-ratio: 3 / 4;
+    display: grid;
+    place-content: center;
+    gap: 1.1rem;
+    justify-items: center;
+    background: var(--linen-deep);
+    border: 1px solid var(--line);
+  }
+  .ritual-card .slats { color: var(--bronze-soft); width: 3rem; height: 1.6rem; }
+  .ritual-card__n {
+    font-family: var(--font-display);
+    font-size: clamp(2.6rem, 2rem + 2.4vw, 4.2rem);
+    line-height: 1;
+    color: var(--bronze);
+  }
+  .ritual-shot--type .ritual-card { transition: border-color 0.4s var(--ease); }
+  .ritual-shot--type:hover .ritual-card { border-color: var(--bronze-soft); }
 
   .ritual-shot :global(.fig) { overflow: hidden; }
 

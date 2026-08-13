@@ -13,7 +13,10 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/eda-thermowood-2-35m-hero.jpeg"
+  # src: removed 2026-08-13 — the photograph that was here has no
+  # identifiable source (bundled in 9562ea1, no sourcing note), so nobody
+  # can grant rights to it. File untouched on disk; restore this line the
+  # moment Capra sends EDA photography with written permission.
   alt: "EDA Thermowood 2.35m barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Length", value: "7.7 ft (235 cm)" }

@@ -45,14 +45,28 @@ for (const f of files) {
   if (draft || hold) continue; // not published
 
   const slug = f.replace(/\.md$/, '');
-  const heroMatch = raw.match(/heroImage:\s*\n?\s*src:\s*["']?([^"'\n]+)/) || raw.match(/heroImage:[\s\S]{0,200}?src:\s*["']?([^"'\n]+)/);
-  const heroSrc = heroMatch ? heroMatch[1].trim() : '';
-  const heroAlt = (raw.match(/heroImage:[\s\S]{0,300}?alt:\s*["']?([^"'\n]+)/) || [])[1] ?? '';
+
+  // Read the heroImage block line by line. A `# src:` line is a COMMENT — the
+  // deliberate, documented state for a model whose only photograph had no
+  // identifiable source. Regexing across the block treated that comment text
+  // as a filename and reported 16 models as having a broken image.
+  const heroBlock = (raw.match(/^heroImage:\s*$([\s\S]*?)^(?=[a-zA-Z_]|---)/m) ?? ['', ''])[1] ?? '';
+  const heroLine = heroBlock.split(/\r?\n/).find((l) => /^\s*src:/.test(l)) ?? '';
+  const heroSrc = unquote((heroLine.split(':').slice(1).join(':') ?? '').trim());
+  const heroAlt = unquote(
+    ((heroBlock.split(/\r?\n/).find((l) => /^\s*alt:/.test(l)) ?? '').split(':').slice(1).join(':') ?? '').trim()
+  );
 
   const problems = [];
-  if (!heroSrc) problems.push('NO hero image');
-  else if (!existsSync(path.join(PUBLIC, heroSrc.replace(/^\//, '')))) problems.push(`hero MISSING on disk: ${heroSrc}`);
+  // A hero that POINTS at a file which is not there is broken and always a
+  // failure. A hero deliberately left empty is a rights decision, reported
+  // separately below so it stays visible without turning the board red until
+  // a supplier replies.
+  if (heroSrc && !existsSync(path.join(PUBLIC, heroSrc.replace(/^\//, '')))) {
+    problems.push(`hero MISSING on disk: ${heroSrc}`);
+  }
   if (heroSrc && !heroAlt) problems.push('hero has no alt text');
+  if (!heroSrc && !heroAlt) problems.push('no hero image AND no alt text');
 
   if (unquote(fm.placeholder) !== 'false') problems.push('placeholder: true (dev notice would show)');
   if (!unquote(fm.capacity)) problems.push('no capacity');
@@ -77,7 +91,7 @@ for (const f of files) {
   const avail = unquote(fm.availability);
   if (avail && avail !== 'preorder') problems.push(`availability=${avail} (no inventory data exists)`);
 
-  rows.push({ slug, category, location, productType, problems });
+  rows.push({ slug, category, location, productType, problems, noHero: !heroSrc });
 }
 
 rows.sort((a, b) => b.problems.length - a.problems.length || a.slug.localeCompare(b.slug));
@@ -100,6 +114,27 @@ for (const r of rows) {
   if (!r.problems.length) continue;
   console.log(`  ${r.slug}  [${r.category}/${r.location}/${r.productType}]`);
   for (const p of r.problems) console.log(`      - ${p}`);
+}
+
+/**
+ * Rights-blocked heroes, reported separately and deliberately NOT failing.
+ *
+ * These models render Figure's quiet toned ground instead of a photograph,
+ * because the photograph that was there had no identifiable source and no
+ * permission could ever be obtained for it. That is the correct state, not a
+ * defect — but it is a real commercial weakness and must stay visible, so it
+ * is counted here every run rather than quietly forgotten.
+ *
+ * It does not gate the board: a check that stays red until a supplier answers
+ * an email is a check people learn to ignore.
+ */
+const noHero = rows.filter((r) => r.noHero);
+console.log(`\nNO HERO IMAGE — rights-blocked, awaiting supplier photography: ${noHero.length}`);
+for (const r of noHero) console.log(`      ${r.slug}`);
+if (noHero.length) {
+  console.log('  These pages are launch-SAFE (no unsourced image is served) but');
+  console.log('  sell worse than they should. Resolved by supplier photography');
+  console.log('  arriving with written permission — see docs/*-pricing-request.md.');
 }
 
 // Non-zero so the pre-launch board and any CI can gate on it.

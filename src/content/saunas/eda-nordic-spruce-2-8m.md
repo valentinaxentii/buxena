@@ -13,7 +13,10 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Nordic spruce"]
 heroImage:
-  src: "/images/saunas/eda-nordic-spruce-2-8m-hero.png"
+  # src: removed 2026-08-13 — the photograph that was here has no
+  # identifiable source (bundled in 9562ea1, no sourcing note), so nobody
+  # can grant rights to it. File untouched on disk; restore this line the
+  # moment Capra sends EDA photography with written permission.
   alt: "EDA Nordic Spruce 2.8m barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Length", value: "9.2 ft (280 cm)" }
