@@ -4,9 +4,8 @@
  *
  * PRIVACY / SAFETY (founders' rules):
  * - Files NEVER leave the visitor's browser in this MVP. No production
- *   storage integration is configured or approved (the existing Supabase
- *   "documents" bucket is PUBLIC and must not hold customer project
- *   photos). Until a private bucket + upload endpoint is explicitly
+ *   storage bucket or private upload endpoint is configured or approved.
+ *   Until a deliberately private bucket + controlled upload endpoint is
  *   approved, only file METADATA (names, types, sizes) travels with the
  *   enquiry, via the hidden input this component maintains.
  * - Customer uploads are private project data — never marketing imagery,
@@ -138,8 +137,6 @@ const { id = 'project-upload', label = 'Photos or plans' } = Astro.props;
       }
     });
 
-    // Prevent a file dragged onto the component's child elements from being
-    // opened/navigated by the browser instead of being handled by the control.
     root.addEventListener('dragover', (event) => event.preventDefault());
     root.addEventListener('drop', (event) => event.preventDefault());
   });
