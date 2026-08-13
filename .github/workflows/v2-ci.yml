@@ -12,7 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,11 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Security regression audit
-        run: npm run security:audit
-
       - name: Astro check
         run: npm run check
 
+      - name: Security regression audit
+        run: npm run security:audit
+
       - name: Production build
         run: npm run build
+
+      - name: Full prelaunch audit
+        run: node scripts/prelaunch-check.mjs --skip-build
