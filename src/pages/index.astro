@@ -562,6 +562,23 @@ const wellnessPillars = [
   .band { padding-block: calc(var(--band) * 0.88); }
 
   /* --- packages --- */
+  /* COMPRESSED ~25%, 2026-08-14 — founder-approved, deliberate exception to
+     Home's standing exclusion, scoped to ONLY this section via
+     [data-package-section] and the .pkgs* classes below (Astro auto-scopes
+     this whole style block to index.astro anyway, so none of this can leak
+     into any other page). Nothing here touches font-size — every cut is
+     padding, margin or line-height, per the explicit "do not make text
+     tiny" constraint. */
+  [data-package-section] { padding-block: clamp(1.25rem, 0.73rem + 2.2vw, 2.6rem); }
+  /* Scoped, not a --sec-head-gap change — that token is shared by every
+     "eyebrow / heading / lead" block sitewide, and this cut is specific to
+     this one section. */
+  [data-package-section] .sec-head { margin-bottom: clamp(0.95rem, 0.55rem + 1vw, 1.5rem); }
+  /* Scoped, not a .btn change — same reasoning: .btn is the shared button
+     class used by every CTA on every page. Vertical padding only, so click
+     width is unaffected. */
+  [data-package-section] .btn { padding-top: 0.8rem; padding-bottom: 0.8rem; }
+
   .pkgs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -573,7 +590,8 @@ const wellnessPillars = [
     flex-direction: column;
     background: var(--linen);
     border: 1px solid var(--line);
-    padding: clamp(1.4rem, 1rem + 1.3vw, 2.1rem);
+    /* -25%: clamp(1.4rem,1rem+1.3vw,2.1rem) → ...,1.58rem. */
+    padding: clamp(0.9rem, 0.65rem + 0.8vw, 1.35rem);
   }
   /* BUXENA Complete dominates: bronze frame, deeper ground, no size tricks */
   .pkgs__card--hero {
@@ -588,22 +606,26 @@ const wellnessPillars = [
     text-transform: uppercase;
     color: #fff;
     background: var(--bronze-btn);
-    padding: 0.4rem 0.8rem;
-    margin-bottom: 1.1rem;
+    /* Vertical padding only -25% (0.4rem→0.3rem); horizontal untouched —
+       this is a small label, not a spacing-heavy block. */
+    padding: 0.3rem 0.8rem;
+    margin-bottom: 0.65rem;
   }
-  .pkgs__name { margin-bottom: 0.5rem; }
-  .pkgs__price { font-size: var(--t-small); color: var(--bronze-ink); font-weight: 600; margin-bottom: 0.6rem; }
-  .pkgs__summary { font-size: var(--t-small); color: var(--muted); line-height: 1.65; margin-bottom: 1.1rem; }
-  .pkgs__list { margin-bottom: 1.1rem; }
+  .pkgs__name { margin-bottom: 0.3rem; }
+  .pkgs__price { font-size: var(--t-small); color: var(--bronze-ink); font-weight: 600; margin-bottom: 0.4rem; }
+  /* line-height: leading, not font-size — a 2-3 line summary, not a long
+     paragraph, so 1.3 still reads comfortably. */
+  .pkgs__summary { font-size: var(--t-small); color: var(--muted); line-height: 1.3; margin-bottom: 0.65rem; }
+  .pkgs__list { margin-bottom: 0.65rem; }
   .pkgs__list li {
     position: relative;
     font-size: var(--t-small);
-    line-height: 1.5;
-    padding: 0.38rem 0 0.38rem 1.4rem;
+    line-height: 1.3;
+    padding: 0.2rem 0 0.2rem 1.4rem;
     border-bottom: 1px solid var(--line);
   }
   .pkgs__list li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
-  .pkgs__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.1rem; }
+  .pkgs__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 0.65rem; }
   .pkgs__cta { margin-top: auto; align-self: flex-start; }
 
   .pkgs__foot {
@@ -612,7 +634,7 @@ const wellnessPillars = [
     align-items: center;
     justify-content: space-between;
     gap: 1.25rem 2rem;
-    margin-top: clamp(1.6rem, 1rem + 1.6vw, 2.5rem);
+    margin-top: clamp(0.96rem, 0.6rem + 0.96vw, 1.5rem);
   }
   .pkgs__confidence { font-size: var(--t-small); color: var(--muted); max-width: 34em; margin: 0; }
   .pkgs__foot-ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
