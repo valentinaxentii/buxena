@@ -72,9 +72,15 @@
   /* Hero.astro is NOT tokenised: it is imported by index.astro and nowhere
      else, so it is homepage-only and therefore entirely out of scope for the
      compression. Its clamps stay literal in the component. */
-  --footer-pad: clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem);  /* Footer.astro vertical pad   */
-  --footer-col-gap: clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem);
-  --footer-row-gap: clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem);
+  /* FOOTER COMPRESSION, 2026-08-14 — ~30% off, and DELIBERATELY UNIFORM.
+     Founder direction: unlike the 2026-08-13 pass above, this one applies to
+     the homepage too — a footer that was taller specifically on Home would
+     read as inconsistent rather than deliberate, and the founder confirmed
+     that reading when asked. So these are the ONLY values now; there is no
+     non-home override to keep in sync, and none is needed. */
+  --footer-pad: clamp(1.82rem, 1.05rem + 2.81vw, 3.15rem);  /* Footer.astro vertical pad, was clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) */
+  --footer-col-gap: clamp(1.33rem, 0.53rem + 2.63vw, 3.15rem);  /* was clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem) */
+  --footer-row-gap: clamp(1.33rem, 0.77rem + 1.58vw, 2.38rem);  /* was clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem) */
   --sec-head-gap: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); /* section head → content     */
   --card-body-pad: 1.1rem;                             /* ProductCard text block        */
   --form-row-gap: 1.25rem;                             /* between form rows             */
@@ -131,10 +137,6 @@ body:not(.is-home) {
 
   --hdr-h: clamp(4.14rem, 4rem + 0.68vw, 4.68rem);
   --band: clamp(2.13rem, 1.23rem + 3.74vw, 4.42rem);
-
-  --footer-pad: clamp(2.21rem, 1.28rem + 3.19vw, 3.83rem);
-  --footer-col-gap: clamp(1.62rem, 0.64rem + 3.19vw, 3.83rem);
-  --footer-row-gap: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
 
   --sec-head-gap: clamp(1.19rem, 0.68rem + 1.45vw, 2.17rem);
   --card-body-pad: 0.94rem;
