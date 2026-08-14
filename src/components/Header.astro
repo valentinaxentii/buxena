@@ -106,16 +106,29 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     background: transparent;
     border-bottom-color: transparent;
   }
+  /* REAL BUG, fixed 2026-08-14: this rule used to declare nothing — the
+     comment argued colors would "fall through" to the dark base .hdr rule.
+     They do not. `.hdr` and `.hdr--over` carry EQUAL specificity (0,1,0),
+     `.hdr--over` is declared AFTER `.hdr` in this file, and CSS breaks a
+     specificity tie by source order — so `.hdr--over`'s `background:
+     transparent` kept winning even with `.is-stuck` also applied. Confirmed
+     live: a scrolled homepage reported `background-color: rgba(0,0,0,0)` on
+     the header, i.e. fully transparent, with light page content showing
+     straight through behind ivory nav text — unreadable, and exactly the
+     "header becomes too light over light content" the founder reported.
+     Fixed by EXPLICITLY restating the dark ground here rather than trusting
+     fallthrough a second time. */
   .hdr--over.is-stuck {
-    /* Snap on rather than fade. The transition below is declared on .hdr, so
-       it applies in both directions; while the background faded in over half
-       a second the page content scrolled visibly through the header. Zeroing
-       the duration here only affects the moment the class is ADDED — removing
-       it (scrolling back to the hero) still uses the base transition. Colors
-       are intentionally NOT restated here: they now fall straight through to
-       the (already dark) base .hdr rule, since stuck-and-solid looks exactly
-       like every other page's header. */
-    transition-duration: 0s;
+    background: var(--ember);
+    border-bottom-color: color-mix(in srgb, var(--bronze-soft) 26%, var(--ember));
+    /* Short, not instant: "smooth transition, no flashing" was explicit, but
+       a slow fade lets page content visibly scroll through the header while
+       it's still partway transparent, which reads as its own glitch. 180ms
+       is fast enough that bleed-through is imperceptible while still being a
+       real transition rather than a hard snap — applies only to the moment
+       .is-stuck is ADDED; removing it (scrolling back up to the hero) still
+       uses the base .hdr rule's 0.5s. */
+    transition-duration: 0.18s;
   }
 
   .hdr__inner {
