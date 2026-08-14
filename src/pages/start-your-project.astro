@@ -151,13 +151,17 @@ const projectTypes = [
     padding: 0;
   }
 
+  /* GLOBAL FORM SYSTEM, 2026-08-14: matched the shared --form-row-gap /
+     --form-label-gap tokens rather than local values that only coincidentally
+     equalled them — a future retune of the tokens would otherwise have
+     silently drifted this page out of sync with every other form. */
   .pform__grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem 1.75rem;
+    gap: var(--form-row-gap) 1.75rem;
   }
 
-  .field { display: grid; gap: 0.55rem; }
+  .field { display: grid; gap: var(--form-label-gap); }
   .field--full { grid-column: 1 / -1; }
 
   .field label {

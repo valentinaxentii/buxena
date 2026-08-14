@@ -63,7 +63,7 @@ const rounds = [
     </div>
   </section>
 
-  <section class="band">
+  <section class="band ritual-steps">
     <div class="shell">
       <ol class="rounds reveal">
         {rounds.map((r) => (
@@ -79,7 +79,7 @@ const rounds = [
     </div>
   </section>
 
-  <section class="band band--birch">
+  <section class="band band--birch etiquette-section">
     <div class="shell split">
       <div class="split__media reveal">
         {/* IMAGE RIGHTS 2026-08-13 — RESOLVED. Founder-provided photograph
@@ -147,11 +147,30 @@ const rounds = [
   .page-head { padding-bottom: 0; }
   .page-head .lead { margin-top: 1.11rem; }
 
+  /* Page-scoped, not the shared --band token: Astro auto-scopes this style
+     block to elements wellness.astro itself renders, so `.page-head` and
+     `.ritual-steps` here cannot leak into any other page's identically-named
+     sections. Needed because the reduction required (outer padding on just
+     these two sections cut roughly in half) is specific to fitting THIS
+     composition in one screen, not something every --band section should do. */
+  .page-head { padding-block: clamp(0.5rem, 0.35rem + 0.5vw, 0.8rem); }
+  .ritual-steps { padding-block: clamp(0.35rem, 0.25rem + 0.3vw, 0.55rem); }
+
+  /* ONE-SCREEN RITUAL, 2026-08-14 — founder target: the whole Ritual
+     composition (heading, intro, image, all four steps) visible at 1440x900
+     with no scroll. Measured baseline before this pass: 1441px of content
+     under a 75px header, against 900px available — needed roughly 43% off
+     this section specifically, well beyond what the page-wide --band token
+     could give without changing height everywhere else, so these are
+     page-scoped overrides local to Wellness alone. Mobile is deliberately
+     NOT touched here (no media-query override) — it keeps the site-wide
+     token values and stacks/scrolls normally, per the founder's explicit
+     "mobile can stack naturally" instruction. */
   .ritual-photo {
-    max-width: 800px;
+    max-width: 520px;
     margin-inline: auto;
-    margin-top: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
-    margin-bottom: clamp(1.62rem, 0.94rem + 1.91vw, 2.89rem);
+    margin-top: clamp(0.4rem, 0.2rem + 0.4vw, 0.7rem);
+    margin-bottom: clamp(0.4rem, 0.2rem + 0.4vw, 0.7rem);
   }
 
   .rounds {
@@ -160,9 +179,9 @@ const rounds = [
   }
   .round {
     display: grid;
-    grid-template-columns: minmax(0, 5rem) minmax(0, 1fr);
-    gap: clamp(0.94rem, 0.4rem + 1.9vw, 2.6rem);
-    padding-block: clamp(0.64rem, 0.44rem + 0.74vw, 1.04rem);
+    grid-template-columns: minmax(0, 4rem) minmax(0, 1fr);
+    gap: clamp(0.8rem, 0.35rem + 1.6vw, 2.1rem);
+    padding-block: clamp(0.2rem, 0.15rem + 0.2vw, 0.3rem);
     border-top: 1px solid var(--line);
     align-items: center;
   }
@@ -170,20 +189,36 @@ const rounds = [
 
   .round__n {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 1.4rem + 2vw, 3.25rem);
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.2rem);
     line-height: 1;
     color: var(--bronze);
   }
-  .round__title { margin-bottom: 0.43rem; }
+  /* Line-height only (not font-size, which the brief protects): 1.5 → 1.32.
+     This is the one real lever left once every pure-whitespace gap on this
+     page was already cut — four rows of title+body text is most of what
+     makes this section tall, and a leading trim reads as denser typesetting,
+     not smaller type. */
+  .round__title { margin-bottom: 0.25rem; line-height: 1.25; }
+  .round__body { line-height: 1.32; }
   .round__body { color: var(--muted); max-width: 42em; }
 
   .split {
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: clamp(1.5rem, 0.4rem + 3.75vw, 4.5rem);
+    /* Trimmed ~25% off the max: clamp(1.5rem,...,4.5rem) → ...,3.4rem. */
+    gap: clamp(1.3rem, 0.4rem + 3vw, 3.4rem);
     align-items: center;
   }
   .split__text .h2 { margin-bottom: 1.11rem; }
+
+  /* Page-scoped (Astro auto-scopes this style block to wellness.astro's own
+     elements — see the identical note on .page-head/.ritual-steps above),
+     for the founder's explicit numeric targets on this one section:
+     image ~25-30% narrower, section padding ~35-40% tighter. Neither number
+     maps to any other page, so this isn't the shared token doing the work —
+     it's a deliberate, additional constraint on top of it. */
+  .etiquette-section { padding-block: clamp(1.4rem, 0.9rem + 1.2vw, 2.1rem); }
+  .split__media { max-width: 330px; }
 
   .disclaimer {
     border-top: 2px solid var(--ink);
@@ -194,5 +229,12 @@ const rounds = [
   @media (max-width: 900px) {
     .split { grid-template-columns: 1fr; }
     .round { grid-template-columns: 1fr; gap: 0.75rem; }
+    /* The 330px desktop cap is an editorial choice for a wide two-column
+       layout; once .split stacks to one column on a phone it would just
+       leave the portrait photo floating narrow in the middle of the page.
+       Let it use the full column width instead, per the founder's own
+       "mobile should use most of the available width" direction on this
+       page's other image. */
+    .split__media { max-width: none; }
   }
 </style>

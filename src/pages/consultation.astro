@@ -113,9 +113,13 @@ const types = [
   .consult__type p { font-size: var(--t-small); color: var(--muted); margin: 0.4rem 0 0; }
 
   .cform__hp { position: absolute; left: -9999px; }
-  .cform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.1rem 1.5rem; }
+  /* GLOBAL FORM SYSTEM, 2026-08-14: row gap now reads --form-row-gap — the
+     same token QuoteForm already used — instead of its own hardcoded 1.1rem.
+     Column gap (1.5rem) stays local; that's layout width, not the vertical
+     rhythm the shared token governs. */
+  .cform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--form-row-gap) 1.5rem; }
 
-  .field { display: grid; gap: 0.5rem; }
+  .field { display: grid; gap: var(--form-label-gap); }
   .field--full { grid-column: 1 / -1; }
   .field label {
     font-size: var(--t-label);

@@ -219,13 +219,15 @@ const projectTypes = [
   .tform__h { margin: 0.6rem 0 1.4rem; }
   .tform__hp { position: absolute; left: -9999px; }
 
+  /* GLOBAL FORM SYSTEM, 2026-08-14: row gap now reads --form-row-gap instead
+     of its own hardcoded 1.1rem, matching every other public form. */
   .tform__grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.1rem 1.5rem;
+    gap: var(--form-row-gap) 1.5rem;
   }
 
-  .field { display: grid; gap: 0.5rem; }
+  .field { display: grid; gap: var(--form-label-gap); }
   .field--full { grid-column: 1 / -1; }
   .field label {
     font-size: var(--t-label);

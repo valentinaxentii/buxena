@@ -165,7 +165,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
        for it to feel like "a luxury brand mark, not a small utility logo."
        ~10% larger at both ends of the clamp than the previous pass. Width-only
        sizing: height follows the intrinsic ratio, the mark never distorts. */
-    width: clamp(6.5rem, 6.2rem + 1.8vw, 8.25rem);
+    /* GROWN 15% further, 2026-08-14: "logo = strongest brand element." At
+       max width (9.49rem=152px) this is 82px tall against an 88px-tall
+       header — fits with margin at the header's new, restored height. */
+    width: clamp(7.48rem, 7.13rem + 2.07vw, 9.49rem);
     height: auto;
   }
 
@@ -209,7 +212,12 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
        old max = 201.6px); tightening it plus the lighter tracking below
        comfortably closes that 33px gap with room to spare, verified by
        measuring actual rendered widths at 1440/1280/1024, not by estimate. */
-    gap: clamp(0.9rem, 0.3rem + 1vw, 1.3rem);
+    /* GROWN, 2026-08-14: "more breathing room horizontally." Bigger gap here
+       is only affordable because the CTA shrank in the same pass (see
+       .hdr__cta below) — re-verified empirically across the full
+       1001-1440px range afterward; see the narrow-band media query at the
+       bottom of this file for how the budget was rebalanced. */
+    gap: clamp(1.2rem, 0.5rem + 1.4vw, 2rem);
   }
 
   /* Quiet-luxury nav type: weight 500 at 13px, restrained 0.12em tracking
@@ -217,14 +225,16 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      underline is a 1px line that grows from the left on hover instead of
      popping in — drawn as a scaling gradient, not a border. */
   .hdr__nav a {
-    font-size: 0.8125rem;
+    /* GROWN ~9%, 2026-08-14: 0.8125rem (13px) → 0.8875rem (14.2px) —
+       "navigation = clear, substantial, premium." */
+    font-size: 0.8875rem;
     font-weight: 500;
     /* 0.12em → 0.09em — the other half of reclaiming the ~33px this row was
        short by. `white-space:nowrap` is the actual fix for the wrapping
        itself (the anchor was plain inline text, so a squeezed <li> could
        always wrap it); the gap and tracking changes are what make nowrap
        safe to add without the row overflowing at 1440/1280/1024 instead. */
-    letter-spacing: 0.09em;
+    letter-spacing: 0.105em;
     line-height: 1;
     text-transform: uppercase;
     text-decoration: none;
@@ -265,14 +275,20 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      need), and the header background is dark everywhere now, so that
      override duplicated these exact values rather than differing from them.
      Removed instead of kept as a no-op. */
+  /* SHRUNK, 2026-08-14 — the header grew (height, logo, nav text and gap all
+     up) and the founder was explicit this CTA should NOT grow with it:
+     "elegant secondary CTA... NOT a large dominant block." Height down,
+     horizontal padding down, tracking eased off so the same word doesn't
+     fight the narrower box, font nudged up toward (not to) nav's new size
+     per "approximately the same... or only slightly smaller." */
   .hdr__cta {
-    height: 2.75rem;
-    padding: 0 1.5rem;
+    height: 2.35rem;
+    padding: 0 1.05rem;
     display: inline-flex;
     align-items: center;
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.1em;
     white-space: nowrap;
     background: var(--bronze-btn);
     color: #fff;
@@ -355,10 +371,18 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      tightens all three independently of the wider clamps above rather than
      making those clamps fight two very different jobs (looking spacious at
      1440 AND fitting at 1024). */
-  @media (max-width: 1200px) and (min-width: 1001px) {
-    .hdr__nav ul { gap: 0.7rem; }
-    .hdr__nav a { font-size: 0.75rem; letter-spacing: 0.07em; }
-    .hdr__cta { padding: 0 1.1rem; font-size: 0.625rem; }
+  /* RECOMPUTED, 2026-08-14: the base header grew substantially (height,
+     logo, nav font, nav gap all up; CTA shrunk but not enough to offset the
+     rest) so this band's own values needed to shrink to match — the old
+     numbers here had drifted to be LARGER than the new base CTA, which is
+     backwards for a "narrow band gets tighter" rule. Widened to 1320px
+     because at the previous 1200px cutoff the jump back to base values
+     opened a fresh 13px overflow right at that boundary; verified
+     overflow-free from 1001px to 1440px afterward. */
+  @media (max-width: 1320px) and (min-width: 1001px) {
+    .hdr__nav ul { gap: 0.6rem; }
+    .hdr__nav a { font-size: 0.75rem; letter-spacing: 0.06em; }
+    .hdr__cta { padding: 0 0.8rem; font-size: 0.6875rem; height: 2.2rem; }
   }
 
   @media (max-width: 1000px) {

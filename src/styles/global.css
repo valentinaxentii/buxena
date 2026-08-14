@@ -78,9 +78,16 @@
      read as inconsistent rather than deliberate, and the founder confirmed
      that reading when asked. So these are the ONLY values now; there is no
      non-home override to keep in sync, and none is needed. */
-  --footer-pad: clamp(1.82rem, 1.05rem + 2.81vw, 3.15rem);  /* Footer.astro vertical pad, was clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) */
-  --footer-col-gap: clamp(1.33rem, 0.53rem + 2.63vw, 3.15rem);  /* was clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem) */
-  --footer-row-gap: clamp(1.33rem, 0.77rem + 1.58vw, 2.38rem);  /* was clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem) */
+  /* RESET 2026-08-14 to the same ×0.89-of-original ratio as --band above
+     ("footer is too small" was the founder's first complaint about the
+     2026-08-14 footer pass, which had cut these as far as ×0.7). Original
+     values preserved in each comment — restore fully to those if ×0.89 is
+     ever still judged too tight. */
+  /* TIGHTENED ONE MORE STEP, 2026-08-14: another ~11% off the just-restored
+     row above (settles ~×0.79 of original, not the earlier ×0.7). */
+  --footer-pad: clamp(2.06rem, 1.19rem + 2.97vw, 3.57rem);  /* Footer.astro vertical pad, original clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) */
+  --footer-col-gap: clamp(1.5rem, 0.6rem + 2.97vw, 3.57rem);  /* original clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem) */
+  --footer-row-gap: clamp(1.5rem, 0.87rem + 1.78vw, 2.7rem);  /* original clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem) */
   --sec-head-gap: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); /* section head → content     */
   --card-body-pad: 1.1rem;                             /* ProductCard text block        */
   --form-row-gap: 1.25rem;                             /* between form rows             */
@@ -131,19 +138,40 @@ body:not(.is-home) {
      --t-hero is untouched because it is used only by the homepage hero.
 
      desktop:  h1 80px → 64px   ·  h2 54.4px → 43.5px
-     mobile:   h1 38.4px → 30.7px ·  h2 30.4px → 24.3px */
+     mobile:   h1 38.4px → 30.7px ·  h2 30.4px → 24.3px
+
+     LEFT UNCHANGED in the 2026-08-14 restoration below: this pass complained
+     about spacing and footer/nav sizing, not headings, and 64px/43.5px
+     already sit inside the founder's own newly-stated H1/H2 guideline
+     (48-56 / 34-42 desktop) — moving them again in either direction would be
+     adjustment for its own sake. */
   --t-h1: clamp(1.92rem, 1.2rem + 3.12vw, 4rem);
   --t-h2: clamp(1.52rem, 1.08rem + 1.92vw, 2.72rem);
 
-  --hdr-h: clamp(4.14rem, 4rem + 0.68vw, 4.68rem);
-  --band: clamp(2.13rem, 1.23rem + 3.74vw, 4.42rem);
+  /* GROWN BACK, 2026-08-14: "header feels too small and thin" — restored to
+     the same height as :root/Home (a ~17.5% increase from the compressed
+     4.68rem max, matching the founder's "increase ~15-20%"), rather than
+     inventing a third value. */
+  --hdr-h: clamp(4.875rem, 4.7rem + 0.8vw, 5.5rem);
 
-  --sec-head-gap: clamp(1.19rem, 0.68rem + 1.45vw, 2.17rem);
-  --card-body-pad: 0.94rem;
+  /* RESET 2026-08-14 — the 2026-08-13 site-wide -15% pass, stacked under
+     that same day's footer/CTA work, compounded into "sections feel
+     squeezed together... luxury spacing is gone." Rather than revert the
+     commit outright — it also carries the Home-exclusion mechanism this
+     whole system depends on — every spacing token below is recomputed
+     directly from its ORIGINAL (pre-2026-08-13) value at a single, final
+     ×0.89 (~11% off original — the founder's own explicit "10-12% tighter
+     overall" target, applied uniformly rather than page-by-page). Landing
+     point at 1440px: ~74px, inside "section padding 64-88px" and close to
+     the low end of "CTA sections 72-96px". */
+  --band: clamp(2.23rem, 1.29rem + 3.92vw, 4.63rem);
 
-  --form-row-gap: 1.06rem;
-  --form-label-gap: 0.47rem;
-  --form-foot-gap: 1.62rem;
+  --sec-head-gap: clamp(1.25rem, 0.71rem + 1.51vw, 2.27rem);
+  --card-body-pad: 0.98rem;
+
+  --form-row-gap: 1.11rem;
+  --form-label-gap: 0.49rem;
+  --form-foot-gap: 1.69rem;
 }
 
 

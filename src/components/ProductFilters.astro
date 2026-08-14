@@ -62,7 +62,10 @@ const { facets } = Astro.props;
 </div>
 
 <style>
-  .pfilters { position: relative; margin-bottom: clamp(1.5rem, 0.9rem + 1.5vw, 2.4rem); }
+  /* Tightened 2026-08-14 — shared across all 5 catalogue pages that use this
+     component, so this is a genuine cross-page consistency improvement, not
+     a one-off override. */
+  .pfilters { position: relative; margin-bottom: clamp(0.9rem, 0.5rem + 1vw, 1.5rem); }
 
   .pfilters__trigger {
     display: none;
@@ -92,10 +95,10 @@ const { facets } = Astro.props;
   .pfilters__groups {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
-  .pfilters__group { display: grid; gap: 0.75rem; }
+  .pfilters__group { display: grid; gap: 0.5rem; }
 
   .pfilters__label {
     font-size: var(--t-label);
