@@ -654,3 +654,28 @@ input.is-zip-invalid {
   text-transform: uppercase;
   opacity: 0.8;
 }
+
+/* ---------------------------------------------------------------------------
+   Touch targets for the standalone `.link` CTAs
+
+   Browser QA (scripts/browser-qa.mjs) measured these at 26–29px tall on 390px
+   and 430px viewports: "Configure This Sauna", "Compare Heaters", "Find My
+   Sauna", "Request Pricing". They are the secondary conversion actions on
+   product pages and the homepage, and they were roughly half the 44px a thumb
+   needs.
+
+   Padding-top rather than a larger font: the underline sits on the baseline via
+   padding-bottom, so growing the box upward extends the hit area without moving
+   the rule, changing the type, or altering the desktop appearance at all. The
+   rule is confined to coarse pointers so the desktop layout is untouched.
+
+   Inline links inside prose are excluded — they are read as text, and giving
+   every one of them a 44px box would wreck paragraph rhythm.
+--------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .link:not(p .link):not(li .link):not(td .link):not(dd .link) {
+    padding-top: 0.75rem;
+    min-height: 2.75rem;   /* 44px */
+    box-sizing: border-box;
+  }
+}

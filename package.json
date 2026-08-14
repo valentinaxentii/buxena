@@ -19,7 +19,10 @@
     "catalog:audit": "node scripts/sync-products-from-content.mjs",
     "verify": "npm run check && npm test && npm run images:audit && npm run prelaunch",
     "images:audit": "node scripts/image-integrity.mjs",
-    "routes:runtime": "node scripts/runtime-routes.mjs"
+    "routes:runtime": "node scripts/runtime-routes.mjs",
+    "leaks:audit": "node scripts/commercial-leak-audit.mjs",
+    "failures:audit": "node scripts/failure-modes.mjs",
+    "qa:browser": "node scripts/browser-qa.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^8.1.2",

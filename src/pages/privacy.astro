@@ -349,7 +349,10 @@ const sections = [
 <style>
   .legal__contact-email {
     display: inline-block;
-    margin: 0.2rem 0 0.86em;
+    /* The page's one action. 26px tall on a phone before; padding grows the
+       hit area to ~44px without moving the text. */
+    padding-block: 0.55rem;
+    margin: -0.35rem 0 0.51em;
     font-size: 1.1rem;
     font-family: var(--font-display);
     color: var(--bronze-ink);

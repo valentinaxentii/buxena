@@ -101,6 +101,28 @@ const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
     font-size: var(--t-small);
     color: var(--muted);
   }
+
+  /* Field styling, matching QuoteForm.astro.
+     This form used the `.field` markup pattern but those styles are SCOPED to
+     QuoteForm, so nothing here ever received them — the warranty form shipped
+     with raw browser-default controls: 21px inputs, 13px font, no underline,
+     no focus state. Found by scripts/browser-qa.mjs measuring tap targets at
+     390px. Duplicated rather than globalised because promoting `.field` to
+     global.css would double-apply against every scoped copy and risk drift in
+     the other direction. */
+  .field { display: grid; gap: var(--form-label-gap); }
+  .field--full { grid-column: 1 / -1; }
+  .field label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+  .field label span { color: var(--bronze-ink); font-weight: 700; }
+  .field input, .field select, .field textarea {
+    font-family: var(--font-sans); font-size: 1.0625rem; font-weight: 400; color: var(--ink);
+    background: transparent; border: none; border-bottom: 1.5px solid var(--line);
+    padding: 0.7rem 0; width: 100%; border-radius: 0; transition: border-color 0.4s var(--ease);
+  }
+  .field textarea { border: 1.5px solid var(--line); padding: 0.9rem 1rem; resize: vertical; line-height: 1.6; }
+  .field select { appearance: none; cursor: pointer; }
+  .field input:hover, .field select:hover, .field textarea:hover { border-color: var(--muted); }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--bronze); }
   .wform__submit { justify-self: start; }
 
   @media (max-width: 640px) {

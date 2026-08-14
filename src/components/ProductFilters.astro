@@ -156,6 +156,12 @@ const { facets } = Astro.props;
     .pfilters__title { font-family: var(--font-display); font-size: 1.4rem; }
     .pfilters__close {
       display: inline-flex;
+      align-items: center;
+      /* 25px tall before — the drawer's only dismiss control, at half a thumb.
+         Padding, not font-size: the label stays quiet, the hit area doesn't. */
+      min-height: 2.75rem;
+      padding: 0.5rem 0.75rem;
+      margin: -0.5rem -0.75rem;
       background: none;
       border: none;
       cursor: pointer;

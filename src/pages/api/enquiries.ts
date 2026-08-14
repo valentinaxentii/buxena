@@ -73,8 +73,21 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     }
   }
 
+  // Parse OUTSIDE the main try. A body that is not JSON is the caller's error
+  // and deserves a 400; the catch below answers 500, which is reserved for our
+  // side failing. Before this split, `curl -d 'not json'` produced a 500 —
+  // wrong semantically, and noise in any error monitoring that alerts on 5xx.
+  let body: any;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ ok: false, error: 'Request body must be JSON.' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  try {
     const {
       name, email, phone, location, zip, message, chatTranscript, saunaInterest, source, attribution, botField,
       appendToEnquiryId,
