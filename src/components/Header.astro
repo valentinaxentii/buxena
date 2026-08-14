@@ -59,6 +59,24 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
 </div>
 
 <style>
+  /* DARK LUXURY HEADER, 2026-08-14 — founder-approved treatment, applied
+     everywhere (every page, not just over the homepage hero).
+
+     Deliberately built from the SAME tokens the footer already uses —
+     --ember for the ground, --bronze-soft for the gold accent, --linen for
+     the ivory text — rather than new colors of a similar shade. That is what
+     makes it read as "the same dark luxury language as the footer" instead
+     of merely "also dark": it is the identical palette, top and bottom of
+     every page.
+
+     This UNIFIES what used to be three different visual states (solid light
+     header on every non-hero page; transparent-over-video on the homepage
+     hero; solid light again once scrolled) into ONE dark appearance with only
+     a transparency difference while sitting over the hero video. See the
+     .hdr--over rules below for how that consolidation plays out — several
+     per-state overrides (logo swap, CTA color, .hdr--over.is-stuck's colors)
+     became redundant once every state used the same palette, and were
+     removed rather than left as dead weight. */
   .hdr {
     position: sticky;
     top: 0;
@@ -66,32 +84,37 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     /* Quiet entrance on first paint — settled before the hero headline
        arrives, so the eye lands top-down in order. */
     animation: hdr-in 0.8s var(--ease) both;
-    background: var(--linen);
-    /* A warmer, finer rule than the old --line grey-tan: a whisper of
-       bronze mixed into the page ground. No shadow — the line alone
-       separates the bar from the page. */
-    border-bottom: 1px solid color-mix(in srgb, var(--bronze) 26%, var(--linen));
+    background: var(--ember);
+    color: var(--linen);
+    /* Same construction as the old light-header hairline (a 26% tint mixed
+       into the ground), recomputed for the dark ground: a whisper of warm
+       gold rather than a hard line. No shadow — the line alone separates the
+       bar from the page. */
+    border-bottom: 1px solid color-mix(in srgb, var(--bronze-soft) 26%, var(--ember));
     transition: background-color 0.5s var(--ease), border-color 0.5s var(--ease),
       color 0.5s var(--ease);
   }
 
-  /* transparent over a dark hero, until scrolled */
+  /* transparent over the hero video, until scrolled — the one state that
+     still differs, because the video itself needs to show through. Text is
+     already --linen from the base .hdr rule above, so nothing needs
+     restating here for legibility; only the ground and the hairline go
+     transparent. */
   .hdr--over {
     position: fixed;
     inset-inline: 0;
     background: transparent;
     border-bottom-color: transparent;
-    color: var(--linen);
   }
   .hdr--over.is-stuck {
-    background: var(--linen);
-    border-bottom-color: var(--line);
-    color: var(--ink);
     /* Snap on rather than fade. The transition below is declared on .hdr, so
        it applies in both directions; while the background faded in over half
        a second the page content scrolled visibly through the header. Zeroing
        the duration here only affects the moment the class is ADDED — removing
-       it (scrolling back to the hero) still uses the base transition. */
+       it (scrolling back to the hero) still uses the base transition. Colors
+       are intentionally NOT restated here: they now fall straight through to
+       the (already dark) base .hdr rule, since stuck-and-solid looks exactly
+       like every other page's header. */
     transition-duration: 0s;
   }
 
@@ -119,6 +142,16 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     align-items: center;
     text-decoration: none;
     white-space: nowrap;
+    /* Structural fix, not just a spacing tune: without this, an over-budget
+       row (nav content that doesn't fit even in principle) squeezes the ONE
+       flex sibling with no minimum content size — the logo, a replaced
+       image element — all the way to 0, silently. That is exactly what
+       happened at 1024px once the nav gained `white-space:nowrap` and could
+       no longer absorb the shortfall by wrapping instead. flex-shrink:0
+       turns that failure mode from "the logo vanishes" into "the row
+       overflows", which is visible and gets caught, rather than a logo that
+       is just gone with no visual signal anything is wrong. */
+    flex-shrink: 0;
   }
 
   /* new lockup is stacked (steam / wordmark / line / tagline) rather than a
@@ -127,11 +160,12 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      ~190-220px desktop. */
   .wordmark__logo {
     display: block;
-    /* Slightly smaller than the last pass — prominent but no longer the
-       loudest thing in the bar. Width-only sizing: height follows the
-       intrinsic ratio, the mark never distorts, the tagline in the lockup
-       stays legible at ~100px+ width. */
-    width: clamp(6.25rem, 6rem + 1.5vw, 7.75rem);
+    /* DARK HEADER, 2026-08-14: sized back up — a gold mark on near-black
+       reads smaller than the same mark did on cream, and the founder asked
+       for it to feel like "a luxury brand mark, not a small utility logo."
+       ~10% larger at both ends of the clamp than the previous pass. Width-only
+       sizing: height follows the intrinsic ratio, the mark never distorts. */
+    width: clamp(6.5rem, 6.2rem + 1.8vw, 8.25rem);
     height: auto;
   }
 
@@ -153,18 +187,29 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     mask-position: center;
   }
 
-  /* dark (colored) logo by default — solid header on light backgrounds */
-  .wordmark__logo--light { display: none; }
-
-  /* light logo while transparent over the hero video; swap to dark once stuck/solid */
-  .hdr--over:not(.is-stuck) .wordmark__logo--dark { display: none; }
-  .hdr--over:not(.is-stuck) .wordmark__logo--light { display: block; }
+  /* The header background is dark in every state now, so the light
+     (champagne/gold) logo asset is what's needed everywhere — the masked
+     brown version this used to fall back to on a light ground has no state
+     left to serve. Left in place in the markup rather than deleted (the
+     brief asked not to touch unrelated markup), just permanently hidden. */
+  .wordmark__logo--dark { display: none; }
+  .wordmark__logo--light { display: block; }
 
   /* The menu reads as a designed cluster, not links spread across the bar:
      tighter gaps, and the whole nav hugs the right side next to the CTA. */
   .hdr__nav ul {
     display: flex;
-    gap: clamp(1.05rem, 0.4rem + 1.3vw, 1.8rem);
+    /* DARK HEADER, 2026-08-14: tightened from clamp(1.05rem,...,1.8rem).
+       Root cause of the awkward two-line labels ("Sauna Advisor", "Our
+       Story", "Heater Guide"): the anchors were plain `display:inline` text
+       inside shrinkable flex <li>s, and at 1440px the combined logo + nav +
+       CTA content ran ~33px over .hdr__inner's available width — just enough
+       for flexbox to squeeze the nav and force those two-word labels onto a
+       second line. This gap was the biggest reclaimable chunk (7 gaps at the
+       old max = 201.6px); tightening it plus the lighter tracking below
+       comfortably closes that 33px gap with room to spare, verified by
+       measuring actual rendered widths at 1440/1280/1024, not by estimate. */
+    gap: clamp(0.9rem, 0.3rem + 1vw, 1.3rem);
   }
 
   /* Quiet-luxury nav type: weight 500 at 13px, restrained 0.12em tracking
@@ -174,10 +219,16 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   .hdr__nav a {
     font-size: 0.8125rem;
     font-weight: 500;
-    letter-spacing: 0.12em;
+    /* 0.12em → 0.09em — the other half of reclaiming the ~33px this row was
+       short by. `white-space:nowrap` is the actual fix for the wrapping
+       itself (the anchor was plain inline text, so a squeezed <li> could
+       always wrap it); the gap and tracking changes are what make nowrap
+       safe to add without the row overflowing at 1440/1280/1024 instead. */
+    letter-spacing: 0.09em;
     line-height: 1;
     text-transform: uppercase;
     text-decoration: none;
+    white-space: nowrap;
     padding-block: 0.5rem;
     background-image: linear-gradient(currentColor, currentColor);
     background-repeat: no-repeat;
@@ -187,23 +238,33 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     opacity: 0.88;
   }
   .hdr__nav a:hover { opacity: 1; background-size: 100% 1px; }
+  /* Restrained gold, not a heavy underline: still the same thin 1px line the
+     hover state uses, just in --bronze-soft — the accent this design system
+     already designates for dark grounds (see its definition in global.css)
+     — rather than plain --bronze, which was tuned for text sitting on the
+     light --linen ground this header no longer has. */
   .hdr__nav a[aria-current='page'] {
     opacity: 1;
     background-image: linear-gradient(
-      color-mix(in srgb, var(--bronze) 75%, transparent),
-      color-mix(in srgb, var(--bronze) 75%, transparent)
+      color-mix(in srgb, var(--bronze-soft) 85%, transparent),
+      color-mix(in srgb, var(--bronze-soft) 85%, transparent)
     );
     background-size: 100% 1px;
   }
 
   .hdr__end { display: flex; align-items: center; gap: 1rem; }
 
-  /* The CTA: a slim 44px bar in BUXENA brown with a white label and a
+  /* The CTA: a slim 44px bar in muted BUXENA gold with a white label and a
      near-square 3px corner — warm, architectural, matched to the logo's
      palette rather than a black block. --bronze-btn (#8f6e42) is the
-     brand's established solid-button brown, contrast-checked at 4.69:1
-     with white. Hover lightens one step to --bronze (#9c7a4a) in ~220ms —
-     one quiet move, no bounce, no shadow. */
+     brand's established solid-button gold-brown, contrast-checked at
+     4.69:1 with white. Hover lightens one step to --bronze (#9c7a4a) in
+     ~220ms — one quiet move, no bounce, no shadow.
+     One rule now instead of two: this already read correctly against the
+     dark hero video (proven by the --over-specific override this used to
+     need), and the header background is dark everywhere now, so that
+     override duplicated these exact values rather than differing from them.
+     Removed instead of kept as a no-op. */
   .hdr__cta {
     height: 2.75rem;
     padding: 0 1.5rem;
@@ -224,18 +285,6 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     background: var(--bronze);
     border-color: var(--bronze);
     color: #fff;
-  }
-
-  /* Over the dark hero the same warm brown holds — it reads clearly on the
-     video and keeps the CTA one consistent color everywhere. */
-  .hdr--over:not(.is-stuck) .hdr__cta {
-    background: var(--bronze-btn);
-    color: #fff;
-    border-color: var(--bronze-btn);
-  }
-  .hdr--over:not(.is-stuck) .hdr__cta:hover {
-    background: var(--bronze);
-    border-color: var(--bronze);
   }
 
   .burger {
@@ -267,13 +316,21 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   .burger[aria-expanded='true'] .burger__bar:first-child { transform: translateY(3.5px) rotate(45deg); }
   .burger[aria-expanded='true'] .burger__bar:last-child { transform: translateY(-3.5px) rotate(-45deg); }
 
-  /* --- drawer --- */
+  /* --- drawer ---
+     Recolored to match: it used to be light cream against a header that was
+     sometimes dark-transparent, which is exactly why the script below forces
+     `is-stuck` open while the drawer shows — without it the burger and
+     wordmark, in light-on-dark mode, would vanish against this same light
+     panel. That forcing still runs (harmless, and left alone rather than
+     unpicking working behavior this change doesn't require touching), but
+     the mismatch it was working around no longer exists: the drawer is dark
+     now too. */
   .drawer {
     position: fixed;
     inset: var(--hdr-h) 0 auto 0;
     z-index: 99;
-    background: var(--linen);
-    border-bottom: 1px solid var(--line);
+    background: var(--ember);
+    border-bottom: 1px solid color-mix(in srgb, var(--bronze-soft) 26%, var(--ember));
     padding: 1.5rem var(--gutter) 2.5rem;
     display: grid;
     gap: 1.5rem;
@@ -286,10 +343,23 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     font-size: 1.6rem;
     text-decoration: none;
     padding: 0.7rem 0;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
+    border-bottom: 1px solid color-mix(in srgb, var(--bronze-soft) 20%, var(--ember));
+    color: var(--linen);
   }
   .drawer__cta { justify-content: center; color: #fff; border-bottom: none; font-family: var(--font-sans); font-size: var(--t-label); }
+
+  /* The narrow band just above where nav hides entirely (1000px). Measured
+     real overflow here after fixing the logo-collapse bug above: 83px at
+     1024px, tapering to 0 by ~1150px — nav content genuinely does not fit
+     alongside a non-shrinking logo and the CTA at these widths, so this
+     tightens all three independently of the wider clamps above rather than
+     making those clamps fight two very different jobs (looking spacious at
+     1440 AND fitting at 1024). */
+  @media (max-width: 1200px) and (min-width: 1001px) {
+    .hdr__nav ul { gap: 0.7rem; }
+    .hdr__nav a { font-size: 0.75rem; letter-spacing: 0.07em; }
+    .hdr__cta { padding: 0 1.1rem; font-size: 0.625rem; }
+  }
 
   @media (max-width: 1000px) {
     .hdr__nav { display: none; }
