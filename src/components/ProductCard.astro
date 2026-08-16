@@ -46,7 +46,7 @@ const isVariantGroup = variants.length > 1;
 ---
 
 <article
-  class="pcard"
+  class={`pcard ${isVariantGroup ? 'pcard--family' : ''}`}
   data-category={category}
   data-location={location ?? ''}
   data-type={productType ?? ''}
@@ -56,17 +56,19 @@ const isVariantGroup = variants.length > 1;
 >
   {isVariantGroup ? (
     <div class="pcard__link pcard__link--group">
-      <div class="pcard__media">
+      <div class="pcard__media pcard__media--family">
         <Figure
           src={image?.src}
           alt={image?.alt ?? title}
           note={image?.note}
           label={[series, productType].filter(Boolean).join(' · ')}
           ratio="4 / 3"
-          tone="mid"
-          fit="contain"
+          tone="dark"
+          fit="cover"
           fixedRatio={true}
+          class="pcard-family-figure"
         />
+        <span class="pcard__family-badge">{series} collection</span>
         {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
       </div>
       <div class="pcard__body">
@@ -74,7 +76,7 @@ const isVariantGroup = variants.length > 1;
         {specLine && <p class="pcard__specs">{specLine}</p>}
         <p class="pcard__tag">{tagline}</p>
         <div class="pcard__variants" aria-label={`${displayTitle(title)} available sizes`}>
-          <span class="pcard__variants-label">Available sizes</span>
+          <span class="pcard__variants-label">Choose size</span>
           <div class="pcard__variant-links">
             {variants.map((variant) => (
               <a href={`/saunas/${variant.slug}/`}>{variant.label}</a>
@@ -110,7 +112,7 @@ const isVariantGroup = variants.length > 1;
   )}
 
   {isVariantGroup ? (
-    <div class="pcard__actions">
+    <div class="pcard__actions pcard__actions--family">
       <a
         class="pcard__quote"
         href={`/quote/?model=${encodeURIComponent(title)}`}
@@ -160,6 +162,37 @@ const isVariantGroup = variants.length > 1;
   .pcard__link:hover .pcard__media :global(.fig) { transform: scale(1.035); }
   .pcard__link--group:hover .pcard__media :global(.fig) { transform: none; }
 
+  /* Family/configuration photography comes from supplier catalogue renders,
+     often on a black ground. Present it as an intentional premium dark hero
+     instead of a raw black JPEG floating on the linen page. */
+  .pcard__media--family {
+    background: radial-gradient(circle at 50% 42%, #2b2926 0%, #171614 72%, #111 100%);
+    border: 1px solid rgba(164, 122, 71, 0.28);
+  }
+  .pcard__media--family :global(.fig) {
+    background: transparent;
+  }
+  .pcard__media--family :global(img) {
+    transform: scale(1.06);
+    filter: saturate(1.08) contrast(1.06) brightness(1.04);
+  }
+  .pcard__family-badge {
+    position: absolute;
+    left: 0.8rem;
+    bottom: 0.8rem;
+    z-index: 2;
+    padding: 0.38rem 0.58rem;
+    background: rgba(17, 16, 14, 0.72);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.88);
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    backdrop-filter: blur(5px);
+  }
+
   .pcard__flag {
     position: absolute;
     top: 0.9rem;
@@ -203,12 +236,12 @@ const isVariantGroup = variants.length > 1;
 
   .pcard__variants {
     border-top: 1px solid var(--line);
-    padding-top: 0.75rem;
-    margin-top: 0.25rem;
+    padding-top: 0.8rem;
+    margin-top: 0.3rem;
   }
   .pcard__variants-label {
     display: block;
-    margin-bottom: 0.55rem;
+    margin-bottom: 0.6rem;
     font-family: 'Manrope', var(--font-sans);
     font-size: 0.68rem;
     font-weight: 700;
@@ -219,22 +252,30 @@ const isVariantGroup = variants.length > 1;
   .pcard__variant-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.45rem;
   }
   .pcard__variant-links a {
     display: inline-flex;
     align-items: center;
-    min-height: 34px;
-    padding: 0 0.7rem;
-    border: 1px solid var(--line);
+    justify-content: center;
+    min-height: 36px;
+    min-width: 66px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--bronze);
     color: var(--ink);
+    background: rgba(255,255,255,0.28);
     font-family: 'Manrope', var(--font-sans);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     text-decoration: none;
-    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease), color 0.25s var(--ease);
   }
-  .pcard__variant-links a:hover { border-color: var(--bronze); background: var(--linen); }
+  .pcard__variant-links a:hover {
+    border-color: var(--bronze);
+    background: var(--bronze);
+    color: var(--linen);
+  }
 
   .pcard__price {
     font-family: 'Manrope', var(--font-sans);
@@ -252,6 +293,7 @@ const isVariantGroup = variants.length > 1;
     margin-top: auto;
     padding-top: 0.25rem;
   }
+  .pcard__actions--family { padding-top: 0.65rem; }
 
   .pcard__more {
     font-family: 'Manrope', var(--font-sans);
@@ -293,6 +335,6 @@ const isVariantGroup = variants.length > 1;
   @media (max-width: 640px), (hover: none) {
     .pcard__more { padding-top: 0.7rem; }
     .pcard__quote { padding-block: 0.7rem; }
-    .pcard__variant-links a { min-height: 44px; }
+    .pcard__variant-links a { min-height: 44px; min-width: 76px; }
   }
 </style>
