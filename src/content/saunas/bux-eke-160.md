@@ -10,16 +10,12 @@ order: 310
 placeholder: false
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's
-  # direction (supersedes the earlier placeholder-only decision for this
-  # class of gap). Capra's 2026 Catalogue (Andres Sokk, p.6-7) publishes
-  # ONE generic photograph for the whole EKE line, shared across every
-  # depth/size in the catalogue itself. This is NOT a photo of this specific
-  # depth — it is the correct SERIES, verified against the source page, and
-  # no other model's photo has been substituted. Classification: FAMILY.
-  # Replace with an exact depth photo the moment Capra sends one.
-  src: "/images/saunas/bux-eke-family-hero.jpg"
-  alt: "BUX EKE 160 outdoor cube sauna, glass front and shingle roof"
+  # EXACT MODEL IMAGE — Capra's live EKE 160 product page identifies this
+  # configuration as EKE 160 (SKU EK160TRWD2-1000). The image is served from
+  # Capra's own linked Drive asset rather than reusing the generic EKE family
+  # render. Keep this mapped only to EKE 160.
+  src: "https://drive.google.com/thumbnail?id=1eE-7IM6AzESa5GFA4L0oSwF_iI4tJtsj&sz=w1200"
+  alt: "BUX EKE 160 outdoor thermowood cube sauna"
 dimensions:
   - { label: "Depth", value: "5.2 ft (160 cm)" }
   - { label: "Width", value: "6.9 ft (210 cm)" }
