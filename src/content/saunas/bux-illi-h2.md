@@ -13,6 +13,14 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Extra dried pine"]
 heroImage:
+  # CONFIGURATION IMAGE — labelled 2026-08-16 to satisfy the frozen
+  # classification rule. Traced to Capra's own per-SKU spec sheets: the
+  # ILLI H1 page and the ILLI H2 130 page each independently publish the
+  # identical front-render thumbnail (Capra's own choice, same footprint,
+  # ~13cm height difference only) — not an internal substitution, but not
+  # confirmed as visually distinguishing H1 from H2 either. Shared with
+  # bux-illi-h1.md. Pre-dates this session; flagged, not swapped.
+  # Classification: CONFIGURATION.
   src: "/images/saunas/illi-h2-hero.jpg"
   alt: "ILLI H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
