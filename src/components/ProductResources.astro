@@ -1,32 +1,86 @@
 ---
+import { getCollection } from 'astro:content';
 import { publicAssets } from '../lib/product-assets';
 import type { TechnicalAssets } from '../lib/product-assets';
+import { displayTitle } from '../data/catalog';
 
 /**
- * Technical resources for a product — video, drawings, 3D, manuals.
+ * Technical specification sheet + verified resources for every sauna model.
  *
- * RENDERS NOTHING unless the model has at least one asset that is VERIFIED,
- * permitted in writing, and has a URL. No empty tabs, no dead buttons, no
- * "coming soon" — a placeholder for a drawing we do not have invites a
- * customer to ask for it, and tells them we are not ready.
+ * The product page already renders this component for every model. Looking up
+ * the matching content entry here lets us add the specification-sheet treatment
+ * globally without duplicating markup across 30+ product pages.
  *
- * These are SUPPORTING actions. Configure and Get Exact Quote remain the
- * primary CTAs above; this section sits below the specifications, styled
- * quietly, because a floor plan reassures a buyer who has already decided to
- * take the model seriously — it does not create that decision.
- *
- * PERFORMANCE: nothing third-party loads until a click. No YouTube iframe, no
- * Vimeo player, no 3D viewer is in the initial page. A product page with a
- * video costs the same as one without until the customer asks for it.
+ * FACTUAL INTEGRITY: only values already present in the model's verified content
+ * are rendered. Unit columns are split only when both systems are explicitly
+ * present in the source string. Nothing is calculated or guessed.
  */
 interface Props {
   assets?: TechnicalAssets;
-  /** Internal model title, for analytics. */
+  /** Internal model title, for analytics and content lookup. */
   model: string;
 }
 const { assets, model } = Astro.props;
 
 const resources = publicAssets(assets);
+const saunaEntries = await getCollection('saunas', ({ data }) => !data.draft);
+const product = saunaEntries.find((entry) => entry.data.title === model);
+const data = product?.data;
+
+function stripOuterParens(value: string): string {
+  return value.replace(/^\s*\(|\)\s*$/g, '').trim();
+}
+
+function unitSystem(value: string): 'metric' | 'imperial' | null {
+  const v = value.toLowerCase();
+  if (/\b(mm|cm|kg|m³|m2|m²|kw)\b/.test(v)) return 'metric';
+  if (/\b(in|inch|inches|lb|lbs|ft|sq ft|cu ft)\b/.test(v) || /\d+\s*[′']/u.test(v)) return 'imperial';
+  return null;
+}
+
+/**
+ * Split an existing dual-unit source string, e.g.
+ * "51.2 × 53.1 × 89.0 in (1300 × 1350 × 2260 mm)".
+ * If the source does not explicitly contain both systems, keep it intact in a
+ * neutral Value column rather than manufacturing a conversion.
+ */
+function splitVerifiedUnits(value: string) {
+  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if (!match) return { metric: '', imperial: '', value };
+
+  const first = match[1].trim();
+  const second = stripOuterParens(match[2]);
+  const firstSystem = unitSystem(first);
+  const secondSystem = unitSystem(second);
+
+  if (firstSystem === 'imperial' && secondSystem === 'metric') {
+    return { metric: second, imperial: first, value: '' };
+  }
+  if (firstSystem === 'metric' && secondSystem === 'imperial') {
+    return { metric: first, imperial: second, value: '' };
+  }
+  return { metric: '', imperial: '', value };
+}
+
+const technicalRows = data
+  ? [
+      ...(data.capacity ? [{ label: 'Capacity', raw: data.capacity }] : []),
+      ...(data.dimensions ?? []).map((row) => ({ label: row.label, raw: row.value })),
+      ...(data.specs ?? []).map((row) => ({ label: row.label, raw: row.value })),
+      ...(data.materials?.length ? [{ label: 'Material', raw: data.materials.join(', ') }] : []),
+      ...(data.delivery ? [{ label: 'Delivery', raw: data.delivery }] : []),
+    ].map((row) => ({ ...row, ...splitVerifiedUnits(row.raw) }))
+  : [];
+
+const heaterRows = data?.heaterOptions ?? [];
+const hasTechnicalSheet = technicalRows.length > 0 || heaterRows.length > 0;
+
+const drawingResources = resources.filter(({ slot }) =>
+  ['dimensionDrawing', 'floorPlan', 'elevations', 'benchLayout'].includes(slot.key)
+);
+const otherResources = resources.filter(({ slot }) =>
+  !['dimensionDrawing', 'floorPlan', 'elevations', 'benchLayout'].includes(slot.key)
+);
 
 /** Poster-less videos still need a labelled play target. */
 function embedUrl(provider: string | undefined, url: string): string {
@@ -48,98 +102,273 @@ function minutes(seconds?: number): string {
 }
 ---
 
-{resources.length > 0 && (
-  <section class="band band--tight" id="resources">
+{(hasTechnicalSheet || resources.length > 0) && (
+  <section class="band band--tight techsheet" id="technical-information">
     <div class="shell">
-      <div class="sec-head">
-        <span class="eyebrow">Technical Resources</span>
-        <h2 class="h2 measure--tight">See exactly what you are buying</h2>
-        <p class="lead measure">
-          Drawings, manuals and installation footage for this model — the same
-          documents your builder or electrician will want.
-        </p>
-      </div>
+      {hasTechnicalSheet && (
+        <div class="techsheet__panel">
+          <div class="techsheet__head">
+            <div>
+              <span class="eyebrow">Technical Information</span>
+              <h2 class="h2 techsheet__title">{data ? displayTitle(data.title) : model}</h2>
+              {data?.capacity && <p class="techsheet__subtitle">Verified specifications for {data.capacity}</p>}
+            </div>
+            {data?.series && <span class="techsheet__series">{data.series}</span>}
+          </div>
 
-      <div class="pres" data-resources data-model={model}>
-        {resources.map(({ slot, asset }) => (
-          <div class="pres__item" data-pres-item={slot.key}>
-            {slot.kind === 'video' ? (
-              <button
-                class="pres__btn pres__btn--video"
-                type="button"
-                data-pres-play={slot.key}
-                data-pres-src={embedUrl(asset.provider, asset.url!)}
-                data-pres-title={asset.title ?? slot.label}
-                aria-label={`Play ${asset.title ?? slot.label}`}
-              >
-                <span class="pres__icon" aria-hidden="true">▶</span>
-                <span class="pres__body">
-                  <span class="pres__label">{slot.action}</span>
-                  {minutes(asset.durationSeconds) && (
-                    <span class="pres__meta">{minutes(asset.durationSeconds)}</span>
-                  )}
-                </span>
-              </button>
-            ) : slot.kind === 'model' ? (
-              <button
-                class="pres__btn"
-                type="button"
-                data-pres-embed={slot.key}
-                data-pres-src={asset.url}
-                data-pres-title={asset.title ?? slot.label}
-                aria-label={`Open ${asset.title ?? slot.label}`}
-              >
-                <span class="pres__icon" aria-hidden="true">◈</span>
-                <span class="pres__body"><span class="pres__label">{slot.action}</span></span>
-              </button>
-            ) : (
-              /* Drawings and documents open in a new tab: a PDF or a large
-                 drawing is better handled by the browser's own viewer, which
-                 can zoom and print, than by anything reimplemented here. */
-              <a
-                class="pres__btn"
-                href={asset.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-pres-open={slot.key}
-                data-track="product_resource_opened"
-                data-track-model={model}
-              >
-                <span class="pres__icon" aria-hidden="true">▤</span>
-                <span class="pres__body">
-                  <span class="pres__label">{slot.action}</span>
-                  <span class="pres__meta">Opens in a new tab</span>
-                </span>
-              </a>
+          <div class:list={['techsheet__layout', drawingResources.length > 0 && 'techsheet__layout--with-drawings']}>
+            <div class="techsheet__tablewrap">
+              <table class="techsheet__table">
+                <thead>
+                  <tr>
+                    <th scope="col">Technical information</th>
+                    <th scope="col">Metric</th>
+                    <th scope="col">Imperial</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {technicalRows.map((row) => (
+                    <tr>
+                      <th scope="row">{row.label}</th>
+                      {row.value ? (
+                        <td colspan="2" class="techsheet__combined">{row.value}</td>
+                      ) : (
+                        <>
+                          <td>{row.metric || '—'}</td>
+                          <td>{row.imperial || '—'}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {heaterRows.length > 0 && (
+                <div class="techsheet__compat">
+                  <h3>Compatible heating</h3>
+                  <ul>
+                    {heaterRows.map((heater) => (
+                      <li><span class="techsheet__check" aria-hidden="true">✓</span><span>{heater}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {drawingResources.length > 0 && (
+              <aside class="techsheet__drawings" aria-label="Technical drawings">
+                <span class="techsheet__drawings-label">Verified drawings</span>
+                {drawingResources.map(({ slot, asset }) => (
+                  <a
+                    class="techsheet__drawing"
+                    href={asset.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-track="product_resource_opened"
+                    data-track-model={model}
+                    data-pres-open={slot.key}
+                  >
+                    <span class="techsheet__drawing-icon" aria-hidden="true">⌑</span>
+                    <span>
+                      <strong>{asset.title ?? slot.label}</strong>
+                      <small>Open drawing</small>
+                    </span>
+                  </a>
+                ))}
+              </aside>
             )}
           </div>
-        ))}
-      </div>
+
+          <p class="techsheet__note">Only supplier-verified information is shown. Final heater, electrical, site and delivery requirements are confirmed with your written quote.</p>
+        </div>
+      )}
+
+      {otherResources.length > 0 && (
+        <div class="resources-block">
+          <div class="sec-head resources-block__head">
+            <span class="eyebrow">Technical Resources</span>
+            <h2 class="h2 measure--tight">Plans, manuals & installation resources</h2>
+          </div>
+
+          <div class="pres" data-resources data-model={model}>
+            {otherResources.map(({ slot, asset }) => (
+              <div class="pres__item" data-pres-item={slot.key}>
+                {slot.kind === 'video' ? (
+                  <button
+                    class="pres__btn pres__btn--video"
+                    type="button"
+                    data-pres-play={slot.key}
+                    data-pres-src={embedUrl(asset.provider, asset.url!)}
+                    data-pres-title={asset.title ?? slot.label}
+                    aria-label={`Play ${asset.title ?? slot.label}`}
+                  >
+                    <span class="pres__icon" aria-hidden="true">▶</span>
+                    <span class="pres__body">
+                      <span class="pres__label">{slot.action}</span>
+                      {minutes(asset.durationSeconds) && <span class="pres__meta">{minutes(asset.durationSeconds)}</span>}
+                    </span>
+                  </button>
+                ) : slot.kind === 'model' ? (
+                  <button
+                    class="pres__btn"
+                    type="button"
+                    data-pres-embed={slot.key}
+                    data-pres-src={asset.url}
+                    data-pres-title={asset.title ?? slot.label}
+                    aria-label={`Open ${asset.title ?? slot.label}`}
+                  >
+                    <span class="pres__icon" aria-hidden="true">◈</span>
+                    <span class="pres__body"><span class="pres__label">{slot.action}</span></span>
+                  </button>
+                ) : (
+                  <a
+                    class="pres__btn"
+                    href={asset.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-pres-open={slot.key}
+                    data-track="product_resource_opened"
+                    data-track-model={model}
+                  >
+                    <span class="pres__icon" aria-hidden="true">▤</span>
+                    <span class="pres__body">
+                      <span class="pres__label">{slot.action}</span>
+                      <span class="pres__meta">Opens in a new tab</span>
+                    </span>
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
 
-    {/* One dialog reused by every embed. Empty until something is opened, so
-        no third-party frame exists in the delivered page. */}
-    <dialog class="pres-modal" data-pres-modal aria-label="Technical resource">
-      <div class="pres-modal__bar">
-        <p class="pres-modal__title" data-pres-modal-title></p>
-        <button class="pres-modal__close" type="button" data-pres-close aria-label="Close">×</button>
-      </div>
-      <div class="pres-modal__frame" data-pres-modal-frame></div>
-    </dialog>
+    {otherResources.some(({ slot }) => slot.kind === 'video' || slot.kind === 'model') && (
+      <dialog class="pres-modal" data-pres-modal aria-label="Technical resource">
+        <div class="pres-modal__bar">
+          <p class="pres-modal__title" data-pres-modal-title></p>
+          <button class="pres-modal__close" type="button" data-pres-close aria-label="Close">×</button>
+        </div>
+        <div class="pres-modal__frame" data-pres-modal-frame></div>
+      </dialog>
+    )}
   </section>
 )}
 
 <style>
+  .techsheet__panel {
+    padding: clamp(1.25rem, 1rem + 1.2vw, 2.25rem);
+    border: 1px solid var(--line);
+    background: var(--linen);
+  }
+  .techsheet__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .techsheet__title { margin: 0.18rem 0 0; }
+  .techsheet__subtitle { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+  .techsheet__series {
+    flex: 0 0 auto;
+    color: var(--bronze-ink);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .techsheet__layout { margin-top: 1rem; }
+  .techsheet__layout--with-drawings {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(14rem, 0.65fr);
+    gap: clamp(1rem, 2vw, 2rem);
+    align-items: start;
+  }
+  .techsheet__tablewrap { min-width: 0; overflow-x: auto; }
+  .techsheet__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+  .techsheet__table th,
+  .techsheet__table td {
+    padding: 0.6rem 0.65rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+  .techsheet__table thead th {
+    color: var(--bronze-ink);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .techsheet__table thead th:first-child { width: 34%; }
+  .techsheet__table tbody th { color: var(--ink); font-weight: 500; }
+  .techsheet__table td { color: var(--muted); }
+  .techsheet__combined { color: var(--ink) !important; }
+  .techsheet__compat { margin-top: 1.15rem; }
+  .techsheet__compat h3 {
+    margin: 0 0 0.55rem;
+    color: var(--bronze-ink);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .techsheet__compat ul { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+  .techsheet__compat li { display: flex; gap: 0.55rem; align-items: flex-start; font-size: 0.84rem; }
+  .techsheet__check { color: var(--bronze-ink); font-weight: 700; }
+  .techsheet__drawings {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    background: var(--linen-deep);
+  }
+  .techsheet__drawings-label {
+    margin-bottom: 0.1rem;
+    color: var(--bronze-ink);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .techsheet__drawing {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem;
+    color: var(--ink);
+    text-decoration: none;
+    border: 1px solid var(--line);
+    background: var(--linen);
+  }
+  .techsheet__drawing:hover { border-color: var(--bronze); }
+  .techsheet__drawing-icon { font-size: 1.25rem; color: var(--bronze-ink); }
+  .techsheet__drawing strong { display: block; font-size: 0.78rem; }
+  .techsheet__drawing small { display: block; margin-top: 0.1rem; color: var(--muted); font-size: 0.7rem; }
+  .techsheet__note {
+    max-width: 70rem;
+    margin: 1rem 0 0;
+    color: var(--muted);
+    font-size: 0.73rem;
+    line-height: 1.45;
+  }
+  .resources-block { margin-top: clamp(1.5rem, 1rem + 2vw, 3rem); }
+  .resources-block__head { margin-bottom: 0; }
   .pres {
     display: grid;
     gap: 0.7rem;
     grid-template-columns: 1fr;
-    margin-top: clamp(1.25rem, 1rem + 1vw, 2rem);
+    margin-top: clamp(1.1rem, 0.9rem + 1vw, 1.7rem);
   }
   @media (min-width: 560px) {
     .pres { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
   }
-
   .pres__btn {
     display: flex;
     align-items: center;
@@ -158,7 +387,6 @@ function minutes(seconds?: number): string {
   }
   .pres__btn:hover { border-color: var(--bronze); background: var(--linen-deep); }
   .pres__btn:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
-
   .pres__icon {
     flex: 0 0 auto;
     display: grid;
@@ -171,15 +399,8 @@ function minutes(seconds?: number): string {
     border-radius: 50%;
   }
   .pres__body { display: grid; gap: 0.15rem; min-width: 0; }
-  .pres__label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
+  .pres__label { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
   .pres__meta { font-size: 0.78rem; color: var(--muted); }
-
-  /* -- modal -- */
   .pres-modal {
     width: min(64rem, 94vw);
     max-height: 90vh;
@@ -211,33 +432,40 @@ function minutes(seconds?: number): string {
   .pres-modal__close:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }
   .pres-modal__frame { aspect-ratio: 16 / 9; width: 100%; background: #000; }
   .pres-modal__frame :global(iframe) { width: 100%; height: 100%; border: 0; display: block; }
+
+  @media (max-width: 760px) {
+    .techsheet__layout--with-drawings { grid-template-columns: 1fr; }
+    .techsheet__head { align-items: flex-start; }
+    .techsheet__table { min-width: 38rem; }
+    .techsheet__panel { padding: 1rem; }
+  }
 </style>
 
 <script>
   import { track } from '../lib/track';
 
+  document.querySelectorAll<HTMLElement>('[data-pres-open]').forEach((link) => {
+    link.addEventListener('click', () => {
+      const model = link.dataset.trackModel ?? '';
+      track('product_resource_opened', { model, resource: link.dataset.presOpen });
+    });
+  });
+
   document.querySelectorAll<HTMLElement>('[data-resources]').forEach((root) => {
     const found = document.querySelector<HTMLDialogElement>('[data-pres-modal]');
     if (!found) return;
-    // Bound to a fresh const after the guard: TypeScript will not narrow a
-    // nullable across hoisted function declarations, which can be called
-    // before the guard runs as far as it is concerned.
     const modal = found;
     const frame = modal.querySelector<HTMLElement>('[data-pres-modal-frame]')!;
     const title = modal.querySelector<HTMLElement>('[data-pres-modal-title]')!;
     const model = root.dataset.model ?? '';
 
     const open = (src: string, label: string, event: string, key: string) => {
-      // The iframe is created HERE, on click — never in the delivered HTML.
-      // That is the whole performance contract: a page with a video weighs the
-      // same as one without until someone asks to watch it.
       const iframe = document.createElement('iframe');
       iframe.src = src;
       iframe.title = label;
       iframe.loading = 'lazy';
       iframe.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen';
       iframe.setAttribute('allowfullscreen', '');
-      // No autoplay attribute anywhere: the customer starts it.
       frame.replaceChildren(iframe);
       title.textContent = label;
       modal.showModal();
@@ -245,8 +473,6 @@ function minutes(seconds?: number): string {
     };
 
     const close = () => {
-      // Emptying the frame stops playback and releases the third-party
-      // connection; leaving it would keep a hidden player running.
       frame.replaceChildren();
       if (modal.open) modal.close();
     };
@@ -261,15 +487,8 @@ function minutes(seconds?: number): string {
         open(btn.dataset.presSrc!, btn.dataset.presTitle!, 'product_3d_opened', btn.dataset.presEmbed!)
       );
     });
-    root.querySelectorAll<HTMLElement>('[data-pres-open]').forEach((link) => {
-      link.addEventListener('click', () =>
-        track('product_resource_opened', { model, resource: link.dataset.presOpen })
-      );
-    });
 
     modal.querySelector('[data-pres-close]')?.addEventListener('click', close);
-    // Esc fires `cancel`; the backdrop click surfaces as a click on the dialog
-    // itself. Both must also clear the frame, or playback continues unseen.
     modal.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   });
