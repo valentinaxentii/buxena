@@ -41,7 +41,12 @@ for (const sauna of saunas) {
       const bn = Number(b.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
       return an - bn;
     });
-  const representative = members[0] ?? sauna;
+  // EKE 160 has a verified exact-model image from Capra's live product page;
+  // use that clean supplier image for the collection card instead of the old
+  // generic dark family render. Individual size pages remain unchanged.
+  const representative = series === 'EKE'
+    ? (members.find((member) => member.data.title === 'BUX EKE 160') ?? members[0] ?? sauna)
+    : (members[0] ?? sauna);
   const variants = members.map((member) => ({
     slug: member.id,
     label: `${member.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? member.data.title} cm`,
