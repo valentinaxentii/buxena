@@ -95,7 +95,10 @@ function parseModel(slug) {
   };
   const images = () => {
     const out = [];
-    const hero = fm.match(/heroImage:\s*\n\s*src:\s*"([^"]+)"\s*\n\s*alt:\s*"([^"]*)"/);
+    // heroImage: is frequently followed by explanatory comment lines before
+    // `src:` (image-provenance notes) — tolerate any number of them so a
+    // documented decision never silently drops the cover image.
+    const hero = fm.match(/heroImage:\s*\n(?:\s*#[^\n]*\n)*\s*src:\s*"([^"]+)"\s*\n(?:\s*#[^\n]*\n)*\s*alt:\s*"([^"]*)"/);
     if (hero) out.push({ src: hero[1], alt: hero[2] });
     const gal = fm.match(/^gallery:\s*\n((?:\s+-\s.*\n|\s{4,}.*\n)+)/m);
     if (gal) for (const g of gal[1].matchAll(/src:\s*"([^"]+)"\s*\n\s*alt:\s*"([^"]*)"/g)) out.push({ src: g[1], alt: g[2] });
@@ -250,7 +253,11 @@ const eyebrow = (page, text, { x, y, font, color = BRONZE, size = 7.5, center = 
 };
 
 async function embed(pdf, relSrc) {
-  const bytes = readFileSync(path.join('public', relSrc));
+  // readFileSync can return a pooled Buffer (nonzero byteOffset into a shared
+  // ArrayBuffer). pdf-lib's JpegEmbedder does `new DataView(imageData.buffer)`,
+  // ignoring byteOffset, which reads the wrong bytes for pooled buffers.
+  // Copying into a fresh Uint8Array guarantees byteOffset 0.
+  const bytes = new Uint8Array(readFileSync(path.join('public', relSrc)));
   return /\.png$/i.test(relSrc) ? pdf.embedPng(bytes) : pdf.embedJpg(bytes);
 }
 
@@ -301,7 +308,7 @@ async function buildPresentation(slug) {
   const sansB = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   // The original brand asset, embedded unmodified.
-  const logo = await pdf.embedPng(readFileSync(LOGO_ASSET));
+  const logo = await pdf.embedPng(new Uint8Array(readFileSync(LOGO_ASSET)));
 
   const assets = [];
   for (const i of m.images) assets.push({ ...i, kind: classify(i.src), embedded: await embed(pdf, i.src) });
