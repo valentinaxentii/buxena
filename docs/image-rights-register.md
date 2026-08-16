@@ -380,6 +380,16 @@ JPEG, so the original bytes were written out unchanged rather than re-encoded).
 | `images/editorial/sauna-interior-bench-heater.jpg` | `/our-story/` — "A northern habit, moved south" split media | `sauna-interior-图片.pdf` | 1024×1461 |
 | `images/editorial/sauna-glass-lounge.jpg` | `/wellness/` — "The Ritual / Heat, cold, rest — and then again" | `sauna-glass-lounge-图片.pdf` | 2048×1082 |
 | `images/editorial/sauna-corner-bench-heater.jpg` | `/wellness/` — "Etiquette / A few conventions worth keeping" | `sauna-corner-v2-图片.pdf` | 1024×1461 |
+| `images/editorial/ritual-sauna.jpg` | Home — "The Ritual" 01 SAUNA pillar | `ritual-01.pdf` | 1024×1461 |
+| `images/editorial/ritual-cold.jpg` | Home — "The Ritual" 02 COLD pillar | `ritual-02.pdf` | 1024×1461 |
+| `images/editorial/ritual-rest.jpg` | Home — "The Ritual" 03 REST pillar | `ritual-03.pdf` | 1024×1461 |
+
+These three replace the typographic (slats + numeral) treatment that stood in
+for the original, unsourced `ritual-01-loyly` / `ritual-02-cooling` /
+`ritual-03-rest` photographs removed 2026-08-13. This is the homepage — an
+explicit, confirmed exception to the standing "Home stays unchanged" rule that
+otherwise governed every 2026-08-14/15 layout pass; only this one section's
+photography was in scope, nothing else on Home was touched.
 
 **Open point for the founder — third-party heater branding.** The Our Story
 photograph shows a heater carrying a visible **TYLÖ** wordmark on its casing.

@@ -39,6 +39,27 @@ function waitingFor(createdAt: string): { text: string; urgent: boolean } | null
   return { text: `waiting ${text}`, urgent: hours >= WAITING_URGENT_HOURS };
 }
 
+/**
+ * A recommended next step, derived purely from `status` (and, for New, how
+ * long it's been waiting — reusing waitingFor() rather than a new signal).
+ * No behaviour is tracked to produce this: it is a read of a field that
+ * already exists, restated as an action instead of a status word.
+ */
+function nextAction(e: { status: string; created_at: string }): string {
+  switch (e.status) {
+    case 'New': {
+      const w = waitingFor(e.created_at);
+      return w?.urgent ? 'Follow up — waiting over 24h' : 'Send first reply';
+    }
+    case 'Contacted': return 'Awaiting customer reply';
+    case 'Qualified': return 'Prepare a quote';
+    case 'Quoted': return 'Check if proposal was viewed';
+    case 'Won': return 'No action — won';
+    case 'Lost': return 'No action — lost';
+    default: return '—';
+  }
+}
+
 let enquiries: any[] = [];
 let dbReady = true;
 // Archived records are hidden from the active list; ?archived=1 shows only them.
@@ -94,7 +115,7 @@ try {
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
-          <tr><th>When</th><th>Contact</th><th>Request / Model</th><th>Source</th><th>Status</th><th></th></tr>
+          <tr><th>When</th><th>Contact</th><th>Request / Model</th><th>Source</th><th>Status</th><th>Next Action</th><th></th></tr>
         </thead>
         <tbody>
           {enquiries.map((e) => (
@@ -118,6 +139,7 @@ try {
                   flat "Website", which is the whole problem restated. */}
               <td>{effectiveSource(e) || e.source}</td>
               <td><StatusBadge status={e.status} /></td>
+              <td class="enq-next">{nextAction(e)}</td>
               <td><a class="admin-btn admin-btn--ghost admin-btn--sm" href={`/admin/enquiries/${e.id}`}>View</a></td>
             </tr>
           ))}
@@ -144,5 +166,6 @@ try {
   .enq-wait { display: block; font-size: 0.72rem; color: var(--admin-gold); }
   .enq-wait--urgent { color: #d98a66; }
   .enq-req { max-width: 20rem; white-space: normal; }
+  .enq-next { font-size: 0.78rem; color: var(--admin-muted); white-space: normal; max-width: 12rem; }
   .admin-btn--sm { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
 </style>

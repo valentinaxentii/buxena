@@ -11,8 +11,10 @@ import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { markEnquiryContacted, changeEnquiryStatus, convertEnquiryToLead, createQuoteFromEnquiry } from '../../../lib/enquiry-conversion';
 import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-templates';
+import { buildFollowUpEmail, type FollowUpTrigger } from '../../../lib/follow-up-email-templates';
 import { parseEnquiryDetails } from '../../../lib/enquiry-details';
 import { effectiveSource } from '../../../lib/enquiry-source';
+import { site } from '../../../data/site';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
@@ -91,7 +93,7 @@ try {
     enquiry = enquiryRow;
     const [leadRow, quoteRow, activityRows] = await Promise.all([
       enquiry.lead_id ? supabase.from('leads').select('id, name, status').eq('id', enquiry.lead_id).maybeSingle() : Promise.resolve({ data: null }),
-      enquiry.quote_id ? supabase.from('quotes').select('id, quote_number, status, total').eq('id', enquiry.quote_id).maybeSingle() : Promise.resolve({ data: null }),
+      enquiry.quote_id ? supabase.from('quotes').select('id, quote_number, status, total, share_token, viewed_at').eq('id', enquiry.quote_id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from('activities').select('id, description, created_at').eq('entity_type', 'enquiry').eq('entity_id', id).order('created_at', { ascending: false }),
     ]);
     lead = leadRow.data;
@@ -165,6 +167,31 @@ const reply = enquiry
     })
   : null;
 const replyMailto = enquiry?.email && reply ? buildMailtoHref(enquiry.email, reply) : null;
+
+/**
+ * Follow-up draft — a SEPARATE template from the "Suggested Reply" above.
+ * That one is the founder's first response; this is what a later, "you
+ * started something and didn't finish" nudge could say. Trigger and CTA are
+ * both derived from real, already-loaded fields — never invented:
+ *   quote.share_token exists → the customer's real proposal link, trigger
+ *     'proposal_not_opened' (true whether or not it's actually been opened —
+ *     the copy reads fine either way: "your proposal is ready and waiting").
+ *   otherwise → the generic pricing page, trigger 'pricing_request_no_action'.
+ */
+const followUpTrigger: FollowUpTrigger = quote?.share_token ? 'proposal_not_opened' : 'pricing_request_no_action';
+const siteUrl = String(Astro.site ?? 'https://buxena.com').replace(/\/$/, '');
+const followUp = enquiry
+  ? buildFollowUpEmail({
+      trigger: followUpTrigger,
+      customerFirstName: (enquiry.name ?? '').trim().split(/\s+/)[0] || null,
+      recap: { modelTitle: enquiry.sauna_interest, location: enquiry.location },
+      primaryCtaHref: quote?.share_token ? `${siteUrl}/proposal/${quote.share_token}/` : `${siteUrl}/quote/`,
+      primaryCtaLabel: quote?.share_token ? 'Review your proposal' : 'Request pricing',
+      siteName: site.name,
+      siteUrl,
+    })
+  : null;
+const followUpMailto = enquiry?.email && followUp ? buildMailtoHref(enquiry.email, followUp) : null;
 
 // The customer's own answers, lifted out of the message blob so the reply can
 // be written from them without reading a paragraph first. Read-only.
@@ -322,8 +349,38 @@ const details = parseEnquiryDetails(enquiry?.message);
               <h2 class="enq-sec__h">Linked Records</h2>
               <dl class="enq-kv">
                 {lead && <div><dt>Lead</dt><dd><a href={`/admin/leads/${lead.id}`}>{lead.name}</a> — {lead.status}</dd></div>}
-                {quote && <div><dt>Quote</dt><dd><a href={`/admin/quotes/${quote.id}`}>{quote.quote_number}</a> — {quote.status}</dd></div>}
+                {quote && (
+                  <div>
+                    <dt>Quote</dt>
+                    <dd>
+                      <a href={`/admin/quotes/${quote.id}`}>{quote.quote_number}</a> — {quote.status}
+                      {/* Real, already-captured data — quotes.viewed_at is set the
+                          first time the customer opens their proposal link. Not a
+                          new tracking event, just surfaced here for follow-up. */}
+                      {quote.viewed_at
+                        ? <span class="enq-sub"> · viewed {new Date(quote.viewed_at).toLocaleDateString()}</span>
+                        : <span class="enq-sub"> · not yet viewed</span>}
+                    </dd>
+                  </div>
+                )}
               </dl>
+            </section>
+          )}
+
+          {followUp && (
+            <section class="admin-panel enq-sec">
+              <h2 class="enq-sec__h">Follow-up Email <span class="enq-reply__tpl">Prepared — not sent</span></h2>
+              <p class="enq-label" style="margin-top:0;">Subject</p>
+              <p class="enq-reply__subject">{followUp.subject}</p>
+              <p class="enq-label">Draft — review and personalize before sending</p>
+              <textarea class="enq-reply__body" data-followup-body readonly rows={followUp.body.split('\n').length + 1}>{followUp.body}</textarea>
+              <div class="enq-reply__actions">
+                <button class="admin-btn admin-btn--ghost" type="button" data-copy-followup>Copy Follow-up</button>
+                {followUpMailto && <a class="admin-btn" href={followUpMailto}>Open in Email App</a>}
+              </div>
+              <p class="enq-reply__note">
+                Prepared from this record's own data — nothing is sent automatically, no automated trigger exists yet.
+              </p>
             </section>
           )}
         </div>
@@ -501,11 +558,13 @@ const details = parseEnquiryDetails(enquiry?.message);
 </style>
 
 <script>
-  // Copy the suggested reply to the clipboard. Read-only convenience —
-  // the founder pastes, edits and sends from their own mail app.
-  const btn = document.querySelector<HTMLButtonElement>('[data-copy-reply]');
-  const body = document.querySelector<HTMLTextAreaElement>('[data-reply-body]');
-  if (btn && body) {
+  // Copy a drafted reply to the clipboard. Read-only convenience — the
+  // founder pastes, edits and sends from their own mail app. Nothing here
+  // ever sends anything.
+  function wireCopyButton(buttonSelector: string, bodySelector: string) {
+    const btn = document.querySelector<HTMLButtonElement>(buttonSelector);
+    const body = document.querySelector<HTMLTextAreaElement>(bodySelector);
+    if (!btn || !body) return;
     btn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(body.value);
@@ -518,4 +577,6 @@ const details = parseEnquiryDetails(enquiry?.message);
       setTimeout(() => { btn.textContent = original; }, 1600);
     });
   }
+  wireCopyButton('[data-copy-reply]', '[data-reply-body]');
+  wireCopyButton('[data-copy-followup]', '[data-followup-body]');
 </script>

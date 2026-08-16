@@ -1,0 +1,76 @@
+---
+/**
+ * "Before you decide, get the important questions answered."
+ *
+ * Reduces purchase anxiety with FACTS, not fabricated social proof — this
+ * exists because BUXENA has zero verified customer reviews today (see
+ * Testimonials.astro / src/content/reviews). Every question links to a real
+ * page that actually answers it: a guide, the FAQ, or the flow that resolves
+ * it (Advisor, Heater Guide, Request Pricing). No star ratings, no "verified
+ * customer" badge, nothing invented.
+ */
+interface Props {
+  /** Pre-fills the Advisor / pricing links with the model being viewed. */
+  model?: string;
+}
+const { model } = Astro.props;
+const modelParam = model ? `?model=${encodeURIComponent(model)}` : '';
+
+const QUESTIONS = [
+  { q: 'Is this model right for my space?', a: 'Run the Sauna Advisor', href: '/plan-your-sauna/' },
+  { q: 'Which heater actually matches the room?', a: 'Read the Heater Guide', href: '/heater-guide/' },
+  { q: 'What electrical service will I need?', a: 'See the FAQ', href: '/faq/' },
+  { q: 'What base or foundation is required?', a: 'See the FAQ', href: '/faq/' },
+  { q: 'How will delivery work at my address?', a: 'How buying works', href: '/how-buying-works/' },
+  { q: 'What is included and what is separate?', a: 'How buying works', href: '/how-buying-works/' },
+];
+---
+
+<section class="objres" aria-label="Before you decide">
+  <span class="eyebrow">Before you decide</span>
+  <h2 class="h3">Get the important questions answered</h2>
+  <ul class="objres__list">
+    {QUESTIONS.map((item) => (
+      <li class="objres__row">
+        <span class="objres__q">{item.q}</span>
+        <a class="objres__a" href={item.href}>
+          {item.a} <span aria-hidden="true">→</span>
+        </a>
+      </li>
+    ))}
+    <li class="objres__row">
+      <span class="objres__q">Something else not covered here?</span>
+      <a class="objres__a" href={`/quote/${modelParam}`}>Request Pricing <span aria-hidden="true">→</span></a>
+    </li>
+  </ul>
+</section>
+
+<style>
+  .objres { border-top: 2px solid var(--ink); padding-top: clamp(1.4rem, 0.95rem + 1.6vw, 2.4rem); }
+  .objres .h3 { margin: 0.5rem 0 1.1rem; }
+  .objres__list { display: grid; margin: 0; padding: 0; list-style: none; }
+  .objres__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .objres__q { font-size: var(--t-small); color: var(--ink); }
+  .objres__a {
+    flex: 0 0 auto;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .objres__a:hover { color: var(--ink); }
+  @media (max-width: 560px) {
+    .objres__row { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  }
+</style>

@@ -3,6 +3,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import QuoteForm from '../components/QuoteForm.astro';
 import QuoteCompare from '../components/QuoteCompare.astro';
 import CustomerAnswerSystem from '../components/CustomerAnswerSystem.astro';
+import ContinueProject from '../components/ContinueProject.astro';
+import ReassurancePanel from '../components/ReassurancePanel.astro';
 import { publicEmail } from '../data/site';
 
 // Claim-audited (founders' review): no automatic promise of a written
@@ -32,6 +34,9 @@ const expect = [
   </section>
 
   <section class="band">
+    <div class="shell">
+      <ContinueProject />
+    </div>
     <div class="shell quote">
       <div class="quote__form">
         <QuoteForm />
@@ -47,6 +52,7 @@ const expect = [
         <p class="quote__note">
           <a class="link" href="/how-buying-works/">How buying works <span class="arrow" aria-hidden="true">→</span></a>
         </p>
+        <ReassurancePanel />
         <CustomerAnswerSystem price={null} compact />
         {publicEmail && (
           <p class="quote__alt">
@@ -85,6 +91,7 @@ const expect = [
   .quote__list li { padding: 0.7rem 0; border-bottom: 1px solid var(--line); line-height: 1.7; }
 
   .quote__note { margin-top: 1.49rem; font-size: var(--t-small); font-style: italic; color: var(--muted); }
+  .quote__side :global(.reassure) { margin-top: 1.49rem; }
   .quote__alt { margin-top: 1.27rem; font-size: var(--t-small); }
   .quote__alt a { color: var(--bronze-ink); }
 

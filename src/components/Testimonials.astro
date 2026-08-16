@@ -1,0 +1,65 @@
+---
+import { getCollection } from 'astro:content';
+import Figure from './Figure.astro';
+
+/**
+ * Real customer testimonials — renders NOTHING until real, approved records
+ * exist. src/content/reviews/ is empty on purpose (see its README.txt); this
+ * component exists so that the day a real, permission-cleared review is added
+ * as a markdown file, it appears here with zero code changes.
+ *
+ * THE GATE: `approved: true` AND a `quote`. Not `verifiedPurchase` alone —
+ * that records a purchase fact, not a publication decision. No star ratings
+ * are required or invented; `rating` renders only when the record has one.
+ */
+interface Props {
+  /** Only testimonials for this model title (BUH-…) — omit to show any. */
+  product?: string;
+  limit?: number;
+}
+const { product, limit = 3 } = Astro.props;
+
+const all = await getCollection('reviews', ({ data }) => data.approved === true && Boolean(data.quote));
+const filtered = product ? all.filter((r) => r.data.product === product) : all;
+const items = filtered
+  .sort((a, b) => (a.data.date < b.data.date ? 1 : -1))
+  .slice(0, limit);
+---
+
+{items.length > 0 && (
+  <section class="testi" aria-label="Customer testimonials">
+    <span class="eyebrow">From BUXENA customers</span>
+    <div class="testi__grid">
+      {items.map((r) => (
+        <figure class="testi__card">
+          {r.data.image?.src && r.data.photoPermission && (
+            <Figure src={r.data.image.src} alt={r.data.image.alt} ratio="1 / 1" tone="mid" class="testi__photo" />
+          )}
+          <blockquote class="testi__quote">{r.data.quote}</blockquote>
+          <figcaption class="testi__meta">
+            <span class="testi__name">{r.data.customerName}</span>
+            {r.data.cityState && <span class="testi__loc">{r.data.cityState}</span>}
+            {typeof r.data.rating === 'number' && (
+              <span class="testi__rating" aria-label={`Rated ${r.data.rating} out of 5`}>{r.data.rating}/5</span>
+            )}
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  </section>
+)}
+
+<style>
+  .testi__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: clamp(1.2rem, 0.9rem + 1vw, 1.9rem);
+    margin-top: 1.27rem;
+  }
+  .testi__card { margin: 0; padding: 1.25rem 1.4rem; background: var(--linen-deep); border-left: 3px solid var(--bronze); }
+  .testi__photo { width: 3rem; margin-bottom: 0.9rem; }
+  .testi__quote { margin: 0 0 0.9rem; font-family: var(--font-display); font-style: italic; font-size: var(--t-small); line-height: 1.65; color: var(--ink); }
+  .testi__meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.8rem; font-size: 0.75rem; letter-spacing: 0.04em; color: var(--muted); }
+  .testi__name { font-weight: 600; color: var(--bronze-ink); }
+  .testi__rating { font-variant-numeric: tabular-nums; }
+</style>

@@ -1,0 +1,108 @@
+---
+import Figure from './Figure.astro';
+import { displayTitle } from '../data/catalog';
+
+/**
+ * Reusable personalized project/model recap.
+ *
+ * Used on the proposal page, the project page and the confirmation page (and
+ * available to a future follow-up email template — see
+ * lib/follow-up-email-templates.ts, which renders its own plain-text
+ * equivalent of the same fields).
+ *
+ * EVERY FIELD IS OPTIONAL AND OMITTED CLEANLY. This component never invents a
+ * value: a caller either has real data for a field or leaves it undefined,
+ * and undefined simply does not render. Internal cost, margin, EXW and
+ * supplier notes are never props here — they are not in scope for this
+ * component and must never be added to it.
+ */
+interface Props {
+  modelTitle?: string;
+  modelHref?: string;
+  image?: { src?: string; alt: string };
+  capacity?: string;
+  dimensions?: { label: string; value: string }[];
+  materials?: string[];
+  heaterName?: string;
+  location?: string;
+  timeline?: string;
+  /** Customer-safe status wording only — never a raw internal CRM stage. */
+  statusLabel?: string;
+  compact?: boolean;
+}
+const {
+  modelTitle, modelHref, image, capacity, dimensions, materials,
+  heaterName, location, timeline, statusLabel, compact = false,
+} = Astro.props;
+
+const facts = [
+  capacity ? { label: 'Capacity', value: capacity } : null,
+  dimensions?.[0] ? { label: dimensions[0].label, value: dimensions[0].value } : null,
+  materials?.[0] ? { label: 'Material', value: materials[0] } : null,
+  heaterName ? { label: 'Heater', value: heaterName } : null,
+  location ? { label: 'Location', value: location } : null,
+  timeline ? { label: 'Timeline', value: timeline } : null,
+].filter(Boolean) as { label: string; value: string }[];
+
+const hasAnything = Boolean(modelTitle || image?.src);
+---
+
+{hasAnything && (
+  <div class:list={['recap', { 'recap--compact': compact }]}>
+    {image?.src && (
+      <div class="recap__media">
+        <Figure src={image.src} alt={image.alt} ratio="4 / 3" tone="mid" fit="contain" fixedRatio={true} />
+      </div>
+    )}
+    <div class="recap__body">
+      {statusLabel && <span class="recap__status">{statusLabel}</span>}
+      {modelTitle && (
+        modelHref ? (
+          <a class="recap__title recap__title--link" href={modelHref}>{displayTitle(modelTitle)}</a>
+        ) : (
+          <p class="recap__title">{displayTitle(modelTitle)}</p>
+        )
+      )}
+      {facts.length > 0 && (
+        <dl class="recap__facts">
+          {facts.map((f) => (
+            <div><dt>{f.label}</dt><dd>{f.value}</dd></div>
+          ))}
+        </dl>
+      )}
+    </div>
+  </div>
+)}
+
+<style>
+  .recap { display: grid; grid-template-columns: minmax(0, 10rem) 1fr; gap: 1.25rem; align-items: start; }
+  .recap--compact { grid-template-columns: minmax(0, 6.5rem) 1fr; gap: 1rem; }
+  .recap__media { border: 1px solid var(--line); }
+  .recap__status {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    margin-bottom: 0.4rem;
+  }
+  .recap__title {
+    display: block;
+    font-family: var(--font-display);
+    font-size: var(--t-h3);
+    margin: 0 0 0.6rem;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .recap--compact .recap__title { font-size: 1.3rem; }
+  .recap__title--link:hover { color: var(--bronze-ink); }
+  .recap__facts { display: grid; gap: 0.4rem; margin: 0; }
+  .recap__facts div { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--t-small); padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+  .recap__facts dt { color: var(--muted); margin: 0; }
+  .recap__facts dd { margin: 0; text-align: right; }
+
+  @media (max-width: 480px) {
+    .recap { grid-template-columns: 5rem 1fr; gap: 0.9rem; }
+  }
+</style>

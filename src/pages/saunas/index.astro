@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
+import ContinueProject from '../../components/ContinueProject.astro';
 import { getCollection } from 'astro:content';
 import { byPhotographedThenOrder } from '../../data/catalog';
 
@@ -56,6 +57,7 @@ const facets = [
 >
   <section class="band band--tight page-head catalogue-intro">
     <div class="shell">
+      <ContinueProject />
       <span class="eyebrow">The Range</span>
       <h1 class="display measure--tight">Every model, in one place</h1>
       <p class="lead measure">

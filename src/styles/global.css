@@ -83,11 +83,15 @@
      2026-08-14 footer pass, which had cut these as far as ×0.7). Original
      values preserved in each comment — restore fully to those if ×0.89 is
      ever still judged too tight. */
-  /* TIGHTENED ONE MORE STEP, 2026-08-14: another ~11% off the just-restored
-     row above (settles ~×0.79 of original, not the earlier ×0.7). */
-  --footer-pad: clamp(2.06rem, 1.19rem + 2.97vw, 3.57rem);  /* Footer.astro vertical pad, original clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) */
-  --footer-col-gap: clamp(1.5rem, 0.6rem + 2.97vw, 3.57rem);  /* original clamp(1.9rem, 0.75rem + 3.75vw, 4.5rem) */
-  --footer-row-gap: clamp(1.5rem, 0.87rem + 1.78vw, 2.7rem);  /* original clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem) */
+  /* TIGHTENED AGAIN, 2026-08-15 — founder: "the empty vertical space is
+     excessive", targeting the CTA+footer block together at ~60% of its
+     current combined height. --footer-pad -40%, --footer-row-gap -35% (the
+     gap between the columns block and the divider — "large empty space
+     beneath the columns"). Original values still in the comments for a full
+     restore if this ever goes too far the other way. */
+  --footer-pad: clamp(1.24rem, 0.71rem + 1.78vw, 2.14rem);  /* Footer.astro vertical pad, original clamp(2.6rem, 1.5rem + 3.75vw, 4.5rem) */
+  --footer-col-gap: clamp(1.5rem, 0.6rem + 2.97vw, 3.57rem);  /* unchanged — horizontal on desktop, not part of this vertical cut */
+  --footer-row-gap: clamp(0.98rem, 0.57rem + 1.16vw, 1.76rem);  /* original clamp(1.9rem, 1.1rem + 2.25vw, 3.4rem) */
   --sec-head-gap: clamp(1.4rem, 0.8rem + 1.7vw, 2.55rem); /* section head → content     */
   --card-body-pad: 1.1rem;                             /* ProductCard text block        */
   --form-row-gap: 1.25rem;                             /* between form rows             */
@@ -654,6 +658,11 @@ input.is-zip-invalid {
    aspect-ratio — so a placeholder card is exactly the same height as a
    photographed one and the grid never jumps.
 --------------------------------------------------------------------------- */
+/* PREMIUM NEUTRAL PLACEHOLDER, 2026-08-15 — matches Figure.astro's
+   .fig--mid treatment exactly (see that file for the full reasoning): a
+   clean linen/birch ground instead of the wood-brown gradient, no white
+   "grain" stripes. Card-ph__grain is kept as a class name so nothing that
+   still references it in markup breaks, but it renders nothing now. */
 .card-ph {
   position: absolute;
   inset: 0;
@@ -661,28 +670,30 @@ input.is-zip-invalid {
   place-items: center;
   padding: clamp(1rem, 4%, 2.25rem);
   text-align: center;
-  background: linear-gradient(150deg, var(--wood-1) 0%, var(--wood-2) 55%, var(--wood-3) 100%);
-  color: #fdf8f0;
+  background: linear-gradient(160deg, var(--birch) 0%, var(--linen-deep) 100%);
+  color: var(--bronze-ink);
 }
-.card-ph__grain {
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.16) 0 1px,
-    transparent 1px 9px
-  );
-  opacity: 0.55;
-  pointer-events: none;
-}
+.card-ph__grain { display: none; }
 .card-ph__label {
   position: relative;
+  display: inline-grid;
+  justify-items: center;
+  gap: 0.7rem;
   font-family: var(--font-sans);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  opacity: 0.8;
+  opacity: 0.85;
+}
+/* Same brand motif as Figure.astro's placeholder, inherited via currentColor. */
+.card-ph__label::before {
+  content: '';
+  display: block;
+  width: 2.25rem;
+  height: 1.05rem;
+  background-image: repeating-linear-gradient(to bottom, currentColor 0 1px, transparent 1px 5px);
+  opacity: 0.55;
 }
 
 /* ---------------------------------------------------------------------------

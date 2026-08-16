@@ -1,0 +1,47 @@
+---
+/**
+ * Adapts "buyers pause before checkout because questions remain" into BUXENA
+ * language — restrained, factual, no invented urgency or scarcity.
+ */
+interface Props {
+  ctaLabel?: string;
+  ctaHref?: string;
+}
+const { ctaLabel = 'Talk to BUXENA', ctaHref = '/consultation/' } = Astro.props;
+---
+
+<aside class="reassure">
+  <p class="reassure__body">
+    A sauna is a real project, not an impulse purchase. Before you commit, we
+    help you confirm the fit, the heater, the electrical service and what
+    happens at delivery — so nothing about it is a surprise later.
+  </p>
+  <a class="reassure__cta" href={ctaHref}>{ctaLabel} <span aria-hidden="true">→</span></a>
+</aside>
+
+<style>
+  .reassure {
+    padding: 1.25rem 1.4rem;
+    background: var(--linen-deep);
+    border-left: 3px solid var(--bronze);
+  }
+  .reassure__body { margin: 0 0 0.9rem; font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); }
+  .reassure__cta {
+    display: inline-block;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    text-decoration: none;
+  }
+  .reassure__cta:hover { color: var(--ink); }
+
+  /* Text-only link, no visible padding box — at the sizes this component
+     renders at on mobile, the text glyph box alone measures under the 44px
+     touch-target minimum. Matches the fix already applied to .pcard__quote. */
+  @media (max-width: 640px), (hover: none) {
+    .reassure__cta { padding-block: 0.7rem; }
+  }
+</style>

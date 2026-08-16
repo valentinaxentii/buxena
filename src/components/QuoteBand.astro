@@ -50,14 +50,24 @@ const pricingHref = model ? `/quote/?model=${encodeURIComponent(model)}` : '/quo
 </section>
 
 <style>
-  .qband__body { margin: 1.5rem auto 2.25rem; max-width: 40em; }
+  /* COMPRESSED 2026-08-15, scoped via [data-final-cta] (already on the
+     <section> in the markup above) rather than touching --band — this
+     component renders on many pages, and the brief was explicit: compress
+     ONLY this recurring CTA+footer block, not every section that happens to
+     share the sitewide token. Bottom padding cut harder than top: the
+     founder's own framing was "the gap BELOW Find My Sauna", i.e. the space
+     between this section ending and the footer starting, not the space
+     above the heading. */
+  [data-final-cta] { padding-block: clamp(1.7rem, 1rem + 2.9vw, 3.47rem) clamp(1.05rem, 0.6rem + 1.8vw, 2.08rem); }
+
+  .qband__body { margin: 1.05rem auto 1.58rem; max-width: 40em; }
 
   .qband__actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.9rem;
   }
 
   .qband__tertiary { color: var(--bronze-soft); }

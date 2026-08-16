@@ -20,8 +20,11 @@ export const prerender = false;
  * Noindex: a personalized price for one named customer must never be indexed.
  */
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProjectRecap from '../../components/ProjectRecap.astro';
+import ContinueExploring from '../../components/ContinueExploring.astro';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { site, publicEmail } from '../../data/site';
+import { getCollection } from 'astro:content';
 import {
   ITEM_GROUPS,
   FULFILMENT_LABELS,
@@ -105,6 +108,19 @@ const grouped = proposal
     )
   : [];
 
+/**
+ * Best-effort match to the model's real catalogue entry, purely to enrich the
+ * recap with a photo, capacity, dimensions and material — all facts already
+ * published on that model's own page. No match, no invented data: the recap
+ * simply falls back to showing the model name alone, exactly as before.
+ */
+let modelEntry: Awaited<ReturnType<typeof getCollection<'saunas'>>>[number] | undefined;
+if (proposal?.modelName) {
+  const catalog = await getCollection('saunas', ({ data }) => !data.draft);
+  const target = proposal.modelName.trim().toLowerCase();
+  modelEntry = catalog.find((m) => m.data.title.trim().toLowerCase() === target);
+}
+
 if (notFound) Astro.response.status = 404;
 ---
 
@@ -169,7 +185,14 @@ if (notFound) Astro.response.status = 404;
         <section class="band band--tight">
           <div class="shell shell--narrow">
             <h2 class="prop-h">Selected sauna</h2>
-            <p class="prop-model">{proposal.modelName}</p>
+            <ProjectRecap
+              modelTitle={proposal.modelName}
+              modelHref={modelEntry ? `/saunas/${modelEntry.id}/` : undefined}
+              image={modelEntry?.data.heroImage}
+              capacity={modelEntry?.data.capacity}
+              dimensions={modelEntry?.data.dimensions}
+              materials={modelEntry?.data.materials}
+            />
           </div>
         </section>
       )}
@@ -304,6 +327,12 @@ if (notFound) Astro.response.status = 404;
           </p>
         </div>
       </section>
+
+      <section class="band band--tight">
+        <div class="shell shell--narrow">
+          <ContinueExploring />
+        </div>
+      </section>
     </article>
   )}
 </BaseLayout>
@@ -311,6 +340,21 @@ if (notFound) Astro.response.status = 404;
 <script>
   document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
 </script>
+
+{proposal && (
+  <script
+    is:inline
+    define:vars={{ token, quoteNumber: proposal.quoteNumber, modelName: proposal.modelName }}
+  >
+    // Recognise this browser as this proposal's customer on a later visit —
+    // see lib/project-continuity.ts for what is (and is not) stored. Only the
+    // token, quote number and model name; never price, name or contact info.
+    try {
+      var value = { token: token, quoteNumber: quoteNumber, modelName: modelName, savedAt: new Date().toISOString() };
+      localStorage.setItem('buxena-last-proposal', JSON.stringify(value));
+    } catch (e) { /* private browsing / storage unavailable */ }
+  </script>
+)}
 
 <style>
   .prop-missing { text-align: center; }

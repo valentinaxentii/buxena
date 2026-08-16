@@ -16,6 +16,8 @@ import ProductGallery from '../../components/ProductGallery.astro';
 import ProductConfigPending from '../../components/ProductConfigPending.astro';
 import ProductResources from '../../components/ProductResources.astro';
 import CustomerAnswerSystem from '../../components/CustomerAnswerSystem.astro';
+import ObjectionResolution from '../../components/ObjectionResolution.astro';
+import Testimonials from '../../components/Testimonials.astro';
 import { groupSpecs } from '../../lib/product-specs';
 import { relatedModels } from '../../lib/related-models';
 import { readHeaterFacts, heaterSummary } from '../../lib/heater-options';
@@ -676,6 +678,13 @@ const breadcrumbSchema = {
       </section>
     )}
   </article>
+
+  <section class="band band--tight">
+    <div class="shell">
+      <ObjectionResolution model={data.title} />
+      <Testimonials product={data.title} />
+    </div>
+  </section>
 
   <QuoteBand model={data.title} heading={`Start your ${displayTitle(data.title)} project`} />
 

@@ -6,6 +6,7 @@ import CollectionCard from '../components/CollectionCard.astro';
 import ProductCard from '../components/ProductCard.astro';
 import QuoteBand from '../components/QuoteBand.astro';
 import BuxenaMark from '../components/BuxenaMark.astro';
+import ContinueProject from '../components/ContinueProject.astro';
 import { packages } from '../data/packages';
 import { getCollection } from 'astro:content';
 
@@ -134,14 +135,30 @@ const steps = [
 // are editorial/future categories and are labelled as such. No health
 // claims anywhere in this section.
 const wellnessPillars = [
-  { key: 'sauna', label: 'Sauna', line: 'The core heat experience.', tag: 'The BUXENA range', href: '/saunas/' },
-  { key: 'cold', label: 'Cold', line: 'The contrast that completes the heat.', tag: 'Editorial — future category' },
-  { key: 'rest', label: 'Rest', line: 'The space between heat and cold.', tag: 'Editorial' },
+  {
+    key: 'sauna', label: 'Sauna', line: 'The core heat experience.', tag: 'The BUXENA range', href: '/saunas/',
+    src: '/images/editorial/ritual-sauna.jpg', alt: 'Steam rising over a warm wooden sauna bench',
+  },
+  {
+    key: 'cold', label: 'Cold', line: 'The contrast that completes the heat.', tag: 'Editorial — future category',
+    src: '/images/editorial/ritual-cold.jpg', alt: 'Water pouring from a wooden vessel',
+  },
+  {
+    key: 'rest', label: 'Rest', line: 'The space between heat and cold.', tag: 'Editorial',
+    src: '/images/editorial/ritual-rest.jpg', alt: 'Folded towels and a glass of water beside a sauna',
+  },
 ];
 ---
 
 <BaseLayout title="home" overHero={true}>
   <Hero />
+
+  {/* Hidden until client JS finds real localStorage state (a saved proposal,
+      shortlist or in-progress project) — invisible to a first-time visitor,
+      so the homepage is unchanged for them. See ContinueProject.astro. */}
+  <div class="shell cproj-wrap">
+    <ContinueProject />
+  </div>
 
   <!-- Trust / value strip -->
   <section class="band--ember trust reveal" id="intro">
@@ -430,25 +447,26 @@ const wellnessPillars = [
       </div>
 
       <div class="grid cols-3 reveal" data-reveal-stagger>
-        {/* IMAGE RIGHTS, 2026-08-13 — the three photographs that were here
-            (ritual-01-loyly, ritual-02-cooling, ritual-03-rest) have no
-            identifiable source, so no permission can ever be obtained for
-            them. This is the homepage, so three empty tone blocks were not an
-            acceptable answer either.
+        {/* IMAGE RIGHTS, 2026-08-13 — the three photographs that had been here
+            (ritual-01-loyly, ritual-02-cooling, ritual-03-rest) had no
+            identifiable source, so the band ran typographic instead: slats
+            motif + a large serif numeral standing in for photography.
 
-            The band is now typographic: the same three pillars, the same
-            copy, the same links, carried by the brand's own slat motif and a
-            large serif numeral instead of a photograph. Nothing is claimed
-            that isn't true, and the section reads as an intentional editorial
-            device rather than as missing content.
-
-            When licensed or BUXENA-owned ritual photography exists, this can
-            go back to <Figure> — the pillar data and layout are unchanged. */}
+            RESOLVED 2026-08-15 — three new photographs, supplied directly by
+            the founder (extracted losslessly from three one-page PDFs),
+            registered in docs/image-rights-register.md as FOUNDER-PROVIDED —
+            APPROVED, the same provenance class as the Wellness-page photos
+            from 2026-08-13. Back to <Figure>, exactly as the prior note said
+            it would be — pillar data and grid layout unchanged, 3/4 ratio
+            preserved so nothing shifts. The numeral moves from occupying the
+            card (there is a photo there now) to a small overlay in the
+            corner, on a soft scrim so it stays readable over any of the
+            three images without covering the subject. */}
         {wellnessPillars.map((pillar, i) => (
           <div class="ritual-shot ritual-shot--type">
-            <div class="ritual-card">
-              <span class="slats" aria-hidden="true"></span>
-              <span class="ritual-card__n" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+            <div class="ritual-card ritual-card--photo">
+              <Figure src={pillar.src} alt={pillar.alt} ratio="3 / 4" tone="mid" />
+              <span class="ritual-card__n ritual-card__n--overlay" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
             </div>
             <p class="ritual-shot__caption">{pillar.label}</p>
             <p class="ritual-shot__line">{pillar.line}</p>
@@ -496,6 +514,10 @@ const wellnessPillars = [
 </BaseLayout>
 
 <style>
+  /* Zero footprint when hidden (the default for a first-time visitor) —
+     only takes space once ContinueProject's own JS unhides it. */
+  .cproj-wrap:has([data-continue-project]:not([hidden])) { margin-top: clamp(1.4rem, 1rem + 1.5vw, 2.2rem); }
+
   /* --- trust strip --- */
   .trust {
     background: var(--ember);
@@ -678,27 +700,32 @@ const wellnessPillars = [
     gap: 0.75rem 1.75rem;
   }
 
-  /* Typographic ritual card — stands in for photography we cannot license.
-     Same 3/4 footprint as the <Figure> it replaced, so the grid rhythm and
-     the reveal timing are untouched. */
-  .ritual-card {
-    aspect-ratio: 3 / 4;
-    display: grid;
-    place-content: center;
-    gap: 1.1rem;
-    justify-items: center;
-    background: var(--linen-deep);
-    border: 1px solid var(--line);
-  }
-  .ritual-card .slats { color: var(--bronze-soft); width: 3rem; height: 1.6rem; }
+  /* Real photography, 2026-08-15 — same 3/4 footprint the typographic
+     placeholder used, so the grid rhythm and reveal timing this section
+     already had are untouched; only what fills the frame changed. */
+  .ritual-card { aspect-ratio: 3 / 4; }
+
+  /* .ritual-card__n stays defined (unscoped) for anywhere else that might
+     reuse the plain numeral; --overlay is the version actually used here now
+     that there is a photo underneath it. position:relative on the card is
+     what lets it anchor in a corner rather than float centred over content. */
   .ritual-card__n {
     font-family: var(--font-display);
     font-size: clamp(2.6rem, 2rem + 2.4vw, 4.2rem);
     line-height: 1;
     color: var(--bronze);
   }
-  .ritual-shot--type .ritual-card { transition: border-color 0.4s var(--ease); }
-  .ritual-shot--type:hover .ritual-card { border-color: var(--bronze-soft); }
+  .ritual-card--photo { position: relative; }
+  .ritual-card__n--overlay {
+    position: absolute;
+    left: 0.9rem;
+    bottom: 0.8rem;
+    font-size: clamp(1.6rem, 1.3rem + 1vw, 2.1rem);
+    color: var(--linen);
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.6);
+    z-index: 1;
+    pointer-events: none;
+  }
 
   .ritual-shot :global(.fig) { overflow: hidden; }
 

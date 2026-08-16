@@ -229,6 +229,28 @@ const reviews = defineCollection({
     verifiedPurchase: z.boolean().default(false),
     photoPermission: z.boolean().default(false), // written permission for any project photo
     rating: z.number().min(1).max(5).optional(),
+
+    // The quote itself — the customer's own sentence, unedited. Optional like
+    // every other field here; the render layer additionally requires it
+    // (alongside `approved`) before a card can appear.
+    quote: z.string().optional(),
+
+    // A real customer photo, only ever rendered alongside photoPermission: true.
+    image: imageSlot.optional(),
+
+    /**
+     * THE PUBLICATION GATE. `verifiedPurchase` records a purchase fact;
+     * `approved` is the separate, deliberate decision that this specific
+     * record may go on the public site. Defaults to false so a review added
+     * for internal record-keeping (a draft, one still being confirmed with
+     * the customer) never renders just because the file exists.
+     */
+    approved: z.boolean().default(false),
+
+    // Who granted permission and how — an audit trail, matching the pattern
+    // already used for technicalAsset.source/permission above. Never shown
+    // to customers.
+    permissionSource: z.string().optional(),
   }),
 });
 

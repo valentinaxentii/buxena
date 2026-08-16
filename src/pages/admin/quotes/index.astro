@@ -17,18 +17,30 @@ let dbReady = true;
 const showArchived = Astro.url.searchParams.get('archived') === '1';
 let archiveOk = false;
 
+let hasViewedAt = true;
+
 try {
   const supabase = createSupabaseAdminClient();
-  let query = supabase
-    .from('quotes')
-    .select('id, quote_number, status, total, quote_date, expiry_date, customers(name)')
-    .order('created_at', { ascending: false });
-  if (statusFilter) query = query.eq('status', statusFilter);
-  // Archived rows drop out of the active list. A no-op until the migration
-  // is applied, so this cannot break the page in the meantime.
-  archiveOk = await archiveSupported(supabase);
-  query = withArchiveFilter(query, archiveOk, showArchived);
-  const { data } = await query.limit(200);
+  const baseCols = 'id, quote_number, status, total, quote_date, expiry_date, customers(name)';
+
+  const run = async (cols: string) => {
+    let query = supabase.from('quotes').select(cols).order('created_at', { ascending: false });
+    if (statusFilter) query = query.eq('status', statusFilter);
+    archiveOk = await archiveSupported(supabase);
+    query = withArchiveFilter(query, archiveOk, showArchived);
+    return query.limit(200);
+  };
+
+  // viewed_at ships in the same migration as share_token
+  // (supabase/migrations/2026-08-13-personalized-quotes.sql), which the
+  // customer proposal page already treats as possibly-not-yet-applied. Ask
+  // for it; fall back to the base columns if the column doesn't exist yet,
+  // so a pending migration degrades one column instead of the whole list.
+  let { data, error } = await run(`${baseCols}, viewed_at`);
+  if (error) {
+    hasViewedAt = false;
+    ({ data } = await run(baseCols));
+  }
   quotes = data ?? [];
 } catch {
   dbReady = false;
@@ -58,7 +70,7 @@ try {
   <div class="admin-panel">
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th>Quote #</th><th>Customer</th><th>Total</th><th>Quote Date</th><th>Expires</th><th>Status</th></tr></thead>
+        <thead><tr><th>Quote #</th><th>Customer</th><th>Total</th><th>Quote Date</th><th>Expires</th>{hasViewedAt && <th>Last Viewed</th>}<th>Status</th></tr></thead>
         <tbody>
           {quotes.map((q) => (
             <tr>
@@ -67,6 +79,7 @@ try {
               <td>${q.total ?? 0}</td>
               <td>{q.quote_date || '—'}</td>
               <td>{q.expiry_date || '—'}</td>
+              {hasViewedAt && <td>{q.viewed_at ? new Date(q.viewed_at).toLocaleDateString() : 'Not yet'}</td>}
               <td><StatusBadge status={q.status} /></td>
             </tr>
           ))}

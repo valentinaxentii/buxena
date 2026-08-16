@@ -1,0 +1,67 @@
+---
+/**
+ * Compact, context-aware return path for a customer who already has a
+ * proposal, a saved shortlist or unfinished project details. Hidden by
+ * default and shown only by client JS once real localStorage state is found
+ * — a first-time visitor sees nothing at all, so this never changes the page
+ * for anyone browsing BUXENA for the first time.
+ */
+---
+
+<div class="continue-proj" data-continue-project hidden>
+  <span class="continue-proj__label">Welcome back</span>
+  <a class="continue-proj__cta" data-continue-project-link href="/my-project/">
+    <span data-continue-project-text>Continue Your Project</span>
+    <span aria-hidden="true">→</span>
+  </a>
+</div>
+
+<script>
+  import { getContinuityState } from '../lib/project-continuity';
+
+  const root = document.querySelector<HTMLElement>('[data-continue-project]');
+  if (root) {
+    const state = getContinuityState();
+    if (state.kind !== 'none') {
+      const link = root.querySelector<HTMLAnchorElement>('[data-continue-project-link]')!;
+      const text = root.querySelector<HTMLElement>('[data-continue-project-text]')!;
+      link.href = state.href;
+      text.textContent = state.label;
+      root.hidden = false;
+    }
+  }
+</script>
+
+<style>
+  .continue-proj {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+    padding: 0.85rem 1.25rem;
+    background: var(--linen-deep);
+    border: 1px solid var(--line);
+    margin-bottom: clamp(1.2rem, 0.9rem + 1vw, 1.9rem);
+  }
+  .continue-proj__label {
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .continue-proj__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    text-decoration: none;
+  }
+  .continue-proj__cta:hover { color: var(--ink); }
+</style>

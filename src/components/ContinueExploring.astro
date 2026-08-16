@@ -1,0 +1,49 @@
+---
+/**
+ * Compact "continue exploring" links using real BUXENA destinations only —
+ * no categories BUXENA doesn't sell, no competitor imagery. Text-only by
+ * design: it needs no photography, so it can appear on any page without a
+ * new image dependency.
+ */
+const LINKS = [
+  { label: 'Saunas', href: '/saunas/' },
+  { label: 'Sauna Advisor', href: '/plan-your-sauna/' },
+  { label: 'Heater Guide', href: '/heater-guide/' },
+  { label: 'Compare Saunas', href: '/compare/' },
+  { label: 'How Buying Works', href: '/how-buying-works/' },
+  { label: 'Request Pricing', href: '/quote/' },
+];
+---
+
+<nav class="explore" aria-label="Continue exploring">
+  <span class="explore__eyebrow">Continue exploring</span>
+  <ul class="explore__list">
+    {LINKS.map((l) => (
+      <li><a class="explore__link" href={l.href}>{l.label}</a></li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .explore { border-top: 1px solid var(--line); padding-top: 1.06rem; }
+  .explore__eyebrow {
+    display: block;
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.85rem;
+  }
+  .explore__list { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin: 0; padding: 0; list-style: none; }
+  .explore__link {
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--bronze-ink);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .explore__link:hover { color: var(--ink); border-bottom-color: var(--ink); }
+</style>

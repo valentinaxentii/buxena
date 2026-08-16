@@ -108,7 +108,7 @@ export function buildEnquiryReply(input: EnquiryReplyInput): EnquiryReply {
  * Opening this link only DRAFTS the email in the founder's own mail app —
  * nothing can send without them pressing Send there.
  */
-export function buildMailtoHref(email: string, reply: EnquiryReply): string {
+export function buildMailtoHref(email: string, reply: { subject: string; body: string }): string {
   const subject = encodeURIComponent(reply.subject);
   const body = encodeURIComponent(reply.body.replace(/\n/g, '\r\n'));
   // Recipient stays in its plain form (the one every mail client accepts);
