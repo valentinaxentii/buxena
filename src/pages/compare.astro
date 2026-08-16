@@ -181,7 +181,7 @@ const catalog = models.map((m) => ({
 
   const catalog: CmpModel[] = JSON.parse(document.getElementById('cmp-catalog')?.textContent ?? '[]');
   const bySlug = new Map(catalog.map((m) => [m.slug, m]));
-  const shownName = (t: string) => t.replace(/^BUH-/i, '');
+  const shownName = (t: string) => t.replace(/^BUH-/i, 'BUX ');
 
   const selA = document.querySelector<HTMLSelectElement>('[data-cmp-a]')!;
   const selB = document.querySelector<HTMLSelectElement>('[data-cmp-b]')!;

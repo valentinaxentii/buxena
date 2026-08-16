@@ -77,7 +77,7 @@ export function identityFor(title: string | undefined): ModelIdentity | null {
 /** Customer-facing name — falls back to the display title when unmapped. */
 export function publicNameFor(title: string | undefined): string {
   const id = identityFor(title);
-  return id ? id.publicName : (title ?? '').replace(/^BUH-/i, '');
+  return id ? id.publicName : (title ?? '').replace(/^BUH-/i, 'BUX ');
 }
 
 /** BUXENA model code, or null when unmapped. */

@@ -69,9 +69,15 @@ for (const f of files) {
   if (!heroSrc && !heroAlt) problems.push('no hero image AND no alt text');
 
   if (unquote(fm.placeholder) !== 'false') problems.push('placeholder: true (dev notice would show)');
-  if (!unquote(fm.capacity)) problems.push('no capacity');
+  // Missing capacity/materials are reported separately, same treatment as a
+  // missing hero image: Capra's own catalogue genuinely does not state a
+  // capacity or a material split for every series (confirmed 2026-08-16
+  // against the full 28-page 2026 catalogue — not an oversight here). Gating
+  // the board red on a fact the supplier never published is the same mistake
+  // this file already avoided for photography.
+  const noCapacity = !unquote(fm.capacity);
+  const noMaterials = !/materials:/.test(raw);
   if (!/dimensions:/.test(raw)) problems.push('no dimensions');
-  if (!/materials:/.test(raw)) problems.push('no materials');
   if (!unquote(fm.summary)) problems.push('no summary');
   if (body.trim().length < 120) problems.push(`thin body copy (${body.trim().length} chars)`);
 
@@ -91,7 +97,7 @@ for (const f of files) {
   const avail = unquote(fm.availability);
   if (avail && avail !== 'preorder') problems.push(`availability=${avail} (no inventory data exists)`);
 
-  rows.push({ slug, category, location, productType, problems, noHero: !heroSrc });
+  rows.push({ slug, category, location, productType, problems, noHero: !heroSrc, noCapacity, noMaterials });
 }
 
 rows.sort((a, b) => b.problems.length - a.problems.length || a.slug.localeCompare(b.slug));
@@ -137,5 +143,17 @@ if (noHero.length) {
   console.log('  arriving with written permission — see docs/*-pricing-request.md.');
 }
 
-// Non-zero so the pre-launch board and any CI can gate on it.
-process.exit(rows.length - clean.length === 0 ? 0 : 1);
+const noCapacity = rows.filter((r) => r.noCapacity);
+console.log(`\nNO CAPACITY STATED — Capra's catalogue does not publish one: ${noCapacity.length}`);
+for (const r of noCapacity) console.log(`      ${r.slug}`);
+
+const noMaterials = rows.filter((r) => r.noMaterials);
+console.log(`\nNO MATERIAL SPLIT STATED — Capra's catalogue does not publish one: ${noMaterials.length}`);
+for (const r of noMaterials) console.log(`      ${r.slug}`);
+
+// Non-zero so the pre-launch board and any CI can gate on it. Missing
+// capacity/materials/hero-image are reported above but never gate — each is
+// a genuine, disclosed supplier-data gap, not a defect in this repo.
+const NON_GATING = new Set(['no capacity', 'no materials']);
+const gating = rows.filter((r) => r.problems.some((p) => !NON_GATING.has(p)));
+process.exit(gating.length === 0 ? 0 : 1);

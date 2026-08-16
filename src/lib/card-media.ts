@@ -54,7 +54,7 @@ export function escapeHtml(value: unknown): string {
 
 /** Customer-facing name — the BUH- SKU prefix stays internal. Mirrors catalog.ts displayTitle(). */
 export function shownName(title: string): string {
-  return String(title ?? '').replace(/^BUH-/i, '');
+  return String(title ?? '').replace(/^BUH-/i, 'BUX ');
 }
 
 /**

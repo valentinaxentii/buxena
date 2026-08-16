@@ -111,7 +111,7 @@ const needed = (value: string) =>
 
 test('the catalogue itself loaded (guards a silently-empty test)', () => {
   assert.ok(CATALOG.length >= 30, `expected the real catalogue, got ${CATALOG.length} models`);
-  assert.ok(CATALOG.some((m) => m.slug === 'eda-thermowood-1-3m'), 'the regression model is missing');
+  assert.ok(CATALOG.some((m) => m.slug === 'bux-eda-130'), 'the regression model is missing');
 });
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ test('REGRESSION: a 2–3 model is never Best Match for a 3–4 answer', () => {
 
   const top = recs[0];
   assert.equal(top.label, 'Best Match');
-  assert.notEqual(top.model.slug, 'eda-thermowood-1-3m');
+  assert.notEqual(top.model.slug, 'bux-eda-130');
   assert.ok(
     (top.model.capacityMax ?? 0) >= needed('3-4'),
     `Best Match ${top.model.slug} seats ${top.model.capacityMax}, needs ${needed('3-4')}`

@@ -1,7 +1,7 @@
 {
   "BUH-ELLA H2": {
     "code": "BUH-01",
-    "publicName": "ELLA",
+    "publicName": "BUX ELLA H2",
     "internalRef": "ELLA H2",
     "supplier": "CAPRA (verified)",
     "series": "ELLA",
@@ -10,8 +10,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/ella-h2.md",
-    "slug": "ella-h2",
+    "sourceFile": "src/content/saunas/bux-ella-h2.md",
+    "slug": "bux-ella-h2",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": 1610,
@@ -29,7 +29,7 @@
   },
   "BUH-ELLA H1": {
     "code": "BUH-02",
-    "publicName": "ELLA II",
+    "publicName": "BUX ELLA H1",
     "internalRef": "ELLA H1",
     "supplier": "CAPRA (verified)",
     "series": "ELLA",
@@ -38,8 +38,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/ella-h1.md",
-    "slug": "ella-h1",
+    "sourceFile": "src/content/saunas/bux-ella-h1.md",
+    "slug": "bux-ella-h1",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": null,
@@ -57,7 +57,7 @@
   },
   "BUH-ILLI H2": {
     "code": "BUH-03",
-    "publicName": "ILLI",
+    "publicName": "BUX ILLI H2",
     "internalRef": "ILLI H2",
     "supplier": "CAPRA (verified)",
     "series": "ILLI",
@@ -66,8 +66,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/illi-h2.md",
-    "slug": "illi-h2",
+    "sourceFile": "src/content/saunas/bux-illi-h2.md",
+    "slug": "bux-illi-h2",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": null,
@@ -85,7 +85,7 @@
   },
   "BUH-ILLI H1": {
     "code": "BUH-04",
-    "publicName": "ILLI II",
+    "publicName": "BUX ILLI H1",
     "internalRef": "ILLI H1",
     "supplier": "CAPRA (verified)",
     "series": "ILLI",
@@ -94,8 +94,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/illi-h1.md",
-    "slug": "illi-h1",
+    "sourceFile": "src/content/saunas/bux-illi-h1.md",
+    "slug": "bux-illi-h1",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": null,
@@ -113,7 +113,7 @@
   },
   "BUH-ALLA H1": {
     "code": "BUH-05",
-    "publicName": "ALLA",
+    "publicName": "BUX ALLA H1",
     "internalRef": "ALLA H1",
     "supplier": "CAPRA (verified)",
     "series": "ALLA",
@@ -122,8 +122,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/alla-h1.md",
-    "slug": "alla-h1",
+    "sourceFile": "src/content/saunas/bux-alla-h1.md",
+    "slug": "bux-alla-h1",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": null,
@@ -141,7 +141,7 @@
   },
   "BUH-ALLA H2": {
     "code": "BUH-06",
-    "publicName": "ALLA II",
+    "publicName": "BUX ALLA H2",
     "internalRef": "ALLA H2",
     "supplier": "CAPRA (verified)",
     "series": "ALLA",
@@ -150,8 +150,8 @@
     "materials": [
       "Extra dried pine"
     ],
-    "sourceFile": "src/content/saunas/alla-h2.md",
-    "slug": "alla-h2",
+    "sourceFile": "src/content/saunas/bux-alla-h2.md",
+    "slug": "bux-alla-h2",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": null,
@@ -169,7 +169,7 @@
   },
   "BUH-UKU 160": {
     "code": "BUH-10",
-    "publicName": "UKU 160",
+    "publicName": "BUX UKU 160",
     "internalRef": "UKU 160",
     "supplier": "CAPRA (verified)",
     "series": "UKU",
@@ -179,8 +179,8 @@
       "Spruce",
       "Thermowood"
     ],
-    "sourceFile": "src/content/saunas/uku-160.md",
-    "slug": "uku-160",
+    "sourceFile": "src/content/saunas/bux-uku-160.md",
+    "slug": "bux-uku-160",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": 1930,
@@ -198,7 +198,7 @@
   },
   "BUH-UKU 230": {
     "code": "BUH-11",
-    "publicName": "UKU 230",
+    "publicName": "BUX UKU 230",
     "internalRef": "UKU 230",
     "supplier": "CAPRA (verified)",
     "series": "UKU",
@@ -208,8 +208,8 @@
       "Spruce",
       "Thermowood"
     ],
-    "sourceFile": "src/content/saunas/uku-230.md",
-    "slug": "uku-230",
+    "sourceFile": "src/content/saunas/bux-uku-230.md",
+    "slug": "bux-uku-230",
     "manufacturer": "CAPRA",
     "manufacturerConfidence": "verified (supplier record)",
     "exwEur": 2240,
@@ -286,478 +286,6 @@
     "hold": null,
     "launchStatus": "SPECIAL ORDER",
     "launchBlocker": "Sellable to order — premium/large unit, not a Phase 1 stocking candidate"
-  },
-  "BUH-EDA Thermowood 1.3m": {
-    "code": "BUH-20",
-    "publicName": "EDA Thermowood 1.3m",
-    "internalRef": "EDA Thermowood 1.3m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "2–3 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-1-3m.md",
-    "slug": "eda-thermowood-1-3m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Thermowood 2.35m": {
-    "code": "BUH-21",
-    "publicName": "EDA Thermowood 2.35m",
-    "internalRef": "EDA Thermowood 2.35m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-2-35m.md",
-    "slug": "eda-thermowood-2-35m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Thermowood 2.5m": {
-    "code": "BUH-22",
-    "publicName": "EDA Thermowood 2.5m",
-    "internalRef": "EDA Thermowood 2.5m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-2-5m.md",
-    "slug": "eda-thermowood-2-5m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Thermowood 2.8m": {
-    "code": "BUH-23",
-    "publicName": "EDA Thermowood 2.8m",
-    "internalRef": "EDA Thermowood 2.8m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-2-8m.md",
-    "slug": "eda-thermowood-2-8m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Thermowood 3.0m": {
-    "code": "BUH-24",
-    "publicName": "EDA Thermowood 3.0m",
-    "internalRef": "EDA Thermowood 3.0m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "6–8 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-3-0m.md",
-    "slug": "eda-thermowood-3-0m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "SPECIAL ORDER",
-    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
-  },
-  "BUH-EDA Thermowood 3.3m": {
-    "code": "BUH-25",
-    "publicName": "EDA Thermowood 3.3m",
-    "internalRef": "EDA Thermowood 3.3m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-3-3m.md",
-    "slug": "eda-thermowood-3-3m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Thermowood 4.0m": {
-    "code": "BUH-26",
-    "publicName": "EDA Thermowood 4.0m",
-    "internalRef": "EDA Thermowood 4.0m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-4-0m.md",
-    "slug": "eda-thermowood-4-0m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "SPECIAL ORDER",
-    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
-  },
-  "BUH-EDA Thermo-Treated Pine 1.6m": {
-    "code": "BUH-27",
-    "publicName": "EDA Thermo-Treated Pine 1.6m",
-    "internalRef": "EDA Thermo-Treated Pine 1.6m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "3–4 people",
-    "materials": [
-      "Thermo-treated pine"
-    ],
-    "sourceFile": "src/content/saunas/eda-thermowood-1-6m.md",
-    "slug": "eda-thermowood-1-6m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 1.6m": {
-    "code": "BUH-28",
-    "publicName": "EDA Nordic Spruce 1.6m",
-    "internalRef": "EDA Nordic Spruce 1.6m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "3–4 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-1-6m.md",
-    "slug": "eda-nordic-spruce-1-6m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 2.0m": {
-    "code": "BUH-29",
-    "publicName": "EDA Nordic Spruce 2.0m",
-    "internalRef": "EDA Nordic Spruce 2.0m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-2-0m.md",
-    "slug": "eda-nordic-spruce-2-0m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 2.35m": {
-    "code": "BUH-30",
-    "publicName": "EDA Nordic Spruce 2.35m",
-    "internalRef": "EDA Nordic Spruce 2.35m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-2-35m.md",
-    "slug": "eda-nordic-spruce-2-35m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 2.5m": {
-    "code": "BUH-31",
-    "publicName": "EDA Nordic Spruce 2.5m",
-    "internalRef": "EDA Nordic Spruce 2.5m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-2-5m.md",
-    "slug": "eda-nordic-spruce-2-5m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 2.8m": {
-    "code": "BUH-32",
-    "publicName": "EDA Nordic Spruce 2.8m",
-    "internalRef": "EDA Nordic Spruce 2.8m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-2-8m.md",
-    "slug": "eda-nordic-spruce-2-8m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 3.0m": {
-    "code": "BUH-33",
-    "publicName": "EDA Nordic Spruce 3.0m",
-    "internalRef": "EDA Nordic Spruce 3.0m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "6–8 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-3-0m.md",
-    "slug": "eda-nordic-spruce-3-0m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "SPECIAL ORDER",
-    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
-  },
-  "BUH-EDA Nordic Spruce 3.3m": {
-    "code": "BUH-34",
-    "publicName": "EDA Nordic Spruce 3.3m",
-    "internalRef": "EDA Nordic Spruce 3.3m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-3-3m.md",
-    "slug": "eda-nordic-spruce-3-3m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "WAITING FOR COST",
-    "launchBlocker": "No dealer EXW"
-  },
-  "BUH-EDA Nordic Spruce 4.0m": {
-    "code": "BUH-35",
-    "publicName": "EDA Nordic Spruce 4.0m",
-    "internalRef": "EDA Nordic Spruce 4.0m",
-    "supplier": "CAPRA (verified)",
-    "series": "EDA",
-    "category": "barrel",
-    "capacity": "4–6 people",
-    "materials": [
-      "Nordic spruce"
-    ],
-    "sourceFile": "src/content/saunas/eda-nordic-spruce-4-0m.md",
-    "slug": "eda-nordic-spruce-4-0m",
-    "manufacturer": "CAPRA",
-    "manufacturerConfidence": "verified (supplier record)",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": {
-      "cls": "Capra kit",
-      "unitsPer40HC": 24,
-      "freightPortPerUnit": 254.17
-    },
-    "usTerritory": "UNKNOWN — asked in outreach",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": null,
-    "launchStatus": "SPECIAL ORDER",
-    "launchBlocker": "Sellable to order — large unit, poor container economics for Phase 1"
-  },
-  "BUH-ITI Thermowood 2.3m": {
-    "code": "BUH-36",
-    "publicName": "ITI Thermowood 2.3m",
-    "internalRef": "ITI Thermowood 2.3m",
-    "supplier": "NOT VERIFIED — confirm before ordering",
-    "series": "ITI",
-    "category": "barrel",
-    "capacity": "",
-    "materials": [
-      "Thermowood"
-    ],
-    "sourceFile": "src/content/saunas/iti-thermowood-2-3m.md",
-    "slug": "iti-thermowood-2-3m",
-    "manufacturer": null,
-    "manufacturerConfidence": "UNIDENTIFIED",
-    "exwEur": null,
-    "exwSource": "MISSING",
-    "container": null,
-    "usTerritory": "UNKNOWN",
-    "imageRights": "NOT CONFIRMED IN WRITING",
-    "hold": "HOLD — supplier verification",
-    "launchStatus": "HOLD",
-    "launchBlocker": "No manufacturer identified — withheld from sale"
   },
   "BUH-AURA Thermowood 1.3m": {
     "code": "BUH-37",

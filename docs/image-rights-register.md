@@ -400,3 +400,34 @@ is not a factual misstatement. It is flagged because putting another
 manufacturer's mark on the brand story page is a commercial decision, not a
 technical one. Options: keep as is, crop tighter to exclude the wordmark, or
 substitute a different photograph.
+
+---
+
+## Capra 2026 general dealer catalogue — EKE/UKU/ULLA/KLAAR/AAPO/RUUDI/KLAABU/SUSI/EDA D2/ITI D4 (2026-08-16)
+
+New source, distinct from the shared drive and from `ELLA_ILLI_ALLA_2026_Buxena.pdf`
+/ `UKU_series_2026_Buxena.pdf` (BUXENA-specific per-SKU packs, already covered
+above): `Copy of Capra_2026 Catalogue Andres Sokk 6M (1).pdf` — Capra's general
+28-page dealer line-card, addressed "Capra partners with dealers, distributors
+and retailers... apply to become a Capra dealer," i.e. materials Capra
+distributes to dealers for exactly this kind of resale/marketing use. No
+separate written grant specific to this PDF is on file the way the shared-drive
+permission is documented above.
+
+| Field | Value |
+|---|---|
+| Files | `bux-ulla-hero.jpg`, `bux-aapo-hero.jpg`, `bux-klaabu-hero.jpg`, `bux-klaar-w1-hero.jpg`, `bux-klaar-w1-2-hero.jpg`, `bux-klaar-w2-hero.jpg`, `bux-ruudi-s-hero.jpg`, `bux-ruudi-m-hero.jpg`, `bux-ruudi-l-hero.jpg` (9 files) |
+| Source | Cropped directly from the catalogue PDF (pages 10-11 ULLA, 14-15 AAPO, 18-19 KLAABU, 12-13 KLAAR, 16-17 RUUDI) |
+| Exact-match status | Each is the model's own catalogue photo — ULLA/AAPO/KLAABU have only one size each so there is no family-image ambiguity; KLAAR W1/W1.2/W2 and RUUDI S/M/L each have their own distinct catalogue photo (verified against the source pages, not shared across configurations) |
+| Commercial use | **NEEDS CONFIRMATION** — same tier as Capra dealer-pack renders before the 2026-08-10 written-permission ruling. Treat as website-pending, not yet paid-ads/social eligible, until confirmed in writing the way the shared-drive grant was |
+| Notes | Capra's own disclaimer on every catalogue page: *"Images shown in this brochure are illustrative and may include optional features or custom configurations."* The AAPO photo shows the optional shower/sidewall configuration — captioned as optional on the product page, never presented as standard. |
+
+**EKE, SUSI, and the barrel series (EDA D2, ITI D4) — no exact photo used.**
+Capra's catalogue publishes one generic render per line, shared across every
+depth in that series (confirmed by reviewing the full 28-page PDF page by
+page). Per the founder's ruling on the same EDA issue this session: a shared
+"family" photo is not an acceptable substitute for an exact-model photo, so
+these 24 models (5 EKE + 5 SUSI + 9 EDA + 4 ITI, minus 3 EDA/ITI depths that
+also have no photo for other reasons) render the site's existing honest
+placeholder instead. See `scripts/catalogue-readiness.mjs`'s "NO HERO IMAGE"
+report for the current list.

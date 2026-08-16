@@ -64,7 +64,7 @@ if (existsSync(DIST)) {
 console.log('\n■ 2/7 Expected public routes');
 const MUST_EXIST = [
   'index.html', '404.html',
-  'saunas/index.html', 'saunas/ella-h2/index.html', 'saunas/uku-160/index.html', 'saunas/uku-230/index.html',
+  'saunas/index.html', 'saunas/bux-ella-h2/index.html', 'saunas/bux-uku-160/index.html', 'saunas/bux-uku-230/index.html',
   'saunas/barrel-saunas/index.html', 'saunas/cube-saunas/index.html', 'saunas/indoor-saunas/index.html', 'saunas/outdoor-saunas/index.html',
   'compare/index.html', 'plan-your-sauna/index.html', 'see-it-in-my-space/index.html', 'how-buying-works/index.html',
   'quote/index.html', 'consultation/index.html', 'for-trade/index.html', 'start-your-project/index.html', 'my-project/index.html',
@@ -120,7 +120,7 @@ const sm0 = path.join(DIST, 'sitemap-0.xml');
 record('sitemap', 'sitemap-index.xml generated', existsSync(smIndex));
 if (existsSync(sm0)) {
   const sm = readFileSync(sm0, 'utf8');
-  const wants = ['/saunas/ella-h2/', '/quote/', '/compare/', '/for-trade/'];
+  const wants = ['/saunas/bux-ella-h2/', '/quote/', '/compare/', '/for-trade/'];
   const bans = ['/admin', '/login', '/thank-you/', '/collections/'];
   record('sitemap', 'sales pages listed', wants.every((w) => sm.includes(w)), wants.filter((w) => !sm.includes(w)).join(', '));
   record('sitemap', 'admin/login/thank-you/legacy excluded', bans.every((b) => !sm.includes(b)), bans.filter((b) => sm.includes(b)).join(', '));
@@ -217,7 +217,7 @@ if (devLive) {
     record('email', `customer ack sends for ${SOURCES.length - 1} sources, skips enrichment (saw ${sends} send / ${skips} skip)`, sends === SOURCES.length - 1 && skips === 1);
     const hp = await post({ name: 'Bot', email: 'bot@spam.local', message: 'spam', source: 'Quote Form', botField: 'filled' });
     record('forms', 'honeypot swallowed silently', hp.ok === true && hp.devMode === undefined);
-    const pages = ['/', '/saunas/ella-h2', '/quote/?intent=compare&model=BUH-ELLA%20H2'];
+    const pages = ['/', '/saunas/bux-ella-h2', '/quote/?intent=compare&model=BUH-ELLA%20H2'];
     let pagesOk = true;
     for (const p of pages) { try { if (!(await fetch(base + p)).ok) pagesOk = false; } catch { pagesOk = false; } }
     record('forms', 'key journey pages respond on dev server', pagesOk);

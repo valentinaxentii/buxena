@@ -29,7 +29,7 @@ export interface EnquiryReply {
 }
 
 const clean = (v: string | null | undefined, max = 200) => (v ?? '').trim().slice(0, max);
-const displayModel = (title: string) => title.replace(/^BUH-/i, '');
+const displayModel = (title: string) => title.replace(/^BUH-/i, 'BUX ');
 const sourceKey = (source: string) => source.toLowerCase().replace(/[^a-z]/g, '');
 
 const SIGNATURE = ['Warm regards,', 'The BUXENA Team', 'info@buxena.com · buxena.com'].join('\n');

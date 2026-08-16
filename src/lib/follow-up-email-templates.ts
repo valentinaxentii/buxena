@@ -80,7 +80,7 @@ const clean = (v: string | null | undefined) => (v ?? '').trim();
 function recapLines(recap?: FollowUpRecap): string[] {
   if (!recap) return [];
   const lines: string[] = [];
-  if (recap.modelTitle) lines.push(`Model: ${clean(recap.modelTitle).replace(/^BUH-/i, '')}`);
+  if (recap.modelTitle) lines.push(`Model: ${clean(recap.modelTitle).replace(/^BUH-/i, 'BUX ')}`);
   if (recap.capacity) lines.push(`Capacity: ${recap.capacity}`);
   if (recap.primaryDimension) lines.push(`Dimension: ${recap.primaryDimension}`);
   if (recap.material) lines.push(`Material: ${recap.material}`);

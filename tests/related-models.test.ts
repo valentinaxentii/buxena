@@ -111,7 +111,7 @@ test('the reason never contradicts the capacity data', () => {
 test('both directions are offered when both exist', () => {
   // A mid-sized outdoor model has both smaller and larger siblings, so the
   // shortlist must answer "bigger?" and "smaller?" rather than three of a size.
-  const target = CATALOG.find((m) => m.slug === 'eda-thermowood-2-5m');
+  const target = CATALOG.find((m) => m.slug === 'bux-eda-250');
   assert.ok(target, 'fixture model missing from catalogue');
   const rel = relatedModels(target!, CATALOG);
   const reasons = rel.map((r) => r.reason).join(' | ');
