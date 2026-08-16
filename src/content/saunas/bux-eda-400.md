@@ -13,16 +13,10 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's
-  # direction (supersedes the earlier placeholder-only decision for this
-  # class of gap). Capra's 2026 Catalogue (Andres Sokk, p.22-23) publishes
-  # ONE generic photograph for the whole EDA D2 line, shared across every
-  # depth/size in the catalogue itself. This is NOT a photo of this specific
-  # depth — it is the correct SERIES, verified against the source page, and
-  # no other model's photo has been substituted. Classification: FAMILY.
-  # Replace with an exact depth photo the moment Capra sends one.
-  src: "/images/saunas/eda-family-barrel.jpg"
-  alt: "BUX EDA 400 barrel sauna exterior, glass door and shingled roof"
+  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
+  # EDA family image. Provenance/usage remains governed by the image-rights register.
+  src: "/images/saunas/eda-nordic-spruce-4-0m-hero.png"
+  alt: "BUX EDA 400 Nordic Spruce barrel sauna exterior"
 dimensions:
   - { label: "Depth", value: "13.1 ft (400 cm)" }
   - { label: "Width", value: "6.7 ft (205 cm)" }
