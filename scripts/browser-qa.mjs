@@ -127,12 +127,26 @@ function auditPage() {
     // scales past its frame (ken-burns drift) inside a clipping section, and
     // reporting it as overflow was noise: document scrollWidth stayed at the
     // viewport, which is the fact that matters.
+    //
+    // Same reasoning for a SCROLLABLE ancestor (overflow-x: auto/scroll): a
+    // wide table inside its own scroll box is contained by that box, not by
+    // the page — the product technical-information table is exactly this
+    // (a <table> can't take overflow-x itself once border-collapse:collapse
+    // is set, a CSS 2.1 rule, so the wrapper div carries it instead). Only
+    // exempted while the scrollable ancestor itself stays within the
+    // viewport; if IT also overflows, that is a real fault and gets caught
+    // when the loop visits that ancestor as its own `el`.
     let clipped = false;
+    let scrollContained = false;
     for (let anc = el.parentElement; anc && anc !== document.body; anc = anc.parentElement) {
       const as = getComputedStyle(anc);
       if (as.overflow === 'hidden' || as.overflowX === 'hidden' || as.overflowX === 'clip') { clipped = true; break; }
+      if (as.overflowX === 'auto' || as.overflowX === 'scroll') {
+        const ar = anc.getBoundingClientRect();
+        if (ar.right <= vw + 1 && ar.left >= -1) { scrollContained = true; break; }
+      }
     }
-    if (clipped) continue;
+    if (clipped || scrollContained) continue;
     if (r.right > vw + 1 || r.left < -1) {
       // Report the OUTERMOST offender; children inherit the problem.
       const parent = el.parentElement;

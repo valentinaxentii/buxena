@@ -18,7 +18,6 @@ import ProductResources from '../../components/ProductResources.astro';
 import CustomerAnswerSystem from '../../components/CustomerAnswerSystem.astro';
 import ObjectionResolution from '../../components/ObjectionResolution.astro';
 import Testimonials from '../../components/Testimonials.astro';
-import { groupSpecs } from '../../lib/product-specs';
 import { relatedModels } from '../../lib/related-models';
 import { readHeaterFacts, heaterSummary } from '../../lib/heater-options';
 import { shouldShowConfigurator } from '../../lib/product-config';
@@ -108,38 +107,17 @@ const heaterFacts = readHeaterFacts(data.heaterOptions);
 const TBC = 'To be confirmed';
 
 /**
- * Specification handling.
- *
- * In production, anything without a verified value is simply omitted — a
- * customer never sees a column of "To be confirmed". If nothing at all is
- * verified, the whole sidebar is hidden and the description runs full width.
- *
- * In development every field is shown, so you can see what is still missing.
+ * Condensed key facts for the hero's right column — a compact teaser, not
+ * the full specification. The canonical, detailed sheet (every dimension,
+ * every spec row, metric AND imperial, compatible heating) lives in ONE
+ * place: <ProductResources>'s "Technical Information" table, further down
+ * this page. It used to also be repeated here in a full grouped-by-category
+ * sidebar next to the description — removed 2026-08-15 because dimensions,
+ * capacity, materials and heater compatibility were each appearing on the
+ * page three times (hero teaser, grouped sidebar, technical sheet). This
+ * hero teaser is deliberately the ONLY other place any of these facts
+ * appear, and only as a short at-a-glance subset.
  */
-const verifiedRows = [
-  { label: 'Collection', value: cat?.name ?? data.category },
-  ...(data.series ? [{ label: 'Series', value: data.series }] : []),
-  ...(data.capacity ? [{ label: 'Capacity', value: data.capacity }] : []),
-  ...(data.dimensions ?? []),
-  ...(data.specs ?? []),
-  ...(data.delivery ? [{ label: 'Delivery', value: data.delivery }] : []),
-];
-
-const pendingRows = [
-  ...(data.capacity ? [] : [{ label: 'Capacity', value: TBC }]),
-  ...(data.dimensions ? [] : [{ label: 'Dimensions', value: TBC }]),
-];
-
-const specRows = showDev ? [...verifiedRows, ...pendingRows] : verifiedRows;
-
-// Grouped view of the same verified rows — DIMENSIONS / CONSTRUCTION /
-// DOOR & GLASS / INTERIOR / HEATING / VENTILATION / INSTALLATION. Derived
-// from labels already in the data: no frontmatter rewritten, no value
-// invented, and a category with no rows never renders.
-const specGroups = groupSpecs(specRows.filter((r) => r.value !== TBC), []);
-
-// Condensed key facts for the hero's right column — a subset of the full
-// specification sheet (still shown in full further down the page, unchanged).
 const heroSpecRows = [
   ...(data.capacity ? [{ label: 'Capacity', value: data.capacity }] : []),
   ...(data.location ? [{ label: 'Placement', value: data.location === 'outdoor' ? 'Outdoor' : 'Indoor' }] : []),
@@ -154,20 +132,19 @@ const heroSpecRows = [
   ...(data.specs ?? []).slice(0, 2),
 ];
 
+/**
+ * Everything in this sidebar is content the Technical Information table does
+ * NOT already show: marketing-style feature/option bullets and downloadable
+ * documents. Materials and heater options are deliberately excluded — both
+ * are now owned by the technical sheet's Material row and Compatible
+ * Heating table respectively.
+ */
 const blocks = [
-  { title: 'Materials', items: data.materials },
-  { title: 'Heater options', items: data.heaterOptions },
   { title: 'Features', items: data.features },
   { title: 'Available options', items: data.options },
 ];
 
 const hasDownloads = (data.downloads ?? []).some((d) => d.file);
-
-// Is there anything worth showing a customer beyond the collection name?
-const hasVerifiedDetail =
-  verifiedRows.length > 1 || blocks.some((b) => b.items?.length) || hasDownloads;
-
-const showSpecs = showDev || hasVerifiedDetail;
 
 // Structured data — verified fields only. No price/offers/rating: none of
 // that is published, and none should be invented.
@@ -375,65 +352,33 @@ const breadcrumbSchema = {
       </div>
     </section>
 
-    <!-- Description + specs -->
+    {/* The canonical, detailed specification sheet — every dimension, metric
+        AND imperial, compatible heating, verified drawings. Placed right
+        after the hero, before the description, so "will this fit / how many
+        people / what heater" (the hero teaser above already answers these at
+        a glance) can be confirmed in full without scrolling past the
+        configurator. Renders nothing if this model has no verified technical
+        data at all. */}
+    <ProductResources assets={data.technicalAssets} model={data.title} />
+
+    <!-- Description + Features/Options/Downloads. Dimensions, capacity,
+         materials and heater compatibility live ONLY in the Technical
+         Information sheet above — see the note above heroSpecRows. -->
     <section class="band">
-      <div class={`shell prod-body ${showSpecs ? "" : "prod-body--solo"}`}>
+      <div class="shell prod-body">
         <div class="prose">
           <span class="eyebrow">Why choose this model</span>
           <Content />
         </div>
 
-        {showSpecs && (
-          <aside class="specs">
-            <h2 class="specs__h">Specifications</h2>
-            {specGroups.map((group) => (
-              <div class="specs__group">
-                <h3 class="specs__cat">{group.title}</h3>
-                <dl class="specs__list">
-                  {group.rows.map((row) => (
-                    <div class="specs__row">
-                      <dt>{row.label}</dt>
-                      <dd>{row.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
-
-            {showDev && pendingRows.length > 0 && (
-              <div class="specs__group">
-                <h3 class="specs__cat">Awaiting supplier confirmation</h3>
-                <dl class="specs__list">
-                  {pendingRows.map((row) => (
-                    <div class="specs__row">
-                      <dt>{row.label}</dt>
-                      <dd class="is-tbc">{row.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
+        <aside class="specs">
+            <h2 class="specs__h">More to know</h2>
 
             {blocks.map((block) =>
               block.items?.length ? (
                 <Fragment>
                   <h3 class="specs__sub">{block.title}</h3>
                   <ul class="specs__ul">{block.items.map((i) => <li>{i}</li>)}</ul>
-                  {/* The heater is the choice buyers ask about most and
-                      understand least. Where this model states anything about
-                      it, offer the cross-model comparison — the guide is built
-                      from these same statements, so it can never contradict
-                      the list directly above. */}
-                  {block.title === 'Heater options' && (
-                    <p class="specs__heaterlink">
-                      <a
-                        class="link"
-                        href="/heater-guide/#by-model"
-                        data-track="heater_guide_click"
-                        data-track-model={data.title}
-                      >Compare heaters across models <span class="arrow" aria-hidden="true">→</span></a>
-                    </p>
-                  )}
                 </Fragment>
               ) : showDev ? (
                 <Fragment>
@@ -499,8 +444,7 @@ const breadcrumbSchema = {
                 >For Trade — Submit a Project <span class="arrow" aria-hidden="true">→</span></a>
               </Fragment>
             )}
-          </aside>
-        )}
+        </aside>
       </div>
     </section>
 
@@ -522,9 +466,6 @@ const breadcrumbSchema = {
         <CustomerAnswerSystem price={approved} facts={data.salesFacts} />
       </div>
     </section>
-
-    {/* Renders nothing unless this model has a VERIFIED, permitted asset. */}
-    <ProductResources assets={data.technicalAssets} model={data.title} />
 
     <PackageBand model={data.title} />
 
@@ -821,7 +762,6 @@ const breadcrumbSchema = {
   }
   .notice strong { color: var(--ink); font-weight: 500; }
 
-  .prod-body--solo { grid-template-columns: minmax(0, 1fr); max-width: 52rem; }
   .prod-body {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
@@ -843,28 +783,7 @@ const breadcrumbSchema = {
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    margin: 0 0 1.5rem;
-  }
-  .specs__list { margin: 0 0 2.25rem; }
-  .specs__row {
-    display: flex;
-    justify-content: space-between;
-    gap: 1.5rem;
-    padding: 0.8rem 0;
-    border-bottom: 1px solid var(--line);
-    font-size: var(--t-small);
-  }
-  .specs__row dt { color: var(--muted); margin: 0; }
-  .specs__row dd { margin: 0; text-align: right; }
-
-  .specs__group + .specs__group { margin-top: 1.27rem; }
-  .specs__cat {
-    margin: 0 0 0.6rem;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--bronze-ink);
+    margin: 0 0 0.9rem;
   }
   .specs__sub {
     font-family: var(--font-sans);
@@ -873,8 +792,9 @@ const breadcrumbSchema = {
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted);
-    margin: 2rem 0 0.9rem;
+    margin: 1.4rem 0 0.9rem;
   }
+  .specs__sub:first-of-type { margin-top: 0; }
   .specs__ul { font-size: var(--t-small); }
   .specs__ul li { padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
 
@@ -883,7 +803,6 @@ const breadcrumbSchema = {
 
   .dl { color: var(--bronze-ink); }
 
-  .specs__heaterlink { margin: 0.4rem 0 1.1rem; font-size: 0.8125rem; }
   .specs__docnote { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.9rem; }
   .specs__docreq { display: inline-flex; margin: 0 1.5rem 0.6rem 0; font-size: 0.8125rem; }
 

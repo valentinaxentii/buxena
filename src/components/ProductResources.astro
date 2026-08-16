@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import { publicAssets } from '../lib/product-assets';
 import type { TechnicalAssets } from '../lib/product-assets';
 import { displayTitle } from '../data/catalog';
+import { readHeaterFacts } from '../lib/heater-options';
 
 /**
  * Technical specification sheet + verified resources for every sauna model.
@@ -40,40 +41,74 @@ function unitSystem(value: string): 'metric' | 'imperial' | null {
 
 /**
  * Split an existing dual-unit source string, e.g.
- * "51.2 × 53.1 × 89.0 in (1300 × 1350 × 2260 mm)".
- * If the source does not explicitly contain both systems, keep it intact in a
- * neutral Value column rather than manufacturing a conversion.
+ * "51.2 × 53.1 × 89.0 in (1300 × 1350 × 2260 mm)", or the same shape with a
+ * trailing qualifier after the parenthetical, e.g.
+ * "595 lb (270 kg) flat-pack". If the source does not explicitly contain
+ * both systems, keep it intact in a neutral Value column rather than
+ * manufacturing a conversion.
  */
 function splitVerifiedUnits(value: string) {
-  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*(.*)$/);
   if (!match) return { metric: '', imperial: '', value };
 
   const first = match[1].trim();
   const second = stripOuterParens(match[2]);
+  const trailing = match[3].trim();
   const firstSystem = unitSystem(first);
   const secondSystem = unitSystem(second);
+  const withTrailing = (s: string) => (trailing ? `${s} ${trailing}` : s);
 
   if (firstSystem === 'imperial' && secondSystem === 'metric') {
-    return { metric: second, imperial: first, value: '' };
+    return { metric: withTrailing(second), imperial: withTrailing(first), value: '' };
   }
   if (firstSystem === 'metric' && secondSystem === 'imperial') {
-    return { metric: first, imperial: second, value: '' };
+    return { metric: withTrailing(first), imperial: withTrailing(second), value: '' };
   }
   return { metric: '', imperial: '', value };
 }
 
+/**
+ * Compatible-heating table: real ✓/✕ rows, never inferred. Reuses the same
+ * conservative reader as /heater-guide/ and the hero summary, so this table
+ * can never disagree with either. A fuel gets a row only when the catalogue
+ * states something about it — electric/wood compatibility is never assumed,
+ * and an unstated fuel gets no row at all rather than a guessed ✕.
+ */
+const heaterFacts = readHeaterFacts(data?.heaterOptions);
+const heaterCompatRows = heaterFacts.unknown
+  ? []
+  : [
+      ...(heaterFacts.fuels.includes('electric')
+        ? [{ label: 'Electric heater', compatible: true, note: heaterFacts.kwRange ?? '' }]
+        : []),
+      ...(heaterFacts.woodExplicitlyIncompatible
+        ? [{ label: 'Wood-burning heater', compatible: false, note: 'Not compatible' }]
+        : heaterFacts.fuels.includes('wood')
+          ? [{ label: 'Wood-burning heater', compatible: true, note: '' }]
+          : []),
+    ];
+
+/**
+ * A raw prose "Heater" / "Heater compatibility" row sometimes lives in
+ * `specs` too (e.g. ELLA/ILLI/ALLA's frontmatter). Once heaterCompatRows has
+ * a structured ✓/✕ answer, that raw row would just restate it a second time
+ * in the same table — dropped only in that case. Where heaterCompatRows is
+ * empty (heaterOptions absent, e.g. the EDA barrels), the raw specs row is
+ * the only heater information available and is kept.
+ */
 const technicalRows = data
   ? [
       ...(data.capacity ? [{ label: 'Capacity', raw: data.capacity }] : []),
       ...(data.dimensions ?? []).map((row) => ({ label: row.label, raw: row.value })),
-      ...(data.specs ?? []).map((row) => ({ label: row.label, raw: row.value })),
+      ...(data.specs ?? [])
+        .filter((row) => heaterCompatRows.length === 0 || !/heater/i.test(row.label))
+        .map((row) => ({ label: row.label, raw: row.value })),
       ...(data.materials?.length ? [{ label: 'Material', raw: data.materials.join(', ') }] : []),
       ...(data.delivery ? [{ label: 'Delivery', raw: data.delivery }] : []),
     ].map((row) => ({ ...row, ...splitVerifiedUnits(row.raw) }))
   : [];
 
-const heaterRows = data?.heaterOptions ?? [];
-const hasTechnicalSheet = technicalRows.length > 0 || heaterRows.length > 0;
+const hasTechnicalSheet = technicalRows.length > 0 || heaterCompatRows.length > 0;
 
 const drawingResources = resources.filter(({ slot }) =>
   ['dimensionDrawing', 'floorPlan', 'elevations', 'benchLayout'].includes(slot.key)
@@ -143,14 +178,22 @@ function minutes(seconds?: number): string {
                 </tbody>
               </table>
 
-              {heaterRows.length > 0 && (
+              {heaterCompatRows.length > 0 && (
                 <div class="techsheet__compat">
                   <h3>Compatible heating</h3>
-                  <ul>
-                    {heaterRows.map((heater) => (
-                      <li><span class="techsheet__check" aria-hidden="true">✓</span><span>{heater}</span></li>
-                    ))}
-                  </ul>
+                  <table class="techsheet__compattable">
+                    <tbody>
+                      {heaterCompatRows.map((row) => (
+                        <tr>
+                          <th scope="row">{row.label}</th>
+                          <td class:list={['techsheet__mark', row.compatible ? 'is-yes' : 'is-no']} aria-label={row.compatible ? 'Compatible' : 'Not compatible'}>
+                            {row.compatible ? '✓' : '✕'}
+                          </td>
+                          <td class="techsheet__compatnote">{row.note}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -287,6 +330,10 @@ function minutes(seconds?: number): string {
     gap: clamp(1rem, 2vw, 2rem);
     align-items: start;
   }
+  /* The scroll container. `overflow-x` has no effect on a <table> once
+     border-collapse:collapse is set (CSS 2.1 §17.6.2), so this wrapper — not
+     the table itself — is what keeps a wide table's horizontal scroll
+     contained to itself instead of the page. */
   .techsheet__tablewrap { min-width: 0; overflow-x: auto; }
   .techsheet__table {
     width: 100%;
@@ -319,9 +366,16 @@ function minutes(seconds?: number): string {
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .techsheet__compat ul { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
-  .techsheet__compat li { display: flex; gap: 0.55rem; align-items: flex-start; font-size: 0.84rem; }
-  .techsheet__check { color: var(--bronze-ink); font-weight: 700; }
+  .techsheet__compattable { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  .techsheet__compattable th,
+  .techsheet__compattable td { padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .techsheet__compattable tr:last-child th,
+  .techsheet__compattable tr:last-child td { border-bottom: none; }
+  .techsheet__compattable th { color: var(--ink); font-weight: 500; }
+  .techsheet__mark { width: 1.4rem; font-weight: 700; }
+  .techsheet__mark.is-yes { color: var(--bronze-ink); }
+  .techsheet__mark.is-no { color: var(--muted); }
+  .techsheet__compatnote { color: var(--muted); }
   .techsheet__drawings {
     display: grid;
     gap: 0.55rem;
