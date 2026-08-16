@@ -74,10 +74,20 @@ export function identityFor(title: string | undefined): ModelIdentity | null {
   return MODEL_IDENTITY[title.trim()] ?? null;
 }
 
+// Same 8-title guard as catalog.ts's RENAMED_CAPRA_TITLES — BUH- is used by
+// every model regardless of supplier (NORD, VIRU included), so only these
+// specific titles get "BUX " on an unmapped fallback.
+const RENAMED_CAPRA_TITLES = new Set([
+  'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+  'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+]);
+
 /** Customer-facing name — falls back to the display title when unmapped. */
 export function publicNameFor(title: string | undefined): string {
   const id = identityFor(title);
-  return id ? id.publicName : (title ?? '').replace(/^BUH-/i, 'BUX ');
+  if (id) return id.publicName;
+  const t = title ?? '';
+  return RENAMED_CAPRA_TITLES.has(t) ? t.replace(/^BUH-/i, 'BUX ') : t.replace(/^BUH-/i, '');
 }
 
 /** BUXENA model code, or null when unmapped. */

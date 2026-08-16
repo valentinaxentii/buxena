@@ -76,11 +76,19 @@ export interface FollowUpEmail {
 }
 
 const clean = (v: string | null | undefined) => (v ?? '').trim();
+// BUH- is used by every model regardless of supplier (NORD, VIRU included),
+// so only these 8 renamed Capra titles get "BUX " — see catalog.ts.
+const RENAMED_CAPRA_TITLES = new Set([
+  'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+  'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+]);
+const displayModel = (t: string) =>
+  RENAMED_CAPRA_TITLES.has(t) ? t.replace(/^BUH-/i, 'BUX ') : t.replace(/^BUH-/i, '');
 
 function recapLines(recap?: FollowUpRecap): string[] {
   if (!recap) return [];
   const lines: string[] = [];
-  if (recap.modelTitle) lines.push(`Model: ${clean(recap.modelTitle).replace(/^BUH-/i, 'BUX ')}`);
+  if (recap.modelTitle) lines.push(`Model: ${displayModel(clean(recap.modelTitle))}`);
   if (recap.capacity) lines.push(`Capacity: ${recap.capacity}`);
   if (recap.primaryDimension) lines.push(`Dimension: ${recap.primaryDimension}`);
   if (recap.material) lines.push(`Material: ${recap.material}`);

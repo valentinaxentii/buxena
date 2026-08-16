@@ -10,12 +10,15 @@ order: 10
 placeholder: false
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # NO EXACT PHOTOGRAPH EXISTS. The previous image on this model
-  # (iti-thermowood-2-3m-hero.png) has undocumented origin — it is not
-  # traceable to the Capra shared drive or either Capra catalogue PDF
-  # reviewed 2026-08-16, and docs/image-rights-register.md already listed
-  # ITI in the BLOCKED / REPLACE group for exactly this reason. Not carried
-  # forward. See docs/image-rights-register.md.
+  # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's
+  # direction (supersedes the earlier placeholder-only decision for this
+  # class of gap). Capra's 2026 Catalogue (Andres Sokk, p.24-25) publishes
+  # ONE generic photograph for the whole ITI D4 line, shared across every
+  # depth/size in the catalogue itself. This is NOT a photo of this specific
+  # depth — it is the correct SERIES, verified against the source page, and
+  # no other model's photo has been substituted. Classification: FAMILY.
+  # Replace with an exact depth photo the moment Capra sends one.
+  src: "/images/saunas/bux-iti-family-hero.jpg"
   alt: "BUX ITI 230 barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Depth", value: "7.5 ft (230 cm)" }

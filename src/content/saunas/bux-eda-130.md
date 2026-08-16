@@ -13,11 +13,15 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Thermo Pine"]
 heroImage:
-  # NO EXACT PHOTOGRAPH EXISTS. Confirmed against the full 27-page Capra 2026
-  # Catalogue (Andres Sokk): the EDA D2 Series page (p.22-23) publishes ONE
-  # generic render for the whole line — every depth (130cm-400cm) and both
-  # materials share it there. It is not a photo of this specific depth, so it
-  # is not used here. See docs/image-rights-register.md.
+  # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's
+  # direction (supersedes the earlier placeholder-only decision for this
+  # class of gap). Capra's 2026 Catalogue (Andres Sokk, p.22-23) publishes
+  # ONE generic photograph for the whole EDA D2 line, shared across every
+  # depth/size in the catalogue itself. This is NOT a photo of this specific
+  # depth — it is the correct SERIES, verified against the source page, and
+  # no other model's photo has been substituted. Classification: FAMILY.
+  # Replace with an exact depth photo the moment Capra sends one.
+  src: "/images/saunas/eda-family-barrel.jpg"
   alt: "BUX EDA 130 barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Depth", value: "4.3 ft (130 cm)" }

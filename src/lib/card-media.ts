@@ -52,9 +52,19 @@ export function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Customer-facing name — the BUH- SKU prefix stays internal. Mirrors catalog.ts displayTitle(). */
+/**
+ * Customer-facing name — the BUH- SKU prefix stays internal. Mirrors
+ * catalog.ts displayTitle(), including which 8 titles get "BUX " instead of
+ * a plain strip — see RENAMED_CAPRA_TITLES there for why this can't be a
+ * blanket regex (BUH- is used by non-Capra models too, e.g. NORD, VIRU).
+ */
+const RENAMED_CAPRA_TITLES = new Set([
+  'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+  'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+]);
 export function shownName(title: string): string {
-  return String(title ?? '').replace(/^BUH-/i, 'BUX ');
+  const t = String(title ?? '');
+  return RENAMED_CAPRA_TITLES.has(t) ? t.replace(/^BUH-/i, 'BUX ') : t.replace(/^BUH-/i, '');
 }
 
 /**

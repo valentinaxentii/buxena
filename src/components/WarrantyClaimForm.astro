@@ -13,6 +13,7 @@
  */
 import ProjectUpload from './ProjectUpload.astro';
 import { getCollection } from 'astro:content';
+import { displayTitle } from '../data/catalog';
 
 const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
   (a, b) => a.data.order - b.data.order
@@ -46,7 +47,7 @@ const models = (await getCollection('saunas', ({ data }) => !data.draft)).sort(
       <select id="w-model" name="model">
         <option value="">Select…</option>
         {models.map((m) => (
-          <option value={m.data.title}>{m.data.title.replace(/^BUH-/i, 'BUX ')}</option>
+          <option value={m.data.title}>{displayTitle(m.data.title)}</option>
         ))}
         <option value="Other / not listed">Other / not listed</option>
       </select>

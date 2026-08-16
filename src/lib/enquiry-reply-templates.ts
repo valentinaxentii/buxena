@@ -29,7 +29,14 @@ export interface EnquiryReply {
 }
 
 const clean = (v: string | null | undefined, max = 200) => (v ?? '').trim().slice(0, max);
-const displayModel = (title: string) => title.replace(/^BUH-/i, 'BUX ');
+// BUH- is used by every model regardless of supplier (NORD, VIRU included),
+// so only these 8 renamed Capra titles get "BUX " — see catalog.ts.
+const RENAMED_CAPRA_TITLES = new Set([
+  'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+  'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+]);
+const displayModel = (title: string) =>
+  RENAMED_CAPRA_TITLES.has(title) ? title.replace(/^BUH-/i, 'BUX ') : title.replace(/^BUH-/i, '');
 const sourceKey = (source: string) => source.toLowerCase().replace(/[^a-z]/g, '');
 
 const SIGNATURE = ['Warm regards,', 'The BUXENA Team', 'info@buxena.com · buxena.com'].join('\n');

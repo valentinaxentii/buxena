@@ -69,6 +69,16 @@ const models = await getCollection('saunas', ({ data }) => !data.draft);
 <script>
   import { track } from '../lib/track';
 
+  // BUH- is used by every model regardless of supplier (NORD, VIRU
+  // included), so only these 8 renamed Capra titles get "BUX " — see
+  // src/data/catalog.ts's RENAMED_CAPRA_TITLES.
+  const RENAMED_CAPRA_TITLES = new Set([
+    'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+    'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+  ]);
+  const displayModel = (t: string) =>
+    RENAMED_CAPRA_TITLES.has(t) ? t.replace(/^BUH-/i, 'BUX ') : t.replace(/^BUH-/i, '');
+
   const el = document.querySelector<HTMLElement>('[data-ty-summary]');
   let confirmed = false;
   try {
@@ -147,7 +157,7 @@ const models = await getCollection('saunas', ({ data }) => !data.draft);
             // ZIP is digits and the model carries its own casing — neither
             // wants slug treatment.
             dd.textContent =
-              k === 'model' ? v.replace(/^BUH-/i, 'BUX ') : k === 'zip' ? v : prettify(v);
+              k === 'model' ? displayModel(v) : k === 'zip' ? v : prettify(v);
             div.append(dt, dd);
             return div;
           });

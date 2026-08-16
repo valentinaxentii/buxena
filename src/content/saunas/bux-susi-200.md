@@ -10,10 +10,15 @@ order: 410
 placeholder: false
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # NO EXACT PHOTOGRAPH EXISTS. Capra's 2026 Catalogue (Andres Sokk, p.20-21)
-  # publishes ONE generic render for the whole SUSI line, shared
-  # across every depth and both materials there. It is not a photo of this
-  # specific depth, so it is not used here. See docs/image-rights-register.md.
+  # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's
+  # direction (supersedes the earlier placeholder-only decision for this
+  # class of gap). Capra's 2026 Catalogue (Andres Sokk, p.20-21) publishes
+  # ONE generic photograph for the whole SUSI line, shared across every
+  # depth/size in the catalogue itself. This is NOT a photo of this specific
+  # depth — it is the correct SERIES, verified against the source page, and
+  # no other model's photo has been substituted. Classification: FAMILY.
+  # Replace with an exact depth photo the moment Capra sends one.
+  src: "/images/saunas/bux-susi-family-hero.jpg"
   alt: "BUX SUSI 200 barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Depth", value: "6.6 ft (200 cm)" }

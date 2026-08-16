@@ -422,12 +422,22 @@ permission is documented above.
 | Commercial use | **NEEDS CONFIRMATION** — same tier as Capra dealer-pack renders before the 2026-08-10 written-permission ruling. Treat as website-pending, not yet paid-ads/social eligible, until confirmed in writing the way the shared-drive grant was |
 | Notes | Capra's own disclaimer on every catalogue page: *"Images shown in this brochure are illustrative and may include optional features or custom configurations."* The AAPO photo shows the optional shower/sidewall configuration — captioned as optional on the product page, never presented as standard. |
 
-**EKE, SUSI, and the barrel series (EDA D2, ITI D4) — no exact photo used.**
+**EKE, SUSI, EDA D2, ITI D4, and UKU 130 — FAMILY image, superseding the
+placeholder-only decision above (2026-08-16, same day, later ruling).**
 Capra's catalogue publishes one generic render per line, shared across every
 depth in that series (confirmed by reviewing the full 28-page PDF page by
-page). Per the founder's ruling on the same EDA issue this session: a shared
-"family" photo is not an acceptable substitute for an exact-model photo, so
-these 24 models (5 EKE + 5 SUSI + 9 EDA + 4 ITI, minus 3 EDA/ITI depths that
-also have no photo for other reasons) render the site's existing honest
-placeholder instead. See `scripts/catalogue-readiness.mjs`'s "NO HERO IMAGE"
-report for the current list.
+page). The founder's first ruling on this (same session, see the EDA revert
+above) was that a shared photo is worse than no photo; on seeing the
+resulting catalogue with 24 blank cards, the founder reversed that call —
+a correctly-labelled family photo is preferable to a blank card, provided
+it is (a) always the true series' own catalogue photo, never a different
+series', and (b) internally classified as FAMILY, never presented as an
+exact-depth photo. Both conditions are enforced in each affected file's
+`heroImage` comment.
+
+| Field | Value |
+|---|---|
+| Files | 24 — 9 EDA D2 (`eda-family-barrel.jpg`, already registered above), 5 EKE (`bux-eke-family-hero.jpg`, p.6-7), 5 SUSI (`bux-susi-family-hero.jpg`, p.20-21), 4 ITI D4 (`bux-iti-family-hero.jpg`, p.24-25), 1 UKU 130 (`bux-uku-family-hero.jpg`, p.8-9 — 160/230 keep their own exact per-SKU photos, unaffected) |
+| Exact-match status | FAMILY — each file's own comment records the source page and that it is not an exact-depth photo |
+| Commercial use | Same NEEDS CONFIRMATION tier as the row above |
+| Notes | ITI D4's previous hero (`iti-thermowood-2-3m-hero.png`) was not reused for this — it was already listed BLOCKED above for undocumented origin, independent of this ruling |

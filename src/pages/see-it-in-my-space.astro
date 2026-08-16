@@ -404,7 +404,15 @@ const TOTAL_STEPS = 5;
   const root = document.querySelector<HTMLElement>('[data-space]');
   if (root) {
     const catalog: SpaceModel[] = JSON.parse(document.getElementById('space-catalog')?.textContent ?? '[]');
-    const shownName = (t: string) => t.replace(/^BUH-/i, 'BUX ');
+    // BUH- is used by every model regardless of supplier (NORD, VIRU
+    // included), so only these 8 renamed Capra titles get "BUX " — see
+    // src/data/catalog.ts's RENAMED_CAPRA_TITLES.
+    const RENAMED_CAPRA_TITLES = new Set([
+      'BUH-ELLA H1', 'BUH-ELLA H2', 'BUH-ILLI H1', 'BUH-ILLI H2',
+      'BUH-ALLA H1', 'BUH-ALLA H2', 'BUH-UKU 160', 'BUH-UKU 230',
+    ]);
+    const shownName = (t: string) =>
+      RENAMED_CAPRA_TITLES.has(t) ? t.replace(/^BUH-/i, 'BUX ') : t.replace(/^BUH-/i, '');
 
     const form = root.querySelector<HTMLFormElement>('[data-space-form]')!;
     const steps = Array.from(root.querySelectorAll<HTMLElement>('[data-space-step]'));
