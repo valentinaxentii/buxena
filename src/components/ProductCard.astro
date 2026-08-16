@@ -4,6 +4,11 @@ import { showDev } from '../data/site';
 import { capacityBuckets, displayTitle } from '../data/catalog';
 import { displayFromPrice } from '../data/pricing';
 
+interface VariantLink {
+  slug: string;
+  label: string;
+}
+
 interface Props {
   slug: string;
   title: string;
@@ -19,13 +24,16 @@ interface Props {
   capacityMax?: number;
   materials?: string[];
   dimensions?: { label: string; value: string }[];
+  /** When a supplier publishes one family image for several depths, show the
+   * sizes together instead of repeating the same photograph as separate cards. */
+  variants?: VariantLink[];
   /** Approved display price ("From $18,900"). Absent → card shows Request Pricing only. */
   fromPrice?: string;
 }
 const {
   slug, title, tagline, category, placeholder = true, image,
   location, productType, series, capacity, capacityMin, capacityMax, materials, dimensions,
-  fromPrice,
+  variants = [], fromPrice,
 } = Astro.props;
 const primaryDimension = dimensions?.[0]?.value;
 const specLine = [productType, primaryDimension, capacity, materials?.[0]]
@@ -34,6 +42,7 @@ const specLine = [productType, primaryDimension, capacity, materials?.[0]]
 
 const buckets = capacityBuckets(capacityMin, capacityMax);
 const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z0-9]+/g, '-')).join(' ');
+const isVariantGroup = variants.length > 1;
 ---
 
 <article
@@ -45,63 +54,94 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
   data-material={materialSlug}
   data-capacity={buckets.join(' ')}
 >
-  <a class="pcard__link" href={`/saunas/${slug}/`}>
-    <div class="pcard__media">
-      {/* `label` only ever shows when there is no photograph. Series and form
-          are both facts already on the card, so it states nothing new — it
-          exists so a card without a photo reads as a designed tile instead of
-          a failed image, and so the sixteen models awaiting supplier
-          photography are not sixteen identical blocks. */}
-      <Figure
-        src={image?.src}
-        alt={image?.alt ?? title}
-        note={image?.note}
-        label={[series, productType].filter(Boolean).join(' · ')}
-        ratio="4 / 3"
-        tone="mid"
-        fit="contain"
-        fixedRatio={true}
-      />
-      {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
+  {isVariantGroup ? (
+    <div class="pcard__link pcard__link--group">
+      <div class="pcard__media">
+        <Figure
+          src={image?.src}
+          alt={image?.alt ?? title}
+          note={image?.note}
+          label={[series, productType].filter(Boolean).join(' · ')}
+          ratio="4 / 3"
+          tone="mid"
+          fit="contain"
+          fixedRatio={true}
+        />
+        {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
+      </div>
+      <div class="pcard__body">
+        <h3 class="pcard__title">{displayTitle(title)}</h3>
+        {specLine && <p class="pcard__specs">{specLine}</p>}
+        <p class="pcard__tag">{tagline}</p>
+        <div class="pcard__variants" aria-label={`${displayTitle(title)} available sizes`}>
+          <span class="pcard__variants-label">Available sizes</span>
+          <div class="pcard__variant-links">
+            {variants.map((variant) => (
+              <a href={`/saunas/${variant.slug}/`}>{variant.label}</a>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="pcard__body">
-      <h3 class="pcard__title">{displayTitle(title)}</h3>
-      {specLine && <p class="pcard__specs">{specLine}</p>}
-      <p class="pcard__tag">{tagline}</p>
-      {/* Central pricing register decides; frontmatter is only a legacy
-          fallback. Null today for every model → no price is rendered. */}
-      {displayFromPrice(title, fromPrice) && (
-        <p class="pcard__price">{displayFromPrice(title, fromPrice)}</p>
-      )}
+  ) : (
+    <a class="pcard__link" href={`/saunas/${slug}/`}>
+      <div class="pcard__media">
+        <Figure
+          src={image?.src}
+          alt={image?.alt ?? title}
+          note={image?.note}
+          label={[series, productType].filter(Boolean).join(' · ')}
+          ratio="4 / 3"
+          tone="mid"
+          fit="contain"
+          fixedRatio={true}
+        />
+        {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
+      </div>
+      <div class="pcard__body">
+        <h3 class="pcard__title">{displayTitle(title)}</h3>
+        {specLine && <p class="pcard__specs">{specLine}</p>}
+        <p class="pcard__tag">{tagline}</p>
+        {displayFromPrice(title, fromPrice) && (
+          <p class="pcard__price">{displayFromPrice(title, fromPrice)}</p>
+        )}
+      </div>
+    </a>
+  )}
+
+  {isVariantGroup ? (
+    <div class="pcard__actions">
+      <a
+        class="pcard__quote"
+        href={`/quote/?model=${encodeURIComponent(title)}`}
+        data-track="pricing_request_started"
+        data-track-model={title}
+        data-track-category={category}
+        data-track-form-type="product_card"
+      >Request Pricing</a>
     </div>
-  </a>
-  <div class="pcard__actions">
-    <a class="pcard__more" href={`/saunas/${slug}/`}>View Model <span class="pcard__arrow" aria-hidden="true">→</span></a>
-    <a
-      class="pcard__quote"
-      href={`/quote/?model=${encodeURIComponent(title)}`}
-      data-track="pricing_request_started"
-      data-track-model={title}
-      data-track-category={category}
-      data-track-form-type="product_card"
-    >Request Pricing</a>
-  </div>
+  ) : (
+    <div class="pcard__actions">
+      <a class="pcard__more" href={`/saunas/${slug}/`}>View Model <span class="pcard__arrow" aria-hidden="true">→</span></a>
+      <a
+        class="pcard__quote"
+        href={`/quote/?model=${encodeURIComponent(title)}`}
+        data-track="pricing_request_started"
+        data-track-model={title}
+        data-track-category={category}
+        data-track-form-type="product_card"
+      >Request Pricing</a>
+    </div>
+  )}
 </article>
 
 <style>
-  /* Cards in a row are only as tall as the tallest one, and model names run
-     to two lines often enough ("BUH-VIRU Thermowood 2.4m") that letting each
-     card size itself left the Explore/Quote links at different heights across
-     a row. Stretching the card and pushing the actions to the bottom keeps
-     that row of links on one line regardless of how the titles wrap. */
   .pcard {
     display: flex;
     flex-direction: column;
     height: 100%;
     transition: transform 0.7s var(--ease);
   }
-  /* Desktop-only card lift — restrained, no shadow theatrics. Hover is
-     inert on touch devices, so mobile stays simple and fast. */
   @media (hover: hover) {
     .pcard:hover { transform: translateY(-5px); }
   }
@@ -113,10 +153,12 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     text-decoration: none;
     color: inherit;
   }
+  .pcard__link--group { cursor: default; }
 
   .pcard__media { position: relative; overflow: hidden; }
   .pcard__media :global(.fig) { transition: transform 1.1s var(--ease); }
   .pcard__link:hover .pcard__media :global(.fig) { transform: scale(1.035); }
+  .pcard__link--group:hover .pcard__media :global(.fig) { transform: none; }
 
   .pcard__flag {
     position: absolute;
@@ -135,7 +177,7 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
 
   .pcard__title {
     font-family: var(--font-display);
-    font-size: clamp(1.7rem, 1.5rem + 0.7vw, 2.1rem); /* ~30-34px */
+    font-size: clamp(1.7rem, 1.5rem + 0.7vw, 2.1rem);
     font-weight: 500;
     line-height: 1.08;
     color: var(--ink);
@@ -158,6 +200,41 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
     line-height: 1.55;
     margin-bottom: 1rem;
   }
+
+  .pcard__variants {
+    border-top: 1px solid var(--line);
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
+  }
+  .pcard__variants-label {
+    display: block;
+    margin-bottom: 0.55rem;
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+  }
+  .pcard__variant-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .pcard__variant-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 0.7rem;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: 'Manrope', var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  .pcard__variant-links a:hover { border-color: var(--bronze); background: var(--linen); }
 
   .pcard__price {
     font-family: 'Manrope', var(--font-sans);
@@ -213,14 +290,9 @@ const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z
   }
   .pcard__quote:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
-  /* Without a mouse these two links are the only way off a card to the model
-     page or the quote form, and they measured 25px and 19px tall. The extra
-     padding goes above the label on .pcard__more so its underline stays tight
-     to the text; .pcard__quote underlines only on hover, so it can take
-     padding on both sides. Matched on pointer type so a tablet gets the
-     larger targets too, and on width so the rule is testable in a browser. */
   @media (max-width: 640px), (hover: none) {
     .pcard__more { padding-top: 0.7rem; }
     .pcard__quote { padding-block: 0.7rem; }
+    .pcard__variant-links a { min-height: 44px; }
   }
 </style>
