@@ -11,6 +11,50 @@ import { byPhotographedThenOrder } from '../../data/catalog';
 // see byPhotographedThenOrder in src/data/catalog.ts for why.
 const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort(byPhotographedThenOrder);
 
+/** Capra publishes one family photograph for every depth in these ranges.
+ * Rendering that same photograph as 4–5 separate neighbouring cards made the
+ * catalogue look broken and implied unique model photography that does not
+ * exist. Keep every SKU/page, but present these ranges once with direct size
+ * links to every individual model. */
+const FAMILY_PHOTO_SERIES = new Set(['EKE', 'SUSI', 'ITI']);
+const seenFamilySeries = new Set<string>();
+const catalogueCards: Array<{
+  representative: (typeof saunas)[number];
+  title?: string;
+  tagline?: string;
+  variants?: { slug: string; label: string }[];
+}> = [];
+
+for (const sauna of saunas) {
+  const series = sauna.data.series ?? '';
+  if (!FAMILY_PHOTO_SERIES.has(series)) {
+    catalogueCards.push({ representative: sauna });
+    continue;
+  }
+  if (seenFamilySeries.has(series)) continue;
+  seenFamilySeries.add(series);
+
+  const members = saunas
+    .filter((candidate) => candidate.data.series === series)
+    .sort((a, b) => {
+      const an = Number(a.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
+      const bn = Number(b.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
+      return an - bn;
+    });
+  const representative = members[0] ?? sauna;
+  const variants = members.map((member) => ({
+    slug: member.id,
+    label: `${member.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? member.data.title} cm`,
+  }));
+
+  catalogueCards.push({
+    representative,
+    title: `BUX ${series}`,
+    tagline: `${members.length} available depths. Choose the size that fits your space.`,
+    variants,
+  });
+}
+
 /** Build each facet's option list from whatever is actually in the catalog today. */
 function uniqueOptions(values: (string | undefined)[]) {
   return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();
@@ -61,8 +105,9 @@ const facets = [
       <span class="eyebrow">The Range</span>
       <h1 class="display measure--tight">Every model, in one place</h1>
       <p class="lead measure">
-        Filter by location, type, series, capacity or material. Each model has
-        its own page with full dimensions and specifications.
+        Filter by location, type, series, capacity or material. Every sellable
+        size remains available; ranges that share one supplier photograph are
+        grouped so the catalogue does not repeat the same image again and again.
       </p>
       <a class="plan-cta" href="/plan-your-sauna/">
         Plan Your Sauna <span class="arrow" aria-hidden="true">→</span>
@@ -98,25 +143,29 @@ const facets = [
       <ProductFilters facets={facets} />
 
       <div class="grid cols-3" data-product-grid>
-        {saunas.map((s) => (
-          <ProductCard
-            slug={s.id}
-            title={s.data.title}
-            tagline={s.data.tagline}
-            category={s.data.category}
-            placeholder={s.data.placeholder}
-            image={s.data.heroImage}
-            location={s.data.location}
-            productType={s.data.productType}
-            series={s.data.series}
-            capacity={s.data.capacity}
-            capacityMin={s.data.capacityMin}
-            capacityMax={s.data.capacityMax}
-            materials={s.data.materials}
-            dimensions={s.data.dimensions}
-            fromPrice={s.data.fromPrice}
-          />
-        ))}
+        {catalogueCards.map((card) => {
+          const s = card.representative;
+          return (
+            <ProductCard
+              slug={s.id}
+              title={card.title ?? s.data.title}
+              tagline={card.tagline ?? s.data.tagline}
+              category={s.data.category}
+              placeholder={s.data.placeholder}
+              image={s.data.heroImage}
+              location={s.data.location}
+              productType={s.data.productType}
+              series={s.data.series}
+              capacity={s.data.capacity}
+              capacityMin={s.data.capacityMin}
+              capacityMax={s.data.capacityMax}
+              materials={s.data.materials}
+              dimensions={card.variants ? undefined : s.data.dimensions}
+              fromPrice={s.data.fromPrice}
+              variants={card.variants}
+            />
+          );
+        })}
       </div>
 
       <div class="empty" data-empty hidden>
@@ -133,13 +182,6 @@ const facets = [
 </BaseLayout>
 
 <style>
-  /* Page-scoped (Astro auto-scopes this block to saunas/index.astro's own
-     elements) — three sections tightened toward the founder's "one screen"
-     target for the catalogue intro. Not a --band change, since --band's job
-     is the whole site's rhythm and this page needed noticeably more than
-     that; distinct classes on each section (catalogue-intro/-paths/-filters)
-     rather than reusing .page-head's name, so this can't bleed into any
-     other page that also has a .page-head. */
   .page-head { padding-bottom: 0; }
   .page-head .lead { margin-top: 0.85rem; }
   .catalogue-intro { padding-top: clamp(0.7rem, 0.4rem + 0.7vw, 1.1rem); }
@@ -149,15 +191,11 @@ const facets = [
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: clamp(0.94rem, 0.45rem + 1.5vw, 1.9rem);
-    /* No bottom margin: .paths is the last child of its own band, and the
-       band's padding plus the next band's padding already set the rhythm.
-       The extra 48px here read as a hole between the cards and the filters. */
   }
   .path {
     display: grid;
     align-content: start;
     gap: 0.4rem;
-    /* Card padding -14% off the max: clamp(1.5rem,...,2.5rem) → ...,2.15rem. */
     padding: clamp(1.3rem, 0.9rem + 1.7vw, 2.15rem);
     border: 1px solid var(--line);
     background: var(--linen);
@@ -176,9 +214,6 @@ const facets = [
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
-    /* Sized to its own label, not to a fixed width — "Explore Outdoor" is a
-       character longer than "Explore Indoor" and wrapped at the old 160px.
-       justify-self keeps the button from stretching across the grid cell. */
     justify-self: start;
     min-width: 160px;
     height: 40px;
