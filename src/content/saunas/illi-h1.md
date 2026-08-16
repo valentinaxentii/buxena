@@ -13,7 +13,7 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Extra dried pine"]
 heroImage:
-  src: "/images/saunas/illi-h1-hero.png"
+  src: "/images/saunas/illi-h1-hero.jpg"
   alt: "ILLI H1 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 dimensions:
   - { label: "External (D × W × H)", value: "44.5 × 76.8 × 82.7 in (1130 × 1950 × 2100 mm)" }

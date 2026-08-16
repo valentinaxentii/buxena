@@ -13,7 +13,7 @@ capacityMin: 1
 capacityMax: 2
 materials: ["Extra dried pine"]
 heroImage:
-  src: "/images/saunas/ella-h1-hero.png"
+  src: "/images/saunas/ella-h1-hero.jpg"
   alt: "ELLA H1 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 dimensions:
   - { label: "External (D × W × H)", value: "44.5 × 53.1 × 82.7 in (1130 × 1350 × 2100 mm)" }

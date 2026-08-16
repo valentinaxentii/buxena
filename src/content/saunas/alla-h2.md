@@ -13,7 +13,7 @@ capacityMin: 2
 capacityMax: 6
 materials: ["Extra dried pine"]
 heroImage:
-  src: "/images/saunas/alla-h2-hero.png"
+  src: "/images/saunas/alla-h2-hero.jpg"
   alt: "ALLA H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 dimensions:
   - { label: "External (D × W × H)", value: "51.2 × 106.7 × 89.8 in (1300 × 2710 × 2280 mm)" }

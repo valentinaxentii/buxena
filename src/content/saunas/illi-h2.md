@@ -13,7 +13,7 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Extra dried pine"]
 heroImage:
-  src: "/images/saunas/illi-h2-hero.png"
+  src: "/images/saunas/illi-h2-hero.jpg"
   alt: "ILLI H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
   - src: "/images/catalog/illi-h2-outdoor-spruce.png"

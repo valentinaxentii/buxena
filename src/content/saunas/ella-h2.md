@@ -13,7 +13,7 @@ capacityMin: 1
 capacityMax: 2
 materials: ["Extra dried pine"]
 heroImage:
-  src: "/images/saunas/ella-h2-hero.png"
+  src: "/images/saunas/ella-h2-hero.jpg"
   alt: "ELLA H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
   - src: "/images/catalog/ella-h2-indoor-cutout.png"
