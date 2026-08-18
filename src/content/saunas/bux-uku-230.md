@@ -13,7 +13,7 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Spruce", "Thermowood"]
 heroImage:
-  src: "/images/saunas/uku-230-hero.jpg"
+  src: "/images/saunas-normalized/uku-230-transparent.png"
   alt: "UKU 230 outdoor rounded-cube sauna in Nordic spruce with full glass front"
 gallery:
   - src: "/images/catalog/uku-230-halfmoon.jpg"

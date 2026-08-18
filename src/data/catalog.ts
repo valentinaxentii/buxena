@@ -79,3 +79,64 @@ export function byPhotographedThenOrder(
   const pictured = Number(Boolean(b.data.heroImage?.src)) - Number(Boolean(a.data.heroImage?.src));
   return pictured !== 0 ? pictured : a.data.order - b.data.order;
 }
+
+/** Capra publishes one family photograph for every depth in these ranges.
+ * Rendering that same photograph as 4–5 separate neighbouring cards makes the
+ * catalogue look broken and implies unique model photography that does not
+ * exist. Keep every SKU/page, but present these ranges once with direct size
+ * links to every individual model. Used by every listing page (the main
+ * catalogue and each location/type page), not just one — a family series
+ * shows up wherever its models are listed. */
+const FAMILY_PHOTO_SERIES = new Set(['EKE', 'SUSI', 'ITI']);
+
+export interface FamilyGroupedCard<T> {
+  representative: T;
+  title?: string;
+  tagline?: string;
+  variants?: { slug: string; label: string }[];
+}
+
+/** Collapse repeated-family-photo series into one card each, with the rest
+ * of `items` passed through unchanged. Preserves `items`' existing order. */
+export function groupFamilyPhotoSeries<T extends { id: string; data: { series?: string; title: string } }>(
+  items: T[]
+): FamilyGroupedCard<T>[] {
+  const seenSeries = new Set<string>();
+  const cards: FamilyGroupedCard<T>[] = [];
+
+  for (const item of items) {
+    const series = item.data.series ?? '';
+    if (!FAMILY_PHOTO_SERIES.has(series)) {
+      cards.push({ representative: item });
+      continue;
+    }
+    if (seenSeries.has(series)) continue;
+    seenSeries.add(series);
+
+    const members = items
+      .filter((candidate) => candidate.data.series === series)
+      .sort((a, b) => {
+        const an = Number(a.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
+        const bn = Number(b.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
+        return an - bn;
+      });
+    // EKE 160 has a verified exact-model image from Capra's live product page;
+    // prefer it for the grouped EKE card instead of the generic family render.
+    const representative = series === 'EKE'
+      ? (members.find((member) => member.data.title === 'BUX EKE 160') ?? members[0] ?? item)
+      : (members[0] ?? item);
+    const variants = members.map((member) => ({
+      slug: member.id,
+      label: `${member.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? member.data.title} cm`,
+    }));
+
+    cards.push({
+      representative,
+      title: `BUX ${series}`,
+      tagline: `${members.length} available depths. Choose the size that fits your space.`,
+      variants,
+    });
+  }
+
+  return cards;
+}

@@ -18,7 +18,7 @@ heroImage:
   # depth — it is the correct SERIES, verified against the source page, and
   # no other model's photo has been substituted. Classification: FAMILY.
   # Replace with an exact depth photo the moment Capra sends one.
-  src: "/images/saunas/bux-eke-family-hero.jpg"
+  src: "/images/saunas-normalized/bux-eke-family-transparent.png"
   alt: "BUX EKE 400 outdoor cube sauna, glass front and shingle roof"
 dimensions:
   - { label: "Depth", value: "13.1 ft (400 cm)" }

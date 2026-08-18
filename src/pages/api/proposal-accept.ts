@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '../../lib/supabase-admin';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { isValidShareToken, isAcceptable } from '../../lib/quote-proposal';
 import { isLeadSafeMode, safeModeReason } from '../../lib/safe-mode';
+import { sendProposalAcceptanceEmails } from '../../lib/proposal-email';
 
 export const prerender = false;
 
@@ -27,11 +28,6 @@ const redirect = (location: string) =>
   new Response(null, { status: 303, headers: { Location: location } });
 
 export const POST: APIRoute = async ({ request, clientAddress }) => {
-  // A real customer accepts once. This is generous enough for a fumbled
-  // submit and tight enough to stop a script hammering the endpoint.
-  const { allowed } = checkRateLimit(`proposal-accept:${clientAddress}`, 10, 10 * 60_000);
-  if (!allowed) return redirect('/proposal/invalid?error=rate');
-
   let token = '';
   let acceptedName = '';
   try {
@@ -46,6 +42,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   if (!isValidShareToken(token)) return redirect('/proposal/invalid');
   if (!acceptedName) return redirect(`/proposal/${token}?error=name`);
 
+  // A real customer accepts once. This is generous enough for a fumbled
+  // submit and tight enough to stop a script hammering the endpoint. Parse the
+  // token first so a throttled customer can return to their real proposal and
+  // receive an actionable message instead of landing on a dead URL.
+  const { allowed } = checkRateLimit(`proposal-accept:${clientAddress}`, 10, 10 * 60_000);
+  if (!allowed) return redirect(`/proposal/${token}?error=rate`);
+
   // SAFE MODE — a staging preview must be walkable end to end without
   // mutating anything. The customer sees the same confirmation; no row moves.
   if (isLeadSafeMode()) {
@@ -58,7 +61,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
     const { data: quote } = await supabase
       .from('quotes')
-      .select('id, status, expiry_date, accepted_at, quote_number')
+      .select('id, status, expiry_date, accepted_at, quote_number, customer_id, product_id, owner_staff_id, total')
       .eq('share_token', token)
       .maybeSingle();
 
@@ -98,6 +101,34 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           description: `Proposal accepted by ${acceptedName}`,
         })
         .then(() => {}, () => {});
+
+      // Confirmation and staff notification are best-effort and happen only
+      // after the one-time database update succeeds. An SMTP failure can never
+      // undo or duplicate the customer's recorded acceptance.
+      const [customerRow, productRow, ownerRow] = await Promise.all([
+        quote.customer_id
+          ? supabase.from('customers').select('name, email').eq('id', quote.customer_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        quote.product_id
+          ? supabase.from('products').select('model_name').eq('id', quote.product_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        quote.owner_staff_id
+          ? supabase.from('profiles').select('full_name').eq('id', quote.owner_staff_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      const proposalUrl = new URL(`/proposal/${token}`, request.url).href;
+      await sendProposalAcceptanceEmails({
+        acceptedName,
+        customerName: (customerRow.data as any)?.name,
+        customerEmail: (customerRow.data as any)?.email,
+        proposalUrl,
+        adminUrl: new URL(`/admin/quotes/${quote.id}`, request.url).href,
+        quoteNumber: quote.quote_number ?? 'Proposal',
+        modelName: (productRow.data as any)?.model_name,
+        expiryDate: quote.expiry_date,
+        advisorName: (ownerRow.data as any)?.full_name,
+        total: Number(quote.total ?? 0),
+      });
     }
 
     return redirect(`/proposal/${token}?accepted=1`);

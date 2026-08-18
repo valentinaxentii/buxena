@@ -15,7 +15,7 @@ interface Props {
   tagline: string;
   category: string;
   placeholder?: boolean;
-  image?: { src?: string; alt: string; note?: string };
+  image?: { src?: string; alt: string; note?: string; fit?: 'cover' | 'contain' };
   location?: 'outdoor' | 'indoor';
   productType?: string;
   series?: string;
@@ -43,6 +43,7 @@ const specLine = [productType, primaryDimension, capacity, materials?.[0]]
 const buckets = capacityBuckets(capacityMin, capacityMax);
 const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z0-9]+/g, '-')).join(' ');
 const isVariantGroup = variants.length > 1;
+const familyFit = image?.fit ?? 'contain';
 ---
 
 <article
@@ -56,15 +57,15 @@ const isVariantGroup = variants.length > 1;
 >
   {isVariantGroup ? (
     <div class="pcard__link pcard__link--group">
-      <div class="pcard__media pcard__media--family">
+      <div class={`pcard__media pcard__media--family pcard__media--family-${familyFit}`}>
         <Figure
           src={image?.src}
           alt={image?.alt ?? title}
           note={image?.note}
           label={[series, productType].filter(Boolean).join(' · ')}
           ratio="4 / 3"
-          tone="dark"
-          fit="cover"
+          tone={familyFit === 'cover' ? 'dark' : 'mid'}
+          fit={familyFit}
           fixedRatio={true}
           class="pcard-family-figure"
         />
@@ -95,7 +96,7 @@ const isVariantGroup = variants.length > 1;
           label={[series, productType].filter(Boolean).join(' · ')}
           ratio="4 / 3"
           tone="mid"
-          fit="contain"
+          fit={image?.fit ?? 'contain'}
           fixedRatio={true}
         />
         {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
@@ -142,7 +143,8 @@ const isVariantGroup = variants.length > 1;
     display: flex;
     flex-direction: column;
     height: 100%;
-    transition: transform 0.7s var(--ease);
+    border: 1px solid var(--line);
+    transition: transform 0.7s var(--ease), border-color 0.4s var(--ease);
   }
   @media (hover: hover) {
     .pcard:hover { transform: translateY(-5px); }
@@ -158,6 +160,28 @@ const isVariantGroup = variants.length > 1;
   .pcard__link--group { cursor: default; }
 
   .pcard__media { position: relative; overflow: hidden; }
+
+  /* Product renders arrive from several suppliers on slightly different
+     pale canvases. Give every contained image one shared BUXENA stage: the
+     picture wrapper fills the card frame, the sauna is centred on both axes,
+     and multiply blending lets white/near-white source pixels inherit the
+     warm linen below instead of reading as a pasted-on white rectangle.
+
+     This is intentionally scoped to contained product renders. Lifestyle
+     photography uses fit="cover" and remains full-colour/full-bleed. */
+  .pcard__media :global(.fig--contain-fixed) {
+    --fig-fixed-inset: clamp(0.45rem, 1.35vw, 0.8rem);
+    padding: 0;
+    background: transparent;
+  }
+  .pcard__media :global(.fig--contain-fixed img) {
+    mix-blend-mode: multiply;
+    filter: saturate(1.025) contrast(1.015);
+  }
+  .pcard__media :global(.fig--contain-fixed.fig--alpha img) {
+    mix-blend-mode: normal;
+    filter: none;
+  }
   .pcard__media :global(.fig) { transition: transform 1.1s var(--ease); }
   .pcard__link:hover .pcard__media :global(.fig) { transform: scale(1.035); }
   .pcard__link--group:hover .pcard__media :global(.fig) { transform: none; }
@@ -168,6 +192,9 @@ const isVariantGroup = variants.length > 1;
   .pcard__media--family {
     background: radial-gradient(circle at 50% 42%, #2b2926 0%, #171614 72%, #111 100%);
     border: 1px solid rgba(164, 122, 71, 0.28);
+  }
+  .pcard__media--family-contain {
+    background: transparent;
   }
   .pcard__media--family :global(.fig) {
     background: transparent;
@@ -206,7 +233,7 @@ const isVariantGroup = variants.length > 1;
     padding: 0.4rem 0.7rem;
   }
 
-  .pcard__body { padding-top: var(--card-body-pad); flex: 1 1 auto; }
+  .pcard__body { padding: var(--card-body-pad) var(--card-body-pad) 0; flex: 1 1 auto; }
 
   .pcard__title {
     font-family: var(--font-display);
@@ -291,7 +318,7 @@ const isVariantGroup = variants.length > 1;
     align-items: center;
     gap: 0.6rem 1.25rem;
     margin-top: auto;
-    padding-top: 0.25rem;
+    padding: 0.25rem var(--card-body-pad) var(--card-body-pad);
   }
   .pcard__actions--family { padding-top: 0.65rem; }
 

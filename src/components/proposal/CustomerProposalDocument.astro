@@ -1,0 +1,732 @@
+---
+import { site, publicEmail } from '../../data/site';
+import {
+  ITEM_GROUPS,
+  FULFILMENT_LABELS,
+  type CustomerProposal,
+} from '../../lib/quote-proposal';
+
+interface CatalogueFacts {
+  href?: string;
+  image?: { src: string; alt: string };
+  gallery?: { src: string; alt: string }[];
+  capacity?: string;
+  dimensions?: { label: string; value: string }[];
+  materials?: string[];
+  specs?: { label: string; value: string }[];
+  video?: { title: string; href: string; embedSrc?: string; poster?: string };
+}
+
+interface Props {
+  proposal: CustomerProposal;
+  token: string;
+  acceptable: { ok: boolean; reason?: string };
+  justAccepted?: boolean;
+  acceptError?: string | null;
+  preview?: boolean;
+  catalogue?: CatalogueFacts;
+}
+
+const { proposal, token, acceptable, justAccepted = false, acceptError = null, preview = false, catalogue = {} } = Astro.props;
+
+const acceptErrorMessage = acceptError === 'name'
+  ? 'Enter your name so we can record who accepted the proposal.'
+  : acceptError === 'rate'
+    ? 'Too many attempts were made. Please wait a few minutes, then try again or contact your BUXENA advisor.'
+    : acceptError
+      ? 'We could not record that just now. Please try again or contact your BUXENA advisor for confirmation.'
+      : '';
+
+const money = (value: number) => value.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  maximumFractionDigits: 2,
+});
+
+const formatDate = (value: string | null) => {
+  if (!value) return '';
+  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  return Number.isNaN(date.valueOf())
+    ? value
+    : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+};
+
+const daysRemaining = proposal.expiryDate && !proposal.expired
+  ? Math.max(0, Math.ceil((new Date(`${proposal.expiryDate.slice(0, 10)}T23:59:59Z`).valueOf() - Date.now()) / 86_400_000))
+  : null;
+
+const grouped = ITEM_GROUPS
+  .map((group) => ({ ...group, items: proposal.items.filter((item) => item.kind === group.kind) }))
+  .filter((group) => group.items.length > 0);
+const heaterSpecificationGroups = grouped.filter((group) =>
+  group.kind === 'heater' || group.kind === 'controls' || group.kind === 'accessories'
+);
+
+const dimensions = proposal.product.dimensions.length
+  ? proposal.product.dimensions
+  : (catalogue.dimensions ?? []);
+const capacity = proposal.product.capacity ?? catalogue.capacity ?? null;
+const materials = proposal.product.timberType
+  ? [proposal.product.timberType]
+  : (catalogue.materials ?? []);
+const baseRows = [
+  ...dimensions,
+  ...(capacity ? [{ label: 'Capacity', value: capacity }] : []),
+  ...(materials.length ? [{ label: 'Timber', value: materials.join(' / ') }] : []),
+  ...(proposal.product.glassConfiguration ? [{ label: 'Door & glass', value: proposal.product.glassConfiguration }] : []),
+];
+
+const catalogueSpecs = catalogue.specs ?? [];
+const modelRows = baseRows.length ? baseRows : catalogueSpecs.slice(0, 8);
+const availability = proposal.availability;
+const availabilityLabel = availability
+  ? availability.availableUnits > 0
+    ? `${availability.availableUnits} available`
+    : availability.incomingUnits > 0
+      ? `${availability.incomingUnits} incoming`
+      : 'Availability to confirm'
+  : 'Availability to confirm';
+
+const fulfilmentSummary = proposal.delivery !== 'unset'
+  ? FULFILMENT_LABELS[proposal.delivery]
+  : 'Delivery plan to confirm';
+
+const documents = [
+  { label: 'Product brochure', href: proposal.product.brochureUrl },
+  { label: 'Installation manual', href: proposal.product.installationManualUrl },
+  { label: 'Warranty document', href: proposal.product.warrantyDocumentUrl },
+].filter((document) => document.href);
+
+const catalogueImages = [catalogue.image, ...(catalogue.gallery ?? [])]
+  .filter((image): image is { src: string; alt: string } => Boolean(image?.src))
+  .filter((image, index, images) => images.findIndex((candidate) => candidate.src === image.src) === index);
+const primaryImage = catalogueImages[0];
+const hasHeaterPackage = grouped.some((group) => group.kind === 'heater' || group.kind === 'controls');
+---
+
+<article class="proposal-document">
+  {preview && (
+    <div class="preview-banner" role="status">
+      Preview data — this page is for design review and does not write to Supabase.
+    </div>
+  )}
+
+  <section class="proposal-hero band">
+    <div class="proposal-kicker-band">
+      <div class="shell proposal-shell proposal-kicker">
+        <a class="proposal-kicker__brand" href="/" aria-label={`${site.name} home`}>
+          <img src="/brand/buxena-logo-transparent.png" alt={site.name} />
+        </a>
+        <span>Customer proposal · {proposal.quoteNumber}</span>
+      </div>
+    </div>
+    <div class="shell proposal-shell">
+      <div class="proposal-hero__grid">
+        <div>
+          <p class="eyebrow">Prepared {proposal.customerName ? `for ${proposal.customerName}` : 'for you'}</p>
+          <h1 class="display">{proposal.modelName ? `${proposal.modelName} Proposal` : 'Complete Sauna Proposal'}</h1>
+          <p class="proposal-intro">
+            Complete project scope, equipment, delivered investment, site
+            requirements and next steps — organized in one clear document.
+          </p>
+        </div>
+        <dl class="proposal-hero__meta">
+          <div><dt>Proposal</dt><dd>{proposal.quoteNumber}</dd></div>
+          {proposal.quoteDate && <div><dt>Prepared</dt><dd>{formatDate(proposal.quoteDate)}</dd></div>}
+          {proposal.expiryDate && (
+            <div><dt>Valid until</dt><dd class={proposal.expired ? 'is-expired' : ''}>{formatDate(proposal.expiryDate)}</dd></div>
+          )}
+          {proposal.ownerName && <div><dt>Your advisor</dt><dd>{proposal.ownerName}</dd></div>}
+        </dl>
+      </div>
+
+      {proposal.expiryDate && (
+        <div class:list={['validity-strip', proposal.expired && 'validity-strip--expired']}>
+          <strong>{proposal.expired ? 'This proposal has expired.' : 'Pricing and scope are held through the date above.'}</strong>
+          {!proposal.expired && daysRemaining !== null && (
+            <span>{daysRemaining === 0 ? 'Valid through today.' : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining.`}</span>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
+  {(justAccepted || proposal.acceptedAt) && (
+    <section class="band band--tight">
+      <div class="shell proposal-shell">
+        <p class="notice-strip">
+          <strong>Thank you — your acceptance is recorded.</strong>
+          A BUXENA advisor will confirm the final specification and next step. Nothing has been charged.
+        </p>
+      </div>
+    </section>
+  )}
+
+  <nav class="proposal-nav" aria-label="Proposal sections">
+    <div class="shell proposal-shell proposal-nav__inner">
+      <a href={`/proposal/${token}#overview`}>Overview</a>
+      <a href={`/proposal/${token}#package`}>Package</a>
+      <a href={`/proposal/${token}#investment`}>Investment</a>
+      <a href={`/proposal/${token}#delivery`}>Delivery</a>
+      <a href={`/proposal/${token}#site`}>Site readiness</a>
+      <a href={`/proposal/${token}#warranty`}>Warranty</a>
+      <a href={`/proposal/${token}#proceed`}>Proceed</a>
+    </div>
+  </nav>
+
+  <section class="band band--tight" id="overview">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>01</span>
+        <div><p class="eyebrow">Selected for your project</p><h2>See your sauna configuration</h2></div>
+      </header>
+
+      <div class:list={['model-showcase', !primaryImage && 'model-showcase--text']} data-proposal-gallery>
+        {primaryImage && (
+          <div class="model-gallery">
+            <div class="model-gallery__stage">
+              <img src={primaryImage.src} alt={primaryImage.alt} data-gallery-main />
+              <span class="model-gallery__label">Your selected model</span>
+            </div>
+            {catalogueImages.length > 1 && (
+              <div class="model-gallery__thumbs" aria-label="Product views">
+                {catalogueImages.map((image, index) => (
+                  <button
+                    type="button"
+                    class="model-gallery__thumb"
+                    aria-label={`Show view ${index + 1}: ${image.alt}`}
+                    aria-pressed={index === 0 ? 'true' : 'false'}
+                    data-gallery-thumb
+                    data-src={image.src}
+                    data-alt={image.alt}
+                  >
+                    <img src={image.src} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div class="model-showcase__details">
+          <p class="eyebrow">Configured model</p>
+          <h3>{proposal.modelName ?? 'Your selected sauna'}</h3>
+          <p class="model-showcase__summary">
+            The model, material, equipment and delivery scope below are the basis of this proposal.
+          </p>
+          <dl class="model-highlights">
+            {capacity && <div><dt>Capacity</dt><dd>{capacity}</dd></div>}
+            {dimensions.slice(0, 2).map((row) => <div><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+            {materials.length > 0 && <div><dt>Material</dt><dd>{materials.join(' / ')}</dd></div>}
+          </dl>
+          {catalogue.href && <a class="model-link" href={catalogue.href}>Explore the model <span aria-hidden="true">→</span></a>}
+        </div>
+      </div>
+
+      {modelRows.length > 0 && (
+        <dl class="fact-table">
+          {modelRows.map((row) => <div><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+        </dl>
+      )}
+    </div>
+  </section>
+
+  <section class="band band--tight band--linen" id="package">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>02</span>
+        <div><p class="eyebrow">Configured for your project</p><h2>Sauna, heater & equipment</h2></div>
+      </header>
+
+      {proposal.heaterName && (
+        <section class="heater-specification" aria-labelledby="heater-specification-title">
+          <div class="heater-specification__title">
+            <p class="eyebrow">Selected heating system</p>
+            <h3 id="heater-specification-title">{proposal.heaterName}</h3>
+            <p>The equipment shown here is taken directly from this proposal's configured package.</p>
+          </div>
+          {heaterSpecificationGroups.length > 0 && (
+            <dl class="heater-specification__facts">
+              {heaterSpecificationGroups.map((group) => (
+                <div>
+                  <dt>{group.label}</dt>
+                  <dd>{group.items.map((item) => item.description).join(' · ')}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+      )}
+
+      {grouped.length === 0 ? (
+        <p class="proposal-empty">Your detailed configuration is being prepared.</p>
+      ) : (
+        <div class:list={['package-visual', !hasHeaterPackage && 'package-visual--compact']}>
+          {hasHeaterPackage && (
+            <figure class="equipment-image">
+              <img src="/images/editorial/indoor-sauna-interior-view-concept.png" alt="Warm timber sauna interior with benches, stones and an electric heater" />
+              <figcaption>Representative sauna atmosphere. The exact quoted equipment is listed alongside.</figcaption>
+            </figure>
+          )}
+          <div class="package-groups">
+            {grouped.map((group, groupIndex) => (
+              <section class="package-group">
+                <div class="package-group__heading"><span>{String(groupIndex + 1).padStart(2, '0')}</span><h3>{group.label}</h3></div>
+                <dl>
+                  {group.items.map((item) => (
+                    <div>
+                      <dt>{item.description}{item.quantity !== 1 && <span> × {item.quantity}</span>}</dt>
+                      <dd>{proposal.hasPricing && item.lineTotal > 0 ? money(item.lineTotal) : 'Included / TBC'}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {materials.length > 0 && (
+        <aside class="material-story">
+          <div class="material-story__copy">
+            <p class="eyebrow">Material specification</p>
+            <h3>Natural timber, clearly specified</h3>
+            <p>Your proposal currently lists <strong>{materials.join(' / ')}</strong>. The final timber and exterior finish are confirmed in writing before order.</p>
+            <ol>
+              <li><span>01</span><div><strong>Material recorded</strong><small>The quoted timber is shown directly in this document.</small></div></li>
+              <li><span>02</span><div><strong>Finish confirmed</strong><small>Colour and exterior treatment are finalized with your advisor.</small></div></li>
+              <li><span>03</span><div><strong>Matched to your site</strong><small>Outdoor exposure and maintenance expectations are reviewed before purchase.</small></div></li>
+            </ol>
+          </div>
+          <img src="/images/craftsmanship-detail.jpg" alt="Close detail of finished sauna timber benches and wall boards" />
+        </aside>
+      )}
+
+      <aside class="ritual-story">
+        <img src="/images/editorial/sauna-ritual-birch-whisk.jpg" alt="Birch sauna whisk, dark wooden bucket and ladle arranged in a warm ritual still life" />
+        <div class="ritual-story__copy">
+          <p class="eyebrow">The experience beyond specifications</p>
+          <h3>Built for the sauna ritual</h3>
+          <p>Warmth, steam, water and natural aroma turn the finished sauna into a place to slow down and return to regularly.</p>
+          <small>Atmosphere image shown for inspiration. Accessories are included only when they appear in the package list above.</small>
+        </div>
+      </aside>
+
+      {catalogue.video && (
+        <section class="proposal-video" aria-labelledby="proposal-video-title">
+          <div>
+            <p class="eyebrow">Verified product resource</p>
+            <h3 id="proposal-video-title">{catalogue.video.title}</h3>
+            <p>See how this model is assembled or installed before you make the final decision.</p>
+            <a class="model-link" href={catalogue.video.href} target="_blank" rel="noopener">Open video <span aria-hidden="true">→</span></a>
+          </div>
+          {catalogue.video.embedSrc && (
+            <iframe
+              src={catalogue.video.embedSrc}
+              title={catalogue.video.title}
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          )}
+        </section>
+      )}
+    </div>
+  </section>
+
+  {proposal.hasPricing && (
+    <section class="band band--tight" id="investment">
+      <div class="shell proposal-shell">
+        <header class="section-heading">
+          <span>03</span>
+          <div><p class="eyebrow">Transparent numbers</p><h2>Your delivered investment</h2></div>
+        </header>
+        <div class="investment-grid">
+          <dl class="price-table">
+            <div><dt>Configured sauna package</dt><dd>{money(proposal.subtotal)}</dd></div>
+            {proposal.deliveryCost > 0 && <div><dt>Delivery</dt><dd>{money(proposal.deliveryCost)}</dd></div>}
+            {proposal.installationCost > 0 && <div><dt>Installation</dt><dd>{money(proposal.installationCost)}</dd></div>}
+            {proposal.discount > 0 && <div class="price-discount"><dt>Approved discount</dt><dd>−{money(proposal.discount)}</dd></div>}
+            {proposal.taxAmount > 0 && <div><dt>Sales tax ({proposal.taxRate.toFixed(2).replace(/\.00$/, '')}%)</dt><dd>{money(proposal.taxAmount)}</dd></div>}
+            <div class="price-total"><dt>Proposal total</dt><dd>{money(proposal.total)}</dd></div>
+          </dl>
+          <aside class="investment-summary">
+            <p class="eyebrow">At a glance</p>
+            <strong>{money(proposal.total)}</strong>
+            <span>{fulfilmentSummary}</span>
+            <span>{availabilityLabel}</span>
+            <small>No payment is taken when you accept this proposal.</small>
+          </aside>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="band band--tight band--linen" id="delivery">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>04</span>
+        <div><p class="eyebrow">Fulfilment plan</p><h2>Availability, freight & delivery</h2></div>
+      </header>
+      <div class="detail-columns">
+        <section class="detail-card">
+          <h3>Availability</h3>
+          <dl class="fact-table fact-table--compact">
+            {availability ? (
+              <>
+                <div><dt>Available inventory</dt><dd>{availability.availableUnits > 0 ? `${availability.availableUnits} unit${availability.availableUnits === 1 ? '' : 's'}` : 'None currently available'}</dd></div>
+                {availability.incomingUnits > 0 && <div><dt>Incoming</dt><dd>{availability.incomingUnits} unit{availability.incomingUnits === 1 ? '' : 's'}</dd></div>}
+                {availability.eta && <div><dt>Current inventory ETA</dt><dd>{formatDate(availability.eta)}</dd></div>}
+              </>
+            ) : <div><dt>Status</dt><dd>Confirmed before order</dd></div>}
+          </dl>
+        </section>
+        <section class="detail-card">
+          <h3>Delivery facts</h3>
+          <dl class="fact-table fact-table--compact">
+            {proposal.delivery !== 'unset' && <div><dt>Delivery</dt><dd>{FULFILMENT_LABELS[proposal.delivery]}</dd></div>}
+            {proposal.product.shippingDimensions && <div><dt>Packed dimensions</dt><dd>{proposal.product.shippingDimensions}</dd></div>}
+            {proposal.product.weightKg !== null && <div><dt>Shipping weight</dt><dd>{proposal.product.weightKg.toLocaleString('en-US')} kg</dd></div>}
+            {!proposal.product.shippingDimensions && proposal.product.weightKg === null && proposal.delivery === 'unset' && <div><dt>Method</dt><dd>Confirmed for your address before order</dd></div>}
+          </dl>
+        </section>
+      </div>
+      <p class="clarity-note">Final delivery timing and access requirements are confirmed in writing for your address before the order is placed.</p>
+    </div>
+  </section>
+
+  <section class="band band--tight" id="site">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>05</span>
+        <div><p class="eyebrow">Prepare with confidence</p><h2>Electrical, foundation & installation</h2></div>
+      </header>
+      <div class="detail-columns detail-columns--three">
+        <section class="detail-card">
+          <h3>Electrical</h3>
+          <p>{proposal.product.electricalRequirements ?? 'The final electrical specification will be confirmed in writing before installation.'}</p>
+          <small>Electrical work must be reviewed and completed by a licensed electrician to applicable local code.</small>
+        </section>
+        <section class="detail-card">
+          <h3>Foundation</h3>
+          <p>A level, stable and appropriately load-bearing base is required.</p>
+          <small>Final base size, drainage, setbacks and permitting depend on the model and site.</small>
+        </section>
+        <section class="detail-card">
+          <h3>Installation</h3>
+          <p>{proposal.installation !== 'unset' ? FULFILMENT_LABELS[proposal.installation] : 'Installation responsibility will be confirmed before order.'}</p>
+          <small>Assembly scope and site access are documented before scheduling.</small>
+        </section>
+      </div>
+      <figure class="site-visual">
+        <img src="/images/editorial/sauna-white-mist-floating-bench.jpg" alt="Minimal timber sauna bench emerging through soft white mist" />
+        <figcaption>
+          <p class="eyebrow">Space, light & calm</p>
+          <h3>A calm result begins with a clear site plan</h3>
+          <p>We confirm the practical requirements first, then help keep the finished environment focused on the experience you want.</p>
+          <small>Concept image for atmosphere and spatial inspiration; it does not represent included construction scope.</small>
+        </figcaption>
+      </figure>
+      {proposal.customerNotes && (
+        <div class="customer-note"><p class="eyebrow">Notes for your project</p><p>{proposal.customerNotes}</p></div>
+      )}
+    </div>
+  </section>
+
+  <section class="band band--tight band--linen" id="warranty">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>06</span>
+        <div><p class="eyebrow">After the purchase</p><h2>Warranty, documents & support</h2></div>
+      </header>
+      <div class="warranty-grid">
+        <div>
+          <p class="warranty-lead">
+            {proposal.product.warrantyMonths
+              ? `This sauna is recorded with a ${proposal.product.warrantyMonths}-month warranty term.`
+              : 'The applicable manufacturer and BUXENA warranty terms are confirmed before purchase.'}
+          </p>
+          <p>Product, heater and component warranties can have different coverage. Your final order record identifies the documents applicable to the selected package.</p>
+        </div>
+        {documents.length > 0 && (
+          <div class="document-links">
+            <p class="eyebrow">Reference documents</p>
+            {documents.map((document) => <a href={document.href!} target="_blank" rel="noopener">{document.label}<span aria-hidden="true"> →</span></a>)}
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--tight" id="proceed">
+    <div class="shell proposal-shell">
+      <header class="section-heading">
+        <span>07</span>
+        <div><p class="eyebrow">Your decision</p><h2>Payment & next steps</h2></div>
+      </header>
+      <ol class="next-steps">
+        <li><span>1</span><div><strong>Accept the proposal</strong><p>This records your intention to proceed. It is not a payment or final contract.</p></div></li>
+        <li><span>2</span><div><strong>Confirm final details</strong><p>We verify specification, availability, delivery access and site requirements in writing.</p></div></li>
+        <li><span>3</span><div><strong>Receive order and payment instructions</strong><p>Your BUXENA advisor sends the final order confirmation and payment terms.</p></div></li>
+      </ol>
+
+      {acceptable.ok && !preview && (
+        <div class="accept-panel">
+          <div><p class="eyebrow">Ready to move forward?</p><h3>Accept this proposal</h3><p>Nothing is charged today. We will contact you before any order is placed.</p></div>
+          <form method="POST" action="/api/proposal-accept">
+            <input type="hidden" name="token" value={token} />
+            <label><span>Your name</span><input type="text" name="acceptedName" required maxlength="120" autocomplete="name" /></label>
+            <button class="btn btn--bronze" type="submit">Accept proposal</button>
+          </form>
+        </div>
+      )}
+
+      {acceptErrorMessage && !justAccepted && !proposal.acceptedAt && (
+        <p class="accept-error" role="alert">{acceptErrorMessage}</p>
+      )}
+
+      {preview && <p class="preview-cta">Acceptance is disabled in preview mode.</p>}
+      {!acceptable.ok && acceptable.reason && !proposal.acceptedAt && !preview && <p class="unavailable-note">{acceptable.reason}</p>}
+
+      <footer class="proposal-footer">
+        <div>
+          <p class="eyebrow">Questions?</p>
+          {proposal.ownerName && <strong>{proposal.ownerName}</strong>}
+          <p>{proposal.ownerEmail ? <a href={`mailto:${proposal.ownerEmail}`}>{proposal.ownerEmail}</a> : publicEmail && <a href={`mailto:${publicEmail}`}>{publicEmail}</a>}</p>
+        </div>
+        <div class="proposal-footer__actions">
+          <a class="proposal-download" href={`/proposal/${token}/pdf`} download>Download proposal PDF</a>
+          <a class="proposal-download proposal-download--secondary" href={`/proposal/${token}/pdf?view=1`}>Open PDF</a>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+</article>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-proposal-gallery]').forEach((gallery) => {
+    const main = gallery.querySelector<HTMLImageElement>('[data-gallery-main]');
+    const thumbs = Array.from(gallery.querySelectorAll<HTMLButtonElement>('[data-gallery-thumb]'));
+    if (!main || thumbs.length < 2) return;
+    thumbs.forEach((thumb) => thumb.addEventListener('click', () => {
+      const src = thumb.dataset.src;
+      if (!src) return;
+      main.src = src;
+      main.alt = thumb.dataset.alt ?? '';
+      thumbs.forEach((button) => button.setAttribute('aria-pressed', String(button === thumb)));
+    }));
+  });
+</script>
+
+<style>
+  .proposal-document { --proposal-max: 70rem; background: #f7f3eb; color: #24201c; font-size: 0.96rem; }
+  .proposal-shell { max-width: var(--proposal-max); }
+  .preview-banner { padding: 0.55rem 1rem; text-align: center; background: var(--ink); color: var(--linen); font-size: 0.75rem; letter-spacing: 0.04em; }
+  .proposal-document :global(.band--tight) { padding-block: clamp(2.6rem, 4.5vw, 4.25rem); }
+  .proposal-hero { padding-top: 0; padding-bottom: clamp(1.8rem, 3.5vw, 3rem); background: linear-gradient(120deg, #fbf8f2 0%, #eee6d9 100%); border-bottom: 1px solid var(--line); }
+  .proposal-kicker-band { background: #100f0d; border-bottom: 1px solid #3d352b; }
+  .proposal-kicker { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; min-height: clamp(7.5rem, 10vw, 9rem); color: #f3e7d4; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .proposal-kicker__brand { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+  .proposal-kicker__brand img { display: block; width: clamp(9rem, 12vw, 12rem); height: auto; }
+  .proposal-hero__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.6fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: start; padding-top: clamp(1.6rem, 3vw, 2.5rem); }
+  .proposal-hero .display { max-width: 14ch; margin: 0.35rem 0 0.75rem; font-size: clamp(2.75rem, 5.4vw, 4.7rem); line-height: 0.96; letter-spacing: -0.025em; }
+  .proposal-intro { max-width: 43rem; margin: 0; color: #514a43; font-size: clamp(0.98rem, 1.5vw, 1.08rem); line-height: 1.65; }
+  .proposal-hero__meta { margin: 0; border-top: 1px solid var(--line); }
+  .proposal-hero__meta div { display: grid; grid-template-columns: 6rem 1fr; gap: 1rem; padding: 0.64rem 0; border-bottom: 1px solid var(--line); }
+  .proposal-hero__meta dt { color: #6c6258; font-size: 0.67rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+  .proposal-hero__meta dd { margin: 0; text-align: right; font-size: 0.9rem; font-weight: 500; }
+  .proposal-hero__meta .is-expired { color: #9a4b2f; }
+  .validity-strip, .notice-strip { display: flex; justify-content: space-between; gap: 1rem; margin: 1.5rem 0 0; padding: 0.8rem 1rem; border-left: 3px solid var(--bronze); background: rgba(255,255,255,0.68); font-size: 0.82rem; line-height: 1.5; }
+  .validity-strip--expired { border-left-color: #9a4b2f; }
+  .notice-strip { margin: 0; }
+  .proposal-nav { position: static; overflow-x: auto; background: #f7f3eb; border-bottom: 1px solid var(--line); }
+  .proposal-nav__inner { display: flex; gap: 1.35rem; min-width: max-content; padding-block: 0.72rem; }
+  .proposal-nav a { color: #514a43; font-size: 0.67rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none; }
+  .proposal-nav a:hover { color: var(--bronze-ink); }
+  #overview, #package, #investment, #delivery, #site, #warranty, #proceed { scroll-margin-top: 4.5rem; }
+  .band--linen { background: #eee8de; }
+  .section-heading { display: grid; grid-template-columns: 2.6rem 1fr; gap: 1rem; align-items: start; margin-bottom: clamp(1.35rem, 2.5vw, 2rem); }
+  .section-heading > span { padding-top: 0.22rem; color: var(--bronze-ink); font-family: var(--font-display); font-size: 1.18rem; border-top: 1px solid var(--bronze); }
+  .section-heading .eyebrow { margin: 0 0 0.2rem; }
+  .section-heading h2 { margin: 0; font-family: var(--font-display); font-size: clamp(1.85rem, 3.3vw, 2.65rem); font-weight: 500; line-height: 1.08; }
+  .model-showcase { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(19rem, 0.88fr); min-height: 34rem; overflow: hidden; background: #f1ebe1; border: 1px solid #c7bcac; }
+  .model-showcase--text { grid-template-columns: 1fr; min-height: 0; }
+  .model-gallery { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; background: #e8dfd2; border-right: 1px solid #c7bcac; }
+  .model-gallery__stage { position: relative; display: grid; min-height: 28rem; place-items: center; overflow: hidden; background: #f7f3eb; }
+  .model-gallery__stage::after { position: absolute; inset: auto 7% 8% 7%; height: 1px; content: ''; background: rgba(112, 88, 58, 0.22); }
+  .model-gallery__stage > img { width: 100%; height: 100%; max-height: 31rem; padding: clamp(1rem, 3vw, 2.25rem); object-fit: contain; transition: opacity 180ms ease, transform 240ms ease; }
+  .model-gallery__stage:hover > img { transform: scale(1.018); }
+  .model-gallery__label { position: absolute; top: 1rem; left: 1rem; padding: 0.42rem 0.62rem; color: #fff; background: rgba(36, 32, 28, 0.88); font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .model-gallery__thumbs { display: flex; gap: 0.65rem; padding: 0.8rem; background: #ece4d8; border-top: 1px solid #c7bcac; }
+  .model-gallery__thumb { width: 4.6rem; height: 4.1rem; padding: 0.25rem; cursor: pointer; background: #f8f5ee; border: 1px solid transparent; }
+  .model-gallery__thumb[aria-pressed='true'] { border-color: var(--bronze-ink); box-shadow: inset 0 -2px 0 var(--bronze-ink); }
+  .model-gallery__thumb:focus-visible { outline: 2px solid var(--bronze-ink); outline-offset: 2px; }
+  .model-gallery__thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .model-showcase__details { display: flex; flex-direction: column; justify-content: center; padding: clamp(1.7rem, 4vw, 3.25rem); }
+  .model-showcase__details h3 { max-width: 12ch; margin: 0.25rem 0 0.8rem; font-family: var(--font-display); font-size: clamp(2.25rem, 4.2vw, 3.7rem); font-weight: 400; line-height: 0.98; }
+  .model-showcase__summary { max-width: 34rem; margin: 0 0 1.2rem; color: #5f574f; line-height: 1.65; }
+  .model-highlights { margin: 0 0 1.4rem; border-top: 1px solid var(--line); }
+  .model-highlights div { display: grid; grid-template-columns: 7rem 1fr; gap: 1rem; padding: 0.62rem 0; border-bottom: 1px solid var(--line); }
+  .model-highlights dt { color: #6a6057; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .model-highlights dd { margin: 0; text-align: right; font-weight: 500; }
+  .model-link { display: inline-flex; align-items: center; align-self: flex-start; gap: 0.65rem; padding-bottom: 0.3rem; color: var(--ink); border-bottom: 1px solid var(--bronze); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-decoration: none; text-transform: uppercase; }
+  .model-link span { transition: transform 160ms ease; }
+  .model-link:hover span { transform: translateX(0.25rem); }
+  .fact-table { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1.25rem 0 0; border-top: 1px solid var(--line); }
+  .fact-table div { display: grid; grid-template-columns: minmax(7rem, 0.8fr) 1.2fr; gap: 1rem; padding: 0.66rem 0; border-bottom: 1px solid var(--line); }
+  .fact-table div:nth-child(odd) { padding-right: 1.25rem; }
+  .fact-table div:nth-child(even) { padding-left: 1.25rem; border-left: 1px solid var(--line); }
+  .fact-table dt { color: #655c53; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .fact-table dd { margin: 0; text-align: right; color: #24201c; font-size: 0.9rem; font-weight: 500; }
+  .fact-table--compact { display: block; margin-top: 0.8rem; }
+  .fact-table--compact div, .fact-table--compact div:nth-child(n) { padding: 0.65rem 0; border-left: 0; }
+  .heater-specification { display: grid; grid-template-columns: minmax(16rem, 0.85fr) minmax(0, 1.15fr); gap: clamp(1.4rem, 3.5vw, 3rem); margin-bottom: 1.5rem; padding: clamp(1.35rem, 3vw, 2.1rem); color: #f6efe5; background: #26211d; border: 1px solid #493f35; }
+  .heater-specification__title { align-self: center; }
+  .heater-specification .eyebrow { margin: 0 0 0.45rem; color: #d3b585; }
+  .heater-specification h3 { margin: 0; font-family: var(--font-display); font-size: clamp(1.8rem, 3.2vw, 2.7rem); font-weight: 400; line-height: 1.08; }
+  .heater-specification__title > p:last-child { max-width: 34rem; margin: 0.8rem 0 0; color: #bdb1a5; font-size: 0.78rem; line-height: 1.6; }
+  .heater-specification__facts { margin: 0; border-top: 1px solid rgba(255,255,255,0.18); }
+  .heater-specification__facts div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.18); }
+  .heater-specification__facts dt { color: #c9aa7f; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .heater-specification__facts dd { margin: 0; color: #f1e8dd; font-size: 0.86rem; line-height: 1.45; }
+  .package-visual { display: grid; grid-template-columns: minmax(16rem, 0.72fr) minmax(0, 1.28fr); gap: clamp(1.4rem, 3vw, 2.5rem); margin-top: 1.5rem; align-items: start; }
+  .package-visual--compact { grid-template-columns: 1fr; }
+  .equipment-image { position: sticky; top: 1rem; margin: 0; overflow: hidden; background: var(--ink); }
+  .equipment-image img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+  .equipment-image figcaption { padding: 0.75rem 0.9rem; color: #d8cfc3; background: var(--ink); font-size: 0.68rem; line-height: 1.5; }
+  .package-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+  .package-group { min-width: 0; padding: 1rem; background: rgba(255,255,255,0.62); border: 1px solid #c7bcac; }
+  .package-group__heading { display: flex; align-items: center; gap: 0.7rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--line); }
+  .package-group__heading > span { color: var(--bronze-ink); font-family: var(--font-display); font-size: 1.2rem; }
+  .package-group h3, .detail-card h3 { margin: 0; color: var(--bronze-ink); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .package-group dl { margin: 0; }
+  .package-group dl div { display: grid; grid-template-columns: 1fr auto; gap: 1rem; padding: 0.72rem 0; border-bottom: 1px solid var(--line); }
+  .package-group dt span { color: #6b6259; }
+  .package-group dt { line-height: 1.45; }
+  .package-group dd { margin: 0; color: #5e554c; font-size: 0.82rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .material-story { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 0.95fr); margin-top: clamp(2rem, 5vw, 4rem); overflow: hidden; color: #f7f0e7; background: #26211d; }
+  .material-story__copy { padding: clamp(1.6rem, 4vw, 3.25rem); }
+  .material-story .eyebrow { color: #c8aa81; }
+  .material-story h3 { margin: 0.3rem 0 0.85rem; font-family: var(--font-display); font-size: clamp(2rem, 3.8vw, 3.2rem); font-weight: 400; line-height: 1; }
+  .material-story p { max-width: 38rem; color: #d8cec2; line-height: 1.7; }
+  .material-story ol { display: grid; gap: 0; margin: 1.5rem 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.17); }
+  .material-story li { display: grid; grid-template-columns: 2rem 1fr; gap: 0.8rem; padding: 0.8rem 0; border-bottom: 1px solid rgba(255,255,255,0.17); }
+  .material-story li > span { color: #c8aa81; font-family: var(--font-display); }
+  .material-story li strong, .material-story li small { display: block; }
+  .material-story li small { margin-top: 0.18rem; color: #ad9f92; line-height: 1.45; }
+  .material-story > img { width: 100%; height: 100%; min-height: 29rem; object-fit: cover; }
+  .ritual-story { position: relative; min-height: clamp(22rem, 42vw, 36rem); margin-top: clamp(2rem, 5vw, 4rem); overflow: hidden; color: #fff; background: #13120f; }
+  .ritual-story::after { position: absolute; inset: 0; content: ''; background: linear-gradient(90deg, rgba(8,7,6,0.12) 30%, rgba(8,7,6,0.86) 82%); }
+  .ritual-story > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .ritual-story__copy { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: end; width: min(31rem, 54%); min-height: inherit; margin-left: auto; padding: clamp(1.6rem, 4vw, 3.25rem); }
+  .ritual-story .eyebrow { color: #d3b585; }
+  .ritual-story h3 { max-width: 9ch; margin: 0.3rem 0 0.85rem; font-family: var(--font-display); font-size: clamp(2.2rem, 4.6vw, 4rem); font-weight: 400; line-height: 0.98; }
+  .ritual-story p { margin-bottom: 1rem; color: #e8dfd5; line-height: 1.7; }
+  .ritual-story small { max-width: 36rem; color: #b9aea4; line-height: 1.55; }
+  .proposal-video { display: grid; grid-template-columns: minmax(15rem, 0.7fr) minmax(0, 1.3fr); gap: 2rem; align-items: center; margin-top: 2.5rem; padding: clamp(1.4rem, 3vw, 2.4rem); background: rgba(255,255,255,0.62); border: 1px solid #c7bcac; }
+  .proposal-video h3 { margin: 0.25rem 0 0.65rem; font-family: var(--font-display); font-size: 2rem; font-weight: 400; }
+  .proposal-video p { color: #5e554c; line-height: 1.6; }
+  .proposal-video iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; }
+  .proposal-empty { color: var(--muted); font-style: italic; }
+  .investment-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(15rem, 0.6fr); gap: clamp(2rem, 6vw, 5rem); align-items: start; }
+  .price-table { margin: 0; border-top: 1px solid var(--line); }
+  .price-table div { display: flex; justify-content: space-between; gap: 2rem; padding: 0.78rem 0; border-bottom: 1px solid var(--line); }
+  .price-table dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .price-table .price-discount { color: var(--bronze-ink); }
+  .price-table .price-total { margin-top: 0.5rem; padding-top: 1.15rem; border-top: 2px solid var(--ink); font-family: var(--font-display); font-size: clamp(1.55rem, 3vw, 2.2rem); }
+  .investment-summary { display: grid; gap: 0.55rem; padding: 1.45rem; color: var(--linen); background: var(--ink); }
+  .investment-summary .eyebrow { color: #c4ab8c; }
+  .investment-summary strong { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3rem); font-weight: 400; }
+  .investment-summary span { padding-top: 0.6rem; border-top: 1px solid rgba(255,255,255,0.18); font-size: 0.82rem; }
+  .investment-summary small { margin-top: 0.6rem; color: rgba(255,255,255,0.65); line-height: 1.6; }
+  .detail-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+  .detail-columns--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .detail-card { padding: 1.2rem; background: rgba(255,255,255,0.48); border: 1px solid #c7bcac; }
+  .detail-card p { color: var(--ink); line-height: 1.65; }
+  .detail-card small { display: block; color: #655d55; line-height: 1.6; }
+  .clarity-note { margin: 1.1rem 0 0; padding-left: 1rem; border-left: 2px solid var(--bronze); color: #514a43; font-size: 0.82rem; line-height: 1.6; }
+  .site-visual { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(16rem, 0.75fr); min-height: 22rem; margin: clamp(2rem, 5vw, 3.5rem) 0 0; overflow: hidden; background: #e8e3db; border: 1px solid #c7bcac; }
+  .site-visual > img { width: 100%; height: 100%; min-height: 22rem; object-fit: cover; }
+  .site-visual figcaption { display: flex; flex-direction: column; justify-content: center; padding: clamp(1.5rem, 3vw, 2.5rem); }
+  .site-visual h3 { margin: 0.3rem 0 0.8rem; font-family: var(--font-display); font-size: clamp(1.8rem, 3vw, 2.7rem); font-weight: 400; line-height: 1.05; }
+  .site-visual p { color: #514a43; line-height: 1.65; }
+  .site-visual small { color: #71675e; line-height: 1.55; }
+  .customer-note { margin-top: 1.5rem; padding: 1.25rem; border: 1px solid var(--line); }
+  .customer-note .eyebrow { margin-top: 0; }
+  .customer-note p:last-child { margin-bottom: 0; white-space: pre-wrap; line-height: 1.7; }
+  .warranty-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: clamp(2rem, 6vw, 5rem); }
+  .warranty-grid p { color: #514a43; line-height: 1.65; }
+  .warranty-lead { color: var(--ink) !important; font-family: var(--font-display); font-size: 1.55rem; line-height: 1.35 !important; }
+  .document-links { display: grid; align-content: start; }
+  .document-links a { display: flex; justify-content: space-between; gap: 1rem; padding: 0.8rem 0; color: var(--ink); border-bottom: 1px solid var(--line); text-decoration: none; }
+  .next-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; padding: 0; list-style: none; }
+  .next-steps li { display: grid; grid-template-columns: 2rem 1fr; gap: 0.8rem; }
+  .next-steps li > span { font-family: var(--font-display); font-size: 1.5rem; color: var(--bronze-ink); }
+  .next-steps strong { display: block; margin-bottom: 0.3rem; }
+  .next-steps p { margin: 0; color: #625a52; font-size: 0.85rem; line-height: 1.6; }
+  .accept-panel { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: clamp(1.5rem, 5vw, 4rem); margin-top: 2rem; padding: clamp(1.35rem, 3vw, 2.1rem); background: #eee8de; border: 1px solid #c7bcac; }
+  .accept-panel h3 { margin: 0.2rem 0 0.45rem; font-family: var(--font-display); font-size: 2rem; font-weight: 400; }
+  .accept-panel p { color: #5f574f; line-height: 1.6; }
+  .accept-panel form { display: flex; align-items: end; gap: 1rem; }
+  .accept-panel label { display: grid; flex: 1; gap: 0.35rem; }
+  .accept-panel label span { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .accept-panel input { width: 100%; padding: 0.72rem 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; font: inherit; }
+  .accept-panel input:focus { outline: 0; border-color: var(--bronze); }
+  .preview-cta, .unavailable-note { margin-top: 2rem; padding: 1rem; color: var(--muted-dark); background: var(--linen-deep); border-left: 3px solid var(--bronze); }
+  .accept-error { margin-top: 1rem; padding: 0.9rem 1rem; color: #6f2920; background: #f8e9e5; border-left: 3px solid #9f4c3f; }
+  .proposal-footer { display: flex; justify-content: space-between; align-items: end; gap: 2rem; margin-top: 2.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  .proposal-footer p { margin: 0.25rem 0 0; }
+  .proposal-footer__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.75rem 1rem; }
+  .proposal-download { display: inline-flex; align-items: center; justify-content: center; min-height: 2.65rem; padding: 0.65rem 1rem; color: #f7f0e7; background: var(--ink); border: 1px solid var(--ink); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-decoration: none; text-transform: uppercase; }
+  .proposal-download:hover { color: #fff; background: var(--bronze-ink); border-color: var(--bronze-ink); }
+  .proposal-download:focus-visible { outline: 2px solid var(--bronze-ink); outline-offset: 3px; }
+  .proposal-download--secondary { color: var(--bronze-ink); background: transparent; border-color: #aa9475; }
+  .proposal-download--secondary:hover { color: #f7f0e7; background: var(--bronze-ink); border-color: var(--bronze-ink); }
+  @media (max-width: 800px) {
+    .proposal-hero__grid, .model-showcase, .heater-specification, .package-visual, .material-story, .proposal-video, .site-visual, .investment-grid, .warranty-grid, .accept-panel { grid-template-columns: 1fr; }
+    .model-showcase { min-height: 0; }
+    .model-gallery { border-right: 0; border-bottom: 1px solid #c7bcac; }
+    .model-gallery__stage { min-height: 23rem; }
+    .equipment-image { position: static; }
+    .equipment-image img { aspect-ratio: 16 / 10; }
+    .material-story > img { min-height: 20rem; }
+    .ritual-story::after { background: linear-gradient(0deg, rgba(8,7,6,0.88) 0%, rgba(8,7,6,0.12) 75%); }
+    .ritual-story__copy { width: 100%; min-height: inherit; margin: 0; }
+    .site-visual > img { min-height: 16rem; }
+    .detail-columns--three { grid-template-columns: 1fr; }
+    .next-steps { grid-template-columns: 1fr; }
+    .accept-panel form { align-items: stretch; flex-direction: column; }
+  }
+  @media (max-width: 620px) {
+    .proposal-kicker { align-items: flex-start; flex-direction: column; gap: 0.75rem; padding-block: 1.35rem; }
+    .proposal-kicker__brand { align-self: flex-start; }
+    .heater-specification__facts div { grid-template-columns: 5.5rem 1fr; }
+    .proposal-hero__grid { gap: 2rem; }
+    .proposal-nav { overflow: visible; }
+    .proposal-nav__inner { flex-wrap: wrap; gap: 0.6rem 1rem; min-width: 0; }
+    .validity-strip, .notice-strip, .proposal-footer { align-items: flex-start; flex-direction: column; }
+    .proposal-footer__actions { justify-content: flex-start; }
+    .fact-table, .package-groups, .detail-columns { grid-template-columns: 1fr; }
+    .model-gallery__stage { min-height: 19rem; }
+    .model-gallery__thumb { width: 4rem; height: 3.6rem; }
+    .fact-table div:nth-child(n) { padding-inline: 0; border-left: 0; }
+    .section-heading { grid-template-columns: 2.3rem 1fr; }
+    .proposal-hero .display { font-size: clamp(2.45rem, 13vw, 3.35rem); }
+  }
+  @media print {
+    :global(header), :global(footer), :global(.chat-fab), :global(.chat-panel), :global(.salesbar),
+    .proposal-nav, .preview-banner, .accept-panel, .proposal-footer__actions { display: none !important; }
+    :global(body), .proposal-document { background: #fff !important; color: #000 !important; }
+    .band { padding-block: 1rem !important; }
+    .proposal-hero { padding-top: 1rem !important; }
+    .section-heading, .model-showcase, .heater-specification, .detail-card, .package-group, .material-story, .ritual-story, .proposal-video, .site-visual, .price-table, .investment-summary, .customer-note { break-inside: avoid; }
+    .model-gallery__stage { min-height: 16rem; }
+    .model-gallery__stage > img { max-height: 18rem; }
+    .equipment-image { position: static; }
+    .investment-summary { color: #000; background: #f3f0eb; border: 1px solid #bbb; }
+    .investment-summary .eyebrow, .investment-summary small { color: #333; }
+    .proposal-nav, .validity-strip { position: static; }
+  }
+</style>

@@ -13,7 +13,7 @@ capacityMin: 2
 capacityMax: 2
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/viru-vertical-2-6m-hero.jpg"
+  src: "/images/saunas-normalized/viru-vertical-2-6m-transparent.png"
   alt: "VIRU Vertical standing barrel sauna on a garden terrace beside a lounge set, full-height glass door"
 dimensions:
   - { label: "Diameter", value: "6.6 ft (200 cm)" }

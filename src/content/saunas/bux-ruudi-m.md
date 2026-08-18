@@ -17,11 +17,11 @@ heroImage:
   # p.16-17) — RUUDI S/M/L each have their own catalogue photo (page 16
   # shows all three named separately), even though the three are visually
   # similar. This is the RUUDI M photo specifically.
-  src: "/images/saunas/bux-ruudi-m-hero.jpg"
+  src: "/images/saunas-normalized/bux-ruudi-m-transparent.png"
   alt: "BUX RUUDI M sauna, glass front"
 dimensions:
-  - { label: "Depth", value: "3.6 ft (110 cm)" }
   - { label: "Width", value: "6.5 ft (199 cm)" }
+  - { label: "Depth", value: "3.6 ft (110 cm)" }
   - { label: "Height", value: "7.0 ft (213 cm)" }
 specs:
   - { label: "Sauna room volume", value: "3.3 m³ (117 cu ft)" }

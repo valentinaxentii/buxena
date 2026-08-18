@@ -21,7 +21,7 @@ heroImage:
   # confirmed as visually distinguishing H1 from H2 either. Shared with
   # bux-illi-h1.md. Pre-dates this session; flagged, not swapped.
   # Classification: CONFIGURATION.
-  src: "/images/saunas/illi-h2-hero.jpg"
+  src: "/images/saunas-normalized/illi-h2-transparent.png"
   alt: "ILLI H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
 gallery:
   - src: "/images/catalog/illi-h2-outdoor-spruce.png"

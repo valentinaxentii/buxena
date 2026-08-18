@@ -466,6 +466,22 @@ button { font: inherit; color: inherit; }
 .cols-3 { grid-template-columns: repeat(3, 1fr); }
 .cols-4 { grid-template-columns: repeat(4, 1fr); }
 
+/* Product cards vary in height — a family-grouped card (e.g. BUX EKE) carries
+ * an extra "Available sizes" row its neighbours don't have. Grid's default
+ * row-stretch would force every card in that row to match the tallest one,
+ * shoving each shorter card's actions row down and leaving a dead gap above
+ * it. Let every card size to its own content instead. */
+[data-product-grid] {
+  align-items: start;
+  /* A first attempt fixed row-boundary ambiguity by blowing the row-gap out
+   * to ~4.75rem. That backfired: scrolled to a cut mid-row, a card's own
+   * text sits above a huge empty band before the next row's photos, reading
+   * as "these products have no photo" rather than as a gap. ProductCard now
+   * draws its own border, which is what actually solves "whose button is
+   * this" — so the gap only needs to be a bit more than the column gap. */
+  row-gap: clamp(1.4rem, 1rem + 1.6vw, 2.4rem);
+}
+
 @media (max-width: 900px) {
   .cols-3, .cols-4 { grid-template-columns: repeat(2, 1fr); }
 }

@@ -16,6 +16,7 @@ heroImage:
   # render. Keep this mapped only to EKE 160.
   src: "https://drive.google.com/thumbnail?id=1eE-7IM6AzESa5GFA4L0oSwF_iI4tJtsj&sz=w1200"
   alt: "BUX EKE 160 outdoor thermowood cube sauna"
+  fit: cover
 dimensions:
   - { label: "Depth", value: "5.2 ft (160 cm)" }
   - { label: "Width", value: "6.9 ft (210 cm)" }

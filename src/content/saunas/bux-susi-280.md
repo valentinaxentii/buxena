@@ -18,7 +18,7 @@ heroImage:
   # depth — it is the correct SERIES, verified against the source page, and
   # no other model's photo has been substituted. Classification: FAMILY.
   # Replace with an exact depth photo the moment Capra sends one.
-  src: "/images/saunas/bux-susi-family-hero.jpg"
+  src: "/images/saunas-normalized/bux-susi-family-transparent.png"
   alt: "BUX SUSI 280 barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Depth", value: "9.2 ft (280 cm)" }

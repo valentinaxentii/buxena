@@ -5,60 +5,15 @@ import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import ContinueProject from '../../components/ContinueProject.astro';
 import { getCollection } from 'astro:content';
-import { byPhotographedThenOrder } from '../../data/catalog';
+import { byPhotographedThenOrder, groupFamilyPhotoSeries } from '../../data/catalog';
 
 // Photographed models lead, curated order preserved within each group —
 // see byPhotographedThenOrder in src/data/catalog.ts for why.
 const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort(byPhotographedThenOrder);
 
-/** Capra publishes one family photograph for every depth in these ranges.
- * Rendering that same photograph as 4–5 separate neighbouring cards made the
- * catalogue look broken and implied unique model photography that does not
- * exist. Keep every SKU/page, but present these ranges once with direct size
- * links to every individual model. */
-const FAMILY_PHOTO_SERIES = new Set(['EKE', 'SUSI', 'ITI']);
-const seenFamilySeries = new Set<string>();
-const catalogueCards: Array<{
-  representative: (typeof saunas)[number];
-  title?: string;
-  tagline?: string;
-  variants?: { slug: string; label: string }[];
-}> = [];
-
-for (const sauna of saunas) {
-  const series = sauna.data.series ?? '';
-  if (!FAMILY_PHOTO_SERIES.has(series)) {
-    catalogueCards.push({ representative: sauna });
-    continue;
-  }
-  if (seenFamilySeries.has(series)) continue;
-  seenFamilySeries.add(series);
-
-  const members = saunas
-    .filter((candidate) => candidate.data.series === series)
-    .sort((a, b) => {
-      const an = Number(a.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
-      const bn = Number(b.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
-      return an - bn;
-    });
-  // EKE 160 has a verified exact-model image from Capra's live product page;
-  // use that clean supplier image for the collection card instead of the old
-  // generic dark family render. Individual size pages remain unchanged.
-  const representative = series === 'EKE'
-    ? (members.find((member) => member.data.title === 'BUX EKE 160') ?? members[0] ?? sauna)
-    : (members[0] ?? sauna);
-  const variants = members.map((member) => ({
-    slug: member.id,
-    label: `${member.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? member.data.title} cm`,
-  }));
-
-  catalogueCards.push({
-    representative,
-    title: `BUX ${series}`,
-    tagline: `${members.length} available depths. Choose the size that fits your space.`,
-    variants,
-  });
-}
+// Series that share one supplier photograph across every depth are grouped
+// into a single card — see groupFamilyPhotoSeries in src/data/catalog.ts.
+const catalogueCards = groupFamilyPhotoSeries(saunas);
 
 /** Build each facet's option list from whatever is actually in the catalog today. */
 function uniqueOptions(values: (string | undefined)[]) {

@@ -13,7 +13,7 @@ capacityMin: 4
 capacityMax: 4
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/viru-thermowood-3-0m-hero.jpg"
+  src: "/images/saunas-normalized/viru-thermowood-3-0m-transparent.png"
   alt: "VIRU 3.0m barrel sauna on decking with smoke rising, wooden entrance door with window"
 dimensions:
   - { label: "Length", value: "9.8 ft (300 cm)" }

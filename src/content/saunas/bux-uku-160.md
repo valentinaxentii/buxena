@@ -13,7 +13,7 @@ capacityMin: 3
 capacityMax: 4
 materials: ["Spruce", "Thermowood"]
 heroImage:
-  src: "/images/saunas/uku-160-hero.jpg"
+  src: "/images/saunas-normalized/uku-160-transparent.png"
   alt: "UKU 160 outdoor rounded-cube sauna, black exterior with full glass front and shingle roof"
 gallery:
   - src: "/images/catalog/uku-160-halfmoon.jpg"

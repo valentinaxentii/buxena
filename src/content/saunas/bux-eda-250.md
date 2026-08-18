@@ -15,7 +15,7 @@ materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
   # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
   # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas/eda-nordic-spruce-2-5m-hero.png"
+  src: "/images/saunas-normalized/eda-nordic-spruce-2-5m-hero.png"
   alt: "BUX EDA 250 Nordic Spruce barrel sauna exterior"
 dimensions:
   - { label: "Depth", value: "8.2 ft (250 cm)" }

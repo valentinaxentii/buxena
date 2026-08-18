@@ -34,22 +34,9 @@ const trustItems = [
  * on. Nobody can grant rights to an image whose owner is unknown, so they were
  * not replaceable by asking — only by swapping.
  *
- * Every tile now points at an image whose provenance is documented:
- *   Outdoor · Cube · Indoor — Capra dealer-pack renders, WEBSITE APPROVED in
- *     writing (docs/image-rights-register.md §7). Exact-model rule respected:
- *     UKU 230 is an outdoor model, UKU 160 is a cube, ELLA H2 is indoor.
- *   Barrel — a Baltresto VIRU photograph. Supplier-owned and identifiable, so
- *     it is a PAID-ADVERTISING blocker rather than a launch blocker per the
- *     founder's 2026-08-13 ruling. It is the only barrel imagery we hold with
- *     a known owner; the unsourced alternative was strictly worse.
- *
- * The Cube tile also improves: it was a NORD Cube catalogue extraction
- * (supplier-owned, no permission on record) and is now Capra dealer-pack with
- * written website permission.
- *
- * BEFORE PAID ADVERTISING the Barrel tile still needs Baltresto's written
- * permission, and the three Capra tiles need their grant extended from website
- * to ads/social. Both are asked in the outreach drafts in docs/.
+ * Every tile now points at a documented BUXENA-owned AI-generated concept
+ * image (docs/image-rights-register.md §6b–6d). The images communicate sauna
+ * form and atmosphere only; they are not real installations or exact models.
  */
 const chooseTiles = [
   {
@@ -57,40 +44,42 @@ const chooseTiles = [
     blurb: 'Architectural backyard sauna systems',
     href: '/saunas/outdoor-saunas/',
     count: locationCount('outdoor'),
-    image: '/images/catalog/uku-230-glass-front.jpg',
-    alt: 'UKU 230 outdoor rounded-cube sauna in Nordic spruce with a full glass front',
+    image: '/images/editorial/outdoor-sauna-architectural-cabin-concept.png',
+    alt: 'Rectangular dark-timber outdoor sauna cabin with a panoramic glass wall on a woodland terrace',
     focus: 'center center',
-    note: 'Outdoor Saunas — UKU 230, an outdoor model we sell.',
+    note: 'Outdoor Saunas — AI-generated concept image, not a real installation or specific model.',
   },
   {
     name: 'Cube Saunas',
     blurb: 'Modern form, panoramic design',
     href: '/saunas/cube-saunas/',
     count: typeCount('Cube'),
-    image: '/images/catalog/uku-160-glass-front.jpg',
-    alt: 'UKU 160 rounded-cube sauna in Nordic spruce with a full glass front',
+    image: '/images/editorial/cube-sauna-blue-hour-concept.png',
+    alt: 'Compact pale-timber cube sauna glowing on a contemporary garden terrace',
     focus: 'center center',
-    note: 'Cube Saunas — UKU 160, a cube model we sell.',
+    note: 'Cube Saunas — AI-generated concept image, not a real installation or specific model.',
   },
   {
     name: 'Barrel Saunas',
     blurb: 'Traditional shape, efficient footprint',
     href: '/saunas/barrel-saunas/',
     count: typeCount('Barrel'),
-    image: '/images/saunas/viru-thermowood-2-4m-hero.jpg',
-    alt: 'VIRU Thermowood 2.4m barrel sauna in thermo-treated timber with a glass door',
+    image: '/images/editorial/barrel-sauna-lakeside-concept.jpg',
+    alt: 'Warm timber barrel sauna glowing beside a lake at sunset',
     focus: 'center center',
-    note: 'Barrel Saunas — VIRU Thermowood 2.4m, a barrel model we sell.',
+    note: 'Barrel Saunas — AI-generated concept image, not a real installation or specific model.',
   },
   {
     name: 'Indoor Saunas',
     blurb: 'Integrated wellness for the home',
     href: '/saunas/indoor-saunas/',
     count: locationCount('indoor'),
-    image: '/images/catalog/ella-h2-interior.jpg',
-    alt: 'Interior of the ELLA H2 indoor sauna with timber benches and warm lighting',
+    image: '/images/editorial/indoor-sauna-interior-view-concept.png',
+    alt: 'View from inside a warm cedar sauna with benches, heater, and a glass door to the home',
     focus: 'center center',
-    note: 'Indoor Saunas — ELLA H2, an indoor model we sell.',
+    // AI-generated concept image (see image-rights-register.md), not a
+    // specific BUXENA SKU or a real installation — note stays generic.
+    note: 'Indoor Saunas — AI-generated concept image, not a real installation or specific model.',
   },
 ];
 

@@ -12,6 +12,15 @@ const imageSlot = z.object({
   src: z.string().optional(),
   alt: z.string(),
   note: z.string().optional(),
+  /**
+   * How this photo fills its card/gallery box — see scripts/normalize-
+   * card-images.mjs, which sets this automatically. Real full-bleed
+   * photography (no excess canvas to trim) gets "cover" so it fills the box
+   * like an ordinary photo crop; everything else defaults to "contain" —
+   * padded/trimmed studio renders never crop, since the empty canvas around
+   * them has already been normalized in the pixels themselves.
+   */
+  fit: z.enum(['cover', 'contain']).optional(),
 });
 
 /**

@@ -14,7 +14,7 @@ heroImage:
   # p.10-11) — ULLA has only one size, so this is the model's own photo,
   # not a shared family image. Per the catalogue's own disclaimer, images
   # are illustrative and may show optional features.
-  src: "/images/saunas/bux-ulla-hero.jpg"
+  src: "/images/saunas-normalized/bux-ulla-transparent.png"
   alt: "BUX ULLA outdoor cube sauna, glass door and shingled roof"
 dimensions:
   - { label: "Depth", value: "4.3 ft (130 cm)" }

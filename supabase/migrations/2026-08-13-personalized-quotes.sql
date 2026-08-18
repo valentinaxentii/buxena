@@ -42,6 +42,12 @@ alter table quotes add column if not exists viewed_at timestamptz;
 alter table quotes add column if not exists accepted_at timestamptz;
 alter table quotes add column if not exists accepted_name text;
 
+-- Delivery audit for the customer email. This is intentionally separate from
+-- status: a proposal may be resent after it has been viewed or negotiated,
+-- and changing it back to Sent would erase useful lifecycle information.
+alter table quotes add column if not exists proposal_sent_at timestamptz;
+alter table quotes add column if not exists proposal_sent_to text;
+
 
 -- ----------------------------------------------------------------------------
 -- 2. Ownership and the two kinds of note
@@ -183,14 +189,15 @@ alter table settings add column if not exists margin_floor_percent numeric(5,2);
 -- ----------------------------------------------------------------------------
 -- 6. Verify
 -- ----------------------------------------------------------------------------
--- Expect: share_token, viewed_at, accepted_at, accepted_name, owner_staff_id,
--- customer_notes, internal_notes, enquiry_id on quotes; kind + unit_cost on
--- quote_items; margin_floor_percent on settings.
+-- Expect: share_token, viewed_at, accepted_at, accepted_name,
+-- proposal_sent_at, proposal_sent_to, owner_staff_id, customer_notes,
+-- internal_notes, enquiry_id on quotes; kind + unit_cost on quote_items;
+-- margin_floor_percent on settings.
 select table_name, column_name, data_type
   from information_schema.columns
  where (table_name = 'quotes' and column_name in
-        ('share_token','viewed_at','accepted_at','accepted_name','owner_staff_id',
-         'customer_notes','internal_notes','enquiry_id'))
+        ('share_token','viewed_at','accepted_at','accepted_name','proposal_sent_at',
+         'proposal_sent_to','owner_staff_id','customer_notes','internal_notes','enquiry_id'))
     or (table_name = 'quote_items' and column_name in ('kind','unit_cost'))
     or (table_name = 'settings' and column_name = 'margin_floor_percent')
  order by table_name, column_name;

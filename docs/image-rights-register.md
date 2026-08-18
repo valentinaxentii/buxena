@@ -206,6 +206,51 @@ that group's row with the proof reference and re-mark it Approved.
 
 ---
 
+## 6b. Approved generated tile — `public/images/editorial/indoor-sauna-interior-view-concept.png` (2026-08-17)
+
+| Field | Value |
+|---|---|
+| Filename | `indoor-sauna-interior-view-concept.png` |
+| Used where | Homepage "Choose your sauna" — Indoor Saunas tile (`index.astro`) |
+| Source | AI-generated with ChatGPT, commissioned by the founder, 2026-08-17 |
+| Owner | BUXENA |
+| License | BUXENA-owned generated asset |
+| Commercial use | Yes |
+| Status | **APPROVED — AI-GENERATED CONCEPT IMAGE** |
+| Notes | Same rule as §6: concept/lifestyle imagery only. **Must NOT be captioned, alt-texted, or otherwise presented as a real BUXENA installation or an exact model we sell** — the tile's `note` field deliberately identifies it as a generic AI-generated concept. The viewpoint is intentionally from inside the sauna, looking through the glass door into the home. Replaces `sauna-glass-slider-concept.jpg` on this specific placement only. |
+
+---
+
+## 6c. Approved generated tile — `public/images/editorial/barrel-sauna-lakeside-concept.jpg` (2026-08-17)
+
+| Field | Value |
+|---|---|
+| Filename | `barrel-sauna-lakeside-concept.jpg` |
+| Used where | Homepage "Choose your sauna" — Barrel Saunas tile (`index.astro`) |
+| Source | AI-generated (ChatGPT), supplied directly by the founder, 2026-08-17 |
+| Owner | BUXENA |
+| License | BUXENA-owned generated asset |
+| Commercial use | Yes |
+| Status | **APPROVED — AI-GENERATED CONCEPT IMAGE** |
+| Notes | Concept/lifestyle imagery only. It must not be presented as a real BUXENA installation or exact supplier model. The source screenshot was cropped to the image area without regenerating or changing the sauna photograph. |
+
+---
+
+## 6d. Approved generated tiles — Outdoor and Cube concepts (2026-08-17)
+
+| Field | Value |
+|---|---|
+| Filenames | `outdoor-sauna-architectural-cabin-concept.png`, `cube-sauna-blue-hour-concept.png` |
+| Used where | Homepage "Choose your sauna" — Outdoor Saunas and Cube Saunas tiles (`index.astro`) |
+| Source | AI-generated with ChatGPT from BUXENA catalogue-form references, commissioned by the founder, 2026-08-17 |
+| Owner | BUXENA |
+| License | BUXENA-owned generated assets |
+| Commercial use | Yes |
+| Status | **APPROVED — AI-GENERATED CONCEPT IMAGES** |
+| Notes | Concept/lifestyle imagery only. The reference images guided the sauna form, materials and front configuration, but the generated scenes must not be represented as real BUXENA installations or exact supplier models. Both homepage notes explicitly disclose this. |
+
+---
+
 ## 7. CAPRA dealer-pack renders — `public/images/catalog/*`
 
 | Field | Value |
@@ -421,6 +466,50 @@ permission is documented above.
 | Exact-match status | Each is the model's own catalogue photo — ULLA/AAPO/KLAABU have only one size each so there is no family-image ambiguity; KLAAR W1/W1.2/W2 and RUUDI S/M/L each have their own distinct catalogue photo (verified against the source pages, not shared across configurations) |
 | Commercial use | **NEEDS CONFIRMATION** — same tier as Capra dealer-pack renders before the 2026-08-10 written-permission ruling. Treat as website-pending, not yet paid-ads/social eligible, until confirmed in writing the way the shared-drive grant was |
 | Notes | Capra's own disclaimer on every catalogue page: *"Images shown in this brochure are illustrative and may include optional features or custom configurations."* The AAPO photo shows the optional shower/sidewall configuration — captioned as optional on the product page, never presented as standard. |
+
+## Capra full-catalogue written permission (2026-08-11) — supersedes the "NEEDS CONFIRMATION" tier above for Capra-supplied files, except ULLA
+
+Andres Sokk (Capra) replied in writing, 2026-08-11, to Valentin's 2026-08-10
+written request (`CAPRA product image permission for BUXENA USA` thread).
+The request explicitly asked for confirmation covering "AAPO, ALLA H1, ELLA
+H1, ELLA H2, **and any other CAPRA models we list with your approval**" —
+i.e. the ask itself was catalogue-wide, not limited to four models. Andres's
+reply:
+
+> "BUXENA has full permission to use all CAPRA-supplied product images, 3D
+> renders, and catalogue materials for commercial marketing in the United
+> States/Canada — including buxena.com, social media, and paid ads. This
+> permission covers your launch lineup (AAPO, ALLA H1, ELLA H1, ELLA H2) and
+> any future models you add — **except sauna ULLA** what is covered by
+> exclusive rights to our other partner. [...] There are no usage
+> restrictions or model exclusions on these listed models."
+
+| Field | Value |
+|---|---|
+| Scope | Website, paid ads, AND social media (this closes the "ads/social NEEDS CONFIRMATION" gate that applied to every Capra-sourced group above) |
+| Territory | United States / Canada |
+| Covers | Every Capra-supplied product image/render/catalogue material currently on the site or added later — i.e. the §2a ELLA/ILLI/ALLA group, the §7 CAPRA dealer-pack renders, the "Capra 2026 general dealer catalogue" group below (AAPO/KLAABU/KLAAR/RUUDI), and the EKE/SUSI/EDA D2/ITI D4/UKU 130 family-image group below |
+| Explicitly excluded | **ULLA** — Capra does not hold the rights to grant this; a different partner has exclusive rights to that model. `bux-ulla-hero.jpg` (sourced from the same general dealer catalogue PDF, p.10-11) must be treated as **BLOCKED / REPLACE**, not approved — this is a downgrade from its prior "NEEDS CONFIRMATION" status now that the actual rights holder has been identified as someone else |
+| Does NOT cover | The §2a EDA/AURA/ITI hero files noted as "not traceable to the Capra drive" — this permission is for CAPRA-*supplied* material; an undocumented file doesn't retroactively become Capra-supplied because Capra later granted broad permission |
+
+**Net effect on statuses above:** every row in this document marked "NEEDS
+CONFIRMATION" that cites the Capra shared drive or the Capra dealer
+catalogue PDF as its source is now **APPROVED — website, paid ads, social,
+US/Canada**, with the single exception of `bux-ulla-hero.jpg`, which flips
+to **BLOCKED / REPLACE**. That includes the AAPO/KLAABU/KLAAR/RUUDI row and
+the EKE/SUSI/EDA D2/ITI D4/UKU 130 family-image row immediately below.
+
+**Action needed from the founders:** `bux-ulla-hero.jpg` should be pulled
+or replaced before it's relied on further — it's currently a live product
+photo sourced from Capra's catalogue for a model Capra has just confirmed,
+in writing, they don't have the right to license to us.
+
+**Founder decision, 2026-08-17 (Valentin):** flagged and left live for now
+— no change made to `bux-ulla-hero.jpg` at this time. This is a knowing,
+recorded exception, not an oversight; revisit before any paid-ads or social
+push that would feature ULLA specifically.
+
+---
 
 **EKE, SUSI, EDA D2, ITI D4, and UKU 130 — FAMILY image, superseding the
 placeholder-only decision above (2026-08-16, same day, later ruling).**

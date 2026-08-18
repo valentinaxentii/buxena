@@ -1,12 +1,19 @@
-import type { PDFPage } from 'pdf-lib';
+import type { PDFImage, PDFPage } from 'pdf-lib';
 import {
   PAGE_W, PAGE_H, MARGIN, FOOTER_CLEARANCE,
-  INK, SECONDARY, BRONZE, HAIRLINE,
+  INK, SECONDARY, BRONZE, HAIRLINE, WHITE, hex,
   wrapText,
-  createReportDoc, newReportPage, drawDocHeader, drawDocFooter, drawPageNumbers,
-  type ReportDocContext,
+  createReportDoc, newReportPage,
 } from './report-kit.ts';
-import { DOC_TYPE, DOC_LOGO } from '../doc-theme.ts';
+import { DOC_TYPE } from '../doc-theme.ts';
+
+const PAPER = hex('#F7F3EB');
+const PAPER_DEEP = hex('#EEE6D9');
+const PANEL = hex('#FBF8F2');
+const DARK = hex('#100F0D');
+const DARK_SOFT = hex('#24201C');
+const IVORY = hex('#F3E7D4');
+const GOLD = hex('#C18A32');
 
 /**
  * Customer quote PDF — migrated onto the shared document design (white paper,
@@ -42,6 +49,12 @@ export interface QuotePdfData {
     electrical_requirements: string | null;
     images: string[] | null;
   } | null;
+  visuals?: {
+    heaterInterior?: string | null;
+    ritual?: string | null;
+    siteReadiness?: string | null;
+    coldPlunge?: string | null;
+  };
   items: { description: string; quantity: number; unit_price: number; line_total: number }[];
   company: {
     name: string;
@@ -111,127 +124,231 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
     }
   }
 
-  let productImage: Awaited<ReturnType<typeof ctx.doc.embedPng>> | null = null;
-  const firstImageUrl = data.product?.images?.[0];
-  if (firstImageUrl) {
+  async function embedRemoteImage(url: string | null | undefined): Promise<PDFImage | null> {
+    if (!url) return null;
     try {
-      const res = await fetch(firstImageUrl);
+      const res = await fetch(url);
       if (res.ok) {
         const bytes = new Uint8Array(await res.arrayBuffer());
         const contentType = res.headers.get('content-type') ?? '';
-        productImage = contentType.includes('png') || firstImageUrl.toLowerCase().endsWith('.png')
+        return contentType.includes('png') || url.toLowerCase().endsWith('.png')
           ? await ctx.doc.embedPng(bytes)
           : await ctx.doc.embedJpg(bytes);
       }
     } catch {
-      productImage = null;
+      return null;
     }
+    return null;
   }
 
-  function sectionHeading(page: PDFPage, text: string, y: number): number {
-    page.drawText(text, { x: MARGIN, y, size: 11, font: serifBold, color: INK });
-    page.drawLine({ start: { x: MARGIN, y: y - 6 }, end: { x: PAGE_W - MARGIN, y: y - 6 }, thickness: 0.75, color: BRONZE });
-    return y - 24;
-  }
+  const [productImage, heaterInteriorImage, ritualImage, siteReadinessImage, coldPlungeImage] = await Promise.all([
+    embedRemoteImage(data.product?.images?.[0]),
+    embedRemoteImage(data.visuals?.heaterInterior),
+    embedRemoteImage(data.visuals?.ritual),
+    embedRemoteImage(data.visuals?.siteReadiness),
+    embedRemoteImage(data.visuals?.coldPlunge),
+  ]);
 
-  function labelValueRow(page: PDFPage, label: string, value: string, y: number): number {
-    page.drawText(label, { x: MARGIN, y, size: 9, font: bold, color: INK });
-    const lines = wrapText(value || '—', regular, 9.5, PAGE_W - MARGIN * 2 - 160);
-    lines.forEach((line, i) => {
-      page.drawText(line, { x: MARGIN + 160, y: y - i * 12, size: 9.5, font: regular, color: INK });
+  function drawContainedImage(page: PDFPage, image: PDFImage, x: number, y: number, width: number, height: number): void {
+    const scale = Math.min(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    page.drawImage(image, {
+      x: x + (width - drawWidth) / 2,
+      y: y + (height - drawHeight) / 2,
+      width: drawWidth,
+      height: drawHeight,
     });
-    return y - Math.max(1, lines.length) * 12 - 8;
   }
 
-  // ---------------------------------------------------------------- Cover
-  {
+  function newProposalPage(): PDFPage {
     const page = newReportPage(ctx);
-    const logoDims = ctx.logo.scale(150 / ctx.logo.width);
+    page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: PAPER });
+    return page;
+  }
+
+  function drawBrandBand(page: PDFPage, rightLabel: string): number {
+    const bandHeight = 102;
+    const bandBottom = PAGE_H - bandHeight;
+    page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: bandHeight, color: DARK });
+
+    const logoDims = ctx.logo.scale(128 / ctx.logo.width);
     page.drawImage(ctx.logo, {
-      x: (PAGE_W - logoDims.width) / 2,
-      y: PAGE_H - MARGIN - logoDims.height,
+      x: MARGIN,
+      y: bandBottom + (bandHeight - logoDims.height) / 2,
       width: logoDims.width,
       height: logoDims.height,
     });
 
-    const title = 'PRIVATE SAUNA PROPOSAL';
-    const titleSize = 22;
-    const titleWidth = serifBold.widthOfTextAtSize(title, titleSize);
-    page.drawText(title, { x: (PAGE_W - titleWidth) / 2, y: PAGE_H - MARGIN - logoDims.height - 46, size: titleSize, font: serifBold, color: INK });
-
-    if (productImage) {
-      const maxW = PAGE_W - MARGIN * 2;
-      const maxH = 290;
-      const scale = Math.min(maxW / productImage.width, maxH / productImage.height);
-      const w = productImage.width * scale;
-      const h = productImage.height * scale;
-      page.drawImage(productImage, { x: (PAGE_W - w) / 2, y: PAGE_H - 320 - h, width: w, height: h });
-    }
-
-    const infoY = productImage ? 250 : 420;
-    const rows: [string, string][] = [
-      ['PREPARED FOR', data.customer?.name ?? '—'],
-      ['QUOTE NUMBER', data.quote.quote_number ?? '—'],
-      ['DATE', data.quote.quote_date ?? '—'],
-      ['SAUNA MODEL', data.product?.model_name ?? '—'],
-    ];
-    let y = infoY;
-    for (const [label, value] of rows) {
-      const labelWidth = bold.widthOfTextAtSize(label, 8);
-      page.drawText(label, { x: (PAGE_W - labelWidth) / 2, y, size: 8, font: bold, color: SECONDARY });
-      const valueWidth = regular.widthOfTextAtSize(value, 13);
-      page.drawText(value, { x: (PAGE_W - valueWidth) / 2, y: y - 16, size: 13, font: regular, color: INK });
-      y -= 48;
-    }
-
-    const tagline = data.company.tagline;
-    const taglineWidth = serifItalic.widthOfTextAtSize(tagline, 13);
-    page.drawText(tagline, { x: (PAGE_W - taglineWidth) / 2, y: FOOTER_CLEARANCE + 14, size: 13, font: serifItalic, color: BRONZE });
-    drawDocFooter(ctx, page);
+    const label = rightLabel.toUpperCase();
+    const labelSize = 7.5;
+    page.drawText(label, {
+      x: PAGE_W - MARGIN - bold.widthOfTextAtSize(label, labelSize),
+      y: bandBottom + bandHeight / 2 - 2,
+      size: labelSize,
+      font: bold,
+      color: IVORY,
+    });
+    return bandBottom - 30;
   }
 
-  // ------------------------------------------------- Page 2 — Selected Sauna
-  {
-    const page = newReportPage(ctx);
-    let y = drawDocHeader(ctx, page, 'The Selected Sauna', []);
+  function drawProposalFooter(page: PDFPage): void {
+    const ruleY = MARGIN + 26;
+    page.drawLine({ start: { x: MARGIN, y: ruleY }, end: { x: PAGE_W - MARGIN, y: ruleY }, thickness: 0.8, color: BRONZE });
+    const contact = [data.company.email, data.company.website].filter(Boolean).join('  ·  ');
+    page.drawText(contact, { x: MARGIN, y: ruleY - 16, size: 7.2, font: regular, color: SECONDARY });
+    const documentLabel = 'BUXENA customer proposal';
+    page.drawText(documentLabel, {
+      x: PAGE_W - MARGIN - regular.widthOfTextAtSize(documentLabel, 7.2),
+      y: ruleY - 16,
+      size: 7.2,
+      font: regular,
+      color: SECONDARY,
+    });
+  }
 
-    if (productImage) {
-      const maxW = PAGE_W - MARGIN * 2;
-      const maxH = 200;
-      const scale = Math.min(maxW / productImage.width, maxH / productImage.height);
-      const w = productImage.width * scale;
-      const h = productImage.height * scale;
-      page.drawImage(productImage, { x: (PAGE_W - w) / 2, y: y - h, width: w, height: h });
-      y -= h + 24;
+  function drawProposalPageNumbers(): void {
+    const pages = ctx.doc.getPages();
+    pages.forEach((page, index) => {
+      const label = `Page ${index + 1} of ${pages.length}`;
+      const size = 7.2;
+      page.drawText(label, {
+        x: (PAGE_W - regular.widthOfTextAtSize(label, size)) / 2,
+        y: MARGIN - 10,
+        size,
+        font: regular,
+        color: SECONDARY,
+      });
+    });
+  }
+
+  function sectionHeading(page: PDFPage, section: string, text: string, y: number): number {
+    page.drawLine({ start: { x: MARGIN, y: y + 10 }, end: { x: MARGIN + 28, y: y + 10 }, thickness: 0.8, color: BRONZE });
+    page.drawText(section, { x: MARGIN, y: y - 5, size: 8, font: serifItalic, color: BRONZE });
+    page.drawText(text, { x: MARGIN + 42, y, size: 21, font: serifBold, color: DARK_SOFT });
+    return y - 34;
+  }
+
+  function subsectionHeading(page: PDFPage, text: string, y: number): number {
+    page.drawText(text.toUpperCase(), { x: MARGIN, y, size: 7.5, font: bold, color: BRONZE });
+    page.drawLine({ start: { x: MARGIN, y: y - 7 }, end: { x: PAGE_W - MARGIN, y: y - 7 }, thickness: 0.65, color: BRONZE });
+    return y - 25;
+  }
+
+  function labelValueRow(page: PDFPage, label: string, value: string, y: number): number {
+    page.drawText(label.toUpperCase(), { x: MARGIN, y, size: 7.2, font: bold, color: BRONZE });
+    const lines = wrapText(value || '-', regular, 9.5, PAGE_W - MARGIN * 2 - 150);
+    lines.forEach((line, i) => {
+      page.drawText(line, { x: MARGIN + 150, y: y - i * 12, size: 9.5, font: regular, color: DARK_SOFT });
+    });
+    const nextY = y - Math.max(1, lines.length) * 12 - 9;
+    page.drawLine({ start: { x: MARGIN, y: nextY + 5 }, end: { x: PAGE_W - MARGIN, y: nextY + 5 }, thickness: 0.45, color: HAIRLINE });
+    return nextY;
+  }
+
+  // ---------------------------------------------------------------- Cover
+  {
+    const page = newProposalPage();
+    let y = drawBrandBand(page, `Prepared for ${data.customer?.name ?? 'you'}`);
+
+    const leftW = 315;
+    const metaX = MARGIN + 350;
+    const metaW = PAGE_W - MARGIN - metaX;
+
+    const title = `${data.product?.model_name ?? 'Complete Sauna'} Proposal`;
+    const titleLines = wrapText(title, serifBold, 34, leftW);
+    titleLines.forEach((line, index) => {
+      page.drawText(line, { x: MARGIN, y: y - index * 37, size: 34, font: serifBold, color: DARK_SOFT });
+    });
+    y -= titleLines.length * 37 + 4;
+
+    const intro = 'Complete project scope, equipment, delivered investment, site requirements and next steps - organized in one clear document.';
+    const introLines = wrapText(intro, regular, 10.5, leftW);
+    introLines.forEach((line, index) => {
+      page.drawText(line, { x: MARGIN, y: y - index * 15, size: 10.5, font: regular, color: SECONDARY });
+    });
+
+    const metadata: [string, string][] = [
+      ['PROPOSAL', data.quote.quote_number ?? '-'],
+      ['PREPARED', data.quote.quote_date ?? '-'],
+      ['VALID UNTIL', data.quote.expiry_date ?? '-'],
+    ];
+    let metaY = 646;
+    for (const [label, value] of metadata) {
+      page.drawLine({ start: { x: metaX, y: metaY + 10 }, end: { x: metaX + metaW, y: metaY + 10 }, thickness: 0.5, color: BRONZE });
+      page.drawText(label, { x: metaX, y: metaY - 5, size: 6.8, font: bold, color: BRONZE });
+      page.drawText(value, {
+        x: metaX + metaW - regular.widthOfTextAtSize(value, 8.8),
+        y: metaY - 5,
+        size: 8.8,
+        font: regular,
+        color: DARK_SOFT,
+      });
+      metaY -= 34;
     }
 
-    page.drawText(data.product?.model_name ?? '—', { x: MARGIN, y, size: 14, font: serifBold, color: INK });
-    y -= 28;
+    const validityY = 486;
+    page.drawRectangle({ x: MARGIN, y: validityY, width: PAGE_W - MARGIN * 2, height: 34, color: PANEL });
+    page.drawRectangle({ x: MARGIN, y: validityY, width: 2, height: 34, color: BRONZE });
+    page.drawText('Pricing and scope are held through the validity date above.', {
+      x: MARGIN + 13, y: validityY + 12, size: 8.8, font: bold, color: DARK_SOFT,
+    });
+
+    y = sectionHeading(page, '01', 'See your sauna configuration', 446);
+    const cardTop = y - 2;
+    const cardBottom = FOOTER_CLEARANCE + 13;
+    const cardHeight = cardTop - cardBottom;
+    const splitX = MARGIN + 302;
+    page.drawRectangle({ x: MARGIN, y: cardBottom, width: PAGE_W - MARGIN * 2, height: cardHeight, color: PANEL, borderColor: BRONZE, borderWidth: 0.6 });
+    page.drawRectangle({ x: splitX, y: cardBottom, width: PAGE_W - MARGIN - splitX, height: cardHeight, color: PAPER_DEEP });
+    page.drawLine({ start: { x: splitX, y: cardBottom }, end: { x: splitX, y: cardTop }, thickness: 0.5, color: BRONZE });
+
+    page.drawRectangle({ x: MARGIN + 12, y: cardTop - 32, width: 104, height: 20, color: DARK_SOFT });
+    page.drawText('YOUR SELECTED MODEL', { x: MARGIN + 20, y: cardTop - 25, size: 6.6, font: bold, color: WHITE });
+
+    if (productImage) {
+      const maxW = splitX - MARGIN - 42;
+      const maxH = cardHeight - 68;
+      const scale = Math.min(maxW / productImage.width, maxH / productImage.height);
+      const width = productImage.width * scale;
+      const height = productImage.height * scale;
+      page.drawImage(productImage, {
+        x: MARGIN + (splitX - MARGIN - width) / 2,
+        y: cardBottom + 18,
+        width,
+        height,
+      });
+    }
+
+    const detailX = splitX + 24;
+    page.drawText('PROJECT DETAILS', { x: detailX, y: cardTop - 72, size: 7, font: bold, color: BRONZE });
 
     const dims = data.product?.dimensions;
     const dimsText = dims && (dims.width || dims.depth || dims.height)
-      ? `${dims.width ?? '—'} × ${dims.depth ?? '—'} × ${dims.height ?? '—'} ${dims.unit ?? ''}`.trim()
-      : '—';
-
-    const specs: [string, string][] = [
-      ['Category', data.product?.category ?? '—'],
-      ['Dimensions', dimsText],
-      ['Capacity', data.product?.capacity ?? '—'],
-      ['Timber / Material', data.product?.timber_type ?? '—'],
-      ['Glass Configuration', data.product?.glass_configuration ?? '—'],
-      ['Heater', data.quote.heater || data.product?.heater_options?.join(', ') || '—'],
-      ['Electrical Requirements', data.product?.electrical_requirements ?? '—'],
+      ? `${dims.width ?? '-'} x ${dims.depth ?? '-'} x ${dims.height ?? '-'} ${dims.unit ?? ''}`.trim()
+      : '-';
+    const coverFacts: [string, string][] = [
+      ['CATEGORY', data.product?.category ?? '-'],
+      ['CAPACITY', data.product?.capacity ?? '-'],
+      ['DIMENSIONS', dimsText],
+      ['MATERIAL', data.product?.timber_type ?? '-'],
     ];
-    for (const [label, value] of specs) {
-      y = labelValueRow(page, label, value, y);
+    let factY = cardTop - 108;
+    for (const [label, value] of coverFacts) {
+      page.drawText(label, { x: detailX, y: factY, size: 6.5, font: bold, color: BRONZE });
+      const valueLines = wrapText(value, regular, 8.3, PAGE_W - MARGIN - detailX - 10);
+      valueLines.forEach((line, index) => page.drawText(line, { x: detailX, y: factY - 12 - index * 11, size: 8.3, font: regular, color: DARK_SOFT }));
+      factY -= 29 + Math.max(0, valueLines.length - 1) * 11;
     }
-    drawDocFooter(ctx, page);
+
+    drawProposalFooter(page);
   }
 
-  // ------------------------------------------------- Page 3 — Configuration
+  // ------------------------------------------------- Page 2 — Configuration
   {
-    const page = newReportPage(ctx);
-    let y = drawDocHeader(ctx, page, 'Your Configuration', []);
+    const page = newProposalPage();
+    let y = drawBrandBand(page, `Customer proposal · ${data.quote.quote_number ?? ''}`);
+    y = sectionHeading(page, '02', 'Your configuration', y);
 
     let accessoriesText = 'None selected';
     if (Array.isArray(data.quote.accessories) && data.quote.accessories.length) {
@@ -241,23 +358,69 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
       if (vals.length) accessoriesText = vals.map((v) => String(v)).join(', ');
     }
 
+    const controlItem = data.items.find((item) => /control/i.test(item.description))?.description ?? 'As itemized in this proposal';
+    const panelHeight = 156;
+    const panelBottom = y - panelHeight;
+    page.drawRectangle({ x: MARGIN, y: panelBottom, width: PAGE_W - MARGIN * 2, height: panelHeight, color: DARK_SOFT });
+    page.drawText('SELECTED HEATING SYSTEM', { x: MARGIN + 20, y: y - 26, size: 7, font: bold, color: GOLD });
+    const heaterLines = wrapText(data.quote.heater || 'Heater selection confirmed with your proposal', serifBold, 19, PAGE_W - MARGIN * 2 - 40);
+    heaterLines.slice(0, 2).forEach((line, index) => {
+      page.drawText(line, { x: MARGIN + 20, y: y - 54 - index * 22, size: 19, font: serifBold, color: IVORY });
+    });
+
+    const specColumns: [string, string][] = [
+      ['CONTROLS', controlItem],
+      ['INCLUDED ACCESSORIES', accessoriesText],
+    ];
+    const columnWidth = (PAGE_W - MARGIN * 2 - 40) / 2;
+    specColumns.forEach(([label, value], index) => {
+      const x = MARGIN + 20 + index * columnWidth;
+      page.drawText(label, { x, y: panelBottom + 47, size: 6.5, font: bold, color: GOLD });
+      const valueLines = wrapText(value, regular, 7.8, columnWidth - 13);
+      valueLines.slice(0, 3).forEach((line, lineIndex) => {
+        page.drawText(line, { x, y: panelBottom + 31 - lineIndex * 10, size: 7.8, font: regular, color: IVORY });
+      });
+    });
+
+    y = panelBottom - 30;
     const rows: [string, string][] = [
-      ['Sauna', data.product?.model_name ?? '—'],
-      ['Heater', data.quote.heater || '—'],
-      ['Accessories', accessoriesText],
-      ['Delivery', Number(data.quote.delivery_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal — confirm before order'],
-      ['Installation', Number(data.quote.installation_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal — confirm before order'],
+      ['Glass configuration', data.product?.glass_configuration ?? '-'],
+      ['Electrical requirements', data.product?.electrical_requirements ?? '-'],
+      ['Delivery', Number(data.quote.delivery_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal - confirm before order'],
+      ['Installation', Number(data.quote.installation_cost) > 0 ? 'Priced in this proposal' : 'Not priced in this proposal - confirm before order'],
     ];
     for (const [label, value] of rows) {
       y = labelValueRow(page, label, value, y);
     }
-    drawDocFooter(ctx, page);
+
+    if (heaterInteriorImage) {
+      const cardX = MARGIN;
+      const cardY = FOOTER_CLEARANCE + 44;
+      const cardW = PAGE_W - MARGIN * 2;
+      const cardH = 218;
+      const imageW = 185;
+      page.drawRectangle({ x: cardX, y: cardY, width: cardW, height: cardH, color: PAPER_DEEP });
+      drawContainedImage(page, heaterInteriorImage, cardX, cardY, imageW, cardH);
+      const copyX = cardX + imageW + 24;
+      page.drawText('REPRESENTATIVE INTERIOR', { x: copyX, y: cardY + 174, size: 7, font: bold, color: BRONZE });
+      page.drawText('Warmth, control and comfort', { x: copyX, y: cardY + 143, size: 17, font: serifBold, color: DARK_SOFT });
+      const copy = 'A considered interior helps the selected heater, controls and material work together as one calm sauna environment.';
+      wrapText(copy, regular, 9, cardW - imageW - 48).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 114 - index * 13, size: 9, font: regular, color: DARK_SOFT });
+      });
+      const caption = 'Atmosphere image. Exact equipment is defined in the selected-system panel above.';
+      wrapText(caption, regular, 7.5, cardW - imageW - 48).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 45 - index * 10, size: 7.5, font: regular, color: SECONDARY });
+      });
+    }
+    drawProposalFooter(page);
   }
 
-  // ------------------------------------------------- Page 4 — Investment
+  // ------------------------------------------------- Page 3 — Investment
   {
-    const page = newReportPage(ctx);
-    let y = drawDocHeader(ctx, page, 'Investment', []);
+    const page = newProposalPage();
+    let y = drawBrandBand(page, `Customer proposal · ${data.quote.quote_number ?? ''}`);
+    y = sectionHeading(page, '03', 'Delivered investment', y);
 
     // shared table treatment: bold 7pt headers, 2pt black rule, #ddd dividers,
     // last column flush to the right margin
@@ -290,12 +453,21 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
     }
 
     y -= 14;
+    const taxAmount = Math.max(
+      0,
+      (Number(data.quote.total) || 0)
+        - (Number(data.quote.subtotal) || 0)
+        - (Number(data.quote.delivery_cost) || 0)
+        - (Number(data.quote.installation_cost) || 0)
+        + (Number(data.quote.discount) || 0)
+    );
+    const taxRate = Number(data.quote.tax_rate) || 0;
     const totals: [string, string][] = [
       ['Subtotal', money(data.quote.subtotal)],
       ['Delivery', money(data.quote.delivery_cost)],
       ['Installation', money(data.quote.installation_cost)],
       ['Discount', `-${money(data.quote.discount)}`],
-      ['Tax', `${Number(data.quote.tax_rate) || 0}%`],
+      [`Sales tax (${taxRate}%)`, money(taxAmount)],
     ];
     for (const [label, value] of totals) {
       page.drawText(label, { x: colPrice - 60, y, size: 9.5, font: regular, color: INK });
@@ -310,15 +482,34 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
     const totalVal = money(data.quote.total);
     page.drawText(totalVal, { x: colTotalRight - bold.widthOfTextAtSize(totalVal, 11), y, size: 11, font: bold, color: INK });
 
-    drawDocFooter(ctx, page);
+    if (ritualImage) {
+      const cardX = MARGIN;
+      const cardY = FOOTER_CLEARANCE + 44;
+      const cardW = PAGE_W - MARGIN * 2;
+      const cardH = 172;
+      const imageW = 300;
+      page.drawRectangle({ x: cardX, y: cardY, width: cardW, height: cardH, color: DARK_SOFT });
+      drawContainedImage(page, ritualImage, cardX, cardY, imageW, cardH);
+      const copyX = cardX + imageW + 22;
+      page.drawText('THE EXPERIENCE', { x: copyX, y: cardY + 129, size: 7, font: bold, color: GOLD });
+      page.drawText('Beyond the numbers', { x: copyX, y: cardY + 101, size: 16, font: serifBold, color: IVORY });
+      const copy = 'A complete proposal brings the equipment, delivery and final sauna ritual into one clear investment.';
+      wrapText(copy, regular, 8.5, cardW - imageW - 44).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 75 - index * 12, size: 8.5, font: regular, color: IVORY });
+      });
+      page.drawText('Accessories are included only when itemized above.', { x: copyX, y: cardY + 23, size: 7.2, font: regular, color: GOLD });
+    }
+
+    drawProposalFooter(page);
   }
 
-  // -------------------------------------- Page 5 — Delivery & Installation
+  // -------------------------------------- Page 4 — Delivery & Installation
   {
-    const page = newReportPage(ctx);
-    let y = drawDocHeader(ctx, page, 'Delivery & Installation', []);
+    const page = newProposalPage();
+    let y = drawBrandBand(page, `Customer proposal · ${data.quote.quote_number ?? ''}`);
+    y = sectionHeading(page, '04', 'Delivery & site readiness', y);
 
-    y = sectionHeading(page, 'Estimated Process', y);
+    y = subsectionHeading(page, 'Estimated Process', y);
     for (const note of TIMELINE_NOTES) {
       for (const line of wrapText(`• ${note}`, regular, 9.5, PAGE_W - MARGIN * 2)) {
         page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
@@ -328,7 +519,7 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
     }
 
     y -= 16;
-    y = sectionHeading(page, 'Site Readiness', y);
+    y = subsectionHeading(page, 'Site Readiness', y);
     for (const note of SITE_READINESS_NOTES) {
       for (const line of wrapText(`• ${note}`, regular, 9.5, PAGE_W - MARGIN * 2)) {
         page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
@@ -336,64 +527,85 @@ export async function buildQuotePdf(data: QuotePdfData): Promise<Uint8Array> {
       }
       y -= 2;
     }
-    drawDocFooter(ctx, page);
+
+    if (siteReadinessImage) {
+      const cardX = MARGIN;
+      const cardY = FOOTER_CLEARANCE + 44;
+      const cardW = PAGE_W - MARGIN * 2;
+      const cardH = 176;
+      const imageW = 320;
+      page.drawRectangle({ x: cardX, y: cardY, width: cardW, height: cardH, color: PANEL });
+      drawContainedImage(page, siteReadinessImage, cardX, cardY, imageW, cardH);
+      const copyX = cardX + imageW + 21;
+      page.drawText('SPACE & LIGHT', { x: copyX, y: cardY + 132, size: 7, font: bold, color: BRONZE });
+      page.drawText('Plan the setting', { x: copyX, y: cardY + 103, size: 16, font: serifBold, color: DARK_SOFT });
+      page.drawText('Concept image for spatial inspiration.', { x: copyX, y: cardY + 67, size: 7.2, font: regular, color: SECONDARY });
+    }
+    drawProposalFooter(page);
   }
 
-  // ------------------------------------------- Page 6 — Warranty / Terms
+  // ------------------------------------------- Page 5 — Warranty / Terms
   {
-    const page = newReportPage(ctx);
-    let y = drawDocHeader(ctx, page, 'Warranty & Terms', []);
+    const page = newProposalPage();
+    let y = drawBrandBand(page, `Customer proposal · ${data.quote.quote_number ?? ''}`);
+    y = sectionHeading(page, '05', 'Warranty & next steps', y);
 
-    y = sectionHeading(page, 'Warranty', y);
+    y = subsectionHeading(page, 'Warranty', y);
     for (const line of wrapText(warrantySummary(data.company.name), regular, 9.5, PAGE_W - MARGIN * 2)) {
       page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
       y -= 14;
     }
 
     y -= 16;
-    y = sectionHeading(page, 'Quote Validity', y);
-    page.drawText(`This proposal is valid until ${data.quote.expiry_date ?? `the date noted by your ${data.company.name} representative`}.`, {
-      x: MARGIN, y, size: 9.5, font: regular, color: INK,
-    });
-    y -= 28;
-
-    y = sectionHeading(page, 'Payment Terms', y);
+    y = subsectionHeading(page, 'Payment Terms', y);
     for (const line of wrapText(paymentTerms(data.company.name), regular, 9.5, PAGE_W - MARGIN * 2)) {
       page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
       y -= 14;
     }
 
     y -= 16;
-    y = sectionHeading(page, 'Before You Proceed', y);
-    const decisionNote = 'Review the itemized configuration, site requirements and expiry date with your BUXENA representative. The order is confirmed only after both sides agree the final specifications, availability and order agreement.';
+    y = subsectionHeading(page, 'Before You Proceed', y);
+    const decisionNote = 'Confirm the final specifications, availability and order agreement with your BUXENA representative before payment.';
     for (const line of wrapText(decisionNote, regular, 9.5, PAGE_W - MARGIN * 2)) {
       page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
       y -= 14;
     }
 
     y -= 16;
-    y = sectionHeading(page, 'Notes & Exclusions', y);
+    y = subsectionHeading(page, 'Notes & Exclusions', y);
     for (const line of wrapText(EXCLUSIONS_NOTE, regular, 9.5, PAGE_W - MARGIN * 2)) {
       page.drawText(line, { x: MARGIN, y, size: 9.5, font: regular, color: INK });
       y -= 14;
     }
 
-    // closing block — structure kept: small logo, italic tagline, contact line
-    y = Math.max(y - 46, FOOTER_CLEARANCE + 66);
-    const logoDims = ctx.logo.scale(90 / ctx.logo.width);
-    page.drawImage(ctx.logo, { x: (PAGE_W - logoDims.width) / 2, y, width: logoDims.width, height: logoDims.height });
-    y -= 16;
-    const closingTagline = data.company.tagline;
-    const closingWidth = serifItalic.widthOfTextAtSize(closingTagline, 11);
-    page.drawText(closingTagline, { x: (PAGE_W - closingWidth) / 2, y, size: 11, font: serifItalic, color: BRONZE });
-    y -= 15;
-    const contact = [data.company.email, data.company.website].filter(Boolean).join('  ·  ');
-    const contactWidth = regular.widthOfTextAtSize(contact, 8.5);
-    page.drawText(contact, { x: (PAGE_W - contactWidth) / 2, y, size: 8.5, font: regular, color: SECONDARY });
+    if (coldPlungeImage) {
+      const cardX = MARGIN;
+      const cardY = FOOTER_CLEARANCE + 44;
+      const cardW = PAGE_W - MARGIN * 2;
+      const cardH = 172;
+      const imageW = 300;
+      page.drawRectangle({ x: cardX, y: cardY, width: cardW, height: cardH, color: DARK_SOFT });
+      drawContainedImage(page, coldPlungeImage, cardX, cardY, imageW, cardH);
+      const copyX = cardX + imageW + 22;
+      const copyW = cardW - imageW - 44;
+      page.drawText('OPTIONAL WELLNESS ADD-ON', { x: copyX, y: cardY + 129, size: 7, font: bold, color: GOLD });
+      const titleLines = wrapText('Complete the contrast ritual', serifBold, 16, copyW);
+      titleLines.slice(0, 2).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 101 - index * 18, size: 16, font: serifBold, color: IVORY });
+      });
+      const copy = 'A cold plunge adds a dedicated cool-down step beside the sauna.';
+      wrapText(copy, regular, 8.5, copyW).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 58 - index * 12, size: 8.5, font: regular, color: IVORY });
+      });
+      const caption = 'Concept image. Not included unless separately itemized.';
+      wrapText(caption, regular, 7.2, copyW).forEach((line, index) => {
+        page.drawText(line, { x: copyX, y: cardY + 23 - index * 9, size: 7.2, font: regular, color: GOLD });
+      });
+    }
 
-    drawDocFooter(ctx, page);
+    drawProposalFooter(page);
   }
 
-  drawPageNumbers(ctx);
+  drawProposalPageNumbers();
   return ctx.doc.save();
 }

@@ -15,7 +15,7 @@ capacityMin: 2
 capacityMax: 2
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/aura-thermowood-1-3m-hero.jpeg"
+  src: "/images/saunas-normalized/aura-thermowood-1-3m-transparent.png"
   alt: "AURA Thermowood 1.3m barrel sauna exterior, glass door and shingled roof"
 dimensions:
   - { label: "Length", value: "4.3 ft (130 cm)" }

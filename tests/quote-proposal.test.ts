@@ -57,14 +57,57 @@ test('no internal field survives the projection', () => {
 });
 
 test('the customer-visible figures DO survive', () => {
-  const p = toCustomerProposal(quoteRow, itemRows, { customerName: 'Jane Doe' });
+  const p = toCustomerProposal(
+    { ...quoteRow, delivery_cost: 500, installation_cost: 250, tax_rate: 6.35, total: 10401.25 },
+    itemRows,
+    {
+      customerName: 'Jane Doe',
+      product: {
+        dimensions: { width: 80, depth: 92, height: 84, unit: 'in' },
+        capacity: '4–6 people',
+        electrical_requirements: '240V, 40A',
+        warranty_duration_months: 24,
+        warranty_document_url: 'https://example.com/warranty.pdf',
+      },
+      inventory: [{ available: 2, incoming: 1, eta: '2026-09-15' }],
+    },
+  );
   assert.equal(p.customerName, 'Jane Doe');
   assert.equal(p.quoteNumber, 'Q-TEST1');
   assert.equal(p.subtotal, 10000);
   assert.equal(p.discount, 500);
-  assert.equal(p.total, 9500);
+  assert.equal(p.deliveryCost, 500);
+  assert.equal(p.installationCost, 250);
+  assert.equal(p.netBeforeTax, 10250);
+  assert.equal(p.taxRate, 6.35);
+  assert.equal(p.taxAmount, 151.25);
+  assert.equal(p.total, 10401.25);
   assert.equal(p.items.length, 2);
   assert.equal(p.customerNotes, 'Bench upgrade included as discussed.');
+  assert.deepEqual(p.product.dimensions, [
+    { label: 'Width', value: '80 in' },
+    { label: 'Depth', value: '92 in' },
+    { label: 'Height', value: '84 in' },
+  ]);
+  assert.equal(p.product.capacity, '4–6 people');
+  assert.equal(p.product.electricalRequirements, '240V, 40A');
+  assert.equal(p.product.warrantyMonths, 24);
+  assert.equal(p.availability?.availableUnits, 2);
+  assert.equal(p.availability?.incomingUnits, 1);
+  assert.equal(p.availability?.eta, '2026-09-15');
+});
+
+test('unsafe document URLs never reach the customer', () => {
+  const p = toCustomerProposal(quoteRow, itemRows, {
+    product: {
+      brochure_url: 'javascript:alert(1)',
+      installation_manual_url: '/documents/install.pdf',
+      warranty_document_url: 'https://example.com/warranty.pdf',
+    },
+  });
+  assert.equal(p.product.brochureUrl, null);
+  assert.equal(p.product.installationManualUrl, '/documents/install.pdf');
+  assert.equal(p.product.warrantyDocumentUrl, 'https://example.com/warranty.pdf');
 });
 
 test('a line with an unknown kind is shown, not silently dropped', () => {

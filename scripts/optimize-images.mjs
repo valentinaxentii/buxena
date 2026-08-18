@@ -21,7 +21,7 @@
  * from its meta tag; it must stay a plain JPG and needs no variants.
  */
 import sharp from 'sharp';
-import { readdirSync, statSync, mkdirSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOTS = ['public/images', 'public/media'];
@@ -41,7 +41,7 @@ const walk = (dir) => {
 };
 ROOTS.forEach(walk);
 
-let made = 0, skipped = 0, srcBytes = 0, outBytes = 0;
+let made = 0, skipped = 0, pruned = 0, srcBytes = 0, outBytes = 0;
 for (const file of files) {
   const meta = await sharp(file).metadata();
   const rel = path.relative('public', file);
@@ -61,6 +61,23 @@ for (const file of files) {
   if (widths.length === 0) widths = [WIDTHS[0]];
   else if (srcW > widths[widths.length - 1] && srcW < WIDTHS[WIDTHS.length - 1]) widths.push(srcW);
 
+  // If a source image is replaced with a different native width, an old
+  // native-width variant can remain beside the new 480/960/1600 files. The
+  // browser may then select that obsolete image from srcset (for example an
+  // old 879px AAPO render), even though every current tier was regenerated.
+  // Remove only variants belonging to this exact source basename whose width
+  // is no longer part of the current output set.
+  const outDir = path.join(OUT_ROOT, path.dirname(relNoExt));
+  const outBase = path.basename(relNoExt);
+  if (existsSync(outDir)) {
+    for (const name of readdirSync(outDir)) {
+      const match = name.match(new RegExp(`^${outBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d{3,4})\\.webp$`));
+      if (!match || widths.includes(Number(match[1]))) continue;
+      unlinkSync(path.join(outDir, name));
+      pruned++;
+    }
+  }
+
   for (const w of widths) {
     const out = path.join(OUT_ROOT, `${relNoExt}-${w}.webp`);
     if (existsSync(out) && statSync(out).mtimeMs >= statSync(file).mtimeMs) {
@@ -76,4 +93,4 @@ for (const file of files) {
 }
 
 console.log(`sources:  ${files.length} images, ${(srcBytes / 1048576).toFixed(1)} MB`);
-console.log(`variants: ${made} written, ${skipped} already current, ${(outBytes / 1048576).toFixed(1)} MB total`);
+console.log(`variants: ${made} written, ${skipped} already current, ${pruned} obsolete removed, ${(outBytes / 1048576).toFixed(1)} MB total`);

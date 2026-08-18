@@ -16,7 +16,7 @@ heroImage:
   # p.12-13) — KLAAR W1/W1.2/W2 are three distinct configurations, each with
   # its own catalogue photo. This is the KLAAR W2 photo specifically,
   # not shared with the other two configurations.
-  src: "/images/saunas/bux-klaar-w2-hero.jpg"
+  src: "/images/saunas-normalized/bux-klaar-w2-transparent.png"
   alt: "BUX KLAAR W2 outdoor cube sauna, with dressing room"
 dimensions:
   - { label: "Depth", value: "7.5 ft (230 cm)" }

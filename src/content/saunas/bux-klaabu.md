@@ -12,7 +12,7 @@ materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
   # EXACT PHOTOGRAPH. Cropped from Capra's 2026 Catalogue (Andres Sokk,
   # p.18-19) — KLAABU has only one size, so this is the model's own photo.
-  src: "/images/saunas/bux-klaabu-hero.jpg"
+  src: "/images/saunas-normalized/bux-klaabu-transparent.png"
   alt: "BUX KLAABU outdoor oval sauna, glass door and shingled roof"
 dimensions:
   - { label: "Width", value: "6.8 ft (208 cm)" }

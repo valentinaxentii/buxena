@@ -13,7 +13,7 @@ capacityMin: 4
 capacityMax: 4
 materials: ["Burnt wood", "Thermo aspen"]
 heroImage:
-  src: "/images/saunas/nord-cube-200-hero.jpg"
+  src: "/images/saunas-normalized/nord-cube-200-transparent.png"
   alt: "NORD Cube 200 outdoor sauna with charred timber cladding and full-glass front, glowing at dusk in a Nordic landscape"
 gallery:
   - src: "/images/saunas/nord-cube-200-interior.jpg"

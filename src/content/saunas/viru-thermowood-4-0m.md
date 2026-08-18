@@ -13,7 +13,7 @@ capacityMin: 8
 capacityMax: 8
 materials: ["Thermowood"]
 heroImage:
-  src: "/images/saunas/viru-thermowood-4-0m-hero.jpg"
+  src: "/images/saunas-normalized/viru-thermowood-4-0m-transparent.png"
   alt: "VIRU 4.0m barrel sauna with entrance door and side windows, smoke rising from the chimney"
 dimensions:
   - { label: "Length", value: "13.1 ft (400 cm)" }

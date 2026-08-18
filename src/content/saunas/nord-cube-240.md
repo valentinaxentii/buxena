@@ -13,7 +13,7 @@ capacityMin: 5
 capacityMax: 5
 materials: ["Burnt wood", "Thermo aspen"]
 heroImage:
-  src: "/images/saunas/nord-cube-240-hero.jpg"
+  src: "/images/saunas-normalized/nord-cube-240-transparent.png"
   alt: "NORD Cube 240 outdoor sauna with mirror-glass front reflecting a mossy Nordic landscape"
 gallery:
   - src: "/images/saunas/nord-cube-240-interior.jpg"

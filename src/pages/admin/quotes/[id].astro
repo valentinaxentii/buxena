@@ -11,17 +11,27 @@ import RecordActions from '../../../components/admin/RecordActions.astro';
 import { handleRecordAction, recordActionState } from '../../../lib/record-actions';
 import { approvedQuoteFloor, belowApprovedFloor, quoteNetBeforeTax } from '../../../lib/quote-margin-guard';
 import { generateShareToken } from '../../../lib/quote-proposal';
+import { proposalSendReadiness, statusAfterProposalSent } from '../../../lib/proposal-workflow';
+import { sendProposalEmail } from '../../../lib/proposal-email';
+import { isLeadSafeMode } from '../../../lib/safe-mode';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
 const canDelete = await isAdminStaff(Astro);
 
 const { id } = Astro.params;
-const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
+const STATUSES = ['Draft', 'Ready', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired', 'Converted'];
+const ITEM_KINDS = [
+  ['sauna', 'Sauna'], ['heater', 'Heater'], ['controls', 'Controls'],
+  ['accessories', 'Accessories'], ['delivery', 'Delivery'],
+  ['installation', 'Installation'], ['service', 'Service'], ['other', 'Other'],
+];
 
 let quote: any = null;
 let items: any[] = [];
 let customers: any[] = [];
 let products: any[] = [];
+let staff: any[] = [];
+let activities: any[] = [];
 let existingOrderId: string | null = null;
 let error: string | null = null;
 let notice: string | null = null;
@@ -72,17 +82,113 @@ try {
      * than 500 on a quote a salesperson is trying to edit.
      */
     if (intent === 'share_quote' || intent === 'rotate_token') {
-      const { error: shareError } = await supabase
-        .from('quotes')
-        .update({ share_token: generateShareToken() })
-        .eq('id', id);
-      if (shareError) {
-        error =
-          'Could not create the customer link. Apply supabase/migrations/2026-08-13-personalized-quotes.sql, then try again.';
+      if (isLeadSafeMode()) {
+        notice = 'Safe mode is active. No customer link was created or replaced.';
       } else {
-        notice = intent === 'rotate_token'
-          ? 'New customer link created. The previous link no longer works.'
-          : 'Customer link created.';
+        const { error: shareError } = await supabase
+          .from('quotes')
+          .update({ share_token: generateShareToken() })
+          .eq('id', id);
+        if (shareError) {
+          error =
+            'Could not create the customer link. Apply supabase/migrations/2026-08-13-personalized-quotes.sql, then try again.';
+        } else {
+          notice = intent === 'rotate_token'
+            ? 'New customer link created. The previous link no longer works.'
+            : 'Customer link created.';
+        }
+      }
+    }
+
+    if (intent === 'send_proposal') {
+      if (isLeadSafeMode()) {
+        notice = 'Safe mode is active. The proposal email was not sent and the quote was not changed.';
+      } else {
+        const { data: sendQuote, error: sendQuoteError } = await supabase
+          .from('quotes')
+          .select('id, quote_number, customer_id, product_id, owner_staff_id, status, expiry_date, subtotal, total, share_token, proposal_sent_at, proposal_sent_to')
+          .eq('id', id)
+          .single();
+
+        if (sendQuoteError || !sendQuote) {
+          error = 'Proposal sending is not ready. Apply the personalized-quotes migration, then try again.';
+        } else {
+          const [customerRow, productRow, itemRowsForSend, ownerRow] = await Promise.all([
+            sendQuote.customer_id
+              ? supabase.from('customers').select('name, email').eq('id', sendQuote.customer_id).maybeSingle()
+              : Promise.resolve({ data: null }),
+            sendQuote.product_id
+              ? supabase.from('products').select('model_name').eq('id', sendQuote.product_id).maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase.from('quote_items').select('id').eq('quote_id', sendQuote.id),
+            sendQuote.owner_staff_id
+              ? supabase.from('profiles').select('full_name').eq('id', sendQuote.owner_staff_id).maybeSingle()
+              : Promise.resolve({ data: null }),
+          ]);
+
+          const readiness = proposalSendReadiness({
+            status: sendQuote.status,
+            customerId: sendQuote.customer_id,
+            customerEmail: (customerRow.data as any)?.email,
+            productId: sendQuote.product_id,
+            itemCount: itemRowsForSend.data?.length ?? 0,
+            subtotal: sendQuote.subtotal,
+            total: sendQuote.total,
+            expiryDate: sendQuote.expiry_date,
+          });
+
+          if (!readiness.ok) {
+            error = readiness.reason ?? 'The proposal is not ready to send.';
+          } else {
+            const shareToken = sendQuote.share_token || generateShareToken();
+            if (!sendQuote.share_token) {
+              const { error: tokenError } = await supabase.from('quotes').update({ share_token: shareToken }).eq('id', sendQuote.id);
+              if (tokenError) error = 'Could not create the private proposal link.';
+            }
+
+            if (!error) {
+              const base = Astro.site ?? Astro.url;
+              const proposalUrl = new URL(`/proposal/${shareToken}`, base).href;
+              const delivery = await sendProposalEmail({
+                customerName: (customerRow.data as any)?.name,
+                customerEmail: (customerRow.data as any)?.email,
+                proposalUrl,
+                quoteNumber: sendQuote.quote_number ?? 'Proposal',
+                modelName: (productRow.data as any)?.model_name,
+                expiryDate: sendQuote.expiry_date,
+                advisorName: (ownerRow.data as any)?.full_name ?? Astro.locals.staffFullName,
+                total: Number(sendQuote.total ?? 0),
+              });
+
+              if (!delivery.sent) {
+                error = delivery.reason === 'unconfigured'
+                  ? 'Zoho SMTP is not configured. Add the SMTP environment variables before sending.'
+                  : delivery.reason === 'invalid-recipient'
+                    ? 'The customer email address is invalid.'
+                    : 'Zoho could not send the proposal email. The quote was not marked as sent.';
+              } else {
+                const sentAt = new Date().toISOString();
+                const sentTo = String((customerRow.data as any)?.email ?? '').trim();
+                const nextStatus = statusAfterProposalSent(sendQuote.status);
+                const { error: sentUpdateError } = await supabase.from('quotes').update({
+                  status: nextStatus,
+                  proposal_sent_at: sentAt,
+                  proposal_sent_to: sentTo,
+                }).eq('id', sendQuote.id);
+                if (sentUpdateError) {
+                  error = 'The email was sent, but the sent status could not be recorded. Check the quote before resending.';
+                } else {
+                  await supabase.from('activities').insert({
+                    entity_type: 'quote', entity_id: sendQuote.id, activity_type: 'email',
+                    description: `Proposal emailed to ${sentTo}`,
+                    staff_id: Astro.locals.staffUser?.id ?? null,
+                  }).then(() => {}, () => {});
+                  notice = `Proposal sent to ${sentTo}.`;
+                }
+              }
+            }
+          }
+        }
       }
     }
 
@@ -92,11 +198,13 @@ try {
 
     if (intent === 'add_item') {
       const description = String(form.get('new_description') ?? '').trim();
+      const requestedKind = String(form.get('new_kind') ?? 'other');
+      const kind = ITEM_KINDS.some(([value]) => value === requestedKind) ? requestedKind : 'other';
       const quantity = Number(form.get('new_quantity') ?? 1) || 1;
       const unitPrice = Number(form.get('new_unit_price') ?? 0) || 0;
       if (description) {
         await supabase.from('quote_items').insert({
-          quote_id: id, description, quantity, unit_price: unitPrice, line_total: quantity * unitPrice,
+          quote_id: id, kind, description, quantity, unit_price: unitPrice, line_total: quantity * unitPrice,
         });
       }
     }
@@ -104,7 +212,7 @@ try {
     // Only an ordinary save (or a line-item change) reaches the recalculation
     // and update. Archive and restore must NOT fall through: their form body
     // carries just the intent, so this would zero every total on the quote.
-    if (outcome.kind === 'none') {
+    if (outcome.kind === 'none' && ['update', 'add_item', 'delete_item'].includes(intent)) {
     const deliveryCost = Number(form.get('delivery_cost') ?? 0) || 0;
     const installationCost = Number(form.get('installation_cost') ?? 0) || 0;
     const discount = Number(form.get('discount') ?? 0) || 0;
@@ -116,6 +224,7 @@ try {
     const payload = {
       customer_id: String(form.get('customer_id') ?? '') || null,
       product_id: productId,
+      owner_staff_id: String(form.get('owner_staff_id') ?? '') || null,
       heater: String(form.get('heater') ?? '') || null,
       status: String(form.get('status') ?? 'Draft'),
       quote_date: String(form.get('quote_date') ?? '') || null,
@@ -126,6 +235,10 @@ try {
       tax_rate: taxRate,
       subtotal,
       total,
+      delivery_state: String(form.get('delivery_state') ?? '') || null,
+      installation_state: String(form.get('installation_state') ?? '') || null,
+      customer_notes: String(form.get('customer_notes') ?? '').trim() || null,
+      internal_notes: String(form.get('internal_notes') ?? '').trim() || null,
     };
     if (discount < 0) {
       error = 'Discount cannot be negative.';
@@ -138,11 +251,13 @@ try {
     }
   }
 
-  const [quoteRow, itemRows, customerRows, productRows] = await Promise.all([
+  const [quoteRow, itemRows, customerRows, productRows, staffRows, activityRows] = await Promise.all([
     supabase.from('quotes').select('*').eq('id', id).single(),
     supabase.from('quote_items').select('*').eq('quote_id', id).order('sort_order'),
-    supabase.from('customers').select('id, name').order('name'),
+    supabase.from('customers').select('id, name, email').order('name'),
     supabase.from('products').select('id, model_name, selling_price, heater_options').eq('is_active', true).order('model_name'),
+    supabase.from('profiles').select('id, full_name').order('full_name'),
+    supabase.from('activities').select('id, activity_type, description, created_at').eq('entity_type', 'quote').eq('entity_id', id).order('created_at', { ascending: false }).limit(20),
   ]);
 
   if (quoteRow.error || !quoteRow.data) notFound = true;
@@ -150,6 +265,8 @@ try {
   items = itemRows.data ?? [];
   customers = customerRows.data ?? [];
   products = productRows.data ?? [];
+  staff = staffRows.data ?? [];
+  activities = activityRows.data ?? [];
 
   if (quote) {
     const { data: existingOrder } = await supabase.from('orders').select('id').eq('quote_id', id).limit(1).maybeSingle();
@@ -219,6 +336,13 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
         <label class="admin-field"><span>Sauna Model</span>
           <ModelSelect id="product-select" name="product_id" products={products} value={quote.product_id} />
         </label>
+        <label class="admin-field"><span>Customer advisor</span>
+          <select name="owner_staff_id">
+            <option value="">— BUXENA team —</option>
+            {staff.map((person) => <option value={person.id} selected={person.id === quote.owner_staff_id}>{person.full_name || person.id}</option>)}
+          </select>
+          <small>The advisor's name appears on the proposal and in the email.</small>
+        </label>
         <label class="admin-field"><span>Heater</span><input type="text" name="heater" id="quote-heater" value={quote.heater ?? ''} /></label>
         <label class="admin-field"><span>Status</span>
           <select name="status">{STATUSES.map((s) => <option value={s} selected={s === quote.status}>{s}</option>)}</select>
@@ -229,6 +353,26 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
         <label class="admin-field"><span>Installation Cost</span><input type="number" step="0.01" name="installation_cost" value={quote.installation_cost ?? 0} /></label>
         <label class="admin-field"><span>Discount</span><input type="number" min="0" step="0.01" name="discount" value={quote.discount ?? 0} /><small>Checked against an approved private price floor when one is set.</small></label>
         <label class="admin-field"><span>Tax Rate (%)</span><input type="number" step="0.01" name="tax_rate" value={quote.tax_rate ?? 0} /></label>
+        <label class="admin-field"><span>Delivery</span>
+          <select name="delivery_state">
+            <option value="" selected={!quote.delivery_state}>— not stated —</option>
+            <option value="included" selected={quote.delivery_state === 'included'}>Included</option>
+            <option value="separate" selected={quote.delivery_state === 'separate'}>Quoted separately</option>
+            <option value="customer" selected={quote.delivery_state === 'customer'}>Customer arranged</option>
+            <option value="tbc" selected={quote.delivery_state === 'tbc'}>To be confirmed</option>
+          </select>
+        </label>
+        <label class="admin-field"><span>Installation</span>
+          <select name="installation_state">
+            <option value="" selected={!quote.installation_state}>— not stated —</option>
+            <option value="included" selected={quote.installation_state === 'included'}>Included</option>
+            <option value="separate" selected={quote.installation_state === 'separate'}>Quoted separately</option>
+            <option value="customer" selected={quote.installation_state === 'customer'}>Customer arranged</option>
+            <option value="tbc" selected={quote.installation_state === 'tbc'}>To be confirmed</option>
+          </select>
+        </label>
+        <label class="admin-field admin-form__full"><span>Customer-facing notes</span><textarea name="customer_notes" rows="4">{quote.customer_notes ?? ''}</textarea><small>Shown in the proposal. Use only verified customer-safe information.</small></label>
+        <label class="admin-field admin-form__full"><span>Internal notes</span><textarea name="internal_notes" rows="3">{quote.internal_notes ?? ''}</textarea><small>Never shown to the customer.</small></label>
 
         <div class="admin-form__full">
           <p>Subtotal: <strong>${quote.subtotal ?? 0}</strong> &nbsp; Total: <strong>${quote.total ?? 0}</strong></p>
@@ -263,6 +407,10 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
             <p class="qp-label">Send this link to the customer</p>
             <p class="qp-link"><code>{`${Astro.site ?? ''}proposal/${quote.share_token}`.replace(/([^:])\/\//g, '$1/')}</code></p>
             <div class="qp-actions">
+              <form method="POST" style="margin:0;">
+                <input type="hidden" name="_intent" value="send_proposal" />
+                <button class="admin-btn" type="submit">{quote.proposal_sent_at ? 'Resend proposal' : 'Send proposal'}</button>
+              </form>
               <a class="admin-btn admin-btn--ghost" href={`/proposal/${quote.share_token}`} target="_blank" rel="noopener">
                 Open as the customer sees it
               </a>
@@ -276,6 +424,7 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
               if a proposal went to the wrong address.
               {quote.viewed_at && ` First opened ${new Date(quote.viewed_at).toLocaleString()}.`}
               {quote.accepted_at && ` Accepted by ${quote.accepted_name ?? 'the customer'} on ${new Date(quote.accepted_at).toLocaleString()}.`}
+              {quote.proposal_sent_at && ` Last emailed to ${quote.proposal_sent_to ?? 'the customer'} on ${new Date(quote.proposal_sent_at).toLocaleString()}.`}
             </p>
           </Fragment>
         ) : (
@@ -284,22 +433,43 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
               No customer link exists yet. Creating one makes this proposal
               viewable by anyone holding the link — build the package first.
             </p>
-            <form method="POST" style="margin:0;">
-              <input type="hidden" name="_intent" value="share_quote" />
-              <button class="admin-btn" type="submit">Create customer link</button>
-            </form>
+            <div class="qp-actions">
+              <form method="POST" style="margin:0;">
+                <input type="hidden" name="_intent" value="send_proposal" />
+                <button class="admin-btn" type="submit">Create link and send proposal</button>
+              </form>
+              <form method="POST" style="margin:0;">
+                <input type="hidden" name="_intent" value="share_quote" />
+                <button class="admin-btn admin-btn--ghost" type="submit">Create link only</button>
+              </form>
+            </div>
           </Fragment>
         )}
+      </div>
+
+      <h2 class="admin-section-title" style="margin-top:2.5rem;">Proposal Activity</h2>
+      <div class="admin-panel">
+        {activities.length ? (
+          <ol class="qp-timeline">
+            {activities.map((activity) => (
+              <li>
+                <span>{new Date(activity.created_at).toLocaleString()}</span>
+                <strong>{activity.description || activity.activity_type}</strong>
+              </li>
+            ))}
+          </ol>
+        ) : <p class="admin-empty">No proposal activity recorded yet.</p>}
       </div>
 
       <h2 class="admin-section-title" style="margin-top:2.5rem;">Line Items</h2>
       <div class="admin-panel">
         <div class="admin-table-wrap">
           <table class="admin-table">
-            <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr></thead>
+            <thead><tr><th>Section</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr></thead>
             <tbody>
               {items.map((item) => (
                 <tr>
+                  <td>{ITEM_KINDS.find(([value]) => value === item.kind)?.[1] ?? 'Other'}</td>
                   <td>{item.description}</td>
                   <td>{item.quantity}</td>
                   <td>${item.unit_price}</td>
@@ -321,6 +491,7 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
 
       <form method="POST" class="admin-form" style="margin-top:1.25rem;">
         <input type="hidden" name="_intent" value="add_item" />
+        <label class="admin-field"><span>Section</span><select name="new_kind">{ITEM_KINDS.map(([value, label]) => <option value={value}>{label}</option>)}</select></label>
         <label class="admin-field"><span>Description</span><input type="text" name="new_description" /></label>
         <label class="admin-field"><span>Qty</span><input type="number" step="0.01" name="new_quantity" value="1" /></label>
         <label class="admin-field"><span>Unit Price</span><input type="number" step="0.01" name="new_unit_price" /></label>
@@ -368,4 +539,10 @@ const pdfError = Astro.url.searchParams.get('pdf_error');
   }
   .qp-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
   .qp-note { margin: 0.9rem 0 0; font-size: 0.78rem; line-height: 1.6; color: var(--admin-muted); }
+  .qp-timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+  .qp-timeline li { display: grid; grid-template-columns: minmax(10rem, 0.35fr) 1fr; gap: 1rem; padding: 0.72rem 0; border-bottom: 1px solid var(--admin-border); }
+  .qp-timeline li:last-child { border-bottom: 0; }
+  .qp-timeline span { color: var(--admin-muted); font-size: 0.75rem; }
+  .qp-timeline strong { color: var(--admin-cream); font-size: 0.82rem; font-weight: 500; }
+  @media (max-width: 640px) { .qp-timeline li { grid-template-columns: 1fr; gap: 0.2rem; } }
 </style>

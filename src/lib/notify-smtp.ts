@@ -3,8 +3,8 @@
  *
  * Same env vars as documented in send-enquiry-email.ts / .env.example:
  *   ZOHO_SMTP_USER, ZOHO_SMTP_PASSWORD (required — missing means "skip email"),
- *   ENQUIRY_NOTIFY_TO (optional recipient override), ZOHO_SMTP_HOST,
- *   ZOHO_SMTP_PORT.
+ *   ENQUIRY_NOTIFY_TO and PROPOSAL_NOTIFY_TO (optional recipient overrides),
+ *   ZOHO_SMTP_HOST, ZOHO_SMTP_PORT.
  *
  * Runtime process.env wins over the build-time inlined value so a password
  * rotated in the Netlify UI takes effect without a rebuild; import.meta.env is
@@ -30,6 +30,7 @@ export interface NotifySmtpConfig {
   user: string;
   pass: string;
   to: string;
+  proposalTo: string;
   host: string;
   port: number;
 }
@@ -39,10 +40,12 @@ export function getNotifySmtpConfig(): NotifySmtpConfig | null {
   const user = pick(procEnv.ZOHO_SMTP_USER, import.meta.env.ZOHO_SMTP_USER);
   const pass = pick(procEnv.ZOHO_SMTP_PASSWORD, import.meta.env.ZOHO_SMTP_PASSWORD);
   if (!user || !pass) return null;
+  const to = pick(procEnv.ENQUIRY_NOTIFY_TO, import.meta.env.ENQUIRY_NOTIFY_TO) || DEFAULT_TO;
   return {
     user,
     pass,
-    to: pick(procEnv.ENQUIRY_NOTIFY_TO, import.meta.env.ENQUIRY_NOTIFY_TO) || DEFAULT_TO,
+    to,
+    proposalTo: pick(procEnv.PROPOSAL_NOTIFY_TO, import.meta.env.PROPOSAL_NOTIFY_TO) || to,
     host: pick(procEnv.ZOHO_SMTP_HOST, import.meta.env.ZOHO_SMTP_HOST) || DEFAULT_HOST,
     port: Number(pick(procEnv.ZOHO_SMTP_PORT, import.meta.env.ZOHO_SMTP_PORT)) || DEFAULT_PORT,
   };

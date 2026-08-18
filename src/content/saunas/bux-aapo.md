@@ -15,7 +15,7 @@ heroImage:
   # Shown WITH the optional shower/sidewall configuration; per the
   # catalogue's disclaimer, images are illustrative and this is an option,
   # not standard equipment.
-  src: "/images/saunas/bux-aapo-hero.jpg"
+  src: "/images/saunas-normalized/bux-aapo-transparent.png"
   alt: "BUX AAPO outdoor cube sauna, glass front, shown with optional shower"
 gallery:
   - src: "/images/catalog/aapo-spruce-cutout.png"

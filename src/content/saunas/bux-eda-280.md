@@ -15,7 +15,7 @@ materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
   # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
   # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas/eda-thermowood-2-8m-hero.png"
+  src: "/images/saunas-normalized/eda-thermowood-2-8m-hero.png"
   alt: "BUX EDA 280 Thermo Pine barrel sauna exterior"
 dimensions:
   - { label: "Depth", value: "9.2 ft (280 cm)" }

@@ -82,6 +82,31 @@ export interface CustomerProposalItem {
   lineTotal: number;
 }
 
+export interface CustomerProposalSpec {
+  label: string;
+  value: string;
+}
+
+export interface CustomerProposalProduct {
+  dimensions: CustomerProposalSpec[];
+  capacity: string | null;
+  timberType: string | null;
+  glassConfiguration: string | null;
+  electricalRequirements: string | null;
+  weightKg: number | null;
+  shippingDimensions: string | null;
+  brochureUrl: string | null;
+  installationManualUrl: string | null;
+  warrantyDocumentUrl: string | null;
+  warrantyMonths: number | null;
+}
+
+export interface CustomerProposalAvailability {
+  availableUnits: number;
+  incomingUnits: number;
+  eta: string | null;
+}
+
 export interface CustomerProposal {
   quoteNumber: string;
   customerName: string;
@@ -91,9 +116,15 @@ export interface CustomerProposal {
   status: string;
   acceptedAt: string | null;
   modelName: string | null;
+  heaterName: string | null;
   items: CustomerProposalItem[];
   subtotal: number;
+  deliveryCost: number;
+  installationCost: number;
   discount: number;
+  taxRate: number;
+  taxAmount: number;
+  netBeforeTax: number;
   total: number;
   /** True when every figure is zero — the proposal shows no pricing at all. */
   hasPricing: boolean;
@@ -102,6 +133,8 @@ export interface CustomerProposal {
   customerNotes: string | null;
   ownerName: string | null;
   ownerEmail: string | null;
+  product: CustomerProposalProduct;
+  availability: CustomerProposalAvailability | null;
 }
 
 const num = (v: unknown): number => {
@@ -113,6 +146,47 @@ const str = (v: unknown): string | null => {
   const s = typeof v === 'string' ? v.trim() : '';
   return s ? s : null;
 };
+
+const optionalNum = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+function safeDocumentUrl(value: unknown): string | null {
+  const valueString = str(value);
+  if (!valueString) return null;
+  if (valueString.startsWith('/') && !valueString.startsWith('//')) return valueString;
+  try {
+    const url = new URL(valueString);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function mapDimensions(value: unknown): CustomerProposalSpec[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((row) => ({
+        label: str((row as Record<string, unknown>)?.label) ?? '',
+        value: str((row as Record<string, unknown>)?.value) ?? '',
+      }))
+      .filter((row) => row.label && row.value);
+  }
+
+  if (!value || typeof value !== 'object') return [];
+  const dimensions = value as Record<string, unknown>;
+  const unit = str(dimensions.unit) ?? 'in';
+  return ['width', 'depth', 'height']
+    .map((key) => {
+      const dimension = optionalNum(dimensions[key]);
+      return dimension === null
+        ? null
+        : { label: key[0].toUpperCase() + key.slice(1), value: `${dimension} ${unit}` };
+    })
+    .filter((row): row is CustomerProposalSpec => Boolean(row));
+}
 
 /**
  * Build the customer-visible proposal from raw rows.
@@ -129,6 +203,8 @@ export function toCustomerProposal(
     modelName?: string | null;
     ownerName?: string | null;
     ownerEmail?: string | null;
+    product?: Record<string, unknown> | null;
+    inventory?: Record<string, unknown>[] | null;
   } = {}
 ): CustomerProposal {
   const mapped: CustomerProposalItem[] = (items ?? [])
@@ -145,9 +221,26 @@ export function toCustomerProposal(
     .filter((i) => i.description.length > 0);
 
   const subtotal = num(quote.subtotal);
+  const deliveryCost = num(quote.delivery_cost);
+  const installationCost = num(quote.installation_cost);
   const discount = num(quote.discount);
+  const taxRate = Math.max(0, num(quote.tax_rate));
   const total = num(quote.total);
+  const netBeforeTax = Math.max(0, subtotal + deliveryCost + installationCost - discount);
+  const taxAmount = Math.max(0, total - netBeforeTax);
   const expiry = str(quote.expiry_date);
+  const product = extras.product ?? {};
+  const inventoryRows = extras.inventory ?? [];
+  const availability = inventoryRows.length
+    ? {
+        availableUnits: inventoryRows.reduce((sum, row) => sum + Math.max(0, num(row.available)), 0),
+        incomingUnits: inventoryRows.reduce((sum, row) => sum + Math.max(0, num(row.incoming)), 0),
+        eta: inventoryRows
+          .map((row) => str(row.eta))
+          .filter((date): date is string => Boolean(date))
+          .sort()[0] ?? null,
+      }
+    : null;
 
   return {
     quoteNumber: String(quote.quote_number ?? '').trim() || 'Proposal',
@@ -158,9 +251,15 @@ export function toCustomerProposal(
     status: String(quote.status ?? 'Draft'),
     acceptedAt: str(quote.accepted_at),
     modelName: str(extras.modelName ?? null),
+    heaterName: str(quote.heater),
     items: mapped,
     subtotal,
+    deliveryCost,
+    installationCost,
     discount,
+    taxRate,
+    taxAmount,
+    netBeforeTax,
     total,
     hasPricing: subtotal > 0 || total > 0 || mapped.some((i) => i.lineTotal > 0),
     delivery: readFulfilment(quote.delivery_state),
@@ -168,6 +267,20 @@ export function toCustomerProposal(
     customerNotes: str(quote.customer_notes),
     ownerName: str(extras.ownerName ?? null),
     ownerEmail: str(extras.ownerEmail ?? null),
+    product: {
+      dimensions: mapDimensions(product.dimensions),
+      capacity: str(product.capacity),
+      timberType: str(product.timber_type),
+      glassConfiguration: str(product.glass_configuration),
+      electricalRequirements: str(product.electrical_requirements),
+      weightKg: optionalNum(product.weight_kg),
+      shippingDimensions: str(product.shipping_dimensions),
+      brochureUrl: safeDocumentUrl(product.brochure_url),
+      installationManualUrl: safeDocumentUrl(product.installation_manual_url),
+      warrantyDocumentUrl: safeDocumentUrl(product.warranty_document_url),
+      warrantyMonths: optionalNum(product.warranty_duration_months),
+    },
+    availability,
   };
 }
 

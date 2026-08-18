@@ -5,11 +5,15 @@ import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import CategoryViewTrack from '../../components/CategoryViewTrack.astro';
 import { getCollection } from 'astro:content';
-import { byPhotographedThenOrder } from '../../data/catalog';
+import { byPhotographedThenOrder, groupFamilyPhotoSeries } from '../../data/catalog';
 
 const models = (
   await getCollection('saunas', ({ data }) => !data.draft && data.productType === 'Cube')
 ).sort(byPhotographedThenOrder);
+
+// Series that share one supplier photograph across every depth are grouped
+// into a single card — see groupFamilyPhotoSeries in src/data/catalog.ts.
+const catalogueCards = groupFamilyPhotoSeries(models);
 
 function uniqueOptions(values: (string | undefined)[]) {
   return Array.from(new Set(values.filter((v): v is string => Boolean(v)))).sort();
@@ -68,25 +72,29 @@ const facets = [
       <ProductFilters facets={facets} />
 
       <div class="grid cols-3" data-product-grid>
-        {models.map((s) => (
-          <ProductCard
-            slug={s.id}
-            title={s.data.title}
-            tagline={s.data.tagline}
-            category={s.data.category}
-            placeholder={s.data.placeholder}
-            image={s.data.heroImage}
-            location={s.data.location}
-            productType={s.data.productType}
-            series={s.data.series}
-            capacity={s.data.capacity}
-            capacityMin={s.data.capacityMin}
-            capacityMax={s.data.capacityMax}
-            materials={s.data.materials}
-            dimensions={s.data.dimensions}
-            fromPrice={s.data.fromPrice}
-          />
-        ))}
+        {catalogueCards.map((card) => {
+          const s = card.representative;
+          return (
+            <ProductCard
+              slug={s.id}
+              title={card.title ?? s.data.title}
+              tagline={card.tagline ?? s.data.tagline}
+              category={s.data.category}
+              placeholder={s.data.placeholder}
+              image={s.data.heroImage}
+              location={s.data.location}
+              productType={s.data.productType}
+              series={s.data.series}
+              capacity={s.data.capacity}
+              capacityMin={s.data.capacityMin}
+              capacityMax={s.data.capacityMax}
+              materials={s.data.materials}
+              dimensions={card.variants ? undefined : s.data.dimensions}
+              fromPrice={s.data.fromPrice}
+              variants={card.variants}
+            />
+          );
+        })}
       </div>
 
       <p class="empty" data-empty hidden>Nothing matches those filters yet.</p>

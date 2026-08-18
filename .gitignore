@@ -10,3 +10,9 @@ npm-debug.log*
 
 # npm cache created by tooling — never commit
 .codex-npm-cache/
+
+# Local design review and generated preview artifacts
+astro.qa.config.mjs
+design-qa.md
+design-qa-assets/
+output/

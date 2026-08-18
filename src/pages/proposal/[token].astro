@@ -2,47 +2,79 @@
 export const prerender = false;
 
 /**
- * The customer's personalized BUXENA proposal.
+ * Secure, customer-facing BUXENA proposal.
  *
- * SECURITY POSTURE
- * ----------------
- * Reached only by a 160-bit random token, never by the quote's uuid, so
- * proposals cannot be enumerated and a leaked admin id exposes nothing. The
- * page is READ-ONLY: the single write it permits is acceptance, which goes
- * through POST /api/proposal-accept and is re-validated there. No price, id or
- * status is ever taken from the URL or the DOM.
- *
- * The raw quote row never reaches this template. `toCustomerProposal()` builds
- * an allow-listed projection, so unit cost, margin and internal notes cannot
- * appear here even if someone later edits the markup carelessly — the fields
- * simply are not present on the object.
- *
- * Noindex: a personalized price for one named customer must never be indexed.
+ * Only a random 160-bit share token reaches a quote. Raw database rows are
+ * projected through `toCustomerProposal()` before rendering, so internal
+ * costs, margin controls, supplier notes and internal notes never enter the
+ * component tree. The all-zero token is a DEV-only fixture for visual QA and
+ * is unreachable in production.
  */
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import ProjectRecap from '../../components/ProjectRecap.astro';
-import ContinueExploring from '../../components/ContinueExploring.astro';
+import CustomerProposalDocument from '../../components/proposal/CustomerProposalDocument.astro';
 import { createSupabaseAdminClient } from '../../lib/supabase-admin';
-import { site, publicEmail } from '../../data/site';
+import { publicEmail } from '../../data/site';
 import { getCollection } from 'astro:content';
+import { publicAssets } from '../../lib/product-assets';
 import {
-  ITEM_GROUPS,
-  FULFILMENT_LABELS,
   isValidShareToken,
   toCustomerProposal,
   isAcceptable,
   type CustomerProposal,
 } from '../../lib/quote-proposal';
 
-const { token } = Astro.params;
+const { token = '' } = Astro.params;
+const DEV_PREVIEW_TOKEN = '0'.repeat(40);
+const preview = import.meta.env.DEV && token === DEV_PREVIEW_TOKEN;
 
 let proposal: CustomerProposal | null = null;
 let notFound = false;
 let acceptable: { ok: boolean; reason?: string } = { ok: false };
-let justAccepted = Astro.url.searchParams.get('accepted') === '1';
+const justAccepted = Astro.url.searchParams.get('accepted') === '1';
+const acceptError = Astro.url.searchParams.get('error');
 
-// A malformed token is refused before it can reach a query.
-if (!isValidShareToken(token)) {
+if (preview) {
+  const fixtureQuote = {
+    quote_number: 'BUX-PROPOSAL-1048',
+    quote_date: new Date().toISOString().slice(0, 10),
+    expiry_date: new Date(Date.now() + 6 * 86_400_000).toISOString().slice(0, 10),
+    status: 'Sent',
+    heater: 'Harvia electric heater package with controls and stones',
+    subtotal: 21_790,
+    delivery_cost: 850,
+    installation_cost: 0,
+    discount: 750,
+    tax_rate: 6.35,
+    total: 23_279.90,
+    delivery_state: 'included',
+    installation_state: 'separate',
+    customer_notes: 'Delivery access, final heater sizing and the exact foundation plan will be confirmed during the pre-order project review.',
+  };
+  const fixtureItems = [
+    { kind: 'sauna', description: 'BUX EDA 235 outdoor barrel sauna', quantity: 1, unit_price: 18_650, line_total: 18_650 },
+    { kind: 'heater', description: 'Harvia electric heater', quantity: 1, unit_price: 1_790, line_total: 1_790 },
+    { kind: 'controls', description: 'Digital control package', quantity: 1, unit_price: 500, line_total: 500 },
+    { kind: 'accessories', description: 'Sauna stones and heater guard', quantity: 1, unit_price: 0, line_total: 0 },
+    { kind: 'delivery', description: 'Residential delivery coordination', quantity: 1, unit_price: 850, line_total: 850 },
+  ];
+  proposal = toCustomerProposal(fixtureQuote, fixtureItems, {
+    customerName: 'Valery Smith',
+    modelName: 'BUX EDA 235',
+    ownerName: 'Valentin Axentii',
+    ownerEmail: publicEmail,
+    product: {
+      dimensions: { width: 80.7, depth: 92.5, height: 84.6, unit: 'in' },
+      capacity: '4–6 people',
+      timber_type: 'Nordic Spruce / Thermo Pine',
+      glass_configuration: 'Tempered glass door; glazing confirmed with final configuration',
+      electrical_requirements: 'Final voltage, breaker and conductor sizing are matched to the selected heater and confirmed before order.',
+      weight_kg: 720,
+      shipping_dimensions: 'Confirmed on the final packing list',
+      warranty_duration_months: 24,
+    },
+    inventory: [{ available: 2, incoming: 1, eta: new Date(Date.now() + 21 * 86_400_000).toISOString().slice(0, 10) }],
+  });
+} else if (!isValidShareToken(token)) {
   notFound = true;
 } else {
   try {
@@ -56,31 +88,48 @@ if (!isValidShareToken(token)) {
     if (!quote) {
       notFound = true;
     } else {
-      const [itemRows, customerRow, productRow, ownerRow] = await Promise.all([
+      const productPromise = quote.product_id
+        ? supabase
+            .from('products')
+            .select('model_name, dimensions, capacity, timber_type, glass_configuration, electrical_requirements, weight_kg, shipping_dimensions, brochure_url, installation_manual_url, warranty_document_url')
+            .eq('id', quote.product_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null });
+      const warrantyPromise = quote.product_id
+        ? supabase.from('products').select('warranty_duration_months').eq('id', quote.product_id).maybeSingle()
+        : Promise.resolve({ data: null });
+      const inventoryPromise = quote.product_id
+        ? supabase.from('inventory').select('available, incoming, eta').eq('product_id', quote.product_id)
+        : Promise.resolve({ data: [] });
+
+      const [itemRows, customerRow, productRow, warrantyRow, inventoryRows, ownerRow] = await Promise.all([
         supabase.from('quote_items').select('*').eq('quote_id', quote.id).order('sort_order'),
         quote.customer_id
           ? supabase.from('customers').select('name').eq('id', quote.customer_id).maybeSingle()
           : Promise.resolve({ data: null }),
-        quote.product_id
-          ? supabase.from('products').select('model_name').eq('id', quote.product_id).maybeSingle()
-          : Promise.resolve({ data: null }),
+        productPromise,
+        warrantyPromise,
+        inventoryPromise,
         quote.owner_staff_id
-          ? supabase.from('profiles').select('full_name, email').eq('id', quote.owner_staff_id).maybeSingle()
+          ? supabase.from('profiles').select('full_name').eq('id', quote.owner_staff_id).maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
+
+      const customerProduct = {
+        ...((productRow.data as Record<string, unknown> | null) ?? {}),
+        ...((warrantyRow.data as Record<string, unknown> | null) ?? {}),
+      };
 
       proposal = toCustomerProposal(quote, itemRows.data ?? [], {
         customerName: (customerRow.data as any)?.name ?? null,
         modelName: (productRow.data as any)?.model_name ?? null,
         ownerName: (ownerRow.data as any)?.full_name ?? null,
-        ownerEmail: (ownerRow.data as any)?.email ?? null,
+        ownerEmail: publicEmail,
+        product: customerProduct,
+        inventory: inventoryRows.data ?? [],
       });
       acceptable = isAcceptable(quote);
 
-      // First view is worth knowing and is genuinely measurable — it is a page
-      // load, and the UI never claims more than that. Never overwritten, so it
-      // records the first time rather than the last. Failure is ignored: a
-      // telemetry write must not stop a customer seeing their proposal.
       if (!quote.viewed_at) {
         await supabase
           .from('quotes')
@@ -93,32 +142,57 @@ if (!isValidShareToken(token)) {
       }
     }
   } catch {
-    // Missing table/column (migration not yet applied) or no database. Behave
-    // as though the proposal does not exist rather than leaking a stack trace.
     notFound = true;
   }
 }
 
-const money = (n: number) =>
-  n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+let catalogue: {
+  href?: string;
+  image?: { src: string; alt: string };
+  gallery?: { src: string; alt: string }[];
+  capacity?: string;
+  dimensions?: { label: string; value: string }[];
+  materials?: string[];
+  specs?: { label: string; value: string }[];
+  video?: { title: string; href: string; embedSrc?: string; poster?: string };
+} = {};
 
-const grouped = proposal
-  ? ITEM_GROUPS.map((g) => ({ ...g, items: proposal!.items.filter((i) => i.kind === g.kind) })).filter(
-      (g) => g.items.length > 0
-    )
-  : [];
-
-/**
- * Best-effort match to the model's real catalogue entry, purely to enrich the
- * recap with a photo, capacity, dimensions and material — all facts already
- * published on that model's own page. No match, no invented data: the recap
- * simply falls back to showing the model name alone, exactly as before.
- */
-let modelEntry: Awaited<ReturnType<typeof getCollection<'saunas'>>>[number] | undefined;
 if (proposal?.modelName) {
   const catalog = await getCollection('saunas', ({ data }) => !data.draft);
   const target = proposal.modelName.trim().toLowerCase();
-  modelEntry = catalog.find((m) => m.data.title.trim().toLowerCase() === target);
+  const modelEntry = catalog.find((model) => model.data.title.trim().toLowerCase() === target);
+  if (modelEntry) {
+    const videoAsset = publicAssets(modelEntry.data.technicalAssets).find(({ slot }) => slot.kind === 'video');
+    const videoUrl = videoAsset?.asset.url?.trim() ?? '';
+    const youtubeId = videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{6,})/)?.[1];
+    const vimeoId = videoUrl.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+    const embedSrc = youtubeId
+      ? `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`
+      : vimeoId
+        ? `https://player.vimeo.com/video/${vimeoId}`
+        : undefined;
+    catalogue = {
+      href: `/saunas/${modelEntry.id}/`,
+      image: modelEntry.data.heroImage?.src
+        ? { src: modelEntry.data.heroImage.src, alt: modelEntry.data.heroImage.alt }
+        : undefined,
+      gallery: modelEntry.data.gallery
+        .filter((image) => Boolean(image.src))
+        .map((image) => ({ src: image.src!, alt: image.alt })),
+      capacity: modelEntry.data.capacity,
+      dimensions: modelEntry.data.dimensions,
+      materials: modelEntry.data.materials,
+      specs: modelEntry.data.specs,
+      video: videoAsset && videoUrl
+        ? {
+            title: videoAsset.asset.title || videoAsset.slot.label,
+            href: videoUrl,
+            embedSrc,
+            poster: videoAsset.asset.poster,
+          }
+        : undefined,
+    };
+  }
 }
 
 if (notFound) Astro.response.status = 404;
@@ -128,227 +202,34 @@ if (notFound) Astro.response.status = 404;
   title={proposal ? `Proposal ${proposal.quoteNumber}` : 'Proposal'}
   description="Your personalized BUXENA sauna proposal."
   noindex={true}
+  documentMode={true}
 >
   {notFound && (
     <section class="band">
-      <div class="shell shell--narrow prop-missing">
+      <div class="shell shell--narrow proposal-missing">
         <span class="eyebrow">Proposal</span>
         <h1 class="h2">We couldn't find that proposal</h1>
-        <p class="lead">
-          The link may have expired or been replaced. If you were expecting a
-          proposal from us, reply to our last message and we'll send a fresh
-          link.
-        </p>
+        <p class="lead">The link may have expired or been replaced. Contact your BUXENA advisor and we will send a fresh link.</p>
         {publicEmail && <p><a class="btn btn--bronze" href={`mailto:${publicEmail}`}>Contact BUXENA</a></p>}
       </div>
     </section>
   )}
 
   {proposal && (
-    <article class="prop">
-      <section class="band band--tight prop-head">
-        <div class="shell shell--narrow">
-          <span class="eyebrow">{site.name}</span>
-          <h1 class="display">Personalized Sauna Proposal</h1>
-
-          <dl class="prop-meta">
-            {proposal.customerName && (
-              <div><dt>Prepared for</dt><dd>{proposal.customerName}</dd></div>
-            )}
-            <div><dt>Reference</dt><dd>{proposal.quoteNumber}</dd></div>
-            {proposal.quoteDate && <div><dt>Date</dt><dd>{proposal.quoteDate}</dd></div>}
-            {proposal.expiryDate && (
-              <div>
-                <dt>Valid until</dt>
-                <dd class={proposal.expired ? 'is-expired' : ''}>
-                  {proposal.expiryDate}{proposal.expired ? ' — expired' : ''}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      </section>
-
-      {(justAccepted || proposal.acceptedAt) && (
-        <section class="band band--tight">
-          <div class="shell shell--narrow">
-            <p class="prop-accepted">
-              <strong>Thank you — your acceptance is recorded.</strong>
-              A member of the BUXENA team will be in touch to confirm the next
-              step. Nothing has been charged.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {proposal.modelName && (
-        <section class="band band--tight">
-          <div class="shell shell--narrow">
-            <h2 class="prop-h">Selected sauna</h2>
-            <ProjectRecap
-              modelTitle={proposal.modelName}
-              modelHref={modelEntry ? `/saunas/${modelEntry.id}/` : undefined}
-              image={modelEntry?.data.heroImage}
-              capacity={modelEntry?.data.capacity}
-              dimensions={modelEntry?.data.dimensions}
-              materials={modelEntry?.data.materials}
-            />
-          </div>
-        </section>
-      )}
-
-      <section class="band band--tight">
-        <div class="shell shell--narrow">
-          <h2 class="prop-h">Your package</h2>
-
-          {grouped.length === 0 ? (
-            <p class="prop-empty">
-              The detail of your package is being prepared. We'll be in touch
-              shortly with the full breakdown.
-            </p>
-          ) : (
-            <div class="prop-table-wrap">
-              <table class="prop-table">
-                <tbody>
-                  {grouped.map((group) => (
-                    <Fragment>
-                      <tr class="prop-group"><th colspan="2" scope="colgroup">{group.label}</th></tr>
-                      {group.items.map((item) => (
-                        <tr>
-                          <td>
-                            {item.description}
-                            {item.quantity !== 1 && <span class="prop-qty"> × {item.quantity}</span>}
-                          </td>
-                          <td class="prop-amount">
-                            {proposal.hasPricing && item.lineTotal > 0 ? money(item.lineTotal) : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Only ever the state actually chosen for this quote. Unset renders
-              nothing — we never imply delivery or installation is included. */}
-          {(proposal.delivery !== 'unset' || proposal.installation !== 'unset') && (
-            <dl class="prop-fulfil">
-              {proposal.delivery !== 'unset' && (
-                <div><dt>Delivery</dt><dd>{FULFILMENT_LABELS[proposal.delivery]}</dd></div>
-              )}
-              {proposal.installation !== 'unset' && (
-                <div><dt>Installation</dt><dd>{FULFILMENT_LABELS[proposal.installation]}</dd></div>
-              )}
-            </dl>
-          )}
-        </div>
-      </section>
-
-      {proposal.hasPricing && (
-        <section class="band band--tight">
-          <div class="shell shell--narrow">
-            <dl class="prop-totals">
-              <div><dt>Package subtotal</dt><dd>{money(proposal.subtotal)}</dd></div>
-              {/* Shown ONLY when a real discount was approved. No crossed-out
-                  MSRP, no manufactured saving. */}
-              {proposal.discount > 0 && (
-                <div class="prop-discount"><dt>Discount applied</dt><dd>−{money(proposal.discount)}</dd></div>
-              )}
-              <div class="prop-total"><dt>Total</dt><dd>{money(proposal.total)}</dd></div>
-            </dl>
-          </div>
-        </section>
-      )}
-
-      {proposal.customerNotes && (
-        <section class="band band--tight">
-          <div class="shell shell--narrow">
-            <h2 class="prop-h">Notes for you</h2>
-            <p class="prop-notes">{proposal.customerNotes}</p>
-          </div>
-        </section>
-      )}
-
-      {acceptable.ok && (
-        <section class="band band--tight prop-accept" id="accept">
-          <div class="shell shell--narrow">
-            <h2 class="prop-h">Ready to proceed?</h2>
-            <p class="prop-accept__note">
-              Accepting tells us you would like to go ahead with this package.
-              It does not take payment and is not a contract — we will confirm
-              everything with you in writing before anything is ordered.
-            </p>
-            <form class="prop-accept__form" method="POST" action="/api/proposal-accept">
-              <input type="hidden" name="token" value={token} />
-              <label class="prop-accept__field">
-                <span>Your name</span>
-                <input type="text" name="acceptedName" required maxlength="120" autocomplete="name" />
-              </label>
-              <button class="btn btn--bronze" type="submit">Accept this proposal</button>
-            </form>
-          </div>
-        </section>
-      )}
-
-      {!acceptable.ok && acceptable.reason && !proposal.acceptedAt && (
-        <section class="band band--tight">
-          <div class="shell shell--narrow">
-            <p class="prop-unavailable">{acceptable.reason}</p>
-          </div>
-        </section>
-      )}
-
-      <section class="band band--tight prop-foot">
-        <div class="shell shell--narrow">
-          <h2 class="prop-h">What happens next</h2>
-          <ol class="prop-next">
-            <li>We confirm the specification, delivery and site requirements with you.</li>
-            <li>You receive written confirmation of the order and payment details.</li>
-            <li>Nothing is ordered until you confirm in writing.</li>
-          </ol>
-
-          <p class="prop-warranty">
-            Your sauna, heater and components each carry the applicable
-            manufacturer's warranty. We provide the warranty information for
-            your selected products before purchase.
-          </p>
-
-          <div class="prop-contact">
-            {proposal.ownerName && <p><strong>{proposal.ownerName}</strong> — {site.name}</p>}
-            {proposal.ownerEmail
-              ? <p><a href={`mailto:${proposal.ownerEmail}`}>{proposal.ownerEmail}</a></p>
-              : publicEmail && <p><a href={`mailto:${publicEmail}`}>{publicEmail}</a></p>}
-          </div>
-
-          <p class="prop-print">
-            <button class="link" type="button" data-print>Print or save as PDF</button>
-          </p>
-        </div>
-      </section>
-
-      <section class="band band--tight">
-        <div class="shell shell--narrow">
-          <ContinueExploring />
-        </div>
-      </section>
-    </article>
+    <CustomerProposalDocument
+      proposal={proposal}
+      token={token}
+      acceptable={acceptable}
+      justAccepted={justAccepted}
+      acceptError={acceptError}
+      preview={preview}
+      catalogue={catalogue}
+    />
   )}
 </BaseLayout>
 
-<script>
-  document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
-</script>
-
-{proposal && (
-  <script
-    is:inline
-    define:vars={{ token, quoteNumber: proposal.quoteNumber, modelName: proposal.modelName }}
-  >
-    // Recognise this browser as this proposal's customer on a later visit —
-    // see lib/project-continuity.ts for what is (and is not) stored. Only the
-    // token, quote number and model name; never price, name or contact info.
+{proposal && !preview && (
+  <script is:inline define:vars={{ token, quoteNumber: proposal.quoteNumber, modelName: proposal.modelName }}>
     try {
       var value = { token: token, quoteNumber: quoteNumber, modelName: modelName, savedAt: new Date().toISOString() };
       localStorage.setItem('buxena-last-proposal', JSON.stringify(value));
@@ -357,133 +238,6 @@ if (notFound) Astro.response.status = 404;
 )}
 
 <style>
-  .prop-missing { text-align: center; }
-  .prop-missing .lead { margin: 1.2rem auto 1.75rem; }
-
-  .prop-head { padding-bottom: 0; }
-  .prop-head .display { margin-top: 0.43rem; }
-
-  .prop-meta {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: 1rem 2rem;
-    margin-top: clamp(1.27rem, 0.85rem + 1.7vw, 2.13rem);
-    padding-top: 1.19rem;
-    border-top: 1px solid var(--line);
-  }
-  .prop-meta dt {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .prop-meta dd { margin: 0.3rem 0 0; font-size: 1.0625rem; color: var(--ink); }
-  .prop-meta .is-expired { color: #9a4b2f; }
-
-  .prop-h {
-    font-family: var(--font-sans);
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin: 0 0 1rem;
-  }
-
-  .prop-model { font-family: var(--font-display); font-size: var(--t-h3); margin: 0; }
-
-  .prop-accepted {
-    padding: 1rem 1.25rem;
-    background: var(--linen-deep);
-    border-left: 3px solid var(--bronze);
-    font-size: var(--t-small);
-    line-height: 1.65;
-    margin: 0;
-  }
-
-  /* The table scrolls inside its own box rather than the page — long
-     accessory names must never make the whole proposal scroll sideways. */
-  .prop-table-wrap { overflow-x: auto; }
-  .prop-table { width: 100%; border-collapse: collapse; }
-  .prop-table td, .prop-table th { padding: 0.7rem 0; border-bottom: 1px solid var(--line); text-align: left; }
-  .prop-group th {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--bronze-ink);
-    padding-top: 1.19rem;
-  }
-  .prop-amount { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .prop-qty { color: var(--muted); }
-
-  .prop-fulfil { display: grid; gap: 0.5rem; margin-top: 1.27rem; }
-  .prop-fulfil div { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--t-small); }
-  .prop-fulfil dt { color: var(--muted); }
-  .prop-fulfil dd { margin: 0; }
-
-  .prop-totals { display: grid; gap: 0.6rem; margin: 0; }
-  .prop-totals div { display: flex; justify-content: space-between; gap: 1rem; }
-  .prop-totals dd { margin: 0; font-variant-numeric: tabular-nums; }
-  .prop-discount { color: var(--bronze-ink); }
-  .prop-total {
-    padding-top: 0.68rem;
-    border-top: 2px solid var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-h3);
-  }
-
-  .prop-notes, .prop-warranty { font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); white-space: pre-wrap; }
-  .prop-empty { font-size: var(--t-small); color: var(--muted); font-style: italic; }
-  .prop-unavailable { font-size: var(--t-small); color: var(--muted); font-style: italic; margin: 0; }
-
-  .prop-accept { background: var(--linen-deep); }
-  .prop-accept__note { font-size: var(--t-small); line-height: 1.7; color: var(--muted-dark); max-width: 46em; }
-  .prop-accept__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.9rem; margin-top: 1.06rem; }
-  .prop-accept__field { display: grid; gap: 0.35rem; flex: 1 1 16rem; }
-  .prop-accept__field span {
-    font-size: var(--t-label);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .prop-accept__field input {
-    font-family: var(--font-sans);
-    font-size: 1.0625rem;
-    padding: 0.6rem 0;
-    border: none;
-    border-bottom: 1.5px solid var(--line);
-    background: transparent;
-    border-radius: 0;
-    width: 100%;
-  }
-  .prop-accept__field input:focus { border-color: var(--bronze); outline: none; }
-
-  .prop-next { margin: 0 0 1.5rem; padding-left: 1.1rem; font-size: var(--t-small); line-height: 1.8; color: var(--muted-dark); }
-  .prop-contact { margin-top: 1.27rem; font-size: var(--t-small); line-height: 1.7; }
-  .prop-contact p { margin: 0; }
-  .prop-print { margin-top: 1.49rem; }
-
-  @media (max-width: 560px) {
-    .prop-meta { grid-template-columns: 1fr; gap: 0.9rem; }
-    .prop-accept__form { flex-direction: column; align-items: stretch; }
-    .prop-accept__form .btn { width: 100%; }
-  }
-
-  /* Printing IS the PDF. A browser's own print-to-PDF gives a customer a
-     clean, correctly-paginated document with no engine to maintain — so the
-     page is designed to print rather than shipping a second renderer. */
-  @media print {
-    :global(header), :global(footer), :global(.chat-fab), :global(.chat-panel),
-    :global(.salesbar), .prop-print, .prop-accept { display: none !important; }
-    :global(body) { background: #fff; color: #000; }
-    .band { padding-block: 0.51rem !important; }
-    .prop-table td, .prop-table th { border-color: #ccc; }
-    .prop-total { border-top-color: #000; }
-    .prop-accepted { border-left-color: #000; background: #f5f5f5; }
-    /* Never split a package group across a page break mid-line. */
-    .prop-table tr { break-inside: avoid; }
-  }
+  .proposal-missing { text-align: center; }
+  .proposal-missing .lead { margin: 1.2rem auto 1.75rem; }
 </style>

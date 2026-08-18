@@ -8,31 +8,41 @@ import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings, FALLBACK_SETTINGS } from '../../../lib/settings';
 import { approvedQuoteFloor, belowApprovedFloor, quoteNetBeforeTax } from '../../../lib/quote-margin-guard';
 
-const STATUSES = ['Draft', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired'];
+const STATUSES = ['Draft', 'Ready', 'Sent', 'Viewed', 'Negotiating', 'Accepted', 'Declined', 'Expired', 'Converted'];
+const ITEM_KINDS = [
+  ['sauna', 'Sauna'], ['heater', 'Heater'], ['controls', 'Controls'],
+  ['accessories', 'Accessories'], ['delivery', 'Delivery'],
+  ['installation', 'Installation'], ['service', 'Service'], ['other', 'Other'],
+];
 let customers: any[] = [];
 let products: any[] = [];
+let staff: any[] = [];
 let error: string | null = null;
 let settings = FALLBACK_SETTINGS;
 
 try {
   const supabase = createSupabaseAdminClient();
   settings = await getSettings(supabase);
-  const [customerRows, productRows] = await Promise.all([
-    supabase.from('customers').select('id, name').order('name'),
+  const [customerRows, productRows, staffRows] = await Promise.all([
+    supabase.from('customers').select('id, name, email').order('name'),
     supabase.from('products').select('id, model_name, selling_price, heater_options').eq('is_active', true).order('model_name'),
+    supabase.from('profiles').select('id, full_name').order('full_name'),
   ]);
   customers = customerRows.data ?? [];
   products = productRows.data ?? [];
+  staff = staffRows.data ?? [];
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
     const descriptions = form.getAll('item_description[]').map(String);
+    const kinds = form.getAll('item_kind[]').map(String);
     const quantities = form.getAll('item_quantity[]').map(Number);
     const unitPrices = form.getAll('item_unit_price[]').map(Number);
 
     const items = descriptions
       .map((description, i) => ({
         description,
+        kind: ITEM_KINDS.some(([value]) => value === kinds[i]) ? kinds[i] : 'other',
         quantity: quantities[i] || 0,
         unit_price: unitPrices[i] || 0,
         line_total: (quantities[i] || 0) * (unitPrices[i] || 0),
@@ -64,6 +74,7 @@ try {
       quote_number: `${settings.quote_number_prefix}${Date.now().toString(36).toUpperCase()}`,
       customer_id: String(form.get('customer_id') ?? '') || null,
       product_id: productId,
+      owner_staff_id: String(form.get('owner_staff_id') ?? '') || null,
       heater: String(form.get('heater') ?? '') || null,
       delivery_cost: deliveryCost,
       installation_cost: installationCost,
@@ -74,6 +85,10 @@ try {
       quote_date: quoteDate,
       expiry_date: String(form.get('expiry_date') ?? '') || defaultExpiry.toISOString().slice(0, 10),
       status: String(form.get('status') ?? 'Draft'),
+      delivery_state: String(form.get('delivery_state') ?? '') || null,
+      installation_state: String(form.get('installation_state') ?? '') || null,
+      customer_notes: String(form.get('customer_notes') ?? '').trim() || null,
+      internal_notes: String(form.get('internal_notes') ?? '').trim() || null,
     };
 
     const { data: quote, error: insertError } = await supabase
@@ -106,19 +121,39 @@ try {
         ? <p class="admin-empty" style="padding:0.7rem 0.85rem; text-align:left;">No sauna models available — <a href="/admin/products/new" target="_blank" rel="noopener" style="color:var(--admin-gold);">add one</a>.</p>
         : <ModelSelect id="product-select" name="product_id" products={products} />}
     </label>
+    <label class="admin-field"><span>Customer advisor</span>
+      <select name="owner_staff_id">
+        <option value="">— BUXENA team —</option>
+        {staff.map((person) => <option value={person.id} selected={person.id === Astro.locals.staffUser?.id}>{person.full_name || person.id}</option>)}
+      </select>
+      <small>The advisor's name appears on the proposal and in the email.</small>
+    </label>
     <label class="admin-field"><span>Heater</span><input type="text" name="heater" /></label>
     <label class="admin-field"><span>Status</span>
       <select name="status">{STATUSES.map((s) => <option value={s}>{s}</option>)}</select>
     </label>
     <label class="admin-field"><span>Quote Date</span><input type="date" name="quote_date" value={new Date().toISOString().slice(0, 10)} id="quote-date" /></label>
     <label class="admin-field"><span>Expiry Date</span><input type="date" name="expiry_date" id="quote-expiry-date" /></label>
+    <label class="admin-field"><span>Delivery</span>
+      <select name="delivery_state">
+        <option value="">— not stated —</option><option value="included">Included</option><option value="separate">Quoted separately</option><option value="customer">Customer arranged</option><option value="tbc">To be confirmed</option>
+      </select>
+    </label>
+    <label class="admin-field"><span>Installation</span>
+      <select name="installation_state">
+        <option value="">— not stated —</option><option value="included">Included</option><option value="separate">Quoted separately</option><option value="customer">Customer arranged</option><option value="tbc">To be confirmed</option>
+      </select>
+    </label>
+    <label class="admin-field admin-form__full"><span>Customer-facing notes</span><textarea name="customer_notes" rows="4" placeholder="Only verified details the customer should see"></textarea></label>
+    <label class="admin-field admin-form__full"><span>Internal notes</span><textarea name="internal_notes" rows="3" placeholder="Never shown on the proposal"></textarea></label>
 
     <div class="admin-form__full">
       <h2 class="admin-section-title">Line Items</h2>
       <table class="admin-table" id="items-table">
-        <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr></thead>
+        <thead><tr><th>Section</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Line Total</th><th></th></tr></thead>
         <tbody id="items-body">
           <tr class="item-row">
+            <td><select name="item_kind[]">{ITEM_KINDS.map(([value, label]) => <option value={value} selected={value === 'sauna'}>{label}</option>)}</select></td>
             <td><input type="text" name="item_description[]" placeholder="Sauna base price" /></td>
             <td><input type="number" step="0.01" name="item_quantity[]" value="1" class="qty" /></td>
             <td><input type="number" step="0.01" name="item_unit_price[]" class="price" /></td>
@@ -183,6 +218,11 @@ try {
     const tr = document.createElement('tr');
     tr.className = 'item-row';
     tr.innerHTML = `
+      <td><select name="item_kind[]">
+        <option value="sauna">Sauna</option><option value="heater">Heater</option><option value="controls">Controls</option>
+        <option value="accessories">Accessories</option><option value="delivery">Delivery</option><option value="installation">Installation</option>
+        <option value="service">Service</option><option value="other" selected>Other</option>
+      </select></td>
       <td><input type="text" name="item_description[]" /></td>
       <td><input type="number" step="0.01" name="item_quantity[]" value="1" class="qty" /></td>
       <td><input type="number" step="0.01" name="item_unit_price[]" class="price" /></td>

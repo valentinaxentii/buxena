@@ -16,6 +16,8 @@ interface Props {
   /** Transparent header over a dark hero (homepage + landing pages). */
   overHero?: boolean;
   noindex?: boolean;
+  /** Removes general-site chrome that distracts from focused customer documents. */
+  documentMode?: boolean;
 }
 
 const {
@@ -25,6 +27,7 @@ const {
   image = site.ogImage,
   overHero = false,
   noindex = false,
+  documentMode = false,
 } = Astro.props;
 
 const pageTitle =
@@ -131,7 +134,7 @@ const webSiteSchema = {
     </noscript>
   </head>
 
-  <body class={isHome ? 'is-home' : undefined}>
+  <body class:list={[isHome && 'is-home', documentMode && 'is-document']}>
     {gtmId && (
       <noscript>
         <iframe
@@ -144,12 +147,12 @@ const webSiteSchema = {
       </noscript>
     )}
     <a class="skip-link" href="#main">Skip to content</a>
-    <Header overHero={overHero} />
+    {!documentMode && <Header overHero={overHero} />}
     <main id="main">
       <slot />
     </main>
-    <Footer />
-    <ChatWidget />
+    {!documentMode && <Footer />}
+    {!documentMode && <ChatWidget />}
 
     <script>
       import { track, type TrackEvent, type TrackPayload } from '../lib/track';
