@@ -1,6 +1,7 @@
 ---
 import { site, nav, publicEmail } from '../data/site';
 import { getCollection } from 'astro:content';
+import GooglePreferredSource from './GooglePreferredSource.astro';
 
 const models = await getCollection('saunas', ({ data }) => !data.draft);
 const hasOutdoor = models.some((m) => m.data.location === 'outdoor');
@@ -91,6 +92,8 @@ const year = new Date().getFullYear();
               </a>
             </li>
           </ul>
+
+          <GooglePreferredSource />
         </div>
       </div>
     </div>
