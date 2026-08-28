@@ -1,0 +1,49 @@
+<aside class="qintent" data-quote-intent hidden aria-live="polite">
+  <span class="qintent__eyebrow">Your selection</span>
+  <strong class="qintent__value" data-quote-intent-value></strong>
+  <span class="qintent__note">We will carry this into your pricing request.</span>
+</aside>
+
+<style>
+  .qintent {
+    margin: 0 0 1.4rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--bronze-soft);
+    background: var(--linen-deep);
+  }
+  .qintent__eyebrow {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--bronze-ink);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .qintent__value {
+    display: block;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .qintent__note {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--muted);
+    font-size: var(--t-small);
+  }
+</style>
+
+<script>
+  const box = document.querySelector<HTMLElement>('[data-quote-intent]');
+  const value = box?.querySelector<HTMLElement>('[data-quote-intent-value]');
+  if (box && value) {
+    const params = new URLSearchParams(window.location.search);
+    const packageIntent = params.get('package')?.trim();
+    if (packageIntent) {
+      value.textContent = packageIntent;
+      box.hidden = false;
+    }
+  }
+</script>

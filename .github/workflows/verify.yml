@@ -4,11 +4,6 @@
 # unit tests, pre-launch board — on every push and pull request touching
 # buxena-v2. It only ever reads and builds: nothing here deploys, publishes,
 # or touches `main` / V1.
-#
-# No secrets are used or needed. The build is fully static plus a Netlify SSR
-# function bundle; the admin and enquiry paths never run here, so no Supabase,
-# SMTP or Telegram credentials are involved. Keep it that way — a CI job that
-# needs production keys is a CI job that can email a real customer by accident.
 name: Verify
 
 on:
@@ -31,30 +26,57 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Matches local development. Node 22+ is required: the unit tests are
-          # TypeScript and rely on native type stripping.
           node-version: '22'
           cache: npm
 
       - run: npm ci
 
-      # Type check first — it is the cheapest gate and the one that catches
-      # the widest class of mistakes. It has already caught a real dashboard
-      # bug (a Promise.all whose results were destructured out of order), so
-      # it must stay at zero errors rather than being treated as advisory.
       - name: Type check
         run: npm run check
 
+      # Keep the exact output as an artifact as well as in the log. This makes
+      # a failing draft PR diagnosable without ever adding secrets or touching
+      # production, and can stay useful for future regressions.
       - name: Unit tests
-        run: npm test
+        id: unit_tests
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee unit-test-output.txt
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      # The pre-launch board builds the site itself and then asserts on the
-      # output: routes present, no broken internal links, titles/descriptions,
-      # sitemap and robots correctness, the pricing freeze (no unapproved
-      # price may appear on any public page), lead-form paths, and that no
-      # watermarked preview image is referenced.
-      #
-      # It boots `astro dev` for the form checks; nothing is sent or stored,
-      # because dev mode short-circuits before any production service.
+      - name: Upload unit-test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-diagnostics
+          path: unit-test-output.txt
+          if-no-files-found: error
+
+      - name: Fail on unit-test errors
+        if: steps.unit_tests.outputs.exit_code != '0'
+        run: exit 1
+
       - name: Pre-launch board
-        run: npm run prelaunch
+        id: prelaunch
+        shell: bash
+        run: |
+          set +e
+          npm run prelaunch 2>&1 | tee prelaunch-output.txt
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload pre-launch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prelaunch-diagnostics
+          path: prelaunch-output.txt
+          if-no-files-found: error
+
+      - name: Fail on pre-launch errors
+        if: steps.prelaunch.outputs.exit_code != '0'
+        run: exit 1

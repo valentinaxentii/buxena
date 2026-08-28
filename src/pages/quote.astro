@@ -5,6 +5,7 @@ import QuoteCompare from '../components/QuoteCompare.astro';
 import CustomerAnswerSystem from '../components/CustomerAnswerSystem.astro';
 import ContinueProject from '../components/ContinueProject.astro';
 import ReassurancePanel from '../components/ReassurancePanel.astro';
+import QuoteIntentBanner from '../components/QuoteIntentBanner.astro';
 import { publicEmail } from '../data/site';
 
 // Claim-audited (founders' review): no automatic promise of a written
@@ -39,6 +40,7 @@ const expect = [
     </div>
     <div class="shell quote">
       <div class="quote__form">
+        <QuoteIntentBanner />
         <QuoteForm />
       </div>
       <aside class="quote__side">

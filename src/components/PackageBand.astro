@@ -2,9 +2,9 @@
 /**
  * Three-way package selector rendered on every product page between the
  * description and the enquiry form. No pricing is displayed anywhere —
- * every card routes into the same Request Pricing conversion, carrying the
- * chosen package in the tracking payload so the quote conversation starts
- * with the buyer's intent already known.
+ * the Sauna and Project paths go straight into pricing; BUXENA Complete goes
+ * through the full system builder first so heater, stones, lighting and
+ * installation intent travel together instead of becoming separate enquiries.
  */
 import { packages } from '../data/packages';
 
@@ -12,6 +12,10 @@ interface Props {
   model: string;
 }
 const { model } = Astro.props;
+const packageHref = (id: string, name: string) =>
+  id === 'complete'
+    ? `/build-package/?model=${encodeURIComponent(model)}`
+    : `/quote/?model=${encodeURIComponent(model)}&package=${encodeURIComponent(name)}`;
 ---
 
 <section class="band band--deep pkg" data-pkg-band data-pkg-model={model}>
@@ -19,6 +23,7 @@ const { model } = Astro.props;
     <div class="sec-head reveal">
       <span class="eyebrow">Three Ways to Buy</span>
       <h2 class="h2 measure--tight">From the sauna alone to the whole project</h2>
+      <p class="lead measure">Choose the level of support you want. We carry that choice into your pricing request so you do not have to explain it again.</p>
     </div>
 
     <div class="grid cols-3 reveal">
@@ -34,15 +39,23 @@ const { model } = Astro.props;
           </ul>
           {pkg.note && <p class="pkg__note">{pkg.note}</p>}
           <a
-            class="link pkg__cta"
-            href="#enquire"
+            class="btn btn--outline pkg__cta"
+            href={packageHref(pkg.id, pkg.name)}
             data-track="product_package_selected"
             data-track-model={model}
             data-track-package={pkg.name}
             data-track-form-type="package_card"
-          >Request pricing <span class="arrow" aria-hidden="true">→</span></a>
+          >{pkg.id === 'complete' ? 'Configure Complete Package' : 'Build This Package'}</a>
         </article>
       ))}
+    </div>
+
+    <div class="pkg__shop reveal">
+      <p>Want to understand the components before requesting pricing?</p>
+      <div class="pkg__shop-links">
+        <a class="link" href="/heaters/">Compare Heater Systems <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="link" href="/accessories/">Browse Stones, Lighting &amp; Accessories <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
     </div>
   </div>
 </section>
@@ -56,7 +69,7 @@ const { model } = Astro.props;
     padding: clamp(1.4rem, 1rem + 1.3vw, 2.1rem);
     height: 100%;
   }
-  .pkg__card--flagged { border-color: var(--bronze); }
+  .pkg__card--flagged { border-color: var(--bronze); box-shadow: 0 12px 34px rgba(40, 29, 18, 0.08); }
 
   .pkg__flag {
     align-self: flex-start;
@@ -90,14 +103,16 @@ const { model } = Astro.props;
   }
 
   .pkg__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.2rem; }
-
-  .pkg__cta { margin-top: auto; align-self: flex-start; }
+  .pkg__cta { margin-top: auto; align-self: stretch; justify-content: center; text-align: center; }
+  .pkg__shop { margin-top: clamp(1.5rem, 1rem + 2vw, 2.5rem); padding-top: 1.2rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; }
+  .pkg__shop p { margin: 0; color: var(--muted); font-size: var(--t-small); }
+  .pkg__shop-links { display: flex; flex-wrap: wrap; gap: 0.8rem 1.5rem; }
+  @media (max-width: 720px) { .pkg__shop { align-items: flex-start; flex-direction: column; } }
 </style>
 
 <script>
   import { track } from '../lib/track';
 
-  // product_package_view — once, when the package band first enters view.
   const band = document.querySelector<HTMLElement>('[data-pkg-band]');
   if (band && 'IntersectionObserver' in window) {
     const io = new IntersectionObserver(([entry]) => {

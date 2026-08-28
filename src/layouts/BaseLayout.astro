@@ -156,6 +156,7 @@ const webSiteSchema = {
 
     <script>
       import { track, type TrackEvent, type TrackPayload } from '../lib/track';
+      import { rememberCommercialContext } from '../lib/enquiry-client';
 
       // Delegated conversion tracking. Any element carrying data-track="<event>"
       // fires that event on click, with every data-track-* attribute passed
@@ -185,6 +186,36 @@ const webSiteSchema = {
         if (!link) return;
         track(link.href.startsWith('tel:') ? 'phone_click' : 'email_click', {
           href: link.href,
+        });
+      });
+
+      /**
+       * Keep configurator choices attached to the buyer even if they leave the
+       * product page through a different pricing CTA. The shared enquiry client
+       * consumes this context on the first successful lead submission and then
+       * clears it, so configuration intent cannot get stranded in the UI.
+       */
+      const syncConfiguratorContext = (root: HTMLElement) => {
+        const selections = Array.from(root.querySelectorAll<HTMLInputElement>('[data-cfg-input]:checked'))
+          .map((input) => {
+            const group = input.closest('[data-cfg-group]');
+            const groupLabel = group?.querySelector('.cfg__legend')?.childNodes[0]?.textContent?.trim() ?? input.dataset.cfgInput ?? 'Option';
+            const optionLabel = input.dataset.cfgLabel ?? input.value;
+            return `${groupLabel}: ${optionLabel}`;
+          });
+        const zip = root.querySelector<HTMLInputElement>('[data-cfg-zip]')?.value.trim() ?? '';
+        if (!selections.length && !zip) return;
+        rememberCommercialContext({
+          model: root.dataset.model ?? '',
+          configuration: selections,
+          zip,
+        });
+      };
+
+      document.querySelectorAll<HTMLElement>('[data-configurator]').forEach((root) => {
+        root.addEventListener('change', () => syncConfiguratorContext(root));
+        root.addEventListener('input', (e) => {
+          if ((e.target as HTMLElement | null)?.matches('[data-cfg-zip]')) syncConfiguratorContext(root);
         });
       });
     </script>

@@ -24,6 +24,52 @@ export interface EnquiryResult {
   enquiryId?: string | null;
 }
 
+interface CommercialContext {
+  model?: string;
+  configuration?: string[];
+  zip?: string;
+}
+
+const COMMERCIAL_CONTEXT_KEY = 'buxena:commercialContext';
+
+/**
+ * Preserve high-value buying context across the product-page → quote step.
+ * This is session-only and deliberately limited to commercial selections —
+ * never contact details, payment data or free-form private notes.
+ */
+export function rememberCommercialContext(context: CommercialContext): void {
+  try {
+    sessionStorage.setItem(COMMERCIAL_CONTEXT_KEY, JSON.stringify(context));
+  } catch {
+    /* storage unavailable — the normal enquiry path still works */
+  }
+}
+
+function readCommercialContext(): CommercialContext | null {
+  try {
+    const raw = sessionStorage.getItem(COMMERCIAL_CONTEXT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CommercialContext;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearCommercialContext(): void {
+  try { sessionStorage.removeItem(COMMERCIAL_CONTEXT_KEY); } catch { /* no-op */ }
+}
+
+function commercialContextBlock(context: CommercialContext | null): string {
+  if (!context) return '';
+  const lines = [
+    context.model && `Configured model: ${context.model}`,
+    context.configuration?.length && `Configured selections:\n${context.configuration.map((line) => `- ${line}`).join('\n')}`,
+    context.zip && `Configured delivery ZIP: ${context.zip}`,
+  ].filter(Boolean);
+  return lines.length ? `PRODUCT CONFIGURATION\n${lines.join('\n')}` : '';
+}
+
 export async function submitEnquiry(payload: Record<string, unknown>): Promise<EnquiryResult> {
   // Captured only at submission time, not across visits. Query-string values
   // are limited to standard campaign keys so CRM users see useful attribution
@@ -41,7 +87,20 @@ export async function submitEnquiry(payload: Record<string, unknown>): Promise<E
     utmContent: params.get('utm_content') ?? '',
     utmTerm: params.get('utm_term') ?? '',
   };
-  const enrichedPayload = { ...payload, attribution };
+
+  const context = readCommercialContext();
+  const originalMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
+  // ProductConfigurator's own exact-quote CTA already writes the selections
+  // into the quote textarea. The session context exists for every OTHER exit
+  // from the product page. Do not append the same configuration twice when the
+  // customer used the exact-quote CTA.
+  const messageAlreadyHasConfiguration = originalMessage.includes('Configured on the product page:');
+  const contextBlock = messageAlreadyHasConfiguration ? '' : commercialContextBlock(context);
+  const enrichedPayload = {
+    ...payload,
+    ...(contextBlock ? { message: [originalMessage, contextBlock].filter(Boolean).join('\n\n') } : {}),
+    attribution,
+  };
 
   const emit = (event: 'form_success' | 'form_error', extra: Record<string, unknown> = {}) => {
     window.dataLayer = window.dataLayer || [];
@@ -65,6 +124,7 @@ export async function submitEnquiry(payload: Record<string, unknown>): Promise<E
       emit('form_error', { errorStatus: res.status });
       return { ok: false, error: body.error || `Request failed (${res.status})` };
     }
+    clearCommercialContext();
     emit('form_success', { devMode: Boolean(body.devMode) });
     return { ok: true, devMode: Boolean(body.devMode), enquiryId: body.enquiryId ?? null };
   } catch {

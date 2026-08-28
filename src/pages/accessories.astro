@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { accessoryProducts, accessoryCategories } from '../data/accessories';
+---
+
+<BaseLayout
+  title="Sauna Accessories"
+  description="Curated sauna accessories, lighting and stones selected to complete a BUXENA sauna project."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Complete the Sauna</span>
+      <h1 class="display measure--tight">Accessories chosen as part of the system</h1>
+      <p class="lead measure">
+        The useful pieces, not an endless parts shelf. Choose a set, lighting or stones and we will match it to the sauna and heater in your quote.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell acats">
+      {accessoryCategories.map((category) => (
+        <a class="acat" href={`#${category.id}`}>
+          <span class="acat__name">{category.label}</span>
+          <span class="acat__blurb">{category.blurb}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  {accessoryCategories.map((category) => {
+    const products = accessoryProducts.filter((p) => p.category === category.id);
+    if (!products.length) return null;
+    return (
+      <section class="band" id={category.id}>
+        <div class="shell">
+          <div class="sec-head">
+            <span class="eyebrow">{category.label}</span>
+            <h2 class="h2 measure--tight">{category.blurb}</h2>
+          </div>
+          <div class="agrid">
+            {products.map((product) => (
+              <article class={`acard ${product.featured ? 'acard--featured' : ''}`}>
+                {product.featured && <span class="acard__flag">BUXENA Pick</span>}
+                <p class="acard__sku">{product.sku}</p>
+                <h3 class="h3 acard__name">{product.name}</h3>
+                {product.material && <p class="acard__material">{product.material}</p>}
+                <p class="acard__summary">{product.summary}</p>
+                <div class="acard__foot">
+                  <span class="acard__price">Quoted with your sauna</span>
+                  <a
+                    class="btn btn--outline"
+                    href={`/quote/?package=${encodeURIComponent(`Accessory: ${product.sku} — ${product.name}`)}`}
+                    data-track="pricing_request_started"
+                    data-track-form-type="accessory_catalog"
+                    data-track-model={product.sku}
+                  >Add to My Quote</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  })}
+
+  <section class="band band--deep">
+    <div class="shell next">
+      <div>
+        <span class="eyebrow">BUXENA Complete</span>
+        <h2 class="h2 measure--tight">Let us match the whole package</h2>
+        <p class="lead measure">Sauna, heater, controls, stones, lighting and the useful accessories — one specification, one quote.</p>
+      </div>
+      <a class="btn btn--bronze" href="/build-package/">Build My Complete Package</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .acats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; }
+  .acat { display: grid; gap: 0.35rem; padding: 1rem 1.1rem; border: 1px solid var(--line); text-decoration: none; color: inherit; }
+  .acat:hover { border-color: var(--bronze); }
+  .acat__name { font-weight: 700; }
+  .acat__blurb { color: var(--muted); font-size: var(--t-small); line-height: 1.5; }
+  .agrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .acard { position: relative; display: flex; flex-direction: column; min-height: 22rem; border: 1px solid var(--line); padding: 1.35rem; background: var(--linen); }
+  .acard--featured { border-color: var(--bronze); }
+  .acard__flag { align-self: flex-start; background: var(--bronze-btn); color: var(--linen); padding: 0.35rem 0.6rem; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.9rem; }
+  .acard__sku { margin: 0 0 0.55rem; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .acard__name { margin-bottom: 0.45rem; }
+  .acard__material { margin: 0 0 0.8rem; color: var(--bronze-ink); font-size: var(--t-small); }
+  .acard__summary { color: var(--muted-dark); line-height: 1.65; }
+  .acard__foot { display: grid; gap: 0.8rem; margin-top: auto; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+  .acard__price { color: var(--muted); font-size: var(--t-small); }
+  .next { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  @media (max-width: 900px) { .acats { grid-template-columns: repeat(2, 1fr); } .agrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .acats, .agrid { grid-template-columns: 1fr; } .next { align-items: stretch; flex-direction: column; } }
+</style>

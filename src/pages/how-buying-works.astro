@@ -19,8 +19,8 @@ const steps = [
   },
   {
     n: '02',
-    title: 'Request pricing',
-    body: 'Tell us about your project — or send us another quote you have received and we will help you compare it item by item.',
+    title: 'Build the system or request pricing',
+    body: 'Choose BUXENA Complete if you want to specify sauna, heater preference, controls, stones, lighting and installation together — or go straight to pricing if you already know what you need.',
   },
   {
     n: '03',
@@ -82,6 +82,13 @@ const steps = [
       <div class="hbw__ctas reveal">
         <a
           class="btn btn--bronze"
+          href="/build-package/"
+          data-track="build_package_click"
+          data-track-package="BUXENA Complete"
+          data-track-form-type="how_buying_works"
+        >Build BUXENA Complete</a>
+        <a
+          class="btn btn--outline"
           href="/quote/"
           data-track="request_pricing_click"
           data-track-form-type="how_buying_works"

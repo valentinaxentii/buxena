@@ -1,0 +1,230 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+import { displayTitle } from '../data/catalog';
+import { heaterSystemLines } from '../data/heater-systems';
+import { accessoryProducts } from '../data/accessories';
+import { INSTALLATION_PREFERENCES } from '../lib/product-config';
+
+const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((a, b) =>
+  displayTitle(a.data.title).localeCompare(displayTitle(b.data.title))
+);
+const accessorySets = accessoryProducts.filter((p) => p.category === 'sets');
+const stoneOptions = accessoryProducts.filter((p) => p.category === 'stones');
+const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting' && !p.sku.endsWith('-US'));
+---
+
+<BaseLayout
+  title="Build Your Sauna Package"
+  description="Build a BUXENA Complete sauna package — sauna, heater, control preference, stones, lighting, accessories, installation and delivery ZIP in one pricing request."
+>
+  <section class="band band--tight page-head">
+    <div class="shell shell--narrow">
+      <span class="eyebrow">BUXENA Complete</span>
+      <h1 class="display measure--tight">Build the whole sauna system before you ask for pricing</h1>
+      <p class="lead measure">
+        Choose what you know. Leave anything undecided and BUXENA will match it to the sauna. Every selection travels into one project pricing request.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell builder" data-package-builder>
+      <div class="builder__form">
+        <fieldset class="build-group">
+          <legend>1. Sauna</legend>
+          <p class="build-help">Choose a model, or leave it to BUXENA if you are still deciding.</p>
+          <label class="sr-only" for="bp-model">Sauna model</label>
+          <select id="bp-model" data-build-field="model">
+            <option value="">Help me choose the sauna</option>
+            {saunas.map((s) => <option value={s.data.title}>{displayTitle(s.data.title)}</option>)}
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>2. Heater system</legend>
+          <p class="build-help">A preference, not a compatibility promise. Final output and controls are confirmed for the selected room.</p>
+          <div class="build-options">
+            <label class="build-option">
+              <input type="radio" name="bp-heater" value="BUXENA to match the heater" data-build-label="Heater" checked />
+              <span><strong>BUXENA to match it</strong><small>Recommended if you do not already know the exact heater family.</small></span>
+            </label>
+            {heaterSystemLines.map((heater) => (
+              <label class="build-option">
+                <input type="radio" name="bp-heater" value={`Homecraft ${heater.line}`} data-build-label="Heater preference" />
+                <span><strong>Homecraft {heater.line}</strong><small>{heater.positioning}</small></span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>3. Control preference</legend>
+          <p class="build-help">Tell us how you would prefer to control the sauna. We only quote a control option after confirming that it is compatible with the selected heater.</p>
+          <label class="sr-only" for="bp-controls">Control preference</label>
+          <select id="bp-controls" data-build-field="controls">
+            <option value="BUXENA to match controls">BUXENA to match the controls</option>
+            <option value="App / Wi-Fi control if compatible">App / Wi-Fi control if compatible</option>
+            <option value="Local wall control if compatible">Local wall control if compatible</option>
+            <option value="No preference yet">No preference yet</option>
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>4. Sauna stones</legend>
+          <p class="build-help">Select a preference or let us match the correct quantity and stone size to the heater.</p>
+          <label class="sr-only" for="bp-stones">Sauna stones</label>
+          <select id="bp-stones" data-build-field="stones">
+            <option value="BUXENA to match stones">BUXENA to match the stones</option>
+            {stoneOptions.map((p) => <option value={`${p.sku} — ${p.name}`}>{p.name}</option>)}
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>5. Lighting</legend>
+          <p class="build-help">Lighting is confirmed against the sauna construction and electrical plan.</p>
+          <label class="sr-only" for="bp-lighting">Lighting</label>
+          <select id="bp-lighting" data-build-field="lighting">
+            <option value="BUXENA to recommend lighting">BUXENA to recommend lighting</option>
+            <option value="No additional lighting requested">No additional lighting</option>
+            {lightingOptions.map((p) => <option value={`${p.sku} — ${p.name}`}>{p.name}</option>)}
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>6. Accessory set</legend>
+          <p class="build-help">Optional. These are curated sets from the verified BUXENA supplier assortment.</p>
+          <label class="sr-only" for="bp-accessories">Accessory set</label>
+          <select id="bp-accessories" data-build-field="accessories">
+            <option value="No accessory set selected">No accessory set yet</option>
+            {accessorySets.map((p) => <option value={`${p.sku} — ${p.name}`}>{p.name}</option>)}
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>7. Installation</legend>
+          <p class="build-help">Tell us how much project support to include in the quote.</p>
+          <label class="sr-only" for="bp-install">Installation preference</label>
+          <select id="bp-install" data-build-field="installation">
+            {INSTALLATION_PREFERENCES.map((p) => <option value={p.label}>{p.label}</option>)}
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>8. Delivery ZIP</legend>
+          <p class="build-help">We use this to plan delivery and installation availability. It does not create an order.</p>
+          <label class="sr-only" for="bp-zip">Delivery ZIP code</label>
+          <input id="bp-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" placeholder="ZIP code" data-build-zip />
+        </fieldset>
+      </div>
+
+      <aside class="build-summary" aria-label="Your BUXENA Complete package">
+        <div class="build-summary__inner">
+          <span class="eyebrow">Your Package</span>
+          <h2 class="h3">BUXENA Complete</h2>
+          <dl data-build-summary></dl>
+          <p class="build-summary__price">Project pricing is confirmed after compatibility, delivery and site requirements are checked.</p>
+          <button class="btn btn--bronze" type="button" data-build-continue>Get My Package Pricing</button>
+          <p class="build-summary__note">Nothing is ordered or charged. We confirm the complete specification in writing first.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .builder { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.7fr); gap: clamp(1.5rem, 1rem + 3vw, 4rem); align-items: start; }
+  .builder__form { display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .build-group { border: 0; border-bottom: 1px solid var(--line); margin: 0; padding: 1.35rem 0; }
+  .build-group legend { padding: 0; font-family: var(--font-display); font-size: 1.45rem; color: var(--ink); }
+  .build-help { margin: 0.35rem 0 0.9rem; color: var(--muted); font-size: var(--t-small); line-height: 1.55; }
+  .build-group select, .build-group input[type='text'] { width: 100%; padding: 0.8rem 0.9rem; border: 1px solid var(--line); background: var(--linen); color: var(--ink); font: inherit; }
+  .build-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+  .build-option { display: flex; gap: 0.7rem; min-height: 4.8rem; padding: 0.85rem; border: 1px solid var(--line); cursor: pointer; }
+  .build-option:has(input:checked) { border-color: var(--bronze); background: var(--linen-deep); }
+  .build-option input { margin-top: 0.25rem; accent-color: var(--bronze); }
+  .build-option span { display: grid; gap: 0.22rem; }
+  .build-option strong { font-size: 0.9rem; }
+  .build-option small { color: var(--muted); line-height: 1.45; }
+  .build-summary__inner { position: sticky; top: calc(var(--hdr-h) + 1rem); padding: 1.4rem; border: 1px solid var(--bronze-soft); background: var(--linen-deep); }
+  .build-summary h2 { margin: 0.35rem 0 1rem; }
+  .build-summary dl { display: grid; gap: 0; margin: 0; }
+  .build-summary dl div { display: grid; grid-template-columns: minmax(7rem, 0.7fr) 1fr; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line); }
+  .build-summary dt { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; }
+  .build-summary dd { margin: 0; text-align: right; font-size: 0.85rem; }
+  .build-summary__price { margin: 1rem 0; color: var(--bronze-ink); font-size: var(--t-small); line-height: 1.55; }
+  .build-summary .btn { width: 100%; justify-content: center; }
+  .build-summary__note { margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+  @media (max-width: 900px) { .builder { grid-template-columns: 1fr; } .build-summary { order: -1; } .build-summary__inner { position: static; } }
+  @media (max-width: 640px) { .build-options { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  import { rememberCommercialContext } from '../lib/enquiry-client';
+
+  const root = document.querySelector<HTMLElement>('[data-package-builder]');
+  if (root) {
+    const summary = root.querySelector<HTMLElement>('[data-build-summary]')!;
+    const model = root.querySelector<HTMLSelectElement>('[data-build-field="model"]')!;
+    const zip = root.querySelector<HTMLInputElement>('[data-build-zip]')!;
+
+    const initialModel = new URLSearchParams(window.location.search).get('model')?.trim();
+    if (initialModel && [...model.options].some((option) => option.value === initialModel)) {
+      model.value = initialModel;
+    }
+
+    const labelFor = (el: HTMLSelectElement) => el.selectedOptions[0]?.textContent?.trim() || el.value;
+
+    const collect = () => {
+      const lines: Array<[string, string]> = [];
+      if (model.value) lines.push(['Sauna', labelFor(model)]);
+      else lines.push(['Sauna', 'BUXENA to recommend']);
+
+      const heater = root.querySelector<HTMLInputElement>('input[name="bp-heater"]:checked');
+      if (heater) lines.push(['Heater', heater.value]);
+
+      for (const key of ['controls', 'stones', 'lighting', 'accessories', 'installation']) {
+        const field = root.querySelector<HTMLSelectElement>(`[data-build-field="${key}"]`);
+        if (field) lines.push([key[0].toUpperCase() + key.slice(1), labelFor(field)]);
+      }
+      if (zip.value.trim()) lines.push(['Delivery ZIP', zip.value.trim()]);
+      return lines;
+    };
+
+    const render = () => {
+      summary.replaceChildren();
+      for (const [label, value] of collect()) {
+        const row = document.createElement('div');
+        const dt = document.createElement('dt');
+        const dd = document.createElement('dd');
+        dt.textContent = label;
+        dd.textContent = value;
+        row.append(dt, dd);
+        summary.appendChild(row);
+      }
+    };
+
+    root.addEventListener('change', render);
+    root.addEventListener('input', render);
+    render();
+
+    root.querySelector<HTMLButtonElement>('[data-build-continue]')?.addEventListener('click', () => {
+      if (zip.value && !/^\d{5}$/.test(zip.value.trim())) {
+        zip.setCustomValidity('Enter a valid 5-digit U.S. ZIP code.');
+        zip.reportValidity();
+        return;
+      }
+      zip.setCustomValidity('');
+      const lines = collect();
+      rememberCommercialContext({
+        model: model.value || undefined,
+        configuration: lines.filter(([label]) => label !== 'Sauna' && label !== 'Delivery ZIP').map(([label, value]) => `${label}: ${value}`),
+        zip: zip.value.trim() || undefined,
+      });
+      const params = new URLSearchParams({ package: 'BUXENA Complete' });
+      if (model.value) params.set('model', model.value);
+      window.location.assign(`/quote/?${params.toString()}`);
+    });
+  }
+</script>
