@@ -157,6 +157,11 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
     const model = root.querySelector<HTMLSelectElement>('[data-build-field="model"]')!;
     const zip = root.querySelector<HTMLInputElement>('[data-build-zip]')!;
 
+    const initialModel = new URLSearchParams(window.location.search).get('model')?.trim();
+    if (initialModel && [...model.options].some((option) => option.value === initialModel)) {
+      model.value = initialModel;
+    }
+
     const labelFor = (el: HTMLSelectElement) => el.selectedOptions[0]?.textContent?.trim() || el.value;
 
     const collect = () => {
