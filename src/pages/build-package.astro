@@ -16,7 +16,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
 
 <BaseLayout
   title="Build Your Sauna Package"
-  description="Build a BUXENA Complete sauna package — sauna, heater preference, stones, lighting, accessories, installation and delivery ZIP in one pricing request."
+  description="Build a BUXENA Complete sauna package — sauna, heater, control preference, stones, lighting, accessories, installation and delivery ZIP in one pricing request."
 >
   <section class="band band--tight page-head">
     <div class="shell shell--narrow">
@@ -59,7 +59,19 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
         </fieldset>
 
         <fieldset class="build-group">
-          <legend>3. Sauna stones</legend>
+          <legend>3. Control preference</legend>
+          <p class="build-help">Tell us how you would prefer to control the sauna. We only quote a control option after confirming that it is compatible with the selected heater.</p>
+          <label class="sr-only" for="bp-controls">Control preference</label>
+          <select id="bp-controls" data-build-field="controls">
+            <option value="BUXENA to match controls">BUXENA to match the controls</option>
+            <option value="App / Wi-Fi control if compatible">App / Wi-Fi control if compatible</option>
+            <option value="Local wall control if compatible">Local wall control if compatible</option>
+            <option value="No preference yet">No preference yet</option>
+          </select>
+        </fieldset>
+
+        <fieldset class="build-group">
+          <legend>4. Sauna stones</legend>
           <p class="build-help">Select a preference or let us match the correct quantity and stone size to the heater.</p>
           <label class="sr-only" for="bp-stones">Sauna stones</label>
           <select id="bp-stones" data-build-field="stones">
@@ -69,7 +81,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
         </fieldset>
 
         <fieldset class="build-group">
-          <legend>4. Lighting</legend>
+          <legend>5. Lighting</legend>
           <p class="build-help">Lighting is confirmed against the sauna construction and electrical plan.</p>
           <label class="sr-only" for="bp-lighting">Lighting</label>
           <select id="bp-lighting" data-build-field="lighting">
@@ -80,7 +92,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
         </fieldset>
 
         <fieldset class="build-group">
-          <legend>5. Accessory set</legend>
+          <legend>6. Accessory set</legend>
           <p class="build-help">Optional. These are curated sets from the verified BUXENA supplier assortment.</p>
           <label class="sr-only" for="bp-accessories">Accessory set</label>
           <select id="bp-accessories" data-build-field="accessories">
@@ -90,7 +102,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
         </fieldset>
 
         <fieldset class="build-group">
-          <legend>6. Installation</legend>
+          <legend>7. Installation</legend>
           <p class="build-help">Tell us how much project support to include in the quote.</p>
           <label class="sr-only" for="bp-install">Installation preference</label>
           <select id="bp-install" data-build-field="installation">
@@ -99,7 +111,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
         </fieldset>
 
         <fieldset class="build-group">
-          <legend>7. Delivery ZIP</legend>
+          <legend>8. Delivery ZIP</legend>
           <p class="build-help">We use this to plan delivery and installation availability. It does not create an order.</p>
           <label class="sr-only" for="bp-zip">Delivery ZIP code</label>
           <input id="bp-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" placeholder="ZIP code" data-build-zip />
@@ -172,7 +184,7 @@ const lightingOptions = accessoryProducts.filter((p) => p.category === 'lighting
       const heater = root.querySelector<HTMLInputElement>('input[name="bp-heater"]:checked');
       if (heater) lines.push(['Heater', heater.value]);
 
-      for (const key of ['stones', 'lighting', 'accessories', 'installation']) {
+      for (const key of ['controls', 'stones', 'lighting', 'accessories', 'installation']) {
         const field = root.querySelector<HTMLSelectElement>(`[data-build-field="${key}"]`);
         if (field) lines.push([key[0].toUpperCase() + key.slice(1), labelFor(field)]);
       }
