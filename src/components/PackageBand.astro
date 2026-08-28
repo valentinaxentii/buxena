@@ -2,9 +2,10 @@
 /**
  * Three-way package selector rendered on every product page between the
  * description and the enquiry form. No pricing is displayed anywhere —
- * every card routes into the same Request Pricing conversion, carrying the
- * chosen package in the tracking payload so the quote conversation starts
- * with the buyer's intent already known.
+ * every card routes into the existing Request Pricing conversion with both
+ * the model and selected package in the URL, so the quote form and CRM keep
+ * the buyer's commercial intent even if they never complete optional project
+ * details.
  */
 import { packages } from '../data/packages';
 
@@ -19,6 +20,7 @@ const { model } = Astro.props;
     <div class="sec-head reveal">
       <span class="eyebrow">Three Ways to Buy</span>
       <h2 class="h2 measure--tight">From the sauna alone to the whole project</h2>
+      <p class="lead measure">Choose the level of support you want. We carry that choice into your pricing request so you do not have to explain it again.</p>
     </div>
 
     <div class="grid cols-3 reveal">
@@ -34,13 +36,13 @@ const { model } = Astro.props;
           </ul>
           {pkg.note && <p class="pkg__note">{pkg.note}</p>}
           <a
-            class="link pkg__cta"
-            href="#enquire"
+            class="btn btn--outline pkg__cta"
+            href={`/quote/?model=${encodeURIComponent(model)}&package=${encodeURIComponent(pkg.name)}`}
             data-track="product_package_selected"
             data-track-model={model}
             data-track-package={pkg.name}
             data-track-form-type="package_card"
-          >Request pricing <span class="arrow" aria-hidden="true">→</span></a>
+          >Build This Package</a>
         </article>
       ))}
     </div>
@@ -56,7 +58,7 @@ const { model } = Astro.props;
     padding: clamp(1.4rem, 1rem + 1.3vw, 2.1rem);
     height: 100%;
   }
-  .pkg__card--flagged { border-color: var(--bronze); }
+  .pkg__card--flagged { border-color: var(--bronze); box-shadow: 0 12px 34px rgba(40, 29, 18, 0.08); }
 
   .pkg__flag {
     align-self: flex-start;
@@ -90,8 +92,7 @@ const { model } = Astro.props;
   }
 
   .pkg__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.2rem; }
-
-  .pkg__cta { margin-top: auto; align-self: flex-start; }
+  .pkg__cta { margin-top: auto; align-self: stretch; justify-content: center; text-align: center; }
 </style>
 
 <script>
