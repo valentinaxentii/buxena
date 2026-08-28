@@ -2,10 +2,9 @@
 /**
  * Three-way package selector rendered on every product page between the
  * description and the enquiry form. No pricing is displayed anywhere —
- * every card routes into the existing Request Pricing conversion with both
- * the model and selected package in the URL, so the quote form and CRM keep
- * the buyer's commercial intent even if they never complete optional project
- * details.
+ * the Sauna and Project paths go straight into pricing; BUXENA Complete goes
+ * through the full system builder first so heater, stones, lighting and
+ * installation intent travel together instead of becoming separate enquiries.
  */
 import { packages } from '../data/packages';
 
@@ -13,6 +12,10 @@ interface Props {
   model: string;
 }
 const { model } = Astro.props;
+const packageHref = (id: string, name: string) =>
+  id === 'complete'
+    ? `/build-package/?model=${encodeURIComponent(model)}`
+    : `/quote/?model=${encodeURIComponent(model)}&package=${encodeURIComponent(name)}`;
 ---
 
 <section class="band band--deep pkg" data-pkg-band data-pkg-model={model}>
@@ -37,12 +40,12 @@ const { model } = Astro.props;
           {pkg.note && <p class="pkg__note">{pkg.note}</p>}
           <a
             class="btn btn--outline pkg__cta"
-            href={`/quote/?model=${encodeURIComponent(model)}&package=${encodeURIComponent(pkg.name)}`}
+            href={packageHref(pkg.id, pkg.name)}
             data-track="product_package_selected"
             data-track-model={model}
             data-track-package={pkg.name}
             data-track-form-type="package_card"
-          >Build This Package</a>
+          >{pkg.id === 'complete' ? 'Configure Complete Package' : 'Build This Package'}</a>
         </article>
       ))}
     </div>
