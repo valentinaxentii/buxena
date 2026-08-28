@@ -13,9 +13,8 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Thermo Pine"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas/eda-thermowood-1-3m-hero.png"
+  # Source photography remains rights-blocked. Figure renders the designed
+  # no-photo treatment until written website permission is recorded.
   alt: "BUX EDA 130 Thermo Pine barrel sauna exterior"
 dimensions:
   - { label: "Depth", value: "4.3 ft (130 cm)" }
