@@ -42,9 +42,9 @@ export const nav = [
   { label: 'Heaters', href: '/heaters/' },
   { label: 'Accessories', href: '/accessories/' },
   { label: 'For Trade', href: '/for-trade/' },
+  { label: 'Resources', href: '/resources/' },
   { label: 'Our Story', href: '/our-story/' },
   { label: 'Wellness', href: '/wellness/' },
-  { label: 'Heater Guide', href: '/heater-guide/' },
   { label: 'FAQ', href: '/faq/' },
   { label: 'Contact', href: '/contact/' },
 ];
