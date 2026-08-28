@@ -1,0 +1,105 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const groups = [
+  {
+    eyebrow: 'Choose',
+    title: 'Find the right sauna',
+    body: 'Start with the project, not the product list. Narrow the range by space, people, form and heating preference.',
+    links: [
+      { label: 'Plan Your Sauna', href: '/plan-your-sauna/' },
+      { label: 'Compare Saunas', href: '/compare/' },
+      { label: 'Browse All Saunas', href: '/saunas/' },
+      { label: 'See It In My Space', href: '/see-it-in-my-space/' },
+    ],
+  },
+  {
+    eyebrow: 'Specify',
+    title: 'Build the complete system',
+    body: 'Understand heating, controls, stones and the accessories that belong together before requesting project pricing.',
+    links: [
+      { label: 'Heater Systems', href: '/heaters/' },
+      { label: 'Heater Compatibility Guide', href: '/heater-guide/' },
+      { label: 'Stones, Lighting & Accessories', href: '/accessories/' },
+    ],
+  },
+  {
+    eyebrow: 'Prepare',
+    title: 'Know what the project needs',
+    body: 'Delivery, access, foundation and electrical planning matter as much as the sauna itself. Use these pages before committing.',
+    links: [
+      { label: 'How Buying Works', href: '/how-buying-works/' },
+      { label: 'Frequently Asked Questions', href: '/faq/' },
+      { label: 'Book a Consultation', href: '/consultation/' },
+    ],
+  },
+  {
+    eyebrow: 'Trade',
+    title: 'Architects, builders and commercial projects',
+    body: 'Send plans, drawings and site information early so the sauna can be specified around the project instead of retrofitted later.',
+    links: [
+      { label: 'For Trade', href: '/for-trade/' },
+      { label: 'Submit a Project', href: '/for-trade/#trade-form' },
+      { label: 'Request Project Pricing', href: '/quote/' },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Sauna Resources"
+  description="BUXENA sauna buying resources — model selection, heater systems, planning, installation guidance, trade support and project pricing."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Resources</span>
+      <h1 class="display measure--tight">Everything you need before choosing a sauna</h1>
+      <p class="lead measure">
+        Use the tools below to narrow the models, understand the heating system and prepare the site. When you are ready, your answers flow into the same BUXENA pricing process.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell rgrid">
+      {groups.map((group) => (
+        <article class="rcard">
+          <span class="eyebrow">{group.eyebrow}</span>
+          <h2 class="h2 rcard__title">{group.title}</h2>
+          <p class="rcard__body">{group.body}</p>
+          <nav class="rcard__links" aria-label={group.title}>
+            {group.links.map((link) => (
+              <a class="rcard__link" href={link.href}>
+                <span>{link.label}</span><span aria-hidden="true">→</span>
+              </a>
+            ))}
+          </nav>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="band band--deep">
+    <div class="shell rnext">
+      <div>
+        <span class="eyebrow">Ready for numbers?</span>
+        <h2 class="h2 measure--tight">Turn the research into one project quote</h2>
+        <p class="lead measure">Model, heater, options, delivery location and installation preference — one request instead of separate conversations.</p>
+      </div>
+      <a class="btn btn--bronze" href="/quote/">Get Project Pricing</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .rgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .rcard { padding: clamp(1.4rem, 1rem + 1.5vw, 2.2rem); border: 1px solid var(--line); background: var(--linen); }
+  .rcard__title { margin-top: 0.45rem; }
+  .rcard__body { color: var(--muted-dark); line-height: 1.7; max-width: 42rem; }
+  .rcard__links { display: grid; margin-top: 1.2rem; border-top: 1px solid var(--line); }
+  .rcard__link { display: flex; justify-content: space-between; gap: 1rem; padding: 0.85rem 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 600; }
+  .rcard__link:hover { color: var(--bronze-ink); }
+  .rnext { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  @media (max-width: 760px) { .rgrid { grid-template-columns: 1fr; } .rnext { flex-direction: column; align-items: stretch; } }
+</style>
