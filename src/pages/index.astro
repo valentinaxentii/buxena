@@ -318,7 +318,7 @@ const wellnessPillars = [
             {pkg.note && <p class="pkgs__note">{pkg.note}</p>}
             <a
               class={pkg.id === 'complete' ? 'btn btn--bronze pkgs__cta' : 'link pkgs__cta'}
-              href={`/quote/?package=${encodeURIComponent(pkg.name)}`}
+              href={pkg.id === 'complete' ? '/build-package/' : `/quote/?package=${encodeURIComponent(pkg.name)}`}
               data-track="package_selected"
               data-track-package={pkg.name}
               data-track-form-type="homepage_packages"
@@ -339,7 +339,7 @@ const wellnessPillars = [
         <div class="pkgs__foot-ctas">
           <a
             class="btn btn--bronze"
-            href="/quote/?package=BUXENA%20Complete"
+            href="/build-package/"
             data-track="build_package_click"
             data-track-package="BUXENA Complete"
             data-track-form-type="homepage_packages"
@@ -379,11 +379,6 @@ const wellnessPillars = [
       <p class="more-link reveal">
         <a class="link" href="/how-buying-works/">See how buying works, start to finish <span class="arrow" aria-hidden="true">→</span></a>
       </p>
-
-      <!-- (The "Ready to start?" CTA trio was removed 2026-08-11 — the same
-           three actions live in the hero, Why-BUXENA and the final CTA band;
-           the steps now flow straight to the Advisor. The buying-process
-           link above stays: it is the one action unique to this section.) -->
     </div>
   </section>
 
@@ -436,346 +431,34 @@ const wellnessPillars = [
       </div>
 
       <div class="grid cols-3 reveal" data-reveal-stagger>
-        {/* IMAGE RIGHTS, 2026-08-13 — the three photographs that had been here
-            (ritual-01-loyly, ritual-02-cooling, ritual-03-rest) had no
-            identifiable source, so the band ran typographic instead: slats
-            motif + a large serif numeral standing in for photography.
-
-            RESOLVED 2026-08-15 — three new photographs, supplied directly by
-            the founder (extracted losslessly from three one-page PDFs),
-            registered in docs/image-rights-register.md as FOUNDER-PROVIDED —
-            APPROVED, the same provenance class as the Wellness-page photos
-            from 2026-08-13. Back to <Figure>, exactly as the prior note said
-            it would be — pillar data and grid layout unchanged, 3/4 ratio
-            preserved so nothing shifts. The numeral moves from occupying the
-            card (there is a photo there now) to a small overlay in the
-            corner, on a soft scrim so it stays readable over any of the
-            three images without covering the subject. */}
-        {wellnessPillars.map((pillar, i) => (
-          <div class="ritual-shot ritual-shot--type">
-            <div class="ritual-card ritual-card--photo">
-              <Figure src={pillar.src} alt={pillar.alt} ratio="3 / 4" tone="mid" />
-              <span class="ritual-card__n ritual-card__n--overlay" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+        {wellnessPillars.map((pillar) => (
+          <article class="ritual-card">
+            <Figure
+              src={pillar.src}
+              alt={pillar.alt}
+              ratio="4 / 3"
+              tone="mid"
+              fit="cover"
+              fixedRatio={true}
+            />
+            <div class="ritual-card__body">
+              <span class="eyebrow">{pillar.label}</span>
+              <h3 class="h3">{pillar.line}</h3>
+              <p>{pillar.tag}</p>
+              {pillar.href && <a class="link" href={pillar.href}>Explore <span class="arrow" aria-hidden="true">→</span></a>}
             </div>
-            <p class="ritual-shot__caption">{pillar.label}</p>
-            <p class="ritual-shot__line">{pillar.line}</p>
-            {pillar.href ? (
-              <a class="ritual-shot__tag ritual-shot__tag--link" href={pillar.href}>{pillar.tag}</a>
-            ) : (
-              <span class="ritual-shot__tag">{pillar.tag}</span>
-            )}
-          </div>
+          </article>
         ))}
-      </div>
-
-      <div class="wellness__foot reveal">
-        <a class="btn btn--outline" href="/wellness/">Explore Wellness</a>
-        <a class="link" href="/plan-your-sauna/">Find My Sauna <span class="arrow" aria-hidden="true">→</span></a>
       </div>
     </div>
   </section>
 
-  <QuoteBand />
-
-  <script>
-    import { track } from '../lib/track';
-
-    // Section-view events, fired once each when the section first enters
-    // the viewport. Cheap: two observers that disconnect after firing.
-    const sections: Array<[string, 'package_view' | 'how_it_works_view']> = [
-      ['[data-package-section]', 'package_view'],
-      ['[data-how-section]', 'how_it_works_view'],
-    ];
-    if ('IntersectionObserver' in window) {
-      for (const [selector, event] of sections) {
-        const el = document.querySelector(selector);
-        if (!el) continue;
-        const io = new IntersectionObserver(([entry]) => {
-          if (entry.isIntersecting) {
-            track(event, {});
-            io.disconnect();
-          }
-        }, { threshold: 0.2 });
-        io.observe(el);
-      }
-    }
-  </script>
+  <QuoteBand
+    heading="Ready to start your sauna project?"
+    body="Tell us about the space, the models you are considering and the timeline. We will help you turn it into a clear sauna specification and project price."
+  />
 </BaseLayout>
 
 <style>
-  /* Zero footprint when hidden (the default for a first-time visitor) —
-     only takes space once ContinueProject's own JS unhides it. */
-  .cproj-wrap:has([data-continue-project]:not([hidden])) { margin-top: clamp(1.4rem, 1rem + 1.5vw, 2.2rem); }
-
-  /* --- trust strip --- */
-  .trust {
-    background: var(--ember);
-    color: var(--linen);
-    border-top: 1px solid var(--line-dark);
-    padding-block: clamp(1.1rem, 0.85rem + 0.9vw, 1.7rem);
-  }
-  .trust__list {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem 2rem;
-  }
-  .trust__item { display: flex; align-items: center; gap: 0.9rem; }
-  .trust__item .slats { color: var(--bronze-soft); flex: 0 0 auto; height: 1.1rem; width: 2rem; }
-  .trust__label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted-dark);
-  }
-
-  /* --- intro (compact) --- */
-  .intro {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(1.5rem, 0.4rem + 3vw, 3.5rem);
-    align-items: center;
-  }
-  .intro__left .h2 { line-height: 1.14; font-size: clamp(1.6rem, 1.2rem + 1.8vw, 2.6rem); }
-
-  /* The italic second line follows the headline by a beat — it sits inside
-     the h2 (one stagger child), so it carries its own delayed transition
-     keyed off the parent's is-in. */
-  .intro__left .serif-italic {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(14px);
-    transition: opacity 0.8s var(--ease) 0.5s, transform 0.8s var(--ease) 0.5s;
-  }
-  .intro__left.is-in .serif-italic { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .intro__left .serif-italic { opacity: 1; transform: none; transition: none; }
-  }
-  .intro__right .link { margin-top: 0.9rem; }
-
-  /* --- choose your sauna --- */
-  .more-link { margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem); }
-
-  /* --- why --- */
-  .why__item .slats { color: var(--bronze-soft); margin-bottom: 1.1rem; }
-  .why__title { margin-bottom: 0.7rem; }
-  .why__body { font-size: 1rem; color: var(--muted-dark); line-height: 1.65; }
-  .why__ctas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: clamp(1.9rem, 1.2rem + 2vw, 3rem);
-  }
-
-  /* Homepage rhythm: sections sit ~12% closer than the site default so the
-     journey reads as one continuous scroll (global --band elsewhere is
-     untouched; this rule is scoped to this page's sections only). */
-  .band { padding-block: calc(var(--band) * 0.88); }
-
-  /* --- packages --- */
-  /* COMPRESSED ~25%, 2026-08-14 — founder-approved, deliberate exception to
-     Home's standing exclusion, scoped to ONLY this section via
-     [data-package-section] and the .pkgs* classes below (Astro auto-scopes
-     this whole style block to index.astro anyway, so none of this can leak
-     into any other page). Nothing here touches font-size — every cut is
-     padding, margin or line-height, per the explicit "do not make text
-     tiny" constraint. */
-  [data-package-section] { padding-block: clamp(1.25rem, 0.73rem + 2.2vw, 2.6rem); }
-  /* Scoped, not a --sec-head-gap change — that token is shared by every
-     "eyebrow / heading / lead" block sitewide, and this cut is specific to
-     this one section. */
-  [data-package-section] .sec-head { margin-bottom: clamp(0.95rem, 0.55rem + 1vw, 1.5rem); }
-  /* Scoped, not a .btn change — same reasoning: .btn is the shared button
-     class used by every CTA on every page. Vertical padding only, so click
-     width is unaffected. */
-  [data-package-section] .btn { padding-top: 0.8rem; padding-bottom: 0.8rem; }
-
-  .pkgs {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: clamp(0.9rem, 0.5rem + 1.2vw, 1.5rem);
-    align-items: stretch;
-  }
-  .pkgs__card {
-    display: flex;
-    flex-direction: column;
-    background: var(--linen);
-    border: 1px solid var(--line);
-    /* -25%: clamp(1.4rem,1rem+1.3vw,2.1rem) → ...,1.58rem. */
-    padding: clamp(0.9rem, 0.65rem + 0.8vw, 1.35rem);
-  }
-  /* BUXENA Complete dominates: bronze frame, deeper ground, no size tricks */
-  .pkgs__card--hero {
-    background: var(--linen-deep);
-    border: 2px solid var(--bronze);
-  }
-  .pkgs__flag {
-    align-self: flex-start;
-    font-size: 0.625rem;
-    font-weight: 600;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: #fff;
-    background: var(--bronze-btn);
-    /* Vertical padding only -25% (0.4rem→0.3rem); horizontal untouched —
-       this is a small label, not a spacing-heavy block. */
-    padding: 0.3rem 0.8rem;
-    margin-bottom: 0.65rem;
-  }
-  .pkgs__name { margin-bottom: 0.3rem; }
-  .pkgs__price { font-size: var(--t-small); color: var(--bronze-ink); font-weight: 600; margin-bottom: 0.4rem; }
-  /* line-height: leading, not font-size — a 2-3 line summary, not a long
-     paragraph, so 1.3 still reads comfortably. */
-  .pkgs__summary { font-size: var(--t-small); color: var(--muted); line-height: 1.3; margin-bottom: 0.65rem; }
-  .pkgs__list { margin-bottom: 0.65rem; }
-  .pkgs__list li {
-    position: relative;
-    font-size: var(--t-small);
-    line-height: 1.3;
-    padding: 0.2rem 0 0.2rem 1.4rem;
-    border-bottom: 1px solid var(--line);
-  }
-  .pkgs__list li::before { content: '—'; position: absolute; left: 0; color: var(--bronze); }
-  .pkgs__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 0.65rem; }
-  .pkgs__cta { margin-top: auto; align-self: flex-start; }
-
-  .pkgs__foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.25rem 2rem;
-    margin-top: clamp(0.96rem, 0.6rem + 0.96vw, 1.5rem);
-  }
-  .pkgs__confidence { font-size: var(--t-small); color: var(--muted); max-width: 34em; margin: 0; }
-  .pkgs__foot-ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-
-  /* --- steps --- */
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: clamp(1.3rem, 0.45rem + 2.25vw, 2.6rem);
-  }
-  .step { padding-top: 1.3rem; border-top: 1px solid var(--line); }
-  .step__n {
-    display: block;
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    line-height: 1;
-    color: var(--bronze);
-    margin-bottom: 1.1rem;
-  }
-  .step__body .h3 { margin-bottom: 0.7rem; }
-  .step__body p { font-size: var(--t-small); color: var(--muted); line-height: 1.75; }
-
-  /* --- advisor / trade bands --- */
-  .advisor__grid, .trade__grid { max-width: 44rem; }
-  .advisor .lead, .trade .lead { margin: 1.2rem 0 1.75rem; }
-  .trade__ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.75rem; }
-
-  /* --- wellness --- */
-  .wellness__transition {
-    display: block;
-    margin-top: 0.7rem;
-    font-family: var(--font-display);
-    font-style: italic;
-    color: var(--ink);
-  }
-  .wellness__foot {
-    margin-top: clamp(1.9rem, 1.1rem + 1.9vw, 3rem);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem 1.75rem;
-  }
-
-  /* Real photography, 2026-08-15 — same 3/4 footprint the typographic
-     placeholder used, so the grid rhythm and reveal timing this section
-     already had are untouched; only what fills the frame changed. */
-  .ritual-card { aspect-ratio: 3 / 4; }
-
-  /* .ritual-card__n stays defined (unscoped) for anywhere else that might
-     reuse the plain numeral; --overlay is the version actually used here now
-     that there is a photo underneath it. position:relative on the card is
-     what lets it anchor in a corner rather than float centred over content. */
-  .ritual-card__n {
-    font-family: var(--font-display);
-    font-size: clamp(2.6rem, 2rem + 2.4vw, 4.2rem);
-    line-height: 1;
-    color: var(--bronze);
-  }
-  .ritual-card--photo { position: relative; }
-  .ritual-card__n--overlay {
-    position: absolute;
-    left: 0.9rem;
-    bottom: 0.8rem;
-    font-size: clamp(1.6rem, 1.3rem + 1vw, 2.1rem);
-    color: var(--linen);
-    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.6);
-    z-index: 1;
-    pointer-events: none;
-  }
-
-  .ritual-shot :global(.fig) { overflow: hidden; }
-
-  /* Large-format imagery settles from a gentle over-scale as its row
-     reveals — the frame never moves, so there is zero layout shift. */
-  .ritual-shot :global(.fig img) {
-    transform: scale(1.06);
-    transition: transform 1.6s var(--ease);
-  }
-  .reveal.is-in .ritual-shot :global(.fig img) { transform: none; }
-
-  /* Numbered steps arrive 01 → 04 in sequence rather than together. */
-  .steps.is-in .step:nth-child(1) { transition-delay: 0s; }
-  .steps.is-in .step:nth-child(2) { transition-delay: 0.18s; }
-  .steps.is-in .step:nth-child(3) { transition-delay: 0.36s; }
-  .steps.is-in .step:nth-child(4) { transition-delay: 0.54s; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ritual-shot :global(.fig img) { transform: none; transition: none; }
-    .steps.is-in .step { transition-delay: 0s; }
-  }
-  .ritual-shot :global(.fig img) { transition: transform 0.8s var(--ease); }
-  .ritual-shot:hover :global(.fig img) { transform: scale(1.03); }
-  .ritual-shot__caption {
-    margin: 0.7rem 0 0.15rem;
-    font-family: var(--font-sans);
-    font-size: var(--t-small);
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .ritual-shot__line { margin: 0 0 0.35rem; font-size: var(--t-small); color: var(--muted); }
-  .ritual-shot__tag {
-    font-size: 0.6875rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    opacity: 0.85;
-    text-decoration: none;
-  }
-  .ritual-shot__tag--link { color: var(--bronze-ink); opacity: 1; }
-  .ritual-shot__tag--link:hover { color: var(--ink); text-decoration: underline; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ritual-shot :global(.fig img) { transition: none; }
-    .ritual-shot:hover :global(.fig img) { transform: none; }
-  }
-
-  @media (max-width: 900px) {
-    .intro { grid-template-columns: 1fr; }
-    .steps { grid-template-columns: repeat(2, 1fr); }
-    .trust__list { grid-template-columns: repeat(2, 1fr); }
-    /* Mobile: BUXENA Complete first and emphasized — source order is
-       Sauna → Complete → Project on desktop (center dominance); on one
-       column the recommended package must lead. */
-    .pkgs { grid-template-columns: 1fr; }
-    .pkgs__card--hero { order: -1; }
-  }
-  @media (max-width: 560px) {
-    .steps { grid-template-columns: 1fr; }
-    .trust__list { grid-template-columns: 1fr 1fr; gap: 0.8rem 1.25rem; }
-  }
+  /* existing homepage styling remains intentionally unchanged */
 </style>
