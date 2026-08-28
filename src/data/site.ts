@@ -39,6 +39,7 @@ export const publicEmail = site.emailConfirmed || showDev ? site.email : null;
 export const nav = [
   { label: 'Saunas', href: '/saunas/' },
   { label: 'Sauna Advisor', href: '/plan-your-sauna/' },
+  { label: 'Heaters', href: '/heaters/' },
   { label: 'Accessories', href: '/accessories/' },
   { label: 'For Trade', href: '/for-trade/' },
   { label: 'Our Story', href: '/our-story/' },
