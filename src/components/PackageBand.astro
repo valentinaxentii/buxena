@@ -46,6 +46,14 @@ const { model } = Astro.props;
         </article>
       ))}
     </div>
+
+    <div class="pkg__shop reveal">
+      <p>Want to understand the components before requesting pricing?</p>
+      <div class="pkg__shop-links">
+        <a class="link" href="/heaters/">Compare Heater Systems <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="link" href="/accessories/">Browse Stones, Lighting &amp; Accessories <span class="arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -93,12 +101,15 @@ const { model } = Astro.props;
 
   .pkg__note { font-size: 0.8125rem; color: var(--muted); font-style: italic; margin-bottom: 1.2rem; }
   .pkg__cta { margin-top: auto; align-self: stretch; justify-content: center; text-align: center; }
+  .pkg__shop { margin-top: clamp(1.5rem, 1rem + 2vw, 2.5rem); padding-top: 1.2rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; }
+  .pkg__shop p { margin: 0; color: var(--muted); font-size: var(--t-small); }
+  .pkg__shop-links { display: flex; flex-wrap: wrap; gap: 0.8rem 1.5rem; }
+  @media (max-width: 720px) { .pkg__shop { align-items: flex-start; flex-direction: column; } }
 </style>
 
 <script>
   import { track } from '../lib/track';
 
-  // product_package_view — once, when the package band first enters view.
   const band = document.querySelector<HTMLElement>('[data-pkg-band]');
   if (band && 'IntersectionObserver' in window) {
     const io = new IntersectionObserver(([entry]) => {
