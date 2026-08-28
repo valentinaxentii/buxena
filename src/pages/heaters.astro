@@ -1,0 +1,97 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { heaterSystemLines, heaterCommercialFacts } from '../data/heater-systems';
+---
+
+<BaseLayout
+  title="Sauna Heater Systems"
+  description="Compare BUXENA heater system families and add the right heater, controls and stones to your sauna quote."
+>
+  <section class="band band--tight page-head">
+    <div class="shell">
+      <span class="eyebrow">Heater Systems</span>
+      <h1 class="display measure--tight">Match the heater to the sauna, not the other way around</h1>
+      <p class="lead measure">
+        Choose the sauna first. We then match output, controls, stones and electrical requirements to the room volume, glazing and installation.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell hfacts">
+      {heaterCommercialFacts.map((fact) => <p>{fact}</p>)}
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell">
+      <div class="sec-head">
+        <span class="eyebrow">Homecraft</span>
+        <h2 class="h2 measure--tight">U.S. dealer-supported heater families</h2>
+        <p class="lead measure">
+          Homecraft has confirmed that BUXENA can bundle its heaters with third-party sauna manufacturers. Final model, output and controls are confirmed per project.
+        </p>
+      </div>
+
+      <div class="hgrid">
+        {heaterSystemLines.map((heater) => (
+          <article class="hcard">
+            <p class="hcard__brand">{heater.brand}</p>
+            <h3 class="h3">{heater.line}</h3>
+            <p class="hcard__position">{heater.positioning}</p>
+            <dl>
+              <div>
+                <dt>Electrical</dt>
+                <dd>{heater.electrical}</dd>
+              </div>
+              <div>
+                <dt>Project fit</dt>
+                <dd>{heater.availabilityNote}</dd>
+              </div>
+            </dl>
+            <a
+              class="btn btn--outline"
+              href={`/quote/?package=${encodeURIComponent(`Heater system interest: Homecraft ${heater.line}`)}`}
+              data-track="pricing_request_started"
+              data-track-form-type="heater_catalog"
+              data-track-model={`Homecraft ${heater.line}`}
+            >Add to My Sauna Quote</a>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--deep">
+    <div class="shell complete">
+      <div>
+        <span class="eyebrow">BUXENA Complete</span>
+        <h2 class="h2 measure--tight">Heater + controls + stones, matched as one system</h2>
+        <p class="lead measure">Avoid buying components separately and discovering compatibility problems later. We specify the complete heating system around the sauna you choose.</p>
+      </div>
+      <div class="complete__actions">
+        <a class="btn btn--bronze" href="/quote/?package=BUXENA%20Complete">Build My Complete Package</a>
+        <a class="btn btn--outline" href="/heater-guide/">Check Sauna Compatibility</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-head { padding-bottom: 0; }
+  .hfacts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; }
+  .hfacts p { margin: 0; border-top: 2px solid var(--bronze); padding: 0.9rem 0; font-size: var(--t-small); line-height: 1.65; color: var(--muted-dark); }
+  .hgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .hcard { display: flex; flex-direction: column; min-height: 25rem; padding: 1.4rem; border: 1px solid var(--line); background: var(--linen); }
+  .hcard__brand { margin: 0 0 0.45rem; color: var(--bronze-ink); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .hcard__position { color: var(--muted-dark); line-height: 1.65; }
+  .hcard dl { display: grid; gap: 0.75rem; margin: 1rem 0 1.4rem; }
+  .hcard dl div { border-top: 1px solid var(--line); padding-top: 0.7rem; }
+  .hcard dt { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .hcard dd { margin: 0.25rem 0 0; font-size: var(--t-small); line-height: 1.55; }
+  .hcard .btn { margin-top: auto; text-align: center; justify-content: center; }
+  .complete { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  .complete__actions { display: grid; gap: 0.7rem; min-width: 17rem; }
+  @media (max-width: 900px) { .hfacts { grid-template-columns: repeat(2, 1fr); } .hgrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .hfacts, .hgrid { grid-template-columns: 1fr; } .complete { flex-direction: column; align-items: stretch; } .complete__actions { min-width: 0; } }
+</style>
