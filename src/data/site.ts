@@ -36,6 +36,9 @@ export const site = {
 /** The email address, or null when it must not be shown to customers. */
 export const publicEmail = site.emailConfirmed || showDev ? site.email : null;
 
+// Primary navigation is deliberately commercial. Editorial and trust pages
+// remain available from Resources and the footer instead of competing with
+// the paths that move a buyer toward a quote.
 export const nav = [
   { label: 'Saunas', href: '/saunas/' },
   { label: 'Sauna Advisor', href: '/plan-your-sauna/' },
@@ -43,9 +46,6 @@ export const nav = [
   { label: 'Accessories', href: '/accessories/' },
   { label: 'For Trade', href: '/for-trade/' },
   { label: 'Resources', href: '/resources/' },
-  { label: 'Our Story', href: '/our-story/' },
-  { label: 'Wellness', href: '/wellness/' },
-  { label: 'FAQ', href: '/faq/' },
   { label: 'Contact', href: '/contact/' },
 ];
 
