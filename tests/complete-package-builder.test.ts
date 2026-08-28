@@ -16,7 +16,7 @@ test('BUXENA Complete has one integrated package builder', () => {
 test('product page Complete package route preserves the current model', () => {
   assert.match(band, /id === 'complete'/);
   assert.match(band, /build-package\/\?model=/);
-  assert.match(page, /searchParams/);
+  assert.match(page, /URLSearchParams/);
   assert.match(page, /initialModel/);
 });
 
