@@ -13,14 +13,10 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
+  # BUXENA-normalized product render remains the public hero. The separate
+  # installed-garden photo is omitted until written website rights exist.
   src: "/images/saunas-normalized/eda-thermowood-2-35m-transparent.png"
   alt: "BUX EDA 235 Thermo Pine barrel sauna exterior"
-gallery:
-  - src: "/images/saunas/eda-thermowood-2-35m-hero.jpeg"
-    alt: "BUX EDA 235 Thermo Pine barrel sauna installed on a garden patio"
-    fit: "cover"
 dimensions:
   - { label: "Depth", value: "7.7 ft (235 cm)" }
   - { label: "Width", value: "6.7 ft (205 cm)" }
