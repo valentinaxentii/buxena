@@ -6,11 +6,17 @@ const page = fs.readFileSync('src/pages/build-package.astro', 'utf8');
 const band = fs.readFileSync('src/components/PackageBand.astro', 'utf8');
 
 test('BUXENA Complete has one integrated package builder', () => {
-  for (const label of ['Sauna', 'Heater system', 'Sauna stones', 'Lighting', 'Accessory set', 'Installation', 'Delivery ZIP']) {
+  for (const label of ['Sauna', 'Heater system', 'Control preference', 'Sauna stones', 'Lighting', 'Accessory set', 'Installation', 'Delivery ZIP']) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /rememberCommercialContext/);
   assert.match(page, /package: 'BUXENA Complete'/);
+});
+
+test('control preference never promises unsupported remote control', () => {
+  assert.match(page, /App \/ Wi-Fi control if compatible/);
+  assert.match(page, /Local wall control if compatible/);
+  assert.match(page, /only quote a control option after confirming that it is compatible/i);
 });
 
 test('product page Complete package route preserves the current model', () => {
