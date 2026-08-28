@@ -44,6 +44,10 @@ const year = new Date().getFullYear();
               <li><a href={n.href}>{n.label}</a></li>
             ))}
             <li><a href="/how-buying-works/">How Buying Works</a></li>
+            <li><a href="/heater-guide/">Heater Guide</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="/our-story/">Our Story</a></li>
+            <li><a href="/wellness/">Wellness</a></li>
           </ul>
         </div>
 
@@ -115,9 +119,6 @@ const year = new Date().getFullYear();
   .ftr {
     background: var(--ember);
     color: var(--muted-dark);
-    /* TIGHTENED ONE MORE STEP, 2026-08-14: another ~11% off the just-restored
-       value (1.34rem → 1.19rem) — original was 1.5rem, so this settles at
-       roughly ×0.79 of original overall, not a return to the earlier ×0.7. */
     padding-block: var(--footer-pad) 1.19rem;
     font-size: var(--t-small);
   }
@@ -133,12 +134,8 @@ const year = new Date().getFullYear();
     display: block;
     width: clamp(11rem, 9.5rem + 6vw, 15rem);
     height: auto;
-    /* Logo WIDTH is untouched by this pass ("keep logo size about the
-       same") — only its bottom margin took the same further ~11% cut as
-       everything else: 1.42rem → 1.26rem. */
     margin-bottom: 1.26rem;
   }
-
 
   .ftr__cols {
     display: grid;
@@ -150,107 +147,46 @@ const year = new Date().getFullYear();
     font-family: var(--font-sans);
     font-size: var(--t-label);
     font-weight: 600;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--bronze-soft);
-    /* Tightened one more step: 1.25rem → 1.11rem. */
-    margin: 0 0 1.11rem;
+    color: var(--linen);
+    margin-bottom: 1rem;
   }
-
-  /* Footer links sat 22px tall with 11px between them originally. After two
-     rounds of tightening and one deliberate loosening ("links easier to
-     read"), settled here: padding-block 0.32rem, line-height held at 1.4
-     (untouched by this last step — "keep... links readable" was explicit).
-     Per-row height ≈ line(15px×1.4=21px) + padding(2×0.32rem=10.2px) ≈ 31px —
-     still above the 30px floor this codebase's QA script checks for controls
-     outside a list. */
-  .ftr__cols li + li { margin-top: 0.2rem; }
-  .ftr__cols a { display: inline-block; padding-block: 0.32rem; line-height: 1.4; }
-  .ftr__plain { line-height: 1.4; }
-
-  .ftr a {
-    text-decoration: none;
-    color: var(--muted-dark);
-    transition: color 0.35s var(--ease);
-  }
+  .ftr__h--social { margin-top: 1.4rem; }
+  .ftr ul { list-style: none; padding: 0; margin: 0; }
+  .ftr li + li { margin-top: 0.45rem; }
+  .ftr a { color: inherit; text-decoration: none; transition: color 0.25s var(--ease); }
   .ftr a:hover { color: var(--linen); }
-  .ftr__plain { color: var(--muted-dark); opacity: 0.75; }
+  .ftr__plain { color: inherit; }
 
-  .ftr__h--social { margin-top: 1.11rem; }
+  .ftr__social a { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .ftr__social svg { flex: 0 0 auto; }
 
-  .ftr__social { display: grid; }
-  .ftr__social li + li { margin-top: 0.32rem; }
-  .ftr__social a {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    color: var(--muted-dark);
+  .ftr__rule {
+    margin-block: var(--footer-row-gap) 1.19rem;
+    opacity: 0.42;
   }
-  .ftr__social svg { flex: 0 0 auto; color: inherit; }
-  .ftr__social a:hover { color: var(--bronze-soft); }
-  .ftr__social a span { font-size: 0.8125rem; line-height: 1.4; }
-
-  /* Tightened one more step, pulling the copyright row closer to the
-     divider: 0.98rem → 0.87rem. */
-  .ftr__rule { color: var(--bronze-soft); margin-bottom: 0.87rem; }
 
   .ftr__base {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem 2rem;
-    justify-content: space-between;
     align-items: center;
-    font-size: var(--t-small);
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    font-size: 0.75rem;
   }
   .ftr__base p { margin: 0; }
+  .ftr__legal { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; }
+  .ftr__legal li + li { margin-top: 0; }
 
-  /* The year is the staff entrance to /admin. There is no public link to the
-     login: a visible "Admin" in a consumer footer reads as unfinished and
-     invites drive-by attempts, and the route is already kept out of the
-     sitemap. At rest it is indistinguishable from the text around it — same
-     colour, no underline — so a customer reading the footer sees a copyright
-     line and nothing else.
-     Hover is the exception: it warms to bronze and shows a pointer, purely so
-     staff get confirmation they are on the right two words. Nobody hovers a
-     copyright notice by accident, and if they do, they find a login page that
-     asks for credentials. It keeps an accessible name for screen readers and
-     the global :focus-visible ring still finds it on keyboard. */
-  .ftr__staff {
-    color: inherit;
-    text-decoration: none;
-    cursor: inherit;
-    transition: color 0.3s var(--ease);
-  }
-  .ftr__staff:hover {
-    color: var(--bronze-soft);
-    cursor: pointer;
-  }
-  .ftr__legal {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.5625rem;
-    margin: 0;
-    padding: 0;
-    /* Was 11px — legible on a desktop monitor, a squint on a phone. These are
-       the links people reach for when they want the returns or privacy terms
-       before spending five figures, so they get a readable size and a real
-       hit area rather than legal-microcopy treatment. */
-    font-size: 0.875rem;
-    line-height: 1.2;
-  }
-  .ftr__legal a { display: inline-block; padding-block: 0.35rem; }
-  .ftr__legal li:not(:first-child) { display: flex; align-items: center; gap: 0.5625rem; }
-  .ftr__legal li:not(:first-child)::before {
-    content: '|';
-    opacity: 0.35;
-  }
+  .ftr__staff { text-decoration: none; color: inherit; }
 
-  @media (max-width: 860px) {
+  @media (max-width: 900px) {
     .ftr__top { grid-template-columns: 1fr; }
+    .ftr__cols { grid-template-columns: repeat(3, 1fr); }
   }
-  @media (max-width: 560px) {
-    /* RESET 2026-08-14: original 2.25rem, now 2rem (×0.89) — was 1.6rem. */
-    .ftr__cols { grid-template-columns: 1fr; gap: 2rem; }
+  @media (max-width: 640px) {
+    .ftr__cols { grid-template-columns: 1fr 1fr; }
+    .ftr__cols > :last-child { grid-column: 1 / -1; }
+    .ftr__base { align-items: flex-start; flex-direction: column; }
   }
 </style>
