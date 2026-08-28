@@ -50,7 +50,7 @@ import { accessoryProducts, accessoryCategories } from '../data/accessories';
                   <span class="acard__price">Quoted with your sauna</span>
                   <a
                     class="btn btn--outline"
-                    href={`/quote/?accessory=${encodeURIComponent(`${product.sku} — ${product.name}`)}`}
+                    href={`/quote/?package=${encodeURIComponent(`Accessory: ${product.sku} — ${product.name}`)}`}
                     data-track="pricing_request_started"
                     data-track-form-type="accessory_catalog"
                     data-track-model={product.sku}
