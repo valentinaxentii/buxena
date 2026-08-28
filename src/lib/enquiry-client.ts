@@ -89,8 +89,13 @@ export async function submitEnquiry(payload: Record<string, unknown>): Promise<E
   };
 
   const context = readCommercialContext();
-  const contextBlock = commercialContextBlock(context);
   const originalMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
+  // ProductConfigurator's own exact-quote CTA already writes the selections
+  // into the quote textarea. The session context exists for every OTHER exit
+  // from the product page. Do not append the same configuration twice when the
+  // customer used the exact-quote CTA.
+  const messageAlreadyHasConfiguration = originalMessage.includes('Configured on the product page:');
+  const contextBlock = messageAlreadyHasConfiguration ? '' : commercialContextBlock(context);
   const enrichedPayload = {
     ...payload,
     ...(contextBlock ? { message: [originalMessage, contextBlock].filter(Boolean).join('\n\n') } : {}),
