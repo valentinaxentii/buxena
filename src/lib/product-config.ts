@@ -1,23 +1,28 @@
 /**
  * Builds a product's configurator from the data that model actually has.
  *
- * THE RULE: a group appears only when the model's own frontmatter supplies its
- * choices. Nothing here invents a wood option, a glass option, a control system
- * or a size variant to make the UI look complete — an option a customer can
- * select is a promise BUXENA has to keep, and 32 of 35 models have no verified
- * dealer data behind them yet.
- *
- * Two kinds of group, kept distinct on purpose:
- *
- *   PRODUCT groups are derived from verified supplier data (`options`,
- *   `heaterOptions`). They differ per model and vanish when the data is absent.
- *
- *   PREFERENCE groups ask what the CUSTOMER wants — how they intend to install
- *   it, where it is going. These are not claims about the product, so they are
- *   safe to ask on every model. Installation vocabulary matches what the admin
- *   already records against a unit (DIY / BUXENA / third-party), so a staff
- *   member reads the same words in the enquiry that they use in the back office.
+ * V3 keeps the V2 rule: an option is shown only when the model's verified
+ * content supplies it. The upgrade is structural — supplier-backed choices
+ * can now be organised into a clear Room → Heat & Controls → Finish & Extras
+ * journey without inventing options to fill the UI.
  */
+
+export type ConfigStage = 'room' | 'heat' | 'extras';
+
+export const CONFIG_STAGE_META: Record<ConfigStage, { label: string; help: string }> = {
+  room: {
+    label: 'Room',
+    help: 'Choose the verified room, orientation, supply and finish options for this model.',
+  },
+  heat: {
+    label: 'Heat & Controls',
+    help: 'Choose only from heater and control combinations verified for this sauna.',
+  },
+  extras: {
+    label: 'Finish & Accessories',
+    help: 'Add verified lighting, safety and accessory options where this model supports them.',
+  },
+};
 
 export interface ConfigOption {
   /** Stable value submitted with the enquiry. */
@@ -26,17 +31,20 @@ export interface ConfigOption {
   label: string;
   /** Optional clarifier shown under the label. */
   hint?: string;
+  /** Supplier/manufacturer SKU for internal quote follow-up. Never displayed as a price. */
+  sku?: string;
 }
 
-export interface ConfigGroup {
-  /** Stable key, used in the summary and the enquiry payload. */
+export interface StructuredConfigGroup {
   key: string;
-  /** Section heading, e.g. "Heater". */
   label: string;
-  /** Why we are asking — shown small, under the heading. */
   help?: string;
+  stage: ConfigStage;
   options: ConfigOption[];
-  /** true → derived from this model's verified data; false → a customer preference. */
+}
+
+export interface ConfigGroup extends StructuredConfigGroup {
+  /** true → derived from this model's verified data; false → customer preference. */
   fromProductData: boolean;
 }
 
@@ -46,6 +54,11 @@ export interface ConfigurableModel {
   options?: string[];
   heaterOptions?: string[];
   materials?: string[];
+  /**
+   * V3 structured supplier-backed choices. These are preferred when present.
+   * Legacy fields above remain supported so every V2 product keeps working.
+   */
+  configurationGroups?: StructuredConfigGroup[];
 }
 
 /**
@@ -71,14 +84,43 @@ function toOption(raw: string): ConfigOption {
   return { value: raw.trim(), label: raw.trim() };
 }
 
+function cleanStructuredGroups(groups: StructuredConfigGroup[] | undefined): ConfigGroup[] {
+  if (!groups?.length) return [];
+  const seen = new Set<string>();
+  const cleaned: ConfigGroup[] = [];
+
+  for (const group of groups) {
+    const key = group.key.trim();
+    const label = group.label.trim();
+    if (!key || !label || seen.has(key)) continue;
+
+    const options = group.options
+      .map((option) => ({
+        value: option.value.trim(),
+        label: option.label.trim(),
+        hint: option.hint?.trim() || undefined,
+        sku: option.sku?.trim() || undefined,
+      }))
+      .filter((option) => option.value && option.label);
+
+    if (!options.length) continue;
+    seen.add(key);
+    cleaned.push({
+      key,
+      label,
+      help: group.help?.trim() || undefined,
+      stage: group.stage,
+      options,
+      fromProductData: true,
+    });
+  }
+
+  return cleaned;
+}
+
 /**
  * How the customer intends to install. A PREFERENCE, not a product claim.
- *
- * It lives in the quote form (components/QuoteForm.astro), not here, and is
- * asked once for every model — including the models with no configurator at
- * all. Exported so both surfaces read the same four values, which match the
- * admin's `installation_type` vocabulary, so a staff member sees in the enquiry
- * the same words they use in the back office.
+ * It remains in the quote form, where every model asks it once.
  */
 export const INSTALLATION_PREFERENCES: ConfigOption[] = [
   { value: 'DIY', label: 'I will install it myself', hint: 'Flat-pack and self-assembly' },
@@ -88,39 +130,40 @@ export const INSTALLATION_PREFERENCES: ConfigOption[] = [
 ];
 
 export function buildConfigGroups(model: ConfigurableModel): ConfigGroup[] {
-  const groups: ConfigGroup[] = [];
+  const groups = cleanStructuredGroups(model.configurationGroups);
+  const usedKeys = new Set(groups.map((group) => group.key));
 
-  // Assembly / supply format — only where the model states it.
-  if (model.options?.length) {
+  // Backward compatibility for V2 content. Structured V3 groups win when they
+  // use the same key, so a model cannot show both the old and new version of a
+  // choice while content is migrated gradually.
+  if (model.options?.length && !usedKeys.has('supply')) {
     groups.push({
       key: 'supply',
       label: 'Supply format',
       help: 'Verified for this model.',
+      stage: 'room',
       fromProductData: true,
       options: model.options.map(toOption),
     });
   }
 
-  // Heater — only where the model states verified compatibility. Heater
-  // compatibility is a safety-relevant claim and is never assumed.
-  if (model.heaterOptions?.length) {
+  if (model.heaterOptions?.length && !usedKeys.has('heater')) {
     groups.push({
       key: 'heater',
       label: 'Heater',
       help: 'Only heater types verified for this model are listed. Controls and stones are matched to your choice.',
+      stage: 'heat',
       fromProductData: true,
       options: model.heaterOptions.map(parseHeaterOption),
     });
   }
 
-  // Exterior material — only when the model lists more than one. A single
-  // material is a fact about the product, not a choice, and belongs in the
-  // specifications rather than being dressed up as an option.
-  if (model.materials && model.materials.length > 1) {
+  if (model.materials && model.materials.length > 1 && !usedKeys.has('material')) {
     groups.push({
       key: 'material',
-      label: 'Exterior',
+      label: 'Wood / finish',
       help: 'Verified for this model.',
+      stage: 'room',
       fromProductData: true,
       options: model.materials.map(toOption),
     });
@@ -129,62 +172,34 @@ export function buildConfigGroups(model: ConfigurableModel): ConfigGroup[] {
   return groups;
 }
 
+export function configStages(groups: ConfigGroup[]): { key: ConfigStage; label: string; help: string; groups: ConfigGroup[] }[] {
+  return (Object.keys(CONFIG_STAGE_META) as ConfigStage[])
+    .map((key) => ({ key, ...CONFIG_STAGE_META[key], groups: groups.filter((group) => group.stage === key) }))
+    .filter((stage) => stage.groups.length > 0);
+}
+
 /** Does this model have anything real to configure? */
 export function hasProductOptions(model: ConfigurableModel): boolean {
   return buildConfigGroups(model).some((g) => g.fromProductData);
 }
 
-/**
- * Should the product page render a configurator at all?
- *
- * Only when the model has real, verified choices. A configurator whose single
- * question is "how will you install it?" is a fake configurator: it performs
- * the appearance of configurability while asking nothing about the product,
- * and on a premium page that reads as padding. Those models get the quote and
- * project CTAs instead, and the installation question is asked once in the
- * quote form where every model asks it.
- *
- * This is a pure function of the model's own data, so a model turns its
- * configurator on automatically the moment verified options are added to its
- * frontmatter — no code change, no page to remember to update.
- */
 export function shouldShowConfigurator(model: ConfigurableModel): boolean {
   return hasProductOptions(model);
 }
 
-/**
- * How a model is classified for internal follow-up.
- *
- *   'configurable'  — verified choices exist; the configurator is shown.
- *   'quote-only'    — no configurable dimension for this model; correct as-is.
- *   'blocked-data'  — the model TYPE has options in the range, but this record
- *                     has none recorded. Not a product fact, a data gap: chase
- *                     the supplier rather than invent the options.
- *
- * The distinction between the last two matters commercially. 'quote-only' needs
- * nothing; 'blocked-data' is a task with a supplier's name on it.
- */
 export type ConfiguratorClass = 'configurable' | 'quote-only' | 'blocked-data';
 
 export function classifyModel(
   model: ConfigurableModel,
-  /** Sibling models in the same series, used to spot a data gap. */
   seriesPeers: ConfigurableModel[] = []
 ): ConfiguratorClass {
   if (hasProductOptions(model)) return 'configurable';
-  // A peer in the same series HAS verified options, so this one plausibly has
-  // them too and nobody has recorded them yet.
   if (seriesPeers.some((peer) => peer.title !== model.title && hasProductOptions(peer))) {
     return 'blocked-data';
   }
   return 'quote-only';
 }
 
-/**
- * The configuration as one line per answered group, for the enquiry message.
- * Unanswered groups are omitted — a blank is not a selection, and padding the
- * note with "not selected" makes it harder for staff to read what was chosen.
- */
 export function summariseSelections(
   groups: ConfigGroup[],
   selections: Record<string, string>
@@ -194,18 +209,15 @@ export function summariseSelections(
     const value = selections[group.key];
     if (!value) continue;
     const option = group.options.find((o) => o.value === value);
-    lines.push(`${group.label}: ${option?.label ?? value}`);
+    const sku = option?.sku ? ` [${option.sku}]` : '';
+    lines.push(`${group.label}: ${option?.label ?? value}${sku}`);
   }
   return lines;
 }
 
 /**
- * Pricing state for the summary panel.
- *
- * `src/data/pricing.ts` is deliberately empty — no price is approved for
- * publication — so this returns the honest "we will confirm" wording rather
- * than a computed total. When approved prices exist, this is the one place
- * that has to learn to add them up.
+ * Supplier cost is deliberately absent from this module. Public pricing still
+ * comes only from src/data/pricing.ts after founder approval.
  */
 export const PRICING_PENDING_MESSAGE =
   'Exact package pricing will be confirmed by BUXENA.';
