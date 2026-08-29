@@ -73,11 +73,21 @@ export const LOCATION_OPTIONS = [
  * existed in the catalog, so a visitor could never ask for one. Now that form
  * is a soft preference this is a ranking signal rather than a gate, but an
  * incomplete list still misrepresented the range.
+ *
+ * "Vertical" was missing for the same reason, and mattered more than its single
+ * model suggests: the standing barrel is the answer for a buyer whose whole
+ * problem is that they have no room for a horizontal cabin. Leaving it out hid
+ * the one model that solves that, from exactly the visitor asking about shape.
+ *
+ * The pinned test in tests/advisor-recommendation.test.ts now fails whenever a
+ * productType exists in the catalog but not here, so the next new shape cannot
+ * go unreachable the way these two did.
  */
 export const FORM_OPTIONS = [
   { value: 'Barrel', label: 'Barrel' },
   { value: 'Cube', label: 'Cube / cabin' },
   { value: 'Oval', label: 'Rounded / architectural (Oval)' },
+  { value: 'Vertical', label: 'Upright / space-saving (Vertical)' },
   { value: 'no-preference', label: 'No preference' },
 ];
 
@@ -126,6 +136,11 @@ export interface CatalogModel {
   capacityMax?: number;
   materials?: string[];
   dimensions?: { label: string; value: string }[];
+  heaterOptions?: string[];
+  features?: string[];
+  specs?: { label: string; value: string }[];
+  options?: string[];
+  availability?: 'in-stock' | 'in-transit' | 'preorder';
   heroImage?: { src?: string; alt: string };
   order: number;
 }

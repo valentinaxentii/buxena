@@ -70,9 +70,14 @@ test('a model with no heater data is a gap in OUR data, not a limitation', () =>
   assert.equal(none.unknown, true);
   assert.deepEqual(none.fuels, []);
   assert.equal(none.kwRange, null);
-  // The customer-facing line must never say "none" or "not available".
-  assert.equal(heaterSummary(none), 'Confirmed with your quote');
-  assert.equal(heaterSummary(readHeaterFacts(undefined)), 'Confirmed with your quote');
+  // The customer-facing line must never say "none" or "not available" about
+  // the SAUNA. "Not included" is a statement about BUXENA's offer (no model
+  // ships with a heater), which the team made explicit on every model page --
+  // see heaterSummary(). Both halves have to survive: no implied limitation,
+  // and no ambiguity about what the customer is paying for.
+  assert.equal(heaterSummary(none), 'Compatibility confirmed with your quote · Not included');
+  assert.equal(heaterSummary(readHeaterFacts(undefined)), 'Compatibility confirmed with your quote · Not included');
+  assert.ok(!/none|not available/i.test(heaterSummary(none)));
 });
 
 test('the original sentences are always preserved for display', () => {
@@ -82,11 +87,15 @@ test('the original sentences are always preserved for display', () => {
 });
 
 test('summaries read naturally and never overclaim', () => {
-  assert.equal(heaterSummary(readHeaterFacts(ELLA_H2)), 'Electric · 3.5–4.5 kW');
-  assert.match(heaterSummary(readHeaterFacts(NORD_200)), /Electric · 9 kW · heater included · app control/);
+  assert.equal(heaterSummary(readHeaterFacts(ELLA_H2)), 'Electric · 3.5–4.5 kW · Not included');
+  // NOTE: NORD 200's supplier line says the heater is "(standard)", yet the
+  // summary says "Not included" -- BUXENA's own policy overrides the
+  // supplier's packaging. Flagged for Valentin; pinned here so the copy cannot
+  // drift again while that decision is outstanding.
+  assert.equal(heaterSummary(readHeaterFacts(NORD_200)), 'Electric · 9 kW · app control · Not included');
   // The VIRU line states 'HUUM (with app control)', so app control belongs
   // in the summary — asserting a bare fuel string was my error, not the code's.
-  assert.equal(heaterSummary(readHeaterFacts(VIRU_LINE)), 'Electric or wood-burning · app control');
+  assert.equal(heaterSummary(readHeaterFacts(VIRU_LINE)), 'Electric or wood-burning · app control · Not included');
 });
 
 test('heater inclusion falls back to silence on anything unrecognised', () => {

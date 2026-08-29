@@ -6,6 +6,8 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
 import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
+import { isAdminStaff } from '../../../lib/staff-access';
+import { recomputeIncomingForProduct } from '../../../lib/shipment-inventory';
 
 const STATUSES = [
   'Draft', 'Ordered', 'In Production', 'Ready to Ship', 'In Transit',
@@ -32,9 +34,85 @@ let dbReady = true;
 // Archived records are hidden from the active list; ?archived=1 shows only them.
 const showArchived = Astro.url.searchParams.get('archived') === '1';
 let archiveOk = false;
+let actionError: string | null = null;
+
+// A shipment may be removed directly only while it has never become physical
+// inventory. This is intentionally narrower than a generic database delete:
+// received goods, or generated unit records, must remain auditable.
+const canDelete = await isAdminStaff(Astro);
 
 try {
   const supabase = createSupabaseAdminClient();
+  if (Astro.request.method === 'POST') {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+    const shipmentId = String(form.get('shipment_id') ?? '');
+
+    if (intent === 'delete_shipment') {
+      if (!canDelete) {
+        actionError = 'Only an admin can delete a shipment.';
+      } else if (!shipmentId) {
+        actionError = 'Shipment not found.';
+      } else {
+        const { data: shipment, error: shipmentError } = await supabase
+          .from('shipments')
+          .select('id, status, shipment_items(product_id, quantity_received)')
+          .eq('id', shipmentId)
+          .maybeSingle();
+
+        const receivedUnits = (shipment?.shipment_items ?? []).reduce(
+          (sum: number, item: any) => sum + (Number(item.quantity_received) || 0),
+          0
+        );
+        const { data: linkedUnits, error: linkedUnitsError } = shipmentId
+          ? await supabase
+              .from('inventory_units')
+              .select('id, status')
+              .eq('shipment_id', shipmentId)
+          : { data: [], error: null };
+        const hasNonExpectedUnits = (linkedUnits ?? []).some((unit: any) => unit.status !== 'EXPECTED');
+
+        if (shipmentError || !shipment) {
+          actionError = 'Shipment not found.';
+        } else if (linkedUnitsError || !['Draft', 'Cancelled'].includes(shipment.status) || receivedUnits > 0 || hasNonExpectedUnits) {
+          actionError = 'Only draft or cancelled shipments with no received units can be deleted. Archive all other shipments instead.';
+        } else {
+          // Keep the derived incoming stock number correct after the line
+          // items cascade away. Product IDs are captured before deletion.
+          const productIds = [...new Set((shipment.shipment_items ?? []).map((item: any) => item.product_id).filter(Boolean))] as string[];
+          // A cancelled order can still have EXPECTED unit records generated
+          // while it was active. They are not physical inventory, so remove
+          // them before the shipment (whose foreign key otherwise sets their
+          // shipment link to null and leaves misleading orphan records).
+          let unitCleanupOk = true;
+          if ((linkedUnits ?? []).length > 0) {
+            const { error: unitsDeleteError } = await supabase
+              .from('inventory_units')
+              .delete()
+              .eq('shipment_id', shipmentId)
+              .eq('status', 'EXPECTED');
+            if (unitsDeleteError) {
+              actionError = 'Could not remove the expected units for this shipment. Nothing else was deleted.';
+              unitCleanupOk = false;
+            }
+          }
+
+          if (unitCleanupOk) {
+            // ARCHIVE-EXEMPT: unreachable unless the shipment is Draft or
+            // Cancelled with zero received units and no non-EXPECTED units --
+            // checked above, which is why everything else is told to archive.
+            const { error: deleteError } = await supabase.from('shipments').delete().eq('id', shipmentId);
+            if (deleteError) {
+              actionError = 'Could not delete this shipment. Please try again.';
+            } else {
+              for (const productId of productIds) await recomputeIncomingForProduct(supabase, productId);
+              return Astro.redirect('/admin/shipments');
+            }
+          }
+        }
+      }
+    }
+  }
   // Archived shipments drop out of the active list. A no-op until the
   // migration is applied, so this cannot break the page in the meantime.
   archiveOk = await archiveSupported(supabase);
@@ -154,6 +232,7 @@ const rows = allRows.filter((row) => {
       <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
     </div>
   )}
+  {actionError && <p class="notice notice--error" style="margin-bottom:1.25rem;">{actionError}</p>}
 
   <div class="inc-cards">
     <div class="inc-card">
@@ -252,7 +331,18 @@ const rows = allRows.filter((row) => {
                   </> : '—'}
                 </td>
                 <td class="inc-value">{money(row.total_landed_cost)}</td>
-                <td><a class="inc-action" href={`/admin/shipments/${row.id}`}>View Details →</a></td>
+                <td>
+                  <div class="inc-actions">
+                    <a class="inc-action" href={`/admin/shipments/${row.id}`}>View Details →</a>
+                    {canDelete && ['Draft', 'Cancelled'].includes(row.status) && received === 0 && (
+                      <form method="POST" class="inc-delete" data-shipment-delete>
+                        <input type="hidden" name="_intent" value="delete_shipment" />
+                        <input type="hidden" name="shipment_id" value={row.id} />
+                        <button type="submit">Delete</button>
+                      </form>
+                    )}
+                  </div>
+                </td>
               </tr>
             );
           })}
@@ -395,8 +485,32 @@ const rows = allRows.filter((row) => {
     transition: color 0.15s ease;
   }
   .inc-action:hover { color: #e6cda3; text-decoration: underline; }
+  .inc-actions { display: flex; align-items: center; gap: 0.65rem; }
+  .inc-delete { margin: 0; }
+  .inc-delete button {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #e6b7a0;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .inc-delete button:hover { color: #f0c6b1; text-decoration: underline; }
 
   @media (max-width: 640px) {
     .inc-cards { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
+
+<script is:inline>
+  document.querySelectorAll('[data-shipment-delete]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (!window.confirm('Delete this shipment permanently? This cannot be undone.')) event.preventDefault();
+    });
+  });
+</script>

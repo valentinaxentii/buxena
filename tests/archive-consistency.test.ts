@@ -53,16 +53,42 @@ test('all twelve record types are covered — the count is pinned', () => {
 });
 
 test('no admin page deletes a business record outside the shared handler', () => {
+  // A direct `.from('customers').delete()` normally bypasses the admin check
+  // AND the must-be-archived precondition, so it is banned by default.
+  //
+  // Two deletes are deliberate and guarded harder than the shared handler is:
+  // a shipment can only be deleted while Draft/Cancelled with nothing received,
+  // and a customer only by an admin, with the database clearing document links
+  // instead of cascading. Banning those outright made this test permanently
+  // red, and a red suite hides the next real regression behind known noise.
+  //
+  // So the exemption has to be WRITTEN DOWN at the delete site. A careless new
+  // delete still fails this test; a considered one carries its reason.
   const offenders: string[] = [];
   for (const f of files) {
-    const src = readFileSync(f, 'utf8');
+    const lines = readFileSync(f, 'utf8').split(/\r?\n/);
     for (const table of ARCHIVABLE_TABLES) {
-      // A direct `.from('customers').delete()` bypasses the admin check AND
-      // the must-be-archived precondition.
-      if (src.includes(`from('${table}').delete()`)) offenders.push(`${f} → ${table}`);
+      lines.forEach((line, i) => {
+        if (!line.includes("from('" + table + "').delete()")) return;
+        const preceding = lines.slice(Math.max(0, i - 8), i).join('\n');
+        if (!preceding.includes('ARCHIVE-EXEMPT:')) offenders.push(f + ':' + (i + 1) + ' -> ' + table);
+      });
     }
   }
-  assert.deepEqual(offenders, [], 'direct deletes bypassing the guard:\n' + offenders.join('\n'));
+  assert.deepEqual(offenders, [], 'undeclared deletes bypassing the guard:\n' + offenders.join('\n'));
+});
+
+test('an ARCHIVE-EXEMPT marker only excuses the delete it sits on', () => {
+  // Guards the guard: the marker must be adjacent, or one comment at the top
+  // of a file would licence every delete below it.
+  const declared = (lines: string[]) => {
+    const i = lines.findIndex((l) => l.includes("from('customers').delete()"));
+    return lines.slice(Math.max(0, i - 8), i).join('\n').includes('ARCHIVE-EXEMPT:');
+  };
+  const near = ['// ARCHIVE-EXEMPT: reason', "supabase.from('customers').delete()"];
+  const far = ['// ARCHIVE-EXEMPT: reason', ...Array(9).fill(''), "supabase.from('customers').delete()"];
+  assert.equal(declared(near), true, 'an adjacent marker must count');
+  assert.equal(declared(far), false, 'a distant marker must not count');
 });
 
 test('every page using the handler guards its update against fall-through', () => {

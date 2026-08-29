@@ -27,6 +27,25 @@ try {
 
   if (Astro.request.method === 'POST') {
     const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+
+    // A customer can be deleted directly from their record by an admin. Any
+    // linked quotes, orders, invoices, and documents remain intact — the
+    // database deliberately clears only their customer link on deletion.
+    // This makes it safe to remove test/customer duplicates without erasing
+    // commercial documents.
+    if (intent === 'delete_customer') {
+      if (!canDelete) {
+        error = 'Only an admin can delete a customer.';
+      } else {
+        // ARCHIVE-EXEMPT: admin-only, and the database clears the customer
+        // link on quotes/orders/invoices rather than cascading, so no
+        // commercial document is lost. Deliberate -- see the note above.
+        const { error: deleteError } = await supabase.from('customers').delete().eq('id', id);
+        if (deleteError) error = 'Could not delete this customer. Please try again.';
+        else return Astro.redirect('/admin/customers');
+      }
+    } else {
 
     // Archive / restore / permanent delete, with every authorisation check
     // server-side. Returns 'none' for an ordinary save, which falls through to
@@ -60,6 +79,7 @@ try {
     } else {
       const { error: updateError } = await supabase.from('customers').update(payload).eq('id', id);
       if (updateError) error = updateError.message;
+    }
     }
     }
   }
@@ -114,6 +134,7 @@ try {
         <div class="admin-form__actions">
           <button class="admin-btn" type="submit">Save Changes</button>
           <a class="admin-btn admin-btn--ghost" href="/admin/customers">Back to Customers</a>
+          {canDelete && <button class="admin-btn admin-btn--ghost customer-delete" type="submit" name="_intent" value="delete_customer" data-customer-delete>Delete Customer</button>}
         </div>
       </form>
 
@@ -168,7 +189,16 @@ try {
   initZipValidation();
 </script>
 
+<script is:inline>
+  document.querySelector('[data-customer-delete]')?.addEventListener('click', (event) => {
+    if (!window.confirm('Delete this customer permanently? Linked quotes and orders will remain, but will no longer be connected to this customer.')) {
+      event.preventDefault();
+    }
+  });
+</script>
+
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .customer-delete { color: #e6b7a0; border-color: rgba(230, 130, 90, 0.35); }
 </style>

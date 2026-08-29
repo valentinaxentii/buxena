@@ -4,25 +4,24 @@ import Figure from '../../components/Figure.astro';
 import QuoteForm from '../../components/QuoteForm.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import AvailabilityBadge from '../../components/AvailabilityBadge.astro';
-import CheckAvailability from '../../components/CheckAvailability.astro';
 import StickySalesBar from '../../components/StickySalesBar.astro';
-import PackageBand from '../../components/PackageBand.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
 import QuoteCompare from '../../components/QuoteCompare.astro';
 import NaturalWoodNote from '../../components/NaturalWoodNote.astro';
-import RitualKit from '../../components/RitualKit.astro';
 import ProductConfigurator from '../../components/ProductConfigurator.astro';
 import ProductGallery from '../../components/ProductGallery.astro';
 import ProductConfigPending from '../../components/ProductConfigPending.astro';
 import ProductResources from '../../components/ProductResources.astro';
 import CustomerAnswerSystem from '../../components/CustomerAnswerSystem.astro';
 import ObjectionResolution from '../../components/ObjectionResolution.astro';
+import CheckAvailability from '../../components/CheckAvailability.astro';
 import Testimonials from '../../components/Testimonials.astro';
 import { relatedModels } from '../../lib/related-models';
 import { readHeaterFacts, heaterSummary } from '../../lib/heater-options';
 import { shouldShowConfigurator } from '../../lib/product-config';
-import { categoryMap, showDev, site, publicEmail } from '../../data/site';
+import { categoryMap, showDev, site } from '../../data/site';
 import { displayTitle } from '../../data/catalog';
+import { viruDetailsFor } from '../../data/viru-catalog-details';
 import { publicPrice, priceAmount, displayFromPrice, separateSkuNote } from '../../data/pricing';
 import { publicNameFor, codeFor, presentationPath } from '../../data/model-identity';
 import fs from 'node:fs';
@@ -40,6 +39,7 @@ export async function getStaticPaths() {
 
 const { entry } = Astro.props;
 const { data } = entry;
+const catalogueDetails = viruDetailsFor(entry.id);
 
 // Public price comes from the central register (src/data/pricing.ts) — the
 // only place approved customer-facing prices live. Null (today, for every
@@ -50,7 +50,16 @@ const approved = publicPrice(data.title, data.fromPrice);
 // actually exists on disk (scripts/build-model-presentation.mjs), so a
 // missing file can never produce a broken download link.
 const presentationHref = presentationPath(entry.id);
-const hasPresentation = fs.existsSync(path.join(process.cwd(), 'public', presentationHref));
+// A catalogue spec sheet is preferred over the presentation, but only when the
+// PDF is genuinely on disk. Previously the spec path was chosen first and only
+// the final href was existence-checked, so a model whose spec sheet was missing
+// lost its download link altogether -- even though its presentation PDF was
+// sitting right there. Checking the spec first, then falling back, means a
+// missing spec sheet degrades to the presentation instead of to nothing.
+const specFile = catalogueDetails?.specificationFile ?? null;
+const inPublic = (href: string) => fs.existsSync(path.join(process.cwd(), 'public', href));
+const specificationsHref = specFile && inPublic(specFile) ? specFile : presentationHref;
+const hasSpecifications = inPublic(specificationsHref);
 const buxenaCode = codeFor(data.title);
 const { Content } = await render(entry);
 
@@ -102,7 +111,7 @@ const relatedEntries = relatedPicks
  * nothing published says "confirmed with your quote" rather than being given a
  * plausible default. See lib/heater-options.ts.
  */
-const heaterFacts = readHeaterFacts(data.heaterOptions);
+const heaterFacts = readHeaterFacts(data.heaterOptions ?? catalogueDetails?.heaterOptions);
 
 const TBC = 'To be confirmed';
 
@@ -144,7 +153,8 @@ const blocks = [
   { title: 'Available options', items: data.options },
 ];
 
-const hasDownloads = (data.downloads ?? []).some((d) => d.file);
+const customerDownloads = [...(data.downloads ?? [])];
+const hasDownloads = customerDownloads.some((d) => d.file);
 
 // Structured data — verified fields only. No price/offers/rating: none of
 // that is published, and none should be invented.
@@ -255,7 +265,7 @@ const breadcrumbSchema = {
           <div class="prod-hero__info">
             <h1 class="display">{displayTitle(data.title)}</h1>
             <p class="prod-hero__tag serif-italic">{data.tagline}</p>
-            <AvailabilityBadge status={data.availability ?? 'preorder'} />
+            <AvailabilityBadge model={data.title} />
 
             {/* Pricing block — renders ONLY approved values from frontmatter.
                 With none set (the current state of every model) it shows
@@ -296,49 +306,32 @@ const breadcrumbSchema = {
               </dl>
             )}
 
-            <a
-              class="btn btn--bronze"
-              href="#enquire"
-              data-track="pricing_request_started"
-              data-track-model={data.title}
-              data-track-category={data.category}
-              data-track-location={data.location ?? ''}
-              data-track-form-type="product_page"
-            >Request Pricing</a>
-            <p class="prod-hero__quote-note">We prepare pricing around your chosen configuration and delivery location.</p>
+            <section class="prod-hero__action-card" aria-labelledby="purchase-title">
+              <div class="prod-hero__action-head">
+                <span class="eyebrow">Your purchase plan</span>
+                <h2 id="purchase-title">Ready to price this sauna?</h2>
+                <p>We confirm the chosen configuration, current lead time and delivery approach for your location before you order.</p>
+              </div>
 
-            <CheckAvailability model={data.title} />
-
-            <div class="prod-hero__more">
               <a
-                class="link"
-                href="#configure"
-                data-track="product_configure_click"
+                class="btn btn--bronze prod-hero__primary-cta"
+                href="#enquire"
+                data-track="pricing_request_started"
                 data-track-model={data.title}
-              >Configure This Sauna <span class="arrow" aria-hidden="true">→</span></a>
-              <a
-                class="link"
-                href="/see-it-in-my-space/"
-                data-track="space_flow_started"
-                data-track-model={data.title}
+                data-track-category={data.category}
+                data-track-location={data.location ?? ''}
                 data-track-form-type="product_page"
-              >See It In My Space <span class="arrow" aria-hidden="true">→</span></a>
-              {/* The heater is the choice customers most often ask about, and
-                  the guide already holds every verified per-model fact. Linking
-                  to this model's row means the question is answered without
-                  leaving BUXENA to research it. */}
-              <a
-                class="link"
-                href={`/heater-guide/#${entry.id}`}
-                data-track="heater_guide_click"
-                data-track-model={data.title}
-              >Compare Heaters <span class="arrow" aria-hidden="true">→</span></a>
-              {publicEmail && (
-                <a class="link" href={`mailto:${publicEmail}?subject=${encodeURIComponent(`Question about the ${displayTitle(data.title)}`)}`}>
-                  Talk to BUXENA <span class="arrow" aria-hidden="true">→</span>
-                </a>
-              )}
-            </div>
+              >Request Pricing + Delivery Plan <span class="arrow" aria-hidden="true">→</span></a>
+
+              <CheckAvailability model={data.title} />
+
+              <ul class="prod-hero__assurances" aria-label="What your request includes">
+                <li><strong>No payment required</strong><span>Start with a written quote.</span></li>
+                <li><strong>Built around your space</strong><span>Configuration and access are reviewed.</span></li>
+                <li><strong>Delivery confirmed first</strong><span>Timing and route are agreed in writing.</span></li>
+              </ul>
+            </section>
+
           </div>
         </div>
 
@@ -359,7 +352,7 @@ const breadcrumbSchema = {
         a glance) can be confirmed in full without scrolling past the
         configurator. Renders nothing if this model has no verified technical
         data at all. */}
-    <ProductResources assets={data.technicalAssets} model={data.title} />
+    <ProductResources assets={data.technicalAssets} model={data.title} slug={entry.id} />
 
     <!-- Description + Features/Options/Downloads. Dimensions, capacity,
          materials and heater compatibility live ONLY in the Technical
@@ -389,23 +382,23 @@ const breadcrumbSchema = {
             )}
 
             <h3 class="specs__sub">Downloads</h3>
-            {hasPresentation && (
+            {hasSpecifications && (
               <ul class="specs__ul">
                 <li>
                   <a
                     class="dl"
-                    href={presentationHref}
+                    href={specificationsHref}
                     download
                     data-track="document_download"
                     data-track-model={data.title}
-                    data-track-label="Model Presentation"
-                  >Download Model Presentation (PDF)</a>
+                    data-track-label="Model Specifications"
+                  >Download {displayTitle(data.title)} Specifications (PDF)</a>
                 </li>
               </ul>
             )}
             {hasDownloads ? (
               <ul class="specs__ul">
-                {data.downloads!.filter((d) => d.file).map((d) => (
+                {customerDownloads.filter((d) => d.file).map((d) => (
                   <li>
                     <a
                       class="dl"
@@ -418,16 +411,14 @@ const breadcrumbSchema = {
                   </li>
                 ))}
               </ul>
-            ) : (
+            ) : !hasSpecifications ? (
               <Fragment>
                 {/* Audited 2026-08-10: no real product documents exist
                     anywhere in the repo (no PDFs, manuals or drawings) —
                     nothing is linked until genuine, model-matched files
                     arrive. This fallback turns the gap into a lead path. */}
                 <p class="specs__docnote">
-                  {hasPresentation
-                    ? 'Manufacturer manuals and technical drawings are being prepared for this model. Request specifications and we\'ll send the currently available project information.'
-                    : 'Technical documents are being prepared for this model. Request specifications and we\'ll send the currently available project information.'}
+                  Technical documents are being prepared for this model. Request specifications and we'll send the currently available project information.
                 </p>
                 <a
                   class="link specs__docreq"
@@ -443,7 +434,7 @@ const breadcrumbSchema = {
                   data-track-cta="submit_project"
                 >For Trade — Submit a Project <span class="arrow" aria-hidden="true">→</span></a>
               </Fragment>
-            )}
+            ) : null}
         </aside>
       </div>
     </section>
@@ -467,7 +458,6 @@ const breadcrumbSchema = {
       </div>
     </section>
 
-    <PackageBand model={data.title} />
 
     <QuoteCompare model={data.title} />
 
@@ -522,8 +512,6 @@ const breadcrumbSchema = {
         <NaturalWoodNote materials={data.materials} />
       </div>
     </section>
-
-    <RitualKit />
 
     <!-- Enquiry -->
     <section class="band band--birch" id="enquire">
@@ -665,16 +653,6 @@ const breadcrumbSchema = {
       gio.observe(gallery);
     }
 
-    // product_availability_click — opening the Check Availability disclosure
-    // is the intent signal; the submitted request has its own event.
-    var avail = document.querySelector('[data-avail-check]');
-    if (avail) {
-      avail.addEventListener('toggle', function () {
-        if (avail.open) {
-          window.dataLayer.push({ event: 'product_availability_click', model: model });
-        }
-      });
-    }
   </script>
 </BaseLayout>
 
@@ -737,8 +715,6 @@ const breadcrumbSchema = {
     font-size: var(--t-small);
     color: var(--muted);
   }
-  .prod-hero__quote-note { max-width: 29rem; margin: 0.65rem 0 1.15rem; color: var(--muted); font-size: 0.8125rem; line-height: 1.45; }
-
   .prod-hero__keyspecs { margin: 0 0 1.75rem; }
   .prod-hero__keyspecs-row {
     display: flex;
@@ -750,6 +726,58 @@ const breadcrumbSchema = {
   }
   .prod-hero__keyspecs-row dt { color: var(--muted); margin: 0; }
   .prod-hero__keyspecs-row dd { margin: 0; text-align: right; }
+
+  /* The product page cannot truthfully behave like a commodity checkout:
+     configuration, access and lead time are project-specific. This card still
+     gives the decisive, retail-like next step, but makes the real commitment
+     legible instead of inventing stock, free shipping or payment methods. */
+  .prod-hero__action-card {
+    margin-top: 0.15rem;
+    padding: clamp(1.15rem, 0.8rem + 1.15vw, 1.65rem);
+    border: 1px solid var(--ink);
+    background: linear-gradient(135deg, var(--linen-deep) 0%, var(--linen) 74%);
+  }
+  .prod-hero__action-head { max-width: 38rem; }
+  .prod-hero__action-head .eyebrow { color: var(--bronze-ink); }
+  .prod-hero__action-head h2 {
+    margin: 0.42rem 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.55rem, 1.15rem + 1.15vw, 2rem);
+    font-weight: 500;
+    line-height: 1.04;
+  }
+  .prod-hero__action-head p {
+    margin: 0.65rem 0 1.15rem;
+    color: var(--muted);
+    font-size: var(--t-small);
+    line-height: 1.55;
+  }
+  .prod-hero__primary-cta {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.95rem 1rem;
+  }
+  .prod-hero__action-card :global(.avail-check) { margin-top: 0.75rem; }
+  .prod-hero__assurances {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 0;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+  }
+  .prod-hero__assurances li { display: grid; gap: 0.22rem; }
+  .prod-hero__assurances strong {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+  .prod-hero__assurances span { color: var(--muted); font-size: 0.72rem; line-height: 1.45; }
 
   .notice {
     border: 1px solid var(--line);
@@ -805,14 +833,6 @@ const breadcrumbSchema = {
 
   .specs__docnote { font-size: var(--t-small); color: var(--muted); margin: 0 0 0.9rem; }
   .specs__docreq { display: inline-flex; margin: 0 1.5rem 0.6rem 0; font-size: 0.8125rem; }
-
-  .prod-hero__more {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 1.75rem;
-    margin-top: 0.94rem;
-  }
-  .prod-hero__more .link { font-size: 0.8125rem; }
 
   /* Alternatives — the reason sits above the card, so it reads as a label on
      the recommendation rather than as a claim by the product itself. */
@@ -906,6 +926,8 @@ const breadcrumbSchema = {
   @media (max-width: 900px) {
     .prod-hero__grid, .prod-body { grid-template-columns: 1fr; }
     .prod-hero__grid { align-items: start; }
+    .prod-hero__assurances { grid-template-columns: 1fr; gap: 0.7rem; }
+    .prod-hero__assurances li { grid-template-columns: minmax(9.6rem, 0.9fr) minmax(0, 1.1fr); align-items: baseline; }
 
     /* PREORDER / Request a Quote both link to #enquire. The header is
        position:sticky, so without this the anchor scroll lands the section's

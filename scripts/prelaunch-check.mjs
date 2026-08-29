@@ -176,6 +176,11 @@ try {
 // internal imports); it is verified END-TO-END below instead — the dev
 // server's ack preview lines prove the real send/skip decisions.
 
+// Whether THIS script started the dev server, and so owes it a shutdown.
+// Module scope on purpose: the runtime route sweep near the end of this file
+// needs the same server, so the stop cannot live inside the forms block.
+let devServerStartedHere = false;
+
 // Live dev-server form tests — guarded against any live configuration.
 const envFile = path.join(ROOT, '.env');
 const devLive = existsSync(envFile) && /^\s*ENQUIRIES_DEV_LIVE\s*=\s*true\s*$/m.test(readFileSync(envFile, 'utf8'));
@@ -184,10 +189,14 @@ if (devLive) {
 } else {
   const base = 'http://localhost:4321';
   const up = async () => { try { return (await fetch(`${base}/`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; } };
-  let startedHere = false;
+  // MUST be --background: the customer-ack assertion below reads the server's
+  // own log lines through `astro dev logs`, which only speaks to a background
+  // server. Starting it in the foreground (as this did) made that read return
+  // nothing, so the ack check reported "0 send / 0 skip" and the board said
+  // NOT LAUNCH-READY for a reason that had nothing to do with the emails.
   if (!(await up())) {
-    spawn('npm', ['run', 'dev'], { shell: true, detached: true, stdio: 'ignore' }).unref();
-    startedHere = true;
+    spawn('npx', ['astro', 'dev', '--background'], { shell: true, detached: true, stdio: 'ignore' }).unref();
+    devServerStartedHere = true;
     for (let i = 0; i < 20 && !(await up()); i++) await new Promise((r) => setTimeout(r, 1500));
   }
   if (!(await up())) {
@@ -214,14 +223,21 @@ if (devLive) {
     const newLogs = devLogs().slice(logsBefore);
     const sends = (newLogs.match(/customer ack would send/g) ?? []).length;
     const skips = (newLogs.match(/customer ack would NOT send/g) ?? []).length;
-    record('email', `customer ack sends for ${SOURCES.length - 1} sources, skips enrichment (saw ${sends} send / ${skips} skip)`, sends === SOURCES.length - 1 && skips === 1);
+    // An unreadable log is NOT a failing acknowledgment. Saying so plainly
+    // matters more than the colour of the line: a board that reports a
+    // tooling problem as a broken customer email teaches you to ignore it.
+    const unreadable = /not started with/.test(newLogs) || newLogs.trim() === '';
+    if (unreadable) {
+      record('email', 'customer ack decisions could not be read (dev server not started with --background — stop any running `npm run dev` and re-run)', false);
+    } else {
+      record('email', `customer ack sends for ${SOURCES.length - 1} sources, skips enrichment (saw ${sends} send / ${skips} skip)`, sends === SOURCES.length - 1 && skips === 1);
+    }
     const hp = await post({ name: 'Bot', email: 'bot@spam.local', message: 'spam', source: 'Quote Form', botField: 'filled' });
     record('forms', 'honeypot swallowed silently', hp.ok === true && hp.devMode === undefined);
     const pages = ['/', '/saunas/bux-ella-h2', '/quote/?intent=compare&model=BUH-ELLA%20H2'];
     let pagesOk = true;
     for (const p of pages) { try { if (!(await fetch(base + p)).ok) pagesOk = false; } catch { pagesOk = false; } }
     record('forms', 'key journey pages respond on dev server', pagesOk);
-    if (startedHere) { try { execSync('npx astro dev stop', { stdio: 'pipe' }); } catch { /* leave it running */ } }
   }
 }
 
@@ -401,6 +417,13 @@ if (devLive) {
     ? ''
     : (out.split('RUNTIME FAILURES:')[1] ?? out).replace(/\s+/g, ' ').trim().slice(0, 260);
   record('runtime', `all ${count} public routes render on a live server`, ok, detail);
+}
+
+// Every check that needs a live server has now run. Stopping it earlier left
+// the route sweep talking to a closed port, which only looked fine while a
+// developer happened to have their own `npm run dev` open.
+if (devServerStartedHere) {
+  try { execSync('npx astro dev stop', { stdio: 'pipe' }); } catch { /* leave it running */ }
 }
 
 // ------------------------------------------- 8. model presentation system
