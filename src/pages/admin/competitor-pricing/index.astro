@@ -1,0 +1,204 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
+
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
+
+const supabase = createSupabaseAdminClient();
+let error: string | null = null;
+let notice: string | null = null;
+let registryReady = true;
+let competitors: any[] = [];
+let observations: any[] = [];
+
+const filterCompetitor = Astro.url.searchParams.get('competitor') ?? '';
+const search = (Astro.url.searchParams.get('q') ?? '').trim();
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? 'observation');
+
+    if (intent === 'competitor') {
+      const name = String(form.get('name') ?? '').trim();
+      const website = String(form.get('website') ?? '').trim();
+      const market = String(form.get('market') ?? '').trim();
+      const defaultCurrency = String(form.get('default_currency') ?? '').trim().toUpperCase();
+      const notes = String(form.get('notes') ?? '').trim();
+      if (!name) throw new Error('Competitor name is required.');
+      const { error: insertError } = await supabase.from('competitors').insert({
+        name,
+        website: website || null,
+        market: market || null,
+        default_currency: defaultCurrency || null,
+        notes: notes || null,
+      });
+      if (insertError) throw insertError;
+      notice = `${name} added to competitor tracking.`;
+    } else {
+      const competitorId = String(form.get('competitor_id') ?? '').trim();
+      const productName = String(form.get('product_name') ?? '').trim();
+      const category = String(form.get('category') ?? '').trim();
+      const currency = String(form.get('currency') ?? '').trim().toUpperCase();
+      const price = Number(form.get('price'));
+      const compareAtRaw = String(form.get('compare_at_price') ?? '').trim();
+      const compareAtPrice = compareAtRaw ? Number(compareAtRaw) : null;
+      const observedOn = String(form.get('observed_on') ?? '').trim();
+      const sourceUrl = String(form.get('source_url') ?? '').trim();
+      const availability = String(form.get('availability') ?? '').trim();
+      const notes = String(form.get('notes') ?? '').trim();
+
+      if (!competitorId || !productName || !currency || !observedOn || !sourceUrl) throw new Error('Competitor, product, currency, date and source URL are required.');
+      if (!Number.isFinite(price) || price < 0) throw new Error('Enter a valid competitor price.');
+      if (compareAtPrice != null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) throw new Error('Compare-at price is not valid.');
+      if (!/^https?:\/\//i.test(sourceUrl)) throw new Error('Source URL must be an http(s) address.');
+
+      const { error: insertError } = await supabase.from('competitor_price_observations').insert({
+        competitor_id: competitorId,
+        observed_on: observedOn,
+        product_name: productName,
+        category: category || null,
+        currency,
+        price,
+        compare_at_price: compareAtPrice,
+        source_url: sourceUrl,
+        availability: availability || null,
+        notes: notes || null,
+      });
+      if (insertError) throw insertError;
+      notice = `Competitor price recorded for ${productName}.`;
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Could not save competitor pricing.';
+  }
+}
+
+try {
+  const competitorRes = await supabase.from('competitors').select('id, name, website, market, default_currency, notes').order('name');
+  if (competitorRes.error) throw competitorRes.error;
+  competitors = competitorRes.data ?? [];
+
+  let query = supabase
+    .from('competitor_price_observations')
+    .select('id, observed_on, product_name, category, currency, price, compare_at_price, source_url, availability, notes, product_id, competitors(id, name, market)')
+    .order('observed_on', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (filterCompetitor) query = query.eq('competitor_id', filterCompetitor);
+  if (search) query = query.ilike('product_name', `%${search}%`);
+  const observationRes = await query.limit(500);
+  if (observationRes.error) throw observationRes.error;
+  observations = observationRes.data ?? [];
+} catch (e: any) {
+  registryReady = false;
+  if (!error) {
+    error = e?.code === '42P01'
+      ? 'Competitor Pricing is prepared in V3 but its database migration has not been applied yet.'
+      : (e?.message || 'Competitor Pricing is not available yet.');
+  }
+}
+
+const latestDate = observations.map((row) => row.observed_on).sort().at(-1) ?? '—';
+const mappedCount = observations.filter((row) => row.product_id).length;
+const currencies = [...new Set(observations.map((row) => row.currency).filter(Boolean))];
+
+function money(value: any, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
+}
+---
+
+<AdminLayout title="Competitor Pricing" subtitle="Private market observations — never public retail" parentLabel="Suppliers" parentHref="/admin/suppliers">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  <div class="admin-kpis" style="margin-bottom:2rem;">
+    <div class="admin-kpi"><span class="admin-kpi__value">{competitors.length}</span><span class="admin-kpi__label">Competitors</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{observations.length}</span><span class="admin-kpi__label">Visible Observations</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{latestDate}</span><span class="admin-kpi__label">Latest Check</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{mappedCount}</span><span class="admin-kpi__label">Mapped to BUXENA</span></div>
+  </div>
+
+  <div class="admin-grid-2" style="margin-bottom:2rem; align-items:start;">
+    <div>
+      <h2 class="admin-section-title">Record a Price Check</h2>
+      <div class="admin-panel" style="padding:1.25rem;">
+        <form method="POST" class="admin-form" style="margin:0;">
+          <input type="hidden" name="_intent" value="observation" />
+          <label class="admin-field"><span>Competitor *</span><select name="competitor_id" required disabled={!registryReady}><option value="">— select —</option>{competitors.map((c) => <option value={c.id}>{c.name}</option>)}</select></label>
+          <label class="admin-field"><span>Product *</span><input name="product_name" required /></label>
+          <label class="admin-field"><span>Category</span><input name="category" placeholder="Indoor sauna room" /></label>
+          <label class="admin-field"><span>Currency *</span><input name="currency" maxlength="3" value="USD" required /></label>
+          <label class="admin-field"><span>Observed price *</span><input name="price" type="number" min="0" step="0.01" required /></label>
+          <label class="admin-field"><span>Regular / compare-at price</span><input name="compare_at_price" type="number" min="0" step="0.01" /></label>
+          <label class="admin-field"><span>Checked on *</span><input name="observed_on" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
+          <label class="admin-field"><span>Availability / sale note</span><input name="availability" /></label>
+          <label class="admin-field admin-form__full"><span>Source URL *</span><input name="source_url" type="url" required /></label>
+          <label class="admin-field admin-form__full"><span>Evidence notes</span><textarea name="notes" rows="3" placeholder="Direct page, indexed snapshot, sale wording, package scope…"></textarea></label>
+          <div class="admin-form__actions"><button class="admin-btn" type="submit" disabled={!registryReady}>Save Observation</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="admin-section-title">Add Competitor</h2>
+      <div class="admin-panel" style="padding:1.25rem;">
+        <form method="POST" class="admin-form" style="margin:0;">
+          <input type="hidden" name="_intent" value="competitor" />
+          <label class="admin-field"><span>Name *</span><input name="name" required /></label>
+          <label class="admin-field"><span>Market</span><input name="market" placeholder="United States" /></label>
+          <label class="admin-field"><span>Default currency</span><input name="default_currency" maxlength="3" placeholder="USD" /></label>
+          <label class="admin-field admin-form__full"><span>Website</span><input name="website" type="url" /></label>
+          <label class="admin-field admin-form__full"><span>Notes</span><textarea name="notes" rows="3"></textarea></label>
+          <div class="admin-form__actions"><button class="admin-btn admin-btn--ghost" type="submit" disabled={!registryReady}>Add Competitor</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-toolbar">
+    <form class="admin-toolbar__filters" method="GET">
+      <select class="admin-input" name="competitor">
+        <option value="">All competitors</option>
+        {competitors.map((c) => <option value={c.id} selected={filterCompetitor === c.id}>{c.name}</option>)}
+      </select>
+      <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search product…" value={search} />
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <span style="font-size:.78rem; color:var(--admin-muted);">Currencies kept separate: {currencies.join(', ') || '—'}</span>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Checked</th><th>Competitor</th><th>Product</th><th>Category</th><th>Observed price</th><th>Regular</th><th>Evidence</th><th>Mapping</th></tr></thead>
+        <tbody>
+          {observations.map((row) => (
+            <tr>
+              <td>{row.observed_on}</td>
+              <td>{(row.competitors as any)?.name ?? '—'}</td>
+              <td style="max-width:24rem; white-space:normal;">{row.product_name}</td>
+              <td>{row.category || '—'}</td>
+              <td><strong>{money(row.price, row.currency)}</strong></td>
+              <td>{row.compare_at_price != null ? money(row.compare_at_price, row.currency) : '—'}</td>
+              <td><a href={row.source_url} target="_blank" rel="noreferrer">Source ↗</a>{row.notes && <div class="evidence-note">{row.notes}</div>}</td>
+              <td>{row.product_id ? 'Mapped' : 'Unmapped'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {registryReady && observations.length === 0 && <p class="admin-empty">No competitor observations match this view.</p>}
+  </div>
+</AdminLayout>
+
+<style>
+  .notice--error { padding:.85rem 1rem; font-size:.85rem; color:#e6b7a0; background:rgba(230,130,90,.06); border:1px solid rgba(230,130,90,.35); border-radius:2px; }
+  .notice--success { padding:.85rem 1rem; font-size:.85rem; color:#b8d7b8; background:rgba(90,160,105,.06); border:1px solid rgba(90,160,105,.35); border-radius:2px; }
+  .admin-grid-2 { display:grid; grid-template-columns:1.3fr .7fr; gap:1.25rem; }
+  .evidence-note { margin-top:.25rem; max-width:24rem; color:var(--admin-muted); font-size:.72rem; line-height:1.45; white-space:normal; }
+  @media (max-width:900px) { .admin-grid-2 { grid-template-columns:1fr; } }
+</style>

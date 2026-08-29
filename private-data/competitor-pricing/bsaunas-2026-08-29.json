@@ -1,0 +1,54 @@
+{
+  "checked_on": "2026-08-29",
+  "competitors": [
+    {
+      "name": "BSaunas USA",
+      "website": "https://bsaunasusa.com/",
+      "market": "United States",
+      "default_currency": "USD",
+      "notes": "Direct automated fetch returned 403 on 2026-08-29. Prices below were checked against search-indexed BSaunasUSA category/shop source snapshots available on 2026-08-29; keep source freshness visible and recheck manually before using for a pricing decision.",
+      "observations": [
+        { "product_name": "1414 RS/LS Western Red Clear Cedar Indoor Prefab Sauna Room", "category": "Indoor sauna room", "price": 6490.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "1420 RSC/LSC Western Red Clear Cedar Indoor Prefab Sauna Room", "category": "Indoor sauna room", "price": 7990.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "1420 ML Western Red Clear Cedar Indoor Prefab Sauna Room, Front Glass", "category": "Indoor sauna room", "price": 9990.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "1616 RL/LL Western Red Clear Cedar Indoor Prefab Sauna Room", "category": "Indoor sauna room", "price": 7990.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "1620 RL/LL Western Red Clear Cedar Indoor Prefab Sauna Room", "category": "Indoor sauna room", "price": 9190.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "2026 MiL/MRL Western Red Clear Cedar Indoor Prefab Sauna Room", "category": "Indoor sauna room", "price": 11490.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/", "notes": "Indexed source states sauna-room kit only; heater selected separately." },
+        { "product_name": "Leil Como Indoor Sauna (1 Person)", "category": "Indoor sauna room", "price": 6762.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/" },
+        { "product_name": "Leil Como Indoor Sauna (2 Person)", "category": "Indoor sauna room", "price": 7369.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/" },
+        { "product_name": "Leil Como Indoor Sauna (3 Person)", "category": "Indoor sauna room", "price": 8280.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/" },
+        { "product_name": "Leil Como Indoor Sauna (4 Person)", "category": "Indoor sauna room", "price": 8915.00, "currency": "USD", "source_url": "https://bsaunasusa.com/indoor-prefab-sauna-rooms/" },
+        { "product_name": "1414 RS/LS Spruce/Cedar Outdoor Prefab Sauna", "category": "Outdoor sauna room", "price": 5592.00, "compare_at_price": 6990.00, "currency": "USD", "source_url": "https://bsaunasusa.com/outdoor-prefab-sauna-cabins/", "notes": "Indexed source snapshot showed 20% sale." },
+        { "product_name": "1420 RS/LS Spruce/Cedar Outdoor Prefab Sauna", "category": "Outdoor sauna room", "price": 6232.00, "compare_at_price": 7790.00, "currency": "USD", "source_url": "https://bsaunasusa.com/outdoor-prefab-sauna-cabins/", "notes": "Indexed source snapshot showed 20% sale." },
+        { "product_name": "1420 ML Spruce/Cedar Outdoor Prefab Sauna", "category": "Outdoor sauna room", "price": 6552.00, "compare_at_price": 8190.00, "currency": "USD", "source_url": "https://bsaunasusa.com/outdoor-prefab-sauna-cabins/", "notes": "Indexed source snapshot showed 20% sale." },
+        { "product_name": "1616 RS/LS Spruce/Cedar Outdoor Prefab Sauna", "category": "Outdoor sauna room", "price": 6072.00, "compare_at_price": 7590.00, "currency": "USD", "source_url": "https://bsaunasusa.com/outdoor-prefab-sauna-cabins/", "notes": "Indexed source snapshot showed 20% sale." },
+        { "product_name": "1620 RL/LL Spruce/Cedar Outdoor Prefab Sauna", "category": "Outdoor sauna room", "price": 6712.00, "compare_at_price": 8390.00, "currency": "USD", "source_url": "https://bsaunasusa.com/outdoor-prefab-sauna-cabins/", "notes": "Indexed source snapshot showed 20% sale." }
+      ]
+    },
+    {
+      "name": "Bsaunas Canada",
+      "website": "https://shop.bsaunas.com/",
+      "market": "Canada",
+      "default_currency": "CAD",
+      "notes": "Store states it is currently unable to ship to the United States due to recent tariff changes. Heater prices were directly readable on the store collection when checked 2026-08-29.",
+      "observations": [
+        { "product_name": "HUUM DROP 4.5 kW Electric Sauna Heater", "category": "Electric heater", "price": 1403.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM DROP 6 kW Electric Sauna Heater", "category": "Electric heater", "price": 1584.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM DROP 7.5 kW Electric Sauna Heater", "category": "Electric heater", "price": 1759.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM DROP 9 kW Electric Sauna Heater", "category": "Electric heater", "price": 1842.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM HIVE Mini 6 kW Electric Sauna Heater", "category": "Electric heater", "price": 2631.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM HIVE Mini 9 kW Electric Sauna Heater", "category": "Electric heater", "price": 2794.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM HIVE Mini 10.5 kW Electric Sauna Heater", "category": "Electric heater", "price": 2930.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM HIVE 12 kW Electric Sauna Heater", "category": "Electric heater", "price": 2995.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Apex Mini 6 kW Electric Sauna Heater", "category": "Electric heater", "price": 1900.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Apex Mini 7.5 kW Electric Sauna Heater", "category": "Electric heater", "price": 1950.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Apex Mini 9 kW Electric Sauna Heater", "category": "Electric heater", "price": 2000.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Revive 6 kW Electric Sauna Heater", "category": "Electric heater", "price": 1775.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Revive 7.5 kW Electric Sauna Heater", "category": "Electric heater", "price": 1800.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "Homecraft Revive 9 kW Electric Sauna Heater", "category": "Electric heater", "price": 1850.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/electric-sauna-heaters" },
+        { "product_name": "HUUM Sauna Stones - 3-5 cm", "category": "Sauna stones", "price": 88.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/all" },
+        { "product_name": "UKU Wi-Fi Sauna Control - White", "category": "Sauna control", "price": 1392.00, "currency": "CAD", "source_url": "https://shop.bsaunas.com/collections/all" }
+      ]
+    }
+  ]
+}
