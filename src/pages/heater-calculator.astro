@@ -1,0 +1,229 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import QuoteBand from '../components/QuoteBand.astro';
+---
+
+<BaseLayout
+  title="Sauna Heater Size Calculator"
+  description="Estimate your sauna's calculatory volume from room dimensions and uninsulated glass, tile, stone or concrete surfaces, then use it to size a heater with BUXENA."
+>
+  <section class="band band--tight calc-head">
+    <div class="shell shell--narrow">
+      <span class="eyebrow">Heater Planning</span>
+      <h1 class="display measure--tight">Size the heat to the room</h1>
+      <p class="lead measure">
+        Start with the room volume, then account for glass, tile, stone or concrete that makes the heater work harder.
+        This gives you a planning volume for comparing heater ratings; the final heater is confirmed against its manufacturer specification.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="shell shell--narrow">
+      <div class="hcalc" data-heater-calculator>
+        <div class="hcalc__form">
+          <div class="hcalc__topline">
+            <h2 class="h3">Your sauna</h2>
+            <div class="hcalc__units" role="group" aria-label="Measurement units">
+              <button type="button" class="hcalc__unit is-active" data-unit="imperial" aria-pressed="true">ft</button>
+              <button type="button" class="hcalc__unit" data-unit="metric" aria-pressed="false">m</button>
+            </div>
+          </div>
+
+          <div class="hcalc__grid">
+            <label class="hcalc__field">
+              <span>Width</span>
+              <div><input type="number" min="0" step="0.01" inputmode="decimal" data-dimension="width" /><b data-length-unit>ft</b></div>
+            </label>
+            <label class="hcalc__field">
+              <span>Height</span>
+              <div><input type="number" min="0" step="0.01" inputmode="decimal" data-dimension="height" /><b data-length-unit>ft</b></div>
+            </label>
+            <label class="hcalc__field">
+              <span>Depth</span>
+              <div><input type="number" min="0" step="0.01" inputmode="decimal" data-dimension="depth" /><b data-length-unit>ft</b></div>
+            </label>
+          </div>
+
+          <label class="hcalc__field hcalc__field--wide">
+            <span>Uninsulated surface area</span>
+            <div><input type="number" min="0" step="0.01" value="0" inputmode="decimal" data-surface /><b data-area-unit>ft²</b></div>
+            <small>Glass, tile, stone, brick or concrete inside the hot room. Leave 0 if fully insulated and wood-lined.</small>
+          </label>
+
+          <label class="hcalc__check">
+            <input type="checkbox" data-log-walls />
+            <span><strong>Non-insulated log walls</strong><small>Use only when the sauna's interior wall construction is uninsulated logs.</small></span>
+          </label>
+
+          <button type="button" class="btn btn--outline hcalc__clear" data-clear>Clear</button>
+        </div>
+
+        <aside class="hcalc__result" aria-live="polite">
+          <span class="eyebrow">Planning result</span>
+          <div class="hcalc__metric">
+            <span>Actual room volume</span>
+            <strong data-volume>—</strong>
+          </div>
+          <div class="hcalc__metric hcalc__metric--main">
+            <span>Calculatory volume</span>
+            <strong data-adjusted>—</strong>
+          </div>
+          <div class="hcalc__metric">
+            <span>Planning heater output</span>
+            <strong data-kw>—</strong>
+          </div>
+          <p class="hcalc__note" data-result-note>
+            Enter all three room dimensions to calculate.
+          </p>
+          <a class="btn btn--bronze hcalc__quote" href="/quote/" data-quote-link>Get Heater + Sauna Quote</a>
+          <a class="link hcalc__guide" href="/heater-guide/">See verified heater compatibility <span class="arrow" aria-hidden="true">→</span></a>
+        </aside>
+      </div>
+
+      <div class="hcalc__method">
+        <h2 class="h3">How the planning number works</h2>
+        <p>
+          For an insulated sauna, heater output broadly tracks cubic room volume. Uninsulated glass, stone, tile, brick and concrete increase the effective volume;
+          non-insulated log construction increases it further. BUXENA uses this only as a sizing screen — the heater manufacturer's permitted room-volume range,
+          electrical requirements, clearances and the specific sauna model remain controlling.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <QuoteBand
+    heading="Want us to size the whole package?"
+    body="Send the sauna model or your room dimensions and ZIP code. We will match the room, heater, controls, stones and delivery in one written configuration."
+  />
+</BaseLayout>
+
+<style>
+  .calc-head { padding-bottom: 0; }
+  .calc-head .lead { margin-top: 1rem; }
+  .hcalc { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(18rem,.8fr); gap:clamp(1.25rem,1rem + 2vw,2.5rem); }
+  .hcalc__form, .hcalc__result { padding:clamp(1.15rem,1rem + 1vw,1.7rem); border:1px solid var(--line); background:var(--linen); }
+  .hcalc__topline { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .hcalc__topline .h3 { margin:0; }
+  .hcalc__units { display:inline-flex; border:1px solid var(--line); }
+  .hcalc__unit { min-width:3rem; min-height:2.65rem; border:0; background:transparent; color:var(--muted-dark); font:inherit; cursor:pointer; }
+  .hcalc__unit.is-active { background:var(--ink); color:var(--linen); }
+  .hcalc__grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin-top:1.25rem; }
+  .hcalc__field { display:grid; gap:.4rem; }
+  .hcalc__field > span { font-size:.78rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+  .hcalc__field > div { display:flex; align-items:stretch; border:1px solid var(--line); background:#fff; }
+  .hcalc__field input { width:100%; min-width:0; padding:.78rem .85rem; border:0; background:transparent; color:var(--ink); font:inherit; font-size:1rem; }
+  .hcalc__field input:focus { outline:2px solid var(--bronze); outline-offset:-2px; }
+  .hcalc__field b { display:grid; place-items:center; min-width:3rem; padding:0 .6rem; border-left:1px solid var(--line); color:var(--muted); font-size:.8rem; font-weight:500; }
+  .hcalc__field--wide { margin-top:1rem; }
+  .hcalc__field small, .hcalc__check small { color:var(--muted); font-size:.75rem; line-height:1.5; }
+  .hcalc__check { display:flex; gap:.7rem; align-items:flex-start; margin-top:1rem; padding:.85rem; border:1px solid var(--line); cursor:pointer; }
+  .hcalc__check input { margin-top:.2rem; accent-color:var(--bronze); }
+  .hcalc__check span { display:grid; gap:.25rem; }
+  .hcalc__check strong { font-size:.86rem; }
+  .hcalc__clear { margin-top:1rem; }
+  .hcalc__result { align-self:start; }
+  .hcalc__metric { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; padding:.85rem 0; border-bottom:1px solid var(--line); }
+  .hcalc__metric span { color:var(--muted); font-size:.8rem; }
+  .hcalc__metric strong { font-size:1rem; text-align:right; }
+  .hcalc__metric--main strong { font-size:1.45rem; color:var(--bronze-ink); }
+  .hcalc__note { margin:1rem 0; color:var(--muted-dark); font-size:.8rem; line-height:1.65; }
+  .hcalc__quote { width:100%; text-align:center; }
+  .hcalc__guide { display:inline-block; margin-top:1rem; font-size:.8rem; }
+  .hcalc__method { margin-top:clamp(1.5rem,1rem + 2vw,2.5rem); max-width:54rem; }
+  .hcalc__method p { color:var(--muted-dark); font-size:var(--t-small); line-height:1.8; }
+  @media (max-width:760px) {
+    .hcalc { grid-template-columns:1fr; }
+    .hcalc__grid { grid-template-columns:1fr; }
+  }
+</style>
+
+<script>
+  const FT_TO_M = 0.3048;
+  const FT2_TO_M2 = 0.09290304;
+  const M3_TO_FT3 = 35.3146667;
+
+  document.querySelectorAll<HTMLElement>('[data-heater-calculator]').forEach((root) => {
+    let unit: 'imperial' | 'metric' = 'imperial';
+    const dimensions = [...root.querySelectorAll<HTMLInputElement>('[data-dimension]')];
+    const surface = root.querySelector<HTMLInputElement>('[data-surface]')!;
+    const logWalls = root.querySelector<HTMLInputElement>('[data-log-walls]')!;
+    const volumeOut = root.querySelector<HTMLElement>('[data-volume]')!;
+    const adjustedOut = root.querySelector<HTMLElement>('[data-adjusted]')!;
+    const kwOut = root.querySelector<HTMLElement>('[data-kw]')!;
+    const note = root.querySelector<HTMLElement>('[data-result-note]')!;
+    const quote = root.querySelector<HTMLAnchorElement>('[data-quote-link]')!;
+
+    const number = (input: HTMLInputElement) => Math.max(0, Number(input.value) || 0);
+
+    function calculate() {
+      const [width, height, depth] = dimensions.map(number);
+      if (!width || !height || !depth) {
+        volumeOut.textContent = '—';
+        adjustedOut.textContent = '—';
+        kwOut.textContent = '—';
+        note.textContent = 'Enter all three room dimensions to calculate.';
+        quote.href = '/quote/';
+        return;
+      }
+
+      const widthM = unit === 'imperial' ? width * FT_TO_M : width;
+      const heightM = unit === 'imperial' ? height * FT_TO_M : height;
+      const depthM = unit === 'imperial' ? depth * FT_TO_M : depth;
+      const surfaceM2 = unit === 'imperial' ? number(surface) * FT2_TO_M2 : number(surface);
+
+      const actualM3 = widthM * heightM * depthM;
+      const constructionAdjustedM3 = logWalls.checked ? actualM3 * 1.5 : actualM3;
+      const calculatoryM3 = constructionAdjustedM3 + surfaceM2 * 1.2;
+
+      if (unit === 'imperial') {
+        volumeOut.textContent = `${(actualM3 * M3_TO_FT3).toFixed(0)} ft³`;
+        adjustedOut.textContent = `${(calculatoryM3 * M3_TO_FT3).toFixed(0)} ft³`;
+      } else {
+        volumeOut.textContent = `${actualM3.toFixed(1)} m³`;
+        adjustedOut.textContent = `${calculatoryM3.toFixed(1)} m³`;
+      }
+      kwOut.textContent = `about ${calculatoryM3.toFixed(1)} kW`;
+      note.textContent = 'Planning estimate only. Choose a heater whose manufacturer-rated sauna-volume range covers the calculatory volume; BUXENA confirms the exact model and electrical specification in your quote.';
+
+      const params = new URLSearchParams({
+        message: `Heater sizing: ${width} × ${depth} × ${height} ${unit === 'imperial' ? 'ft' : 'm'}; uninsulated surface ${number(surface)} ${unit === 'imperial' ? 'ft²' : 'm²'}; calculatory volume ${calculatoryM3.toFixed(1)} m³; planning output about ${calculatoryM3.toFixed(1)} kW. Please confirm the correct heater package.`,
+      });
+      quote.href = `/quote/?${params.toString()}`;
+    }
+
+    root.querySelectorAll<HTMLButtonElement>('[data-unit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const next = button.dataset.unit as 'imperial' | 'metric';
+        if (next === unit) return;
+
+        dimensions.forEach((input) => {
+          const value = number(input);
+          if (!value) return;
+          input.value = (next === 'metric' ? value * FT_TO_M : value / FT_TO_M).toFixed(2);
+        });
+        const surfaceValue = number(surface);
+        if (surfaceValue) surface.value = (next === 'metric' ? surfaceValue * FT2_TO_M2 : surfaceValue / FT2_TO_M2).toFixed(2);
+
+        unit = next;
+        root.querySelectorAll<HTMLButtonElement>('[data-unit]').forEach((candidate) => {
+          const active = candidate.dataset.unit === unit;
+          candidate.classList.toggle('is-active', active);
+          candidate.setAttribute('aria-pressed', String(active));
+        });
+        root.querySelectorAll<HTMLElement>('[data-length-unit]').forEach((el) => { el.textContent = unit === 'imperial' ? 'ft' : 'm'; });
+        root.querySelectorAll<HTMLElement>('[data-area-unit]').forEach((el) => { el.textContent = unit === 'imperial' ? 'ft²' : 'm²'; });
+        calculate();
+      });
+    });
+
+    [...dimensions, surface, logWalls].forEach((input) => input.addEventListener('input', calculate));
+    logWalls.addEventListener('change', calculate);
+    root.querySelector<HTMLButtonElement>('[data-clear]')?.addEventListener('click', () => {
+      dimensions.forEach((input) => { input.value = ''; });
+      surface.value = '0';
+      logWalls.checked = false;
+      calculate();
+    });
+  });
+</script>
