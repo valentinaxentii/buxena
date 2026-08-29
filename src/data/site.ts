@@ -42,7 +42,7 @@ export const nav = [
   { label: 'For Trade', href: '/for-trade/' },
   { label: 'Our Story', href: '/our-story/' },
   { label: 'Wellness', href: '/wellness/' },
-  { label: 'Heater Guide', href: '/heater-guide/' },
+  { label: 'Heater Sizing', href: '/heater-calculator/' },
   { label: 'FAQ', href: '/faq/' },
   { label: 'Contact', href: '/contact/' },
 ];

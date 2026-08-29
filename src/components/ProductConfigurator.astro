@@ -11,11 +11,27 @@ interface Props {
   model: ConfigurableModel;
   displayName: string;
 }
-const { model, displayName } = Astro.props;
 
+const { model, displayName } = Astro.props;
 const groups = buildConfigGroups(model);
 const stages = configStages(groups);
+const roomGroups = stages.find((stage) => stage.key === 'room')?.groups ?? [];
+const heatGroups = stages.find((stage) => stage.key === 'heat')?.groups ?? [];
+const extraGroups = stages.find((stage) => stage.key === 'extras')?.groups ?? [];
 const productBacked = hasProductOptions(model);
+
+const flow = [
+  ...(roomGroups.length ? [{ key: 'room', label: 'Room' }] : []),
+  { key: 'heat', label: 'Heat & Controls' },
+  ...(extraGroups.length ? [{ key: 'extras', label: 'Finish & Accessories' }] : []),
+  { key: 'delivery', label: 'Delivery' },
+  { key: 'quote', label: 'Quote' },
+];
+
+const roomNumber = flow.findIndex((step) => step.key === 'room') + 1;
+const heatNumber = flow.findIndex((step) => step.key === 'heat') + 1;
+const extrasNumber = flow.findIndex((step) => step.key === 'extras') + 1;
+const deliveryNumber = flow.findIndex((step) => step.key === 'delivery') + 1;
 ---
 
 <section class="band band--deep" id="configure">
@@ -25,59 +41,39 @@ const productBacked = hasProductOptions(model);
       <h2 class="h2 measure--tight">Configure it before we price it</h2>
       <p class="lead measure">
         {productBacked
-          ? 'Choose only from options verified for this model. We carry the complete configuration into your quote so you do not have to rebuild it with a salesperson.'
+          ? 'Choose only from options verified for this model. We carry the configuration into your quote so you do not have to rebuild it with a salesperson.'
           : 'This model is specified with you directly. Your project details travel with your quote request.'}
       </p>
     </div>
 
-    <div class="cfg__flow" aria-label="Configuration steps">
-      {stages.map((stage, index) => (
-        <a class="cfg__flow-step" href={`#cfg-stage-${stage.key}`}>
-          <span>{index + 1}</span>
-          <strong>{stage.label}</strong>
+    <nav class="cfg-flow" aria-label="Configuration steps">
+      {flow.map((step, index) => (
+        <a class="cfg-flow__step" href={step.key === 'quote' ? '#enquire' : `#cfg-stage-${step.key}`}>
+          <span>{index + 1}</span><strong>{step.label}</strong>
         </a>
       ))}
-      <a class="cfg__flow-step" href="#cfg-stage-delivery">
-        <span>{stages.length + 1}</span>
-        <strong>Delivery</strong>
-      </a>
-      <a class="cfg__flow-step" href="#enquire">
-        <span>{stages.length + 2}</span>
-        <strong>Quote</strong>
-      </a>
-    </div>
+    </nav>
 
     <div class="cfg" data-configurator data-model={model.title}>
       <div class="cfg__groups">
-        {stages.map((stage, stageIndex) => (
-          <section class="cfg__stage" id={`cfg-stage-${stage.key}`} aria-labelledby={`cfg-stage-title-${stage.key}`}>
-            <div class="cfg__stage-head">
-              <span class="cfg__stage-number">{stageIndex + 1}</span>
+        {roomGroups.length > 0 && (
+          <section class="cfg-stage" id="cfg-stage-room">
+            <div class="cfg-stage__head">
+              <span class="cfg-stage__number">{roomNumber}</span>
               <div>
-                <h3 class="cfg__stage-title" id={`cfg-stage-title-${stage.key}`}>{stage.label}</h3>
-                <p class="cfg__stage-help">{stage.help}</p>
+                <h3 class="cfg-stage__title">Room</h3>
+                <p class="cfg-stage__help">Choose the verified layout, supply and finish options for this room.</p>
               </div>
             </div>
-
-            <div class="cfg__stage-groups">
-              {stage.groups.map((group) => (
+            <div class="cfg-stage__groups">
+              {roomGroups.map((group) => (
                 <fieldset class="cfg__group" data-cfg-group={group.key}>
                   <legend class="cfg__legend">{group.label}</legend>
                   {group.help && <p class="cfg__help">{group.help}</p>}
                   <div class="cfg__options" role="radiogroup" aria-label={group.label}>
                     {group.options.map((option) => (
                       <label class="cfg__option">
-                        <input
-                          type="radio"
-                          name={`cfg-${group.key}`}
-                          value={option.value}
-                          data-cfg-input={group.key}
-                          data-cfg-label={option.label}
-                          data-cfg-sku={option.sku ?? ''}
-                          data-track="product_option_selected"
-                          data-track-model={model.title}
-                          data-track-group={group.key}
-                        />
+                        <input type="radio" name={`cfg-${group.key}`} value={option.value} data-cfg-input={group.key} data-cfg-label={option.label} data-track="product_option_selected" data-track-model={model.title} data-track-group={group.key} />
                         <span class="cfg__option-body">
                           <span class="cfg__option-label">{option.label}</span>
                           {option.hint && <span class="cfg__option-hint">{option.hint}</span>}
@@ -89,36 +85,91 @@ const productBacked = hasProductOptions(model);
               ))}
             </div>
           </section>
-        ))}
+        )}
 
-        <section class="cfg__stage" id="cfg-stage-delivery" aria-labelledby="cfg-stage-title-delivery">
-          <div class="cfg__stage-head">
-            <span class="cfg__stage-number">{stages.length + 1}</span>
+        <section class="cfg-stage" id="cfg-stage-heat">
+          <div class="cfg-stage__head">
+            <span class="cfg-stage__number">{heatNumber}</span>
             <div>
-              <h3 class="cfg__stage-title" id="cfg-stage-title-delivery">Delivery</h3>
-              <p class="cfg__stage-help">Tell us where the sauna is going so freight and available installation can be confirmed accurately.</p>
+              <h3 class="cfg-stage__title">Heat &amp; Controls</h3>
+              <p class="cfg-stage__help">Heater sizing depends on room volume and exposed glass, tile, stone or concrete. We confirm the exact heater, controls, stones and electrical requirement in writing.</p>
+            </div>
+          </div>
+          {heatGroups.length > 0 ? (
+            <div class="cfg-stage__groups">
+              {heatGroups.map((group) => (
+                <fieldset class="cfg__group" data-cfg-group={group.key}>
+                  <legend class="cfg__legend">{group.label}</legend>
+                  {group.help && <p class="cfg__help">{group.help}</p>}
+                  <div class="cfg__options" role="radiogroup" aria-label={group.label}>
+                    {group.options.map((option) => (
+                      <label class="cfg__option">
+                        <input type="radio" name={`cfg-${group.key}`} value={option.value} data-cfg-input={group.key} data-cfg-label={option.label} data-track="product_option_selected" data-track-model={model.title} data-track-group={group.key} />
+                        <span class="cfg__option-body">
+                          <span class="cfg__option-label">{option.label}</span>
+                          {option.hint && <span class="cfg__option-hint">{option.hint}</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          ) : (
+            <div class="cfg-plan">
+              <div>
+                <strong>Heater package confirmed with your quote</strong>
+                <p>No unverified heater model is shown as compatible. Use the sizing tool now, or leave the selection to BUXENA.</p>
+              </div>
+              <a class="link" href="/heater-calculator/">Size the heater <span class="arrow" aria-hidden="true">→</span></a>
+            </div>
+          )}
+        </section>
+
+        {extraGroups.length > 0 && (
+          <section class="cfg-stage" id="cfg-stage-extras">
+            <div class="cfg-stage__head">
+              <span class="cfg-stage__number">{extrasNumber}</span>
+              <div>
+                <h3 class="cfg-stage__title">Finish &amp; Accessories</h3>
+                <p class="cfg-stage__help">Add only accessory choices verified for this room or supplier range.</p>
+              </div>
+            </div>
+            <div class="cfg-stage__groups">
+              {extraGroups.map((group) => (
+                <fieldset class="cfg__group" data-cfg-group={group.key}>
+                  <legend class="cfg__legend">{group.label}</legend>
+                  {group.help && <p class="cfg__help">{group.help}</p>}
+                  <div class="cfg__options" role="radiogroup" aria-label={group.label}>
+                    {group.options.map((option) => (
+                      <label class="cfg__option">
+                        <input type="radio" name={`cfg-${group.key}`} value={option.value} data-cfg-input={group.key} data-cfg-label={option.label} data-track="product_option_selected" data-track-model={model.title} data-track-group={group.key} />
+                        <span class="cfg__option-body">
+                          <span class="cfg__option-label">{option.label}</span>
+                          {option.hint && <span class="cfg__option-hint">{option.hint}</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section class="cfg-stage" id="cfg-stage-delivery">
+          <div class="cfg-stage__head">
+            <span class="cfg-stage__number">{deliveryNumber}</span>
+            <div>
+              <h3 class="cfg-stage__title">Delivery</h3>
+              <p class="cfg-stage__help">Tell us where the sauna is going so freight and available installation can be confirmed accurately.</p>
             </div>
           </div>
           <fieldset class="cfg__group">
             <legend class="cfg__legend">Delivery ZIP</legend>
-            <p class="cfg__help">
-              We do not invent freight from a generic national average. Your quote is prepared around the actual destination.
-            </p>
+            <p class="cfg__help">Your quote is prepared around the actual destination, not a generic freight average.</p>
             <label class="cfg__zip-label" for="cfg-zip">ZIP code</label>
-            <input
-              class="cfg__zip"
-              id="cfg-zip"
-              type="text"
-              inputmode="numeric"
-              autocomplete="postal-code"
-              pattern="\d{5}"
-              maxlength="5"
-              title="Enter a valid 5-digit U.S. ZIP code."
-              data-zip-input
-              data-cfg-zip
-              data-track="product_zip_entered"
-              data-track-model={model.title}
-            />
+            <input class="cfg__zip" id="cfg-zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input data-cfg-zip />
           </fieldset>
         </section>
       </div>
@@ -127,28 +178,12 @@ const productBacked = hasProductOptions(model);
         <div class="cfg__summary-inner">
           <p class="cfg__summary-eyebrow">Your configuration</p>
           <p class="cfg__summary-model">{displayName}</p>
-
           <dl class="cfg__summary-list" data-cfg-summary aria-live="polite">
-            <p class="cfg__summary-empty" data-cfg-empty>
-              Choose the options you know. You can still request a quote with decisions left open.
-            </p>
+            <p class="cfg__summary-empty" data-cfg-empty>Choose the options you know. Decisions can stay open.</p>
           </dl>
-
           <p class="cfg__summary-price">{PRICING_PENDING_MESSAGE}</p>
-
-          <a
-            class="btn btn--bronze cfg__cta"
-            href="#enquire"
-            data-cfg-cta
-            data-track="product_quote_cta"
-            data-track-model={model.title}
-            data-track-cta="configurator_exact_quote"
-          >Get My Configured Quote</a>
-
-          <p class="cfg__summary-note">
-            No payment is taken here. BUXENA confirms the configuration, compatibility,
-            delivery and final price in writing before anything is ordered.
-          </p>
+          <a class="btn btn--bronze cfg__cta" href="#enquire" data-cfg-cta data-track="product_quote_cta" data-track-model={model.title} data-track-cta="configurator_exact_quote">Get My Configured Quote</a>
+          <p class="cfg__summary-note">No payment is taken here. BUXENA confirms configuration, compatibility, delivery and final price before anything is ordered.</p>
         </div>
       </aside>
     </div>
@@ -156,130 +191,51 @@ const productBacked = hasProductOptions(model);
 </section>
 
 <style>
-  .cfg__flow {
-    display: flex;
-    gap: 0.55rem;
-    margin-top: clamp(1.25rem, 1rem + 1vw, 2rem);
-    padding-bottom: 0.35rem;
-    overflow-x: auto;
-    scrollbar-width: thin;
-  }
-  .cfg__flow-step {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    min-width: max-content;
-    padding: 0.65rem 0.85rem;
-    color: var(--ink);
-    background: var(--linen);
-    border: 1px solid var(--line);
-    text-decoration: none;
-  }
-  .cfg__flow-step span,
-  .cfg__stage-number {
-    display: inline-grid;
-    place-items: center;
-    width: 1.65rem;
-    height: 1.65rem;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: var(--bronze);
-    color: var(--linen);
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
-  .cfg__flow-step strong { font-size: 0.78rem; letter-spacing: 0.04em; }
-
-  .cfg {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: clamp(1.5rem, 1rem + 2vw, 2.5rem);
-    margin-top: clamp(1.5rem, 1rem + 2vw, 2.5rem);
-  }
-  @media (min-width: 900px) {
-    .cfg { grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr); align-items: start; }
-  }
-
-  .cfg__groups { display: grid; gap: clamp(1.25rem, 1rem + 1vw, 2rem); min-width: 0; }
-  .cfg__stage {
-    scroll-margin-top: 1.25rem;
-    padding: clamp(1rem, 0.75rem + 1vw, 1.5rem);
-    background: color-mix(in srgb, var(--linen) 55%, transparent);
-    border: 1px solid var(--line);
-  }
-  .cfg__stage-head { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 1.25rem; }
-  .cfg__stage-title { margin: 0; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
-  .cfg__stage-help { margin: 0.35rem 0 0; max-width: 46rem; font-size: 0.8125rem; line-height: 1.55; color: var(--muted); }
-  .cfg__stage-groups { display: grid; gap: 1.4rem; }
-
-  .cfg__group { border: none; margin: 0; padding: 0; }
-  .cfg__legend {
-    padding: 0;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink);
-  }
-  .cfg__help { margin: 0.45rem 0 0; font-size: 0.8125rem; line-height: 1.6; color: var(--muted); }
-
-  .cfg__options { display: grid; gap: 0.6rem; margin-top: 0.9rem; }
-  @media (min-width: 560px) {
-    .cfg__options { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
-  }
-
-  .cfg__option {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.7rem;
-    min-height: 3rem;
-    padding: 0.85rem 1rem;
-    background: var(--linen);
-    border: 1px solid var(--line);
-    cursor: pointer;
-    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
-  }
-  .cfg__option:hover { border-color: var(--bronze-soft); }
-  .cfg__option input { margin: 0.2rem 0 0; flex: 0 0 auto; accent-color: var(--bronze); }
-  .cfg__option:has(input:checked) { border-color: var(--bronze); background: var(--linen-deep); }
-  .cfg__option:has(input:focus-visible) { outline: 2px solid var(--bronze); outline-offset: 2px; }
-
-  .cfg__option-body { display: grid; gap: 0.25rem; min-width: 0; }
-  .cfg__option-label { font-size: 0.9375rem; color: var(--ink); }
-  .cfg__option-hint { font-size: 0.8125rem; line-height: 1.5; color: var(--muted); }
-
-  .cfg__zip-label { display: block; margin: 0.9rem 0 0.4rem; font-size: 0.8125rem; color: var(--muted); }
-  .cfg__zip {
-    width: 100%;
-    max-width: 11rem;
-    padding: 0.75rem 0.9rem;
-    font-family: inherit;
-    font-size: 1rem;
-    color: var(--ink);
-    background: var(--linen);
-    border: 1px solid var(--line);
-  }
-  .cfg__zip:focus { outline: none; border-color: var(--bronze); }
-
-  .cfg__summary { min-width: 0; }
-  @media (min-width: 900px) {
-    .cfg__summary-inner { position: sticky; top: 1.5rem; }
-  }
-  .cfg__summary-inner {
-    padding: clamp(1.25rem, 1rem + 1vw, 1.75rem);
-    background: var(--linen);
-    border: 1px solid var(--bronze-soft);
-  }
-  .cfg__summary-eyebrow { margin: 0; font-size: 0.6875rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--bronze-ink); }
-  .cfg__summary-model { margin: 0.35rem 0 1rem; font-family: var(--font-display, inherit); font-size: 1.35rem; line-height: 1.2; color: var(--ink); }
-  .cfg__summary-list { margin: 0; display: grid; gap: 0.55rem; }
-  .cfg__summary-list div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: 0.55rem; border-bottom: 1px solid var(--line); }
-  .cfg__summary-list dt { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-  .cfg__summary-list dd { margin: 0; font-size: 0.875rem; text-align: right; color: var(--ink); }
-  .cfg__summary-empty { margin: 0; font-size: 0.8125rem; line-height: 1.6; color: var(--muted); }
-  .cfg__summary-price { margin: 1.1rem 0; font-size: 0.875rem; line-height: 1.6; color: var(--bronze-ink); }
-  .cfg__cta { width: 100%; text-align: center; }
-  .cfg__summary-note { margin: 0.9rem 0 0; font-size: 0.75rem; line-height: 1.6; color: var(--muted); }
+  .cfg-flow { display:flex; gap:.55rem; margin-top:clamp(1.25rem,1rem + 1vw,2rem); padding-bottom:.35rem; overflow-x:auto; scrollbar-width:thin; }
+  .cfg-flow__step { display:flex; align-items:center; gap:.55rem; min-width:max-content; padding:.65rem .85rem; color:var(--ink); background:var(--linen); border:1px solid var(--line); text-decoration:none; }
+  .cfg-flow__step span,.cfg-stage__number { display:inline-grid; place-items:center; width:1.65rem; height:1.65rem; flex:0 0 auto; border-radius:50%; background:var(--bronze); color:var(--linen); font-size:.72rem; font-weight:600; }
+  .cfg-flow__step strong { font-size:.78rem; letter-spacing:.04em; }
+  .cfg { display:grid; grid-template-columns:1fr; gap:clamp(1.5rem,1rem + 2vw,2.5rem); margin-top:clamp(1.5rem,1rem + 2vw,2.5rem); }
+  @media (min-width:900px) { .cfg { grid-template-columns:minmax(0,1.6fr) minmax(18rem,.9fr); align-items:start; } }
+  .cfg__groups { display:grid; gap:clamp(1.25rem,1rem + 1vw,2rem); min-width:0; }
+  .cfg-stage { scroll-margin-top:1.25rem; padding:clamp(1rem,.75rem + 1vw,1.5rem); background:color-mix(in srgb,var(--linen) 55%,transparent); border:1px solid var(--line); }
+  .cfg-stage__head { display:flex; align-items:flex-start; gap:.85rem; margin-bottom:1.25rem; }
+  .cfg-stage__title { margin:0; font-size:1rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+  .cfg-stage__help { margin:.35rem 0 0; max-width:46rem; font-size:.8125rem; line-height:1.55; color:var(--muted); }
+  .cfg-stage__groups { display:grid; gap:1.4rem; }
+  .cfg__group { border:0; margin:0; padding:0; }
+  .cfg__legend { padding:0; font-size:.8125rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+  .cfg__help { margin:.45rem 0 0; font-size:.8125rem; line-height:1.6; color:var(--muted); }
+  .cfg__options { display:grid; gap:.6rem; margin-top:.9rem; }
+  @media (min-width:560px) { .cfg__options { grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); } }
+  .cfg__option { display:flex; align-items:flex-start; gap:.7rem; min-height:3rem; padding:.85rem 1rem; background:var(--linen); border:1px solid var(--line); cursor:pointer; transition:border-color .25s var(--ease),background-color .25s var(--ease); }
+  .cfg__option:hover { border-color:var(--bronze-soft); }
+  .cfg__option input { margin:.2rem 0 0; flex:0 0 auto; accent-color:var(--bronze); }
+  .cfg__option:has(input:checked) { border-color:var(--bronze); background:var(--linen-deep); }
+  .cfg__option:has(input:focus-visible) { outline:2px solid var(--bronze); outline-offset:2px; }
+  .cfg__option-body { display:grid; gap:.25rem; min-width:0; }
+  .cfg__option-label { font-size:.9375rem; color:var(--ink); }
+  .cfg__option-hint { font-size:.8125rem; line-height:1.5; color:var(--muted); }
+  .cfg-plan { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding:1rem; background:var(--linen); border:1px solid var(--line); }
+  .cfg-plan strong { font-size:.9rem; color:var(--ink); }
+  .cfg-plan p { margin:.25rem 0 0; max-width:38rem; font-size:.78rem; line-height:1.55; color:var(--muted); }
+  .cfg__zip-label { display:block; margin:.9rem 0 .4rem; font-size:.8125rem; color:var(--muted); }
+  .cfg__zip { width:100%; max-width:11rem; padding:.75rem .9rem; font-family:inherit; font-size:1rem; color:var(--ink); background:var(--linen); border:1px solid var(--line); }
+  .cfg__zip:focus { outline:none; border-color:var(--bronze); }
+  .cfg__summary { min-width:0; }
+  @media (min-width:900px) { .cfg__summary-inner { position:sticky; top:1.5rem; } }
+  .cfg__summary-inner { padding:clamp(1.25rem,1rem + 1vw,1.75rem); background:var(--linen); border:1px solid var(--bronze-soft); }
+  .cfg__summary-eyebrow { margin:0; font-size:.6875rem; letter-spacing:.18em; text-transform:uppercase; color:var(--bronze-ink); }
+  .cfg__summary-model { margin:.35rem 0 1rem; font-family:var(--font-display,inherit); font-size:1.35rem; line-height:1.2; color:var(--ink); }
+  .cfg__summary-list { margin:0; display:grid; gap:.55rem; }
+  .cfg__summary-list div { display:flex; justify-content:space-between; gap:1rem; padding-bottom:.55rem; border-bottom:1px solid var(--line); }
+  .cfg__summary-list dt { font-size:.75rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .cfg__summary-list dd { margin:0; font-size:.875rem; text-align:right; color:var(--ink); }
+  .cfg__summary-empty { margin:0; font-size:.8125rem; line-height:1.6; color:var(--muted); }
+  .cfg__summary-price { margin:1.1rem 0; font-size:.875rem; line-height:1.6; color:var(--bronze-ink); }
+  .cfg__cta { width:100%; text-align:center; }
+  .cfg__summary-note { margin:.9rem 0 0; font-size:.75rem; line-height:1.6; color:var(--muted); }
+  @media (max-width:600px) { .cfg-plan { align-items:flex-start; flex-direction:column; } }
 </style>
 
 <script>
@@ -293,16 +249,15 @@ const productBacked = hasProductOptions(model);
     const empty = root.querySelector<HTMLElement>('[data-cfg-empty]')!;
     const zip = root.querySelector<HTMLInputElement>('[data-cfg-zip]');
     const modelTitle = root.dataset.model ?? '';
-
-    const chosen = new Map<string, { groupLabel: string; optionLabel: string; sku?: string }>();
+    const chosen = new Map<string, { groupLabel: string; optionLabel: string }>();
 
     function render() {
       summary.querySelectorAll('div').forEach((el) => el.remove());
       for (const [, entry] of chosen) {
         const row = document.createElement('div');
         const dt = document.createElement('dt');
-        dt.textContent = entry.groupLabel;
         const dd = document.createElement('dd');
+        dt.textContent = entry.groupLabel;
         dd.textContent = entry.optionLabel;
         row.append(dt, dd);
         summary.appendChild(row);
@@ -314,44 +269,30 @@ const productBacked = hasProductOptions(model);
       input.addEventListener('change', () => {
         if (!input.checked) return;
         const key = input.dataset.cfgInput!;
-        const groupEl = input.closest('[data-cfg-group]');
-        const groupLabel = groupEl?.querySelector('.cfg__legend')?.textContent?.trim() ?? key;
-        chosen.set(key, {
-          groupLabel,
-          optionLabel: input.dataset.cfgLabel ?? input.value,
-          sku: input.dataset.cfgSku || undefined,
-        });
+        const group = input.closest('[data-cfg-group]');
+        const groupLabel = group?.querySelector('.cfg__legend')?.textContent?.trim() ?? key;
+        chosen.set(key, { groupLabel, optionLabel: input.dataset.cfgLabel ?? input.value });
         render();
         track('product_option_selected', { model: modelTitle, group: key, value: input.value });
       });
     });
 
-    if (zip) {
-      zip.addEventListener('change', () => {
-        const value = zip.value.trim();
-        if (value) {
-          chosen.set('zip', { groupLabel: 'Delivery ZIP', optionLabel: value });
-          track('product_zip_entered', { model: modelTitle });
-        } else {
-          chosen.delete('zip');
-        }
-        render();
-      });
-    }
+    zip?.addEventListener('change', () => {
+      const value = zip.value.trim();
+      if (value) chosen.set('zip', { groupLabel: 'Delivery ZIP', optionLabel: value });
+      else chosen.delete('zip');
+      render();
+      if (value) track('product_zip_entered', { model: modelTitle });
+    });
 
     root.querySelector('[data-cfg-cta]')?.addEventListener('click', () => {
-      const lines = [...chosen.entries()]
-        .filter(([key]) => key !== 'zip')
-        .map(([, entry]) => `${entry.groupLabel}: ${entry.optionLabel}${entry.sku ? ` [${entry.sku}]` : ''}`);
-
-      const zipValue = chosen.get('zip')?.optionLabel ?? '';
+      const lines = [...chosen.entries()].filter(([key]) => key !== 'zip').map(([, entry]) => `${entry.groupLabel}: ${entry.optionLabel}`);
       const form = document.querySelector<HTMLFormElement>('form[name="quote"]');
       if (!form) return;
 
-      if (zipValue) {
-        const zipField = form.querySelector<HTMLInputElement>('[name="zip"]');
-        if (zipField && !zipField.value) zipField.value = zipValue;
-      }
+      const zipValue = chosen.get('zip')?.optionLabel ?? '';
+      const zipField = form.querySelector<HTMLInputElement>('[name="zip"]');
+      if (zipField && zipValue && !zipField.value) zipField.value = zipValue;
 
       if (lines.length) {
         const message = form.querySelector<HTMLTextAreaElement>('[name="message"]');

@@ -30,15 +30,15 @@ test('structured V3 groups win over legacy groups with the same key', () => {
         key: 'heater',
         label: 'Heater package',
         stage: 'heat' as const,
-        options: [{ value: 'verified', label: 'Verified heater', sku: 'HEAT-01' }],
+        options: [{ value: 'verified', label: 'Verified heater' }],
       },
       {
         key: 'orientation',
-        label: 'Door orientation',
+        label: 'Layout orientation',
         stage: 'room' as const,
         options: [
-          { value: 'right', label: 'Right-hand' },
-          { value: 'left', label: 'Left-hand' },
+          { value: 'right', label: 'Right-side' },
+          { value: 'left', label: 'Left-side' },
         ],
       },
     ],
@@ -49,17 +49,23 @@ test('structured V3 groups win over legacy groups with the same key', () => {
   assert.ok(groups.some((group) => group.key === 'supply'));
 });
 
-test('selection summary can retain supplier SKU for internal quote follow-up', () => {
+test('SAWO staged rooms receive verified public configuration without supplier cost or SKU data', () => {
   const groups = buildConfigGroups({
-    title: 'SKU model',
-    configurationGroups: [
-      {
-        key: 'door',
-        label: 'Door',
-        stage: 'room',
-        options: [{ value: 'bronze', label: 'Bronze glass', sku: 'DOOR-BR' }],
-      },
-    ],
+    title: 'SAWO 1414 Glass Front Sauna Room',
+    materials: ['Cedar', 'Aspen', 'Hemlock', 'Heat treated'],
   });
-  assert.deepEqual(summariseSelections(groups, { door: 'bronze' }), ['Door: Bronze glass [DOOR-BR]']);
+  assert.deepEqual(groups.map((group) => group.key), ['layout-orientation', 'material', 'accessory-package']);
+  assert.equal(groups.find((group) => group.key === 'layout-orientation')?.options.length, 2);
+  assert.equal(groups.find((group) => group.key === 'accessory-package')?.options.length, 5);
+  assert.equal(JSON.stringify(groups).includes('unit_cost'), false);
+  assert.equal(JSON.stringify(groups).includes('supplier_sku'), false);
+  assert.equal(shouldShowConfigurator({ title: 'SAWO 1414 Glass Front Sauna Room' }), true);
+});
+
+test('selection summaries carry customer labels only', () => {
+  const groups = buildConfigGroups({ title: 'SAWO 1414 Glass Front Sauna Room' });
+  assert.deepEqual(
+    summariseSelections(groups, { 'layout-orientation': 'right-side', 'accessory-package': 'traditional' }),
+    ['Layout orientation: Right-side layout', 'Accessory package: Traditional accessory set'],
+  );
 });
