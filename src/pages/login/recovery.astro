@@ -1,0 +1,49 @@
+---
+export const prerender = false;
+---
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Finishing Password Recovery · BUXENA</title>
+    <style>
+      html,body{margin:0;min-height:100%;background:#14120f;color:#f6f2ea;font-family:system-ui,sans-serif}.wrap{min-height:100vh;display:grid;place-items:center;padding:2rem}.card{max-width:30rem;text-align:center;padding:2rem;border:1px solid rgba(212,184,140,.2)}h1{font-size:1.2rem;font-weight:500}p{color:rgba(246,242,234,.7);line-height:1.6}.err{color:#e5a3a3}
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="card">
+        <h1>Finishing password recovery…</h1>
+        <p id="status">Please wait.</p>
+      </div>
+    </main>
+    <script is:inline>
+      (async function () {
+        var status = document.getElementById('status');
+        var params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        var accessToken = params.get('access_token');
+        var refreshToken = params.get('refresh_token');
+        var type = params.get('type');
+        if (!accessToken || !refreshToken || type !== 'recovery') {
+          status.textContent = 'This recovery link is missing or has expired. Request a new one.';
+          status.className = 'err';
+          return;
+        }
+        try {
+          var response = await fetch('/api/auth/recovery-session', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, type: type })
+          });
+          if (!response.ok) throw new Error('recovery failed');
+          history.replaceState(null, '', '/login/recovery');
+          window.location.replace('/login/reset-password');
+        } catch (e) {
+          status.textContent = 'This recovery link could not be used. Request a new one.';
+          status.className = 'err';
+        }
+      })();
+    </script>
+  </body>
+</html>

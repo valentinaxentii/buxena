@@ -6,7 +6,6 @@ import ProjectUpload from './ProjectUpload.astro';
 import { INSTALLATION_PREFERENCES } from '../lib/product-config';
 
 interface Props {
-  /** Pre-selects a model when the form is embedded on a product page. */
   preselect?: string;
   compact?: boolean;
 }
@@ -16,40 +15,11 @@ const saunas = (await getCollection('saunas', ({ data }) => !data.draft)).sort((
   a.data.title.localeCompare(b.data.title)
 );
 
-/**
- * Broad categories offered above the specific models, for the buyer who
- * knows the shape they want but not the model.
- *
- * Only categories the catalog can actually satisfy are listed. `categories`
- * in site.ts declares six, but two of them — Heaters and Accessories — carry
- * no model, so offering them invited an enquiry for a product line BUXENA
- * does not sell. That reaches the customer as an implied catalog and reaches
- * the CRM as a lead nobody can quote.
- *
- * Matched on either axis the content uses: `category` covers barrel, cube
- * and indoor; `location` covers outdoor, which is a placement rather than a
- * category and so has no model filed under it. This is the same live-model
- * test /collections/[category] already builds its pages by — add the first
- * heater model and the Heaters option appears here on its own.
- */
 const offeredCategories = categories.filter((c) =>
   saunas.some((s) => s.data.category === c.id || s.data.location === c.id)
 );
 ---
 
-<!--
-  PROGRESSIVE QUALIFICATION (founders' direction):
-  Step 1 captures the lead with seven fields and GET MY PRICING — the
-  enquiry is submitted the moment step 1 succeeds, so an abandoned step 2
-  never loses the lead. Step 2 then collects optional project detail and
-  MERGES it into that same enquiry, carrying step 1's id back to the server
-  (2026-08-13). It previously created a second enquiry row joined to the
-  first by nothing but a matching email address, which split one buyer into
-  two CRM records and, worse, attached the customer's photos and plans to the
-  second one — so the row a salesperson opened showed no files.
-  Both submissions go through /api/enquiries (Supabase + email + Telegram
-  in production; safe local test mode in dev — see src/lib/enquiry-client.ts).
--->
 <form
   class={`qform ${compact ? 'qform--compact' : ''}`}
   name="quote"
@@ -102,8 +72,6 @@ const offeredCategories = categories.filter((c) =>
           ))}
           {saunas.length > 0 && (
             <optgroup label="Specific models">
-              {/* value keeps the full internal title (BUH-…) so CRM/admin model
-                  matching stays consistent; the label is the customer name. */}
               {saunas.map((s) => (
                 <option value={s.data.title} selected={preselect === s.data.title}>{displayTitle(s.data.title)}</option>
               ))}
@@ -221,15 +189,11 @@ const offeredCategories = categories.filter((c) =>
 
 <script>
   import { attachProjectFiles } from '../lib/enquiry-client';
+  import { INSTALLATION_PREFERENCES } from '../lib/product-config';
+  import { initZipValidation } from '../lib/zip-validate';
+  import { track } from '../lib/track';
+  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
-  /**
-   * Send the customer's actual project files, once the enquiry exists.
-   *
-   * Deliberately after the enquiry and deliberately non-blocking: the lead is
-   * already captured and staff already notified, so a failed upload degrades
-   * to "we have your enquiry, ask them for the photos" rather than losing
-   * anything. The enquiry note already lists the filenames.
-   */
   async function sendProjectFiles(enquiryId: string | null | undefined): Promise<void> {
     if (!enquiryId) return;
     const control = document.querySelector<HTMLElement>('[data-pupload]');
@@ -239,25 +203,27 @@ const offeredCategories = categories.filter((c) =>
     if (!result.ok) console.error('[project-files] attach failed:', result.error);
   }
 
-  import { INSTALLATION_PREFERENCES } from '../lib/product-config';
-
-  // Staff read the label, not the stored code. The codes match the admin's
-  // installation_type vocabulary so the two systems stay in step.
   const installationLabel = (value: string): string =>
     INSTALLATION_PREFERENCES.find((o) => o.value === value)?.label ?? value;
-  import { initZipValidation, zipFieldsValid } from '../lib/zip-validate';
 
-  // Immediate inline feedback on every ZIP field, and a capture-phase
-  // submit guard so an invalid ZIP cannot reach the network.
   initZipValidation();
-  import { track } from '../lib/track';
-  import { submitEnquiry, showFormStatus, rememberEnquiry } from '../lib/enquiry-client';
 
   const urlParams = new URLSearchParams(window.location.search);
   const urlModel = urlParams.get('model');
   const urlPackage = urlParams.get('package');
+  const urlMessage = urlParams.get('message');
   const isCompare = urlParams.get('intent') === 'compare';
-  if (urlModel) document.querySelectorAll<HTMLSelectElement>('form[name="quote"] select[name="model"]').forEach((sel) => { if ([...sel.options].some((o) => o.value === urlModel)) sel.value = urlModel; });
+
+  if (urlModel) {
+    document.querySelectorAll<HTMLSelectElement>('form[name="quote"] select[name="model"]').forEach((sel) => {
+      if ([...sel.options].some((o) => o.value === urlModel)) sel.value = urlModel;
+    });
+  }
+  if (urlMessage) {
+    document.querySelectorAll<HTMLTextAreaElement>('form[name="quote"] textarea[name="message"]').forEach((field) => {
+      if (!field.value) field.value = urlMessage;
+    });
+  }
 
   document.querySelectorAll('form[name="quote"]').forEach((formEl) => {
     const form = formEl as HTMLFormElement;
@@ -272,21 +238,6 @@ const offeredCategories = categories.filter((c) =>
       return (data.get(key) || '').toString().trim();
     };
 
-    /**
-     * The wording the customer actually saw, for a <select>.
-     *
-     * The stored values are slugs — "10-20k", "1-3-months", "need-guidance" —
-     * which is right for analytics and wrong for a human. They used to reach
-     * the CRM and the staff notification verbatim, so a salesperson opening a
-     * fully-qualified lead read "Budget: 10-20k · Foundation: need-guidance"
-     * and had to translate before replying.
-     *
-     * Read from the chosen option's own text rather than a lookup table, so
-     * there is no second vocabulary to drift out of step with the markup.
-     * Falls back to the raw value for inputs and for anything unmatched.
-     * Deliberately NOT used for `model`, whose full BUH- title is what admin
-     * and CRM match on, nor for the track() calls, which keep the stable slugs.
-     */
     const getLabel = (key: string) => {
       const field = form.elements.namedItem(key);
       if (field instanceof HTMLSelectElement) {
@@ -300,8 +251,6 @@ const offeredCategories = categories.filter((c) =>
     let capturedEmail = '';
     let capturedModel = '';
     let wasDevMode = false;
-    // Step 1's enquiry id. Step 2 sends it so its answers are merged into that
-    // same enquiry instead of creating a second row for the same buyer.
     let capturedEnquiryId: string | null = null;
 
     form.addEventListener('focusin', () => track('quote_started', { formType: 'quote_form' }), { once: true });
@@ -310,6 +259,7 @@ const offeredCategories = categories.filter((c) =>
       event.preventDefault();
       if (!form.reportValidity()) return;
       const zip = get('zip');
+      const projectNote = get('message');
       const extras = [
         zip && `ZIP: ${zip}`,
         get('placement') && `Placement: ${getLabel('placement')}`,
@@ -318,18 +268,28 @@ const offeredCategories = categories.filter((c) =>
       ].filter(Boolean).join(' · ');
 
       const originalLabel = captureBtn.textContent ?? '';
-      captureBtn.disabled = true; captureBtn.textContent = 'Sending…';
-      const restore = () => { captureBtn.disabled = false; captureBtn.textContent = originalLabel || 'Get My Pricing'; };
+      captureBtn.disabled = true;
+      captureBtn.textContent = 'Sending…';
+      const restore = () => {
+        captureBtn.disabled = false;
+        captureBtn.textContent = originalLabel || 'Get My Pricing';
+      };
 
+      // The configurator and the heater calculator both prefill the hidden
+      // second-step message before the buyer reaches this form. Capture that
+      // data NOW with step 1 so skipping the optional details step can never
+      // produce a lead that has lost the customer's chosen configuration.
       const result = await submitEnquiry({
         name: get('name'),
         email: get('email'),
         phone: get('phone'),
         location: zip,
         zip,
-        message: [isCompare ? 'Pricing request (has another quote to compare)' : 'Pricing request', extras]
-          .filter(Boolean)
-          .join('\n\n'),
+        message: [
+          isCompare ? 'Pricing request (has another quote to compare)' : 'Pricing request',
+          extras,
+          projectNote && `Configuration / project note:\n${projectNote}`,
+        ].filter(Boolean).join('\n\n'),
         saunaInterest: get('model'),
         source: isCompare ? 'Quote Comparison' : 'Quote Form',
         botField: get('bot-field'),
@@ -351,13 +311,7 @@ const offeredCategories = categories.filter((c) =>
         ...(urlPackage ? { package: urlPackage } : {}),
       });
       track('pricing_request_submitted', { formType: 'quote_form', model: get('model'), zip });
-      // Step 1 is already a durable lead in Supabase. Count the conversion here
-      // so abandoning optional Step 2 cannot disappear from CAC reporting.
-      // Step 1 is already a durable lead in Supabase, so the conversion is
-      // counted HERE rather than on /thank-you/ — step 2 is optional, and an
-      // abandoned step 2 must not vanish from acquisition reporting. The
-      // summary below carries conversionTracked so /thank-you/ does not
-      // count the same lead a second time. (From the remote line of work.)
+
       const leadPayload = {
         model: get('model'),
         formType: 'quote_form',
@@ -371,7 +325,12 @@ const offeredCategories = categories.filter((c) =>
       capturedEnquiryId = result.enquiryId ?? null;
       wasDevMode = Boolean(result.devMode);
 
-      // Lead is captured — progressive step appears, capture step collapses.
+      // The prefilled configuration/project note is already durably captured
+      // above. Clear the textarea before revealing optional step 2 so sending
+      // extra details does not append the same configuration twice.
+      const messageField = form.querySelector<HTMLTextAreaElement>('[name="message"]');
+      if (messageField) messageField.value = '';
+
       restore();
       form.querySelector('.form-status')?.remove();
       captureStep.hidden = true;
@@ -390,8 +349,6 @@ const offeredCategories = categories.filter((c) =>
         `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,
         get('capacity') && `People: ${getLabel('capacity')}`,
         get('budget') && `Budget: ${getLabel('budget')}`,
-        // Installation preference is asked here for EVERY model — including the
-        // ones with no configurator — so a specialist never has to ask twice.
         get('installation') && `Installation: ${installationLabel(get('installation'))}`,
         get('foundation') && `Foundation: ${getLabel('foundation')}`,
         get('electrical') && `Electrical: ${getLabel('electrical')}`,
@@ -413,16 +370,12 @@ const offeredCategories = categories.filter((c) =>
         saunaInterest: capturedModel,
         source: 'Quote Form — details',
         botField: get('bot-field'),
-        // Merge into step 1's enquiry rather than opening a second one. Null
-        // (step 1 recorded to notifications only, because the database was
-        // down) simply means the server records this separately, as before.
         appendToEnquiryId: capturedEnquiryId,
       });
 
       detailsBtn.disabled = false;
       detailsBtn.textContent = originalLabel || 'Add Project Details';
 
-      // Files ride along with the details step, where the upload control is.
       await sendProjectFiles(result.enquiryId);
       if (!result.ok) {
         showFormStatus(form, 'error');

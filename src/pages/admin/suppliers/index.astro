@@ -6,20 +6,19 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
 import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
+import { isAdminStaff } from '../../../lib/staff-access';
 
 const search = Astro.url.searchParams.get('q') ?? '';
 let suppliers: any[] = [];
 let dbReady = true;
-// Archived records are hidden from the active list; ?archived=1 shows only them.
 const showArchived = Astro.url.searchParams.get('archived') === '1';
 let archiveOk = false;
+const canManageCommercialData = await isAdminStaff(Astro);
 
 try {
   const supabase = createSupabaseAdminClient();
   let query = supabase.from('suppliers').select('id, name, contact_name, email, phone, country').order('name');
   if (search) query = query.ilike('name', `%${search}%`);
-  // Archived rows drop out of the active list. A no-op until the migration
-  // is applied, so this cannot break the page in the meantime.
   archiveOk = await archiveSupported(supabase);
   query = withArchiveFilter(query, archiveOk, showArchived);
   const { data } = await query.limit(300);
@@ -31,7 +30,7 @@ try {
 
 <AdminLayout title="Suppliers" parentLabel="Dashboard" parentHref="/admin">
   {!dbReady && (
-    <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
+    <div class="admin-placeholder" style="margin-bottom:1.5rem;">
       <h2>Not connected to Supabase yet</h2>
       <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
     </div>
@@ -44,7 +43,13 @@ try {
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
   </div>
-  <a slot="actions" class="admin-btn" href="/admin/suppliers/new">+ New Supplier</a>
+  <div slot="actions" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
+    {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/pricing-lab">Pricing Lab</a>}
+    {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/supplier-pricing">Supplier Pricing</a>}
+    {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/competitor-pricing">Competitor Pricing</a>}
+    {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/competitor-pricing/mapping">Map Competitors</a>}
+    <a class="admin-btn" href="/admin/suppliers/new">+ New Supplier</a>
+  </div>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">

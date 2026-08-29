@@ -1,0 +1,131 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
+
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
+
+const supabase = createSupabaseAdminClient();
+let error: string | null = null;
+let notice: string | null = null;
+let products: any[] = [];
+let observations: any[] = [];
+const showMapped = Astro.url.searchParams.get('mapped') === '1';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const observationId = String(form.get('observation_id') ?? '').trim();
+    const productId = String(form.get('product_id') ?? '').trim();
+    if (!observationId) throw new Error('Competitor observation is required.');
+
+    const { error: updateError } = await supabase
+      .from('competitor_price_observations')
+      .update({ product_id: productId || null })
+      .eq('id', observationId);
+    if (updateError) throw updateError;
+    return Astro.redirect(`/admin/competitor-pricing/mapping?saved=1${showMapped ? '&mapped=1' : ''}`);
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Could not save competitor mapping.';
+  }
+}
+
+if (Astro.url.searchParams.get('saved') === '1') notice = 'Mapping saved. Pricing Lab can now use that observation as a market reference.';
+
+try {
+  const [productRes, observationRes] = await Promise.all([
+    supabase.from('products').select('id, model_name, category, suppliers(name)').eq('is_active', true).order('model_name').limit(500),
+    (() => {
+      let q = supabase
+        .from('competitor_price_observations')
+        .select('id, observed_on, product_name, category, currency, price, source_url, product_id, competitors(name, market)')
+        .order('observed_on', { ascending: false })
+        .order('product_name');
+      q = showMapped ? q.not('product_id', 'is', null) : q.is('product_id', null);
+      return q.limit(500);
+    })(),
+  ]);
+  if (productRes.error) throw productRes.error;
+  if (observationRes.error) throw observationRes.error;
+  products = productRes.data ?? [];
+  observations = observationRes.data ?? [];
+} catch (e: any) {
+  error = error ?? (e?.code === '42P01'
+    ? 'Competitor mapping is ready in V3, but the competitor-pricing migration has not been applied to this database.'
+    : (e?.message || 'Could not load competitor mapping.'));
+}
+
+function money(value: any, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(value));
+}
+---
+
+<AdminLayout title="Competitor Mapping" subtitle="Manual only — never guess comparable products" parentLabel="Competitor Pricing" parentHref="/admin/competitor-pricing">
+  {error && <p class="notice notice--error">{error}</p>}
+  {notice && <p class="notice notice--ok">{notice}</p>}
+
+  <div class="map-rule">
+    <strong>Why manual:</strong> similar dimensions or model numbers do not prove two sauna packages are comparable. Map an observation only after checking product scope, size and inclusions. Leaving it unmapped is safer than a false market comparison.
+  </div>
+
+  <div class="admin-toolbar" style="margin-top:1.25rem;">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <a class={`admin-btn ${!showMapped ? '' : 'admin-btn--ghost'}`} href="/admin/competitor-pricing/mapping">Unmapped</a>
+      <a class={`admin-btn ${showMapped ? '' : 'admin-btn--ghost'}`} href="/admin/competitor-pricing/mapping?mapped=1">Mapped</a>
+    </div>
+    <a class="admin-btn admin-btn--ghost" href="/admin/pricing-lab">Open Pricing Lab</a>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table map-table">
+        <thead><tr><th>Checked</th><th>Competitor Product</th><th>Observed Price</th><th>Source</th><th>BUXENA Comparable</th><th></th></tr></thead>
+        <tbody>
+          {observations.map((row) => {
+            const formId = `map-${row.id}`;
+            return (
+              <tr>
+                <td>{row.observed_on}</td>
+                <td><strong>{row.product_name}</strong><span class="map-sub">{(row.competitors as any)?.name ?? '—'} · {row.category || 'category not recorded'}</span></td>
+                <td>{money(row.price, row.currency)}</td>
+                <td><a href={row.source_url} target="_blank" rel="noreferrer">Check source ↗</a></td>
+                <td>
+                  <select class="admin-input map-select" name="product_id" form={formId}>
+                    <option value="">— keep unmapped —</option>
+                    {products.map((product) => (
+                      <option value={product.id} selected={row.product_id === product.id}>
+                        {product.model_name}{product.suppliers?.name ? ` · ${product.suppliers.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <form id={formId} method="POST">
+                    <input type="hidden" name="observation_id" value={row.id} />
+                    <button class="admin-btn admin-btn--ghost" type="submit">Save Mapping</button>
+                  </form>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    {observations.length === 0 && <p class="admin-empty">{showMapped ? 'No mapped competitor prices yet.' : 'No unmapped competitor prices.'}</p>}
+  </div>
+</AdminLayout>
+
+<style>
+  .notice { margin:0 0 1rem; padding:.85rem 1rem; font-size:.85rem; border-radius:2px; }
+  .notice--error { color:#e6b7a0; background:rgba(230,130,90,.06); border:1px solid rgba(230,130,90,.35); }
+  .notice--ok { color:#b8d7b8; background:rgba(90,160,105,.06); border:1px solid rgba(90,160,105,.35); }
+  .map-rule { padding:.85rem 1rem; border:1px solid rgba(201,166,104,.28); background:rgba(201,166,104,.06); color:var(--admin-muted); font-size:.8rem; line-height:1.65; }
+  .map-rule strong { color:var(--admin-gold); }
+  .map-table td { vertical-align:top; }
+  .map-sub { display:block; margin-top:.22rem; color:var(--admin-muted); font-size:.7rem; }
+  .map-select { min-width:20rem; }
+</style>

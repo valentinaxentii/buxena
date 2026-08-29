@@ -1,0 +1,227 @@
+---
+export const prerender = false;
+
+import { createHash } from 'node:crypto';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
+import { parseSupplierPriceWorkbook } from '../../../lib/supplier-pricing-import';
+
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
+
+const supabase = createSupabaseAdminClient();
+const BUCKET = 'supplier-price-lists';
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+let error: string | null = null;
+let notice: string | null = null;
+let registryReady = true;
+let suppliers: any[] = [];
+let lists: any[] = [];
+
+function safeFilename(value: string): string {
+  const clean = value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-');
+  return clean.slice(-140) || 'supplier-price-list.xlsx';
+}
+
+function chunk<T>(rows: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
+  return out;
+}
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const supplierId = String(form.get('supplier_id') ?? '').trim();
+    const file = form.get('price_list');
+
+    if (!supplierId) throw new Error('Select the supplier for this price list.');
+    if (!(file instanceof File) || !file.name) throw new Error('Choose an Excel price-list file.');
+    if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Use the original .xlsx supplier price list.');
+    if (file.size <= 0) throw new Error('The selected file is empty.');
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error('The price-list file is larger than the 25 MB upload limit.');
+
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+
+    const { data: duplicate, error: duplicateError } = await supabase
+      .from('supplier_price_lists')
+      .select('id, list_name, source_filename')
+      .eq('supplier_id', supplierId)
+      .eq('source_sha256', sha256)
+      .maybeSingle();
+    if (duplicateError) throw duplicateError;
+    if (duplicate) {
+      notice = `Already imported: ${duplicate.list_name || duplicate.source_filename}. Nothing was duplicated.`;
+    } else {
+      const parsed = await parseSupplierPriceWorkbook(bytes, file.name);
+      const storagePath = `${supplierId}/${new Date().toISOString().slice(0, 10)}/${sha256.slice(0, 16)}-${safeFilename(file.name)}`;
+
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, bytes, {
+        contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        upsert: false,
+      });
+      if (uploadError) throw new Error(`Could not retain the original workbook: ${uploadError.message}`);
+
+      const { data: list, error: listError } = await supabase
+        .from('supplier_price_lists')
+        .insert({
+          supplier_id: supplierId,
+          catalog_scope: parsed.catalogScope,
+          list_name: parsed.listName,
+          source_filename: file.name,
+          source_sha256: sha256,
+          source_storage_path: storagePath,
+          price_list_date: parsed.priceListDate,
+          currency: parsed.currency,
+          incoterm: parsed.incoterm,
+          price_column_label: parsed.priceColumnLabel,
+          row_count: parsed.items.length,
+          status: 'Needs Review',
+          is_current: false,
+          notes: `Auto-detected ${parsed.detectedSupplier} ${parsed.catalogScope} workbook. Imported for review; not made current automatically.`,
+        })
+        .select('id')
+        .single();
+
+      if (listError || !list) {
+        await supabase.storage.from(BUCKET).remove([storagePath]);
+        throw new Error(listError?.message || 'Could not create the price-list record.');
+      }
+
+      try {
+        for (const batch of chunk(parsed.items, 150)) {
+          const { error: itemError } = await supabase.from('supplier_price_items').insert(
+            batch.map((item) => ({ ...item, price_list_id: list.id })),
+          );
+          if (itemError) throw itemError;
+        }
+      } catch (itemFailure) {
+        await supabase.from('supplier_price_lists').delete().eq('id', list.id);
+        await supabase.storage.from(BUCKET).remove([storagePath]);
+        throw itemFailure;
+      }
+
+      notice = `${parsed.items.length} supplier prices imported from ${file.name}. Review the changes before approving this list as current.`;
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Could not import this supplier price list.';
+  }
+}
+
+try {
+  const [supplierRes, listRes] = await Promise.all([
+    supabase.from('suppliers').select('id, name, currency, incoterm').order('name'),
+    supabase
+      .from('supplier_price_lists')
+      .select('id, supplier_id, catalog_scope, list_name, source_filename, price_list_date, currency, incoterm, row_count, status, is_current, created_at, suppliers(name)')
+      .order('created_at', { ascending: false })
+      .limit(250),
+  ]);
+
+  if (supplierRes.error) throw supplierRes.error;
+  if (listRes.error) throw listRes.error;
+  suppliers = supplierRes.data ?? [];
+  lists = listRes.data ?? [];
+} catch (e: any) {
+  registryReady = false;
+  if (!error) {
+    error = e?.code === '42P01'
+      ? 'Supplier Price Registry is prepared in V3 but its database migration has not been applied yet.'
+      : (e?.message || 'Supplier Price Registry is not available yet.');
+  }
+}
+
+const approvedCount = lists.filter((list) => list.status === 'Approved').length;
+const reviewCount = lists.filter((list) => list.status === 'Needs Review').length;
+const totalRows = lists.reduce((sum, list) => sum + Number(list.row_count || 0), 0);
+
+function displayScope(scope: string): string {
+  if (scope === 'sauna_rooms') return 'Sauna Rooms';
+  if (scope === 'accessories') return 'Accessories';
+  return scope.replace(/_/g, ' ');
+}
+---
+
+<AdminLayout title="Supplier Pricing" subtitle="Private supplier costs and price-list history" parentLabel="Suppliers" parentHref="/admin/suppliers">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  <div class="admin-kpis" style="margin-bottom:2rem;">
+    <div class="admin-kpi"><span class="admin-kpi__value">{lists.length}</span><span class="admin-kpi__label">Price Lists</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{totalRows.toLocaleString('en-US')}</span><span class="admin-kpi__label">Stored Price Rows</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{approvedCount}</span><span class="admin-kpi__label">Approved Versions</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{reviewCount}</span><span class="admin-kpi__label">Needs Review</span></div>
+  </div>
+
+  <h2 class="admin-section-title">Upload Supplier Price List</h2>
+  <div class="admin-panel" style="margin-bottom:2rem; padding:1.25rem;">
+    <form method="POST" enctype="multipart/form-data" class="admin-form" style="margin:0;">
+      <label class="admin-field">
+        <span>Supplier *</span>
+        <select name="supplier_id" required disabled={!registryReady}>
+          <option value="">— select supplier —</option>
+          {suppliers.map((supplier) => <option value={supplier.id}>{supplier.name}</option>)}
+        </select>
+      </label>
+      <label class="admin-field">
+        <span>Original Excel Price List *</span>
+        <input type="file" name="price_list" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required disabled={!registryReady} />
+      </label>
+      <div class="admin-form__full" style="font-size:0.8rem; color:var(--admin-muted); line-height:1.65;">
+        V3 retains the original workbook privately, imports every supplier price row, and keeps older versions.
+        A newly uploaded list stays <strong>Needs Review</strong> until an admin approves it. It never changes public BUXENA pricing automatically.
+      </div>
+      <div class="admin-form__actions">
+        <button class="admin-btn" type="submit" disabled={!registryReady}>Import for Review</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-toolbar">
+    <h2 class="admin-section-title" style="margin:0;">Price-List History</h2>
+  </div>
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Supplier</th>
+            <th>Scope</th>
+            <th>Price-list date</th>
+            <th>Rows</th>
+            <th>Currency / Terms</th>
+            <th>Status</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lists.map((list) => (
+            <tr>
+              <td><a href={`/admin/supplier-pricing/${list.id}`}>{(list.suppliers as any)?.name ?? 'Supplier'}</a></td>
+              <td>{displayScope(list.catalog_scope)}</td>
+              <td>{list.price_list_date || '—'}</td>
+              <td>{Number(list.row_count || 0).toLocaleString('en-US')}</td>
+              <td>{[list.currency, list.incoterm].filter(Boolean).join(' · ') || '—'}</td>
+              <td>
+                <span class={`admin-badge ${list.is_current ? 'admin-badge--green' : 'admin-badge--neutral'}`}>
+                  {list.is_current ? 'Current' : list.status}
+                </span>
+              </td>
+              <td style="max-width:22rem; white-space:normal;">{list.source_filename}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    {registryReady && lists.length === 0 && <p class="admin-empty">No supplier price lists imported yet.</p>}
+  </div>
+</AdminLayout>
+
+<style>
+  .notice--error { padding:0.85rem 1rem; font-size:0.85rem; color:#e6b7a0; background:rgba(230,130,90,0.06); border:1px solid rgba(230,130,90,0.35); border-radius:2px; }
+  .notice--success { padding:0.85rem 1rem; font-size:0.85rem; color:#b8d7b8; background:rgba(90,160,105,0.06); border:1px solid rgba(90,160,105,0.35); border-radius:2px; }
+</style>

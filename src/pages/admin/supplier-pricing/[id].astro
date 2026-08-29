@@ -1,0 +1,280 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
+
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
+
+const { id } = Astro.params;
+const supabase = createSupabaseAdminClient();
+let error: string | null = null;
+let notice: string | null = null;
+let list: any = null;
+let items: any[] = [];
+let compareList: any = null;
+let compareItems: any[] = [];
+let sourceUrl: string | null = null;
+
+if (!id) return Astro.redirect('/admin/supplier-pricing');
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const intent = String(form.get('_intent') ?? '');
+    if (intent !== 'approve') throw new Error('Unknown price-list action.');
+
+    const { data: target, error: targetError } = await supabase
+      .from('supplier_price_lists')
+      .select('id, supplier_id, catalog_scope, status, is_current')
+      .eq('id', id)
+      .single();
+    if (targetError || !target) throw new Error(targetError?.message || 'Price list not found.');
+
+    const { data: oldCurrent } = await supabase
+      .from('supplier_price_lists')
+      .select('id, status')
+      .eq('supplier_id', target.supplier_id)
+      .eq('catalog_scope', target.catalog_scope)
+      .eq('is_current', true)
+      .neq('id', target.id)
+      .maybeSingle();
+
+    if (oldCurrent) {
+      const { error: oldError } = await supabase
+        .from('supplier_price_lists')
+        .update({ is_current: false, status: 'Superseded' })
+        .eq('id', oldCurrent.id);
+      if (oldError) throw oldError;
+    }
+
+    const { error: approveError } = await supabase
+      .from('supplier_price_lists')
+      .update({ is_current: true, status: 'Approved' })
+      .eq('id', target.id);
+
+    if (approveError) {
+      if (oldCurrent) {
+        await supabase
+          .from('supplier_price_lists')
+          .update({ is_current: true, status: oldCurrent.status === 'Superseded' ? 'Approved' : oldCurrent.status })
+          .eq('id', oldCurrent.id);
+      }
+      throw approveError;
+    }
+
+    notice = 'Approved. This is now the current supplier price list for this scope. Older versions were retained.';
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Could not approve this price list.';
+  }
+}
+
+try {
+  const { data, error: listError } = await supabase
+    .from('supplier_price_lists')
+    .select('*, suppliers(id, name)')
+    .eq('id', id)
+    .single();
+  if (listError || !data) throw new Error(listError?.message || 'Price list not found.');
+  list = data;
+
+  const { data: itemRows, error: itemError } = await supabase
+    .from('supplier_price_items')
+    .select('id, source_row, section, item_name, source_item, supplier_sku, ean, dimensions, material, pack_length, pack_width, pack_height, weight_kg, package_m3, master_box_qty, inner_box_qty, unit_cost, product_id, mapping_status')
+    .eq('price_list_id', id)
+    .order('source_row')
+    .range(0, 1999);
+  if (itemError) throw itemError;
+  items = itemRows ?? [];
+
+  let comparisonQuery = supabase
+    .from('supplier_price_lists')
+    .select('id, list_name, price_list_date, status, is_current')
+    .eq('supplier_id', list.supplier_id)
+    .eq('catalog_scope', list.catalog_scope)
+    .neq('id', list.id);
+
+  if (!list.is_current) comparisonQuery = comparisonQuery.eq('is_current', true);
+  const comparison = await comparisonQuery
+    .order('price_list_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (comparison.data) {
+    compareList = comparison.data;
+    const { data: previousRows } = await supabase
+      .from('supplier_price_items')
+      .select('source_row, item_name, source_item, supplier_sku, material, dimensions, unit_cost')
+      .eq('price_list_id', compareList.id)
+      .order('source_row')
+      .range(0, 1999);
+    compareItems = previousRows ?? [];
+  }
+
+  if (list.source_storage_path) {
+    const { data: signed } = await supabase.storage
+      .from('supplier-price-lists')
+      .createSignedUrl(list.source_storage_path, 300);
+    sourceUrl = signed?.signedUrl ?? null;
+  }
+} catch (e) {
+  if (!error) error = e instanceof Error ? e.message : 'Could not load this supplier price list.';
+}
+
+function identity(row: any): string {
+  return [row.source_item, row.material, row.dimensions]
+    .map((part) => String(part ?? '').trim().toLowerCase())
+    .join('|');
+}
+
+const previousByKey = new Map(compareItems.map((row) => [identity(row), row]));
+const currentByKey = new Map(items.map((row) => [identity(row), row]));
+const changedRows = items
+  .map((row) => {
+    const previous = previousByKey.get(identity(row));
+    if (!previous) return { kind: 'New', row, previous: null, delta: null };
+    const before = Number(previous.unit_cost);
+    const after = Number(row.unit_cost);
+    if (Math.abs(before - after) < 0.000001) return { kind: 'Unchanged', row, previous, delta: 0 };
+    return { kind: 'Changed', row, previous, delta: after - before };
+  });
+const removedRows = compareItems
+  .filter((row) => !currentByKey.has(identity(row)))
+  .map((row) => ({ kind: 'Removed', row, previous: row, delta: null }));
+
+const changedCount = changedRows.filter((row) => row.kind === 'Changed').length;
+const newCount = changedRows.filter((row) => row.kind === 'New').length;
+const unchangedCount = changedRows.filter((row) => row.kind === 'Unchanged').length;
+const removedCount = removedRows.length;
+const reviewRows = [...changedRows.filter((row) => row.kind !== 'Unchanged'), ...removedRows];
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim().toLowerCase();
+const visibleItems = q
+  ? items.filter((row) => [row.source_item, row.item_name, row.material, row.section, row.ean]
+      .some((value) => String(value ?? '').toLowerCase().includes(q)))
+  : items;
+
+function money(value: any, currency = list?.currency || 'USD'): string {
+  if (value == null || value === '') return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(Number(value));
+}
+
+function scopeLabel(scope: string): string {
+  return scope === 'sauna_rooms' ? 'Sauna Rooms' : scope === 'accessories' ? 'Accessories' : scope.replace(/_/g, ' ');
+}
+---
+
+<AdminLayout title={list?.list_name ?? 'Supplier Price List'} parentLabel="Supplier Pricing" parentHref="/admin/supplier-pricing">
+  {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+  {notice && <p class="notice notice--success" style="margin-bottom:1.25rem;">{notice}</p>}
+
+  {list && (
+    <>
+      <div class="admin-kpis" style="margin-bottom:2rem;">
+        <div class="admin-kpi"><span class="admin-kpi__value">{items.length.toLocaleString('en-US')}</span><span class="admin-kpi__label">Price Rows</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value">{changedCount}</span><span class="admin-kpi__label">Changed Prices</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value">{newCount}</span><span class="admin-kpi__label">New Rows</span></div>
+        <div class="admin-kpi"><span class="admin-kpi__value">{removedCount}</span><span class="admin-kpi__label">Removed Rows</span></div>
+      </div>
+
+      <div class="admin-panel" style="padding:1.25rem; margin-bottom:2rem;">
+        <div class="meta-grid">
+          <div><span>Supplier</span><strong>{(list.suppliers as any)?.name ?? '—'}</strong></div>
+          <div><span>Scope</span><strong>{scopeLabel(list.catalog_scope)}</strong></div>
+          <div><span>Price-list date</span><strong>{list.price_list_date || '—'}</strong></div>
+          <div><span>Terms</span><strong>{[list.currency, list.incoterm].filter(Boolean).join(' · ') || '—'}</strong></div>
+          <div><span>Status</span><strong>{list.is_current ? 'Current · Approved' : list.status}</strong></div>
+          <div><span>Source row count</span><strong>{list.row_count}</strong></div>
+          <div class="meta-grid__wide"><span>Source file</span><strong>{list.source_filename}</strong></div>
+          <div class="meta-grid__wide"><span>SHA-256</span><code>{list.source_sha256}</code></div>
+        </div>
+        <div class="admin-form__actions" style="margin-top:1rem;">
+          {sourceUrl && <a class="admin-btn admin-btn--ghost" href={sourceUrl}>Open Original Workbook</a>}
+          {(!list.is_current || list.status !== 'Approved') && (
+            <form method="POST" style="display:inline;" onsubmit="return confirm('Approve this list and make it current for this supplier scope? The previous current list will remain in history.');">
+              <input type="hidden" name="_intent" value="approve" />
+              <button class="admin-btn" type="submit">Approve & Make Current</button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {compareList ? (
+        <>
+          <div class="admin-toolbar">
+            <h2 class="admin-section-title" style="margin:0;">Changes vs {compareList.list_name}</h2>
+            <span style="font-size:0.78rem; color:var(--admin-muted);">{unchangedCount} unchanged rows hidden</span>
+          </div>
+          <div class="admin-panel" style="margin-bottom:2rem;">
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Change</th><th>Code / Item</th><th>Material</th><th>Old</th><th>New</th><th>Δ</th></tr></thead>
+                <tbody>
+                  {reviewRows.map((change) => (
+                    <tr>
+                      <td><span class="admin-badge admin-badge--neutral">{change.kind}</span></td>
+                      <td>{change.row.source_item}</td>
+                      <td>{change.row.material || '—'}</td>
+                      <td>{change.kind === 'New' ? '—' : money(change.previous?.unit_cost)}</td>
+                      <td>{change.kind === 'Removed' ? '—' : money(change.row.unit_cost)}</td>
+                      <td>{change.delta == null ? '—' : `${change.delta > 0 ? '+' : ''}${money(change.delta)}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {reviewRows.length === 0 && <p class="admin-empty">No line-level changes detected.</p>}
+          </div>
+        </>
+      ) : (
+        <p style="margin:-0.5rem 0 2rem; color:var(--admin-muted); font-size:0.82rem;">No earlier list exists for this supplier scope yet, so this version is the baseline.</p>
+      )}
+
+      <div class="admin-toolbar">
+        <h2 class="admin-section-title" style="margin:0;">All Imported Price Rows</h2>
+        <form method="GET" class="admin-toolbar__filters">
+          <input class="admin-input admin-input--search" type="search" name="q" placeholder="Search code, item, material…" value={Astro.url.searchParams.get('q') ?? ''} />
+          <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+        </form>
+      </div>
+      <div class="admin-panel">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Row</th><th>Section</th><th>Code / Item</th><th>Description</th><th>Material</th><th>Dimensions / EAN</th><th>Supplier Cost</th><th>Mapping</th></tr></thead>
+            <tbody>
+              {visibleItems.map((row) => (
+                <tr>
+                  <td>{row.source_row}</td>
+                  <td>{row.section || '—'}</td>
+                  <td>{row.source_item}</td>
+                  <td style="max-width:22rem; white-space:normal;">{row.item_name || '—'}</td>
+                  <td>{row.material || '—'}</td>
+                  <td>{row.dimensions || row.ean || '—'}</td>
+                  <td><strong>{money(row.unit_cost)}</strong></td>
+                  <td>{row.mapping_status || 'Unmapped'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {visibleItems.length === 0 && <p class="admin-empty">No price rows match this search.</p>}
+      </div>
+    </>
+  )}
+</AdminLayout>
+
+<style>
+  .notice--error { padding:0.85rem 1rem; font-size:0.85rem; color:#e6b7a0; background:rgba(230,130,90,0.06); border:1px solid rgba(230,130,90,0.35); border-radius:2px; }
+  .notice--success { padding:0.85rem 1rem; font-size:0.85rem; color:#b8d7b8; background:rgba(90,160,105,0.06); border:1px solid rgba(90,160,105,0.35); border-radius:2px; }
+  .meta-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem 1.5rem; }
+  .meta-grid > div { min-width:0; }
+  .meta-grid span { display:block; margin-bottom:0.25rem; color:var(--admin-muted); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; }
+  .meta-grid strong, .meta-grid code { font-size:0.86rem; overflow-wrap:anywhere; }
+  .meta-grid__wide { grid-column:1 / -1; }
+  @media (max-width:760px) { .meta-grid { grid-template-columns:1fr; } .meta-grid__wide { grid-column:auto; } }
+</style>
