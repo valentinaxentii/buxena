@@ -44,6 +44,7 @@ try {
     </form>
   </div>
   <div slot="actions" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
+    {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/pricing-lab">Pricing Lab</a>}
     {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/supplier-pricing">Supplier Pricing</a>}
     {canManageCommercialData && <a class="admin-btn admin-btn--ghost" href="/admin/competitor-pricing">Competitor Pricing</a>}
     <a class="admin-btn" href="/admin/suppliers/new">+ New Supplier</a>

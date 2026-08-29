@@ -1,0 +1,272 @@
+---
+export const prerender = false;
+
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import '../../../styles/admin.css';
+import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
+import { requireAdmin } from '../../../lib/staff-access';
+import { grossMarginPct, marketBand, markupPct, retailForMargin } from '../../../lib/pricing-lab';
+
+const denied = await requireAdmin(Astro);
+if (denied) return denied;
+
+const supabase = createSupabaseAdminClient();
+const search = (Astro.url.searchParams.get('q') ?? '').trim();
+const supplierFilter = (Astro.url.searchParams.get('supplier') ?? '').trim();
+let error: string | null = null;
+let notice: string | null = null;
+let pricingReady = true;
+let competitorReady = true;
+let products: any[] = [];
+let supplierNames: string[] = [];
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const productId = String(form.get('product_id') ?? '').trim();
+    const marginRaw = String(form.get('target_margin_pct') ?? '').trim();
+    const retailRaw = String(form.get('recommended_retail') ?? '').trim();
+    if (!productId) throw new Error('Product is required.');
+
+    const margin = marginRaw === '' ? null : Number(marginRaw);
+    const recommended = retailRaw === '' ? null : Number(retailRaw);
+    if (margin != null && (!Number.isFinite(margin) || margin < 0 || margin >= 95)) throw new Error('Target margin must be between 0% and 94.99%.');
+    if (recommended != null && (!Number.isFinite(recommended) || recommended <= 0)) throw new Error('Recommended retail must be a positive number.');
+
+    const { error: saveError } = await supabase.from('product_pricing').upsert({
+      product_id: productId,
+      target_margin_pct: margin,
+      recommended_retail: recommended,
+      // A changed recommendation requires review. It never writes the public
+      // approved_from_price field and never modifies src/data/pricing.ts.
+      status: 'Needs Review',
+    }, { onConflict: 'product_id' });
+    if (saveError) throw saveError;
+    return Astro.redirect('/admin/pricing-lab?saved=1');
+  } catch (e: any) {
+    if (/relation .*product_pricing.* does not exist|42P01/i.test(e?.message ?? '')) pricingReady = false;
+    else error = e instanceof Error ? e.message : 'Could not save the pricing recommendation.';
+  }
+}
+
+if (Astro.url.searchParams.get('saved') === '1') notice = 'Recommendation saved for review. Nothing was published to the customer website.';
+
+try {
+  let productQuery = supabase
+    .from('products')
+    .select('id, model_name, category, suppliers(name)')
+    .eq('is_active', true)
+    .order('model_name');
+  if (search) productQuery = productQuery.ilike('model_name', `%${search}%`);
+  const { data: productRows, error: productError } = await productQuery.limit(500);
+  if (productError) throw productError;
+
+  const rawProducts = productRows ?? [];
+  supplierNames = [...new Set(rawProducts.map((row: any) => row.suppliers?.name).filter(Boolean))].sort() as string[];
+  const filteredProducts = supplierFilter ? rawProducts.filter((row: any) => row.suppliers?.name === supplierFilter) : rawProducts;
+  const ids = filteredProducts.map((row: any) => row.id);
+
+  let pricingByProduct = new Map<string, any>();
+  if (ids.length) {
+    const { data, error: pricingError } = await supabase
+      .from('product_pricing')
+      .select('product_id, sauna_landed_cost, complete_landed_cost, target_margin_pct, recommended_retail, status, updated_at')
+      .in('product_id', ids);
+    if (pricingError) {
+      if (/relation .* does not exist|42P01/i.test(pricingError.message)) pricingReady = false;
+      else throw pricingError;
+    } else pricingByProduct = new Map((data ?? []).map((row: any) => [row.product_id, row]));
+  }
+
+  const supplierByProduct = new Map<string, any[]>();
+  if (ids.length) {
+    const { data } = await supabase
+      .from('supplier_products')
+      .select('product_id, supplier_model_code, unit_cost, currency, last_price_update, is_active')
+      .in('product_id', ids)
+      .eq('is_active', true);
+    for (const row of data ?? []) {
+      const bucket = supplierByProduct.get(row.product_id) ?? [];
+      bucket.push(row);
+      supplierByProduct.set(row.product_id, bucket);
+    }
+  }
+
+  const marketByProduct = new Map<string, any[]>();
+  if (ids.length) {
+    const { data, error: marketError } = await supabase
+      .from('competitor_price_observations')
+      .select('product_id, observed_on, currency, price, competitors(name)')
+      .in('product_id', ids)
+      .not('product_id', 'is', null)
+      .order('observed_on', { ascending: false });
+    if (marketError) {
+      if (/relation .* does not exist|42P01/i.test(marketError.message)) competitorReady = false;
+      else throw marketError;
+    } else {
+      for (const row of data ?? []) {
+        const bucket = marketByProduct.get(row.product_id) ?? [];
+        bucket.push({ ...row, competitor: row.competitors?.name ?? null });
+        marketByProduct.set(row.product_id, bucket);
+      }
+    }
+  }
+
+  products = filteredProducts.map((product: any) => {
+    const pricing = pricingByProduct.get(product.id) ?? null;
+    const supplierSources = supplierByProduct.get(product.id) ?? [];
+    const market = marketByProduct.get(product.id) ?? [];
+    const landed = pricing?.complete_landed_cost ?? pricing?.sauna_landed_cost ?? null;
+    const suggested = retailForMargin(landed, pricing?.target_margin_pct);
+    const savedRetail = pricing?.recommended_retail == null ? null : Number(pricing.recommended_retail);
+    return {
+      ...product,
+      supplierName: product.suppliers?.name ?? '',
+      pricing,
+      supplierSources,
+      landed,
+      suggested,
+      savedRetail,
+      savedMargin: grossMarginPct(landed, savedRetail),
+      savedMarkup: markupPct(landed, savedRetail),
+      usdMarket: marketBand(market, 'USD'),
+      cadMarket: marketBand(market, 'CAD'),
+    };
+  });
+} catch (e) {
+  error = error ?? (e instanceof Error ? e.message : 'Pricing Lab could not load.');
+}
+
+const costReady = products.filter((p) => p.landed != null).length;
+const marketMapped = products.filter((p) => p.usdMarket || p.cadMarket).length;
+const reviewReady = products.filter((p) => p.pricing?.status === 'Needs Review').length;
+
+function money(value: number | null | undefined, currency = 'USD'): string {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value));
+}
+
+function sourceCost(rows: any[]): string {
+  if (!rows.length) return '—';
+  return rows.map((row) => `${row.currency || ''} ${Number(row.unit_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' / ');
+}
+---
+
+<AdminLayout title="Pricing Lab" subtitle="Supplier cost + landed cost + market references → internal retail recommendation" parentLabel="Products" parentHref="/admin/products?view=pricing">
+  {error && <p class="notice notice--error">{error}</p>}
+  {notice && <p class="notice notice--ok">{notice}</p>}
+
+  {!pricingReady && (
+    <div class="admin-placeholder" style="margin-bottom:1.25rem;">
+      <h2>Pricing worksheets are not enabled in this database yet</h2>
+      <p>The V3 lab is ready in code. Its worksheet storage is prepared in <code>supabase/pricing-schema.sql</code>; nothing has been applied to production from this branch.</p>
+    </div>
+  )}
+
+  {!competitorReady && (
+    <div class="admin-placeholder" style="margin-bottom:1.25rem;">
+      <h2>Competitor intelligence is not enabled in this database yet</h2>
+      <p>The V3 competitor migration is committed but not applied. Pricing calculations still work without competitor references.</p>
+    </div>
+  )}
+
+  <div class="admin-kpis" style="margin-bottom:1.5rem;">
+    <div class="admin-kpi"><span class="admin-kpi__value">{products.length}</span><span class="admin-kpi__label">Models in View</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{costReady}</span><span class="admin-kpi__label">Landed Cost Ready</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{marketMapped}</span><span class="admin-kpi__label">Market-Mapped</span></div>
+    <div class="admin-kpi"><span class="admin-kpi__value">{reviewReady}</span><span class="admin-kpi__label">Needs Review</span></div>
+  </div>
+
+  <div class="lab-rule"><strong>Publication firewall:</strong> saving a recommendation here does not publish a price. Customer-visible prices still come only from <code>src/data/pricing.ts</code> after explicit founder approval and a separate code change.</div>
+
+  <div class="admin-toolbar" style="margin-top:1.25rem;">
+    <form method="GET" class="admin-toolbar__filters">
+      <select class="admin-input" name="supplier">
+        <option value="">All suppliers</option>
+        {supplierNames.map((name) => <option value={name} selected={supplierFilter === name}>{name}</option>)}
+      </select>
+      <input class="admin-input admin-input--search" name="q" type="search" value={search} placeholder="Search model…" />
+      <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
+    </form>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <a class="admin-btn admin-btn--ghost" href="/admin/supplier-pricing">Supplier Pricing</a>
+      <a class="admin-btn admin-btn--ghost" href="/admin/competitor-pricing">Competitor Pricing</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table lab-table">
+        <thead><tr><th>Model</th><th>Supplier Source</th><th class="num">Landed</th><th>Market References</th><th>Target Margin</th><th class="num">Calculated</th><th class="num">Recommendation</th><th>Economics</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {products.map((p) => {
+            const formId = `pricing-lab-${p.id}`;
+            return (
+              <tr class="lab-row" data-landed={p.landed ?? ''}>
+                <td><a href={`/admin/products/${p.id}/pricing`}><strong>{p.model_name}</strong></a><span class="lab-sub">{p.supplierName || 'No supplier linked'}</span></td>
+                <td><div>{sourceCost(p.supplierSources)}</div>{p.supplierSources[0]?.last_price_update && <span class="lab-sub">dated {p.supplierSources[0].last_price_update}</span>}</td>
+                <td class="num"><strong>{money(p.landed)}</strong><span class="lab-sub">{p.pricing?.complete_landed_cost != null ? 'complete package' : p.pricing?.sauna_landed_cost != null ? 'sauna only' : 'worksheet missing'}</span></td>
+                <td>
+                  {p.usdMarket && <div><strong>{money(p.usdMarket.low)}–{money(p.usdMarket.high)}</strong><span class="lab-sub">USD · {p.usdMarket.count} mapped · {p.usdMarket.latest}</span></div>}
+                  {p.cadMarket && <div><strong>{money(p.cadMarket.low, 'CAD')}–{money(p.cadMarket.high, 'CAD')}</strong><span class="lab-sub">CAD · kept separate</span></div>}
+                  {!p.usdMarket && !p.cadMarket && <span class="lab-sub">No verified mapping yet</span>}
+                </td>
+                <td>
+                  <select class="admin-input lab-margin" name="target_margin_pct" form={formId} disabled={!pricingReady || p.landed == null}>
+                    <option value="">— %</option>
+                    {[35, 40, 45, 50, 55, 60].map((m) => <option value={m} selected={Number(p.pricing?.target_margin_pct) === m}>{m}%</option>)}
+                  </select>
+                </td>
+                <td class="num lab-calc">{money(p.suggested)}</td>
+                <td class="num"><input class="admin-input lab-price" name="recommended_retail" form={formId} type="number" min="0" step="1" value={p.savedRetail ?? ''} disabled={!pricingReady || p.landed == null} /></td>
+                <td><span class="lab-econ">GM {p.savedMargin == null ? '—' : `${p.savedMargin.toFixed(1)}%`}</span><span class="lab-econ">MU {p.savedMarkup == null ? '—' : `${p.savedMarkup.toFixed(0)}%`}</span></td>
+                <td><span class={`admin-badge ${p.pricing?.status === 'Needs Review' ? 'admin-badge--amber' : 'admin-badge--neutral'}`}>{p.pricing?.status ?? 'No worksheet'}</span></td>
+                <td>
+                  <form id={formId} method="POST">
+                    <input type="hidden" name="product_id" value={p.id} />
+                    <button class="admin-btn admin-btn--ghost lab-save" type="submit" disabled={!pricingReady || p.landed == null}>Save for Review</button>
+                  </form>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    {products.length === 0 && <p class="admin-empty">No products match this view.</p>}
+  </div>
+</AdminLayout>
+
+<style>
+  .notice { margin:0 0 1rem; padding:.85rem 1rem; font-size:.85rem; border-radius:2px; }
+  .notice--error { color:#e6b7a0; background:rgba(230,130,90,.06); border:1px solid rgba(230,130,90,.35); }
+  .notice--ok { color:#b8d7b8; background:rgba(90,160,105,.06); border:1px solid rgba(90,160,105,.35); }
+  .lab-rule { padding:.85rem 1rem; border:1px solid rgba(201,166,104,.28); background:rgba(201,166,104,.06); color:var(--admin-muted); font-size:.8rem; line-height:1.6; }
+  .lab-rule strong { color:var(--admin-gold); }
+  .lab-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .lab-table td { vertical-align:top; }
+  .lab-sub { display:block; margin-top:.18rem; color:var(--admin-muted); font-size:.68rem; line-height:1.35; }
+  .lab-margin { width:5.6rem; }
+  .lab-price { width:7rem; text-align:right; }
+  .lab-econ { display:block; white-space:nowrap; font-size:.72rem; }
+  .lab-save { white-space:nowrap; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLTableRowElement>('.lab-row').forEach((row) => {
+    const landed = Number(row.dataset.landed || 0);
+    const margin = row.querySelector<HTMLSelectElement>('.lab-margin');
+    const price = row.querySelector<HTMLInputElement>('.lab-price');
+    const calc = row.querySelector<HTMLElement>('.lab-calc');
+    if (!margin || !price || !calc || !landed) return;
+
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+    margin.addEventListener('change', () => {
+      const m = Number(margin.value);
+      if (!Number.isFinite(m) || m < 0 || m >= 100) { calc.textContent = '—'; return; }
+      const suggested = landed / (1 - m / 100);
+      calc.textContent = fmt(suggested);
+      if (!price.value) price.value = String(Math.round(suggested));
+    });
+  });
+</script>
