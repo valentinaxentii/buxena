@@ -6,6 +6,7 @@ import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
 import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
+import { isAdminStaff } from '../../../lib/staff-access';
 
 const search = Astro.url.searchParams.get('q') ?? '';
 let suppliers: any[] = [];
@@ -13,6 +14,7 @@ let dbReady = true;
 // Archived records are hidden from the active list; ?archived=1 shows only them.
 const showArchived = Astro.url.searchParams.get('archived') === '1';
 let archiveOk = false;
+const canManageSupplierPricing = await isAdminStaff(Astro);
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -44,7 +46,10 @@ try {
       <button class="admin-btn admin-btn--ghost" type="submit">Filter</button>
     </form>
   </div>
-  <a slot="actions" class="admin-btn" href="/admin/suppliers/new">+ New Supplier</a>
+  <div slot="actions" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+    {canManageSupplierPricing && <a class="admin-btn admin-btn--ghost" href="/admin/supplier-pricing">Supplier Pricing</a>}
+    <a class="admin-btn" href="/admin/suppliers/new">+ New Supplier</a>
+  </div>
 
   <div class="admin-panel">
     <div class="admin-table-wrap">
