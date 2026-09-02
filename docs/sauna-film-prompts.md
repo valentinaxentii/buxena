@@ -1,228 +1,148 @@
-# BUXENA — "The Ritual" sauna film: AI video prompts
+# BUXENA — "The Ritual": the one prompt
 
-A 6-shot sequence for an AI video model: approach the sauna, open the door,
-light the stove, sit, throw water on the stones, steam. No faces. Real sound.
+One continuous take, no cuts: arrive, open the door, light the stove, sit,
+throw the water, steam. No faces. All sound generated with the picture.
 
-## Tool
+Use **Google Veo 3.1** (native synced audio) or **Kling 3.0 Omni** (native audio,
+cheaper, holds an audio timeline across a multi-shot sequence). Not Sora 2 — it
+shuts down 24 September 2026.
 
-Use **Google Veo 3.1**. It is the one that generates synchronised audio in the
-same pass as the picture — the door creak, the fire, the hiss of water on hot
-stones — which is the whole point of this film. Kling 3.0 Omni is the cheaper
-alternative with native audio. Do not start on Sora 2; it is scheduled to shut
-down 24 September 2026.
-
-Two things about Veo that shape everything below:
-
-- Clips are 4, 6 or 8 seconds. Six clips, stitched in an editor.
-- It reads **timestamps**, not adverbs. `0–3s: the hand reaches for the handle`
-  works. "slowly reaches" does not.
-
-## Before you generate
-
-1. Feed it a **real photo of an actual BUXENA barrel** (VIRU or EDA hero image)
-   as a reference image. Then the film sells your product instead of a generic
-   sauna.
-2. Use the **last frame of each shot as the first frame of the next**
-   ("Frames to Video"). This is what stops the sauna changing between clips.
-3. Generate every shot 3–4 times and keep the best. Budget for that.
-
-## Two exports, not one
-
-- **16:9, no sound** → `public/media/hero.mp4`. The site hero autoplays muted
-  and loops, so audio is wasted there. Cut it to loop cleanly.
-- **9:16, with sound** → Instagram, TikTok, paid ads. This is where the fire
-  and the löyly hiss do the selling. Social cut order: 1, 2, 3, 5, 6.
+Veo caps a single generation at 8 seconds. Paste the whole prompt anyway, then
+use **Extend** to carry it forward, or feed the last frame of each pass back in
+as the first frame of the next. The prompt stays the same every pass; the model
+keeps its place because the beats are timestamped.
 
 ---
 
-## The style block
-
-Paste this at the end of **every** shot prompt. It is what keeps the six clips
-looking like one film, and what keeps it from looking AI-generated.
+## The prompt
 
 ```
-Style: real cinematography, documentary realism. Shot on ARRI Alexa 35, 32mm
-spherical prime at T2.0. Natural handheld micro-movement with the weight of a
-real operator. Practical light only — firelight, one small window, dusk sky.
-Muted warm natural palette of linen, birch, ember and bronze. No colour grade,
-no orange-and-teal, no lens flare, no bloom. Fine natural sensor grain, real
-motion blur, focus that is not perfect. Physically accurate fire, smoke and
-steam behaviour.
-Real wood: uneven grain, knots, dark tannin streaks, faint water marks.
-Continuity — the same sauna in every shot: a thermowood barrel sauna, chocolate
-brown horizontal staves, three stainless steel hoops, brown-tinted tempered
-glass door, bitumen shingle roof. Inside: pale alder benches, a black cast-iron
-wood-burning stove on the right with dark grey basalt stones stacked on top, a
-small square window above the bench, one wooden bucket, one long-handled wooden
-ladle, one folded oatmeal linen towel. Same dusk-into-night light throughout.
-No faces. No text, no logo, no captions, no subtitles. No music.
-```
+A single continuous unbroken first-person POV shot, no cuts, filmed as one take.
+A person arrives at a wood-fired barrel sauna at dusk in a Connecticut back yard,
+goes inside, lights the stove, sits down, and throws water on the hot stones.
+Their face is never seen — only their hands enter the frame. The camera is their
+eyes.
 
-## The negative prompt
+THE PLACE: a thermowood barrel sauna standing on a low deck at the edge of a
+birch and maple tree line, late autumn. Chocolate-brown horizontal staves, three
+stainless steel hoops, a brown-tinted tempered glass door, a bitumen shingle
+roof, thin blue-grey woodsmoke rising from the chimney. Inside: pale alder
+benches, a black cast-iron wood-burning stove on the right with dark grey basalt
+stones stacked on top, a small square window above the bench, a wooden bucket and
+a long-handled wooden ladle on the floor, one folded oatmeal linen towel.
 
-If your interface has a negative prompt field, use this. If it does not (Flow,
-the Gemini app), the style block above already covers the important half.
+THE ACTION:
+0-5s: walking slowly toward the sauna over damp leaves, the camera swaying gently
+with each step, faint breath fog at the bottom of the frame, warm amber light
+glowing behind the tinted glass door.
+5-8s: a bare right hand enters from the bottom right and closes around the dark
+wooden handle. The walk stops.
+8-12s: the hand pulls the door open — the heavy hinge gives a low dry creak, the
+catch releases with a knock, and warm air and amber light spill out across the
+lens in a brief haze.
+12-16s: the camera steps up and through the doorway, dipping slightly as the head
+ducks under the lintel. Inside now. The hand reaches back and pulls the door
+closed, and the outside wind cuts off. The room is close and quiet.
+16-20s: the camera lowers to knee height at the open firebox. Two hands lay a
+split birch log and a handful of thin kindling inside. A match is struck against
+the iron and flares.
+20-26s: the flame takes — small yellow tongues climbing, thin smoke curling,
+orange light rising up the hands and across the wood wall behind. The hand swings
+the cast-iron door shut and turns the latch; firelight now flickers through the
+small glass panel.
+26-31s: the camera rises, turns, and settles down onto the upper alder bench with
+the small weight-shift of someone sitting. One bench creak. Hands come to rest on
+knees at the bottom of the frame, an oatmeal linen towel across them. The frame
+holds still. Firelight pulses over the curved wooden ceiling, heat shimmer rises
+off the stones, and a bead of condensation runs down the corner of the window,
+now deep blue with night.
+31-35s: a hand lowers the long wooden ladle into the bucket; the water rocks and
+drips. The ladle lifts, dripping, and moves toward the stones, which glow dark
+red under a grey crust.
+35-38s: the water pours across the stones and vanishes instantly into a violent
+white burst of steam that expands fast, climbs, and folds out across the curved
+wooden ceiling. A second, smaller pour follows.
+38-45s: the ladle lowers back into the bucket. Steam rolls slowly along the
+ceiling and folds back down the walls, thinning as it goes. A blade of dim blue
+window light cuts through it. The steam settles, the wood darkens where the
+moisture lands, and the room goes still — only heat shimmer above the stones.
 
-```
-cartoon, illustration, 3D render, CGI, video game, plastic or waxy surfaces,
-smooth plastic wood, oversaturated, HDR glow, teal and orange grade, lens flare,
-bloom, slow motion, morphing hands, extra fingers, floating objects, impossible
-physics, perfect symmetry, glossy advertising look, drone shot, whip pan, text,
-watermark, logo, subtitles, faces, people looking at camera, unnatural fire,
-flames without smoke, fog-machine haze, music, score, voiceover
-```
-
----
-
-## Shot 1 — The approach
-
-```
-Late autumn dusk in a New England back yard, Connecticut. First-person POV,
-camera at adult eye height, walking slowly toward a thermowood barrel sauna on
-a low deck at the edge of a birch and maple tree line. Thin blue-grey woodsmoke
-drifts from the chimney. Warm amber light glows behind the brown-tinted glass
-door.
-0–3s: slow walk forward, the camera swaying gently with each step, faint breath
-fog at the bottom of the frame.
-3–6s: the barrel fills the frame — wet stave grain and stainless hoops catching
-the last cold daylight.
-6–8s: a bare right hand enters from the bottom right and closes around the dark
-wooden door handle. The walk stops.
-Audio: damp leaves and gravel crunching under slow footsteps, wind moving
-through bare branches, one distant crow, a hollow wooden knock as the hand meets
-the handle.
-```
-
-## Shot 2 — The door
-
-```
-Continuous first-person POV at the door of the thermowood barrel sauna, dusk.
-0–2s: the hand pulls the brown-tinted glass door open. The heavy hinge gives a
-low dry creak and the catch releases with a soft knock.
-2–5s: warm amber light and a slow roll of hot air spill out across the lens, a
-brief haze over the frame. The camera steps up and through the doorway and dips
-slightly as the head ducks under the lintel.
-5–8s: inside — pale alder benches, the black cast-iron stove on the right with
-basalt stones stacked on top, a small square window holding the last blue of the
-dusk. The hand reaches back and pulls the door closed.
-Audio: dry hinge creak, the clack of the catch, a low whoosh of moving air, one
-deep footstep on a hollow wooden floor, the muffled thud of the door closing —
-and then the outside wind cuts off sharply and the room is close and quiet.
-```
-
-## Shot 3 — Lighting the stove
-
-```
-Inside the barrel sauna. Low angle, camera at knee height in front of the black
-cast-iron wood-burning stove. No face in frame. The only light is the small
-window and one dim wall lamp.
-0–2s: two hands lay a split birch log and a handful of thin kindling into the
-open firebox.
-2–4s: a match is struck against the iron, flaring bright, and touched to the
-kindling.
-4–6s: the flame takes — small yellow tongues climbing, thin smoke curling,
-orange light rising up the hands and across the wood wall behind.
-6–8s: the hand swings the cast-iron door shut and turns the latch. Firelight now
-flickers through the small glass panel and breathes across the alder benches.
-Audio: the dry knock of wood on wood, the scrape and flare of a match, kindling
+THE SOUND, all of it diegetic and in sync, and no music of any kind: damp leaves
+and gravel crunching underfoot, wind moving through bare branches, one distant
+crow; a hollow wooden knock as the hand meets the handle; the dry hinge creak,
+the clack of the catch, a low whoosh of moving air; one deep footstep on a hollow
+wooden floor and the muffled thud of the door closing, after which the outdoor
+wind vanishes completely and the room tone goes close, dry and dead with no echo;
+the dry knock of wood on wood, the scrape and flare of the match, kindling
 catching in fine ticking crackles, the low draw of air pulling into the flue, the
-heavy clank and squeak of the iron door and its latch.
-```
-
-## Shot 4 — Sitting down
-
-```
-Inside the barrel sauna. The camera descends from standing height onto the upper
-alder bench and settles, as if a person has just sat down. No face, no head, no
-body in frame. It then holds a still, slightly wide view of the room: the black
-stove with its bed of basalt stones glowing dull red at the base, a wooden bucket
-and long-handled ladle on the floor beside it, the small window now deep blue
-with night.
-0–3s: the camera lowers and settles with the small weight-shift of someone
-sitting down. One creak of the bench.
-3–8s: the frame is completely still. A pair of hands rest on knees at the bottom
-of frame, an oatmeal linen towel across them. Firelight pulses slowly over the
-curved wooden ceiling. Heat shimmer rises off the stones. A single bead of
-condensation runs down the corner of the window.
-Audio: one wooden bench creak, the steady low roar of the fire drawing inside
-the stove, occasional sharp pops and ticks of burning wood, the faint metallic
-tick of hot iron expanding, one slow deep breath. The room tone is close, dry
-and dead — no echo.
-```
-
-## Shot 5 — Löyly, water on the stones
-
-```
-Inside the barrel sauna, night. Medium close shot from bench height, framed on
-the stove and its stones. No face in frame.
-0–2s: a hand lowers a long-handled wooden ladle into a wooden bucket of water.
-The water rocks and drips.
-2–4s: the ladle lifts, dripping, and moves toward the stones — dark red under a
-grey crust.
-4–6s: the water pours across the stones and vanishes instantly into a violent
-white burst of steam that expands fast, rolls upward and folds out across the
-ceiling.
-6–8s: a second, smaller pour. Steam fills the top of the frame and the light
-through it goes soft and golden. The ladle lowers back into the bucket.
-Audio: the hollow knock of the ladle against the wooden bucket, water sloshing
-and dripping, then a hard sharp HISS and crackle as the water hits the stones,
-rising and falling away into a soft steady seethe, with the fire still roaring
-low inside the stove.
-```
-
-## Shot 6 — The steam
-
-```
-Inside the barrel sauna, night. Static wide shot from the opposite bench. No
-people. The room is full of steam.
-0–3s: dense white steam rolls slowly along the curved wooden ceiling and folds
-back down the walls, thinning as it goes.
-3–6s: a hard blade of dim blue light from the small window cuts through the
-steam; moisture turns over inside it. Firelight from the stove glass pulses warm
-against that cold window light.
-6–8s: the steam thins and settles. The wood darkens where the moisture has
-landed. The room goes still — only heat shimmer above the stones.
-Audio: the soft dying seethe of steam on stone, the low steady roar of fire in
-the stove, one dry crack of a log settling, faint ticks of expanding wood, then
+heavy clank and squeak of the iron door and its latch; one wooden bench creak;
+the steady low roar of fire drawing inside the stove with sharp pops of burning
+wood and the faint metallic tick of hot iron expanding; one slow deep breath; the
+hollow knock of the ladle against the wooden bucket, water sloshing and dripping;
+then a hard sharp HISS and crackle as the water hits the stones, rising and
+falling away into a soft steady seethe; a final dry crack of a settling log, and
 deep quiet.
+
+THE LOOK: real cinematography, documentary realism, shot on an ARRI Alexa 35 with
+a 32mm spherical prime at T2.0, handheld with the natural micro-movement and
+weight of a real operator. Practical light only — firelight, one small window, the
+last of the dusk sky. A muted warm natural palette of linen, birch, ember and
+bronze. Fine natural sensor grain, real motion blur, focus that is not perfect.
+Physically accurate fire, smoke and steam behaviour. Real wood with uneven grain,
+knots, dark tannin streaks and faint water marks.
+
+NOT THIS: no colour grade, no orange-and-teal, no lens flare, no bloom, no HDR
+glow, no oversaturation. No slow motion, no drone shot, no whip pan, no cuts. No
+CGI, 3D render, cartoon or video-game look. No plastic or waxy surfaces, no
+smooth plastic wood, no perfect symmetry, no glossy advertising look. No
+fog-machine haze, no flames without smoke, no impossible physics, no morphing
+hands or extra fingers. No faces, no one looking at the camera. No text, no logo,
+no watermark, no subtitles. No music, no score, no voiceover.
 ```
 
 ---
 
-## Shot 7 — Optional ending, and the best hero loop
+## Three things that decide whether it works
 
-Almost nothing moves in this one, which is exactly why it loops well behind the
-wordmark on the homepage.
+**Attach a photo of your own barrel** — a VIRU or EDA hero image as a reference
+image. Otherwise you pay to make a beautiful film of someone else's sauna.
 
-```
-Exterior, night, static wide shot. A thermowood barrel sauna glows warm amber
-behind its brown-tinted glass door, standing on a deck at the edge of a dark
-tree line. Woodsmoke rises straight up from the chimney into cold still air.
-Frost on the deck boards. Steam bleeds from the roof vent.
-0–8s: almost nothing moves — only the smoke drifting, the interior light pulsing
-very slightly with the fire, and one slow gust moving the bare branches at the
-edge of frame.
-Audio: cold night wind, fire crackle muffled through the wall, the faint hiss of
-steam from the vent, one owl far away.
-```
+**Carry the last frame forward** between passes. It is the only reliable way to
+stop the sauna quietly changing — different wood, different stove, different
+window — halfway through.
+
+**Export twice.** The site hero (`Hero.astro`) plays `autoplay muted loop`, so
+every sound above is thrown away there: cut a silent 16:9 loop for
+`public/media/hero.mp4`, and a 9:16 cut with full sound for Instagram, TikTok and
+paid ads, where the fire and the löyly hiss are what actually sell.
+
+Generate it three or four times and keep one. Budget for that.
 
 ---
 
 ## Why these words
 
-The things that make AI video look like AI video, and what is doing the work
-against each of them:
+The things that make AI video look like AI video, and what fights each one:
 
 - **Too clean.** Real cameras have grain, imperfect focus and motion blur. All
-  three are asked for explicitly.
-- **Too graded.** "Cinematic, 8K, hyperrealistic, masterpiece" pushes the model
-  toward a glossy stock-footage look. None of those words appear here. "No
-  colour grade" and "practical light only" do.
-- **Too perfect.** Knots, tannin streaks, water marks, one bead of condensation,
-  frost. Imperfection reads as real.
-- **Wrong physics.** Steam is described the way löyly actually behaves — a hard
-  burst that climbs, folds across the ceiling and dies away — not as drifting
-  fog.
-- **The face problem.** Faces are where AI video falls apart fastest. This film
-  never shows one, which is both safer and more effective: the viewer is the
-  person in the sauna.
+  three are asked for by name.
+- **Too graded.** "Cinematic, 8K, hyperrealistic, masterpiece" is what pushes a
+  model toward the glossy stock-footage look. None of those words appear.
+  "Practical light only" and "no colour grade" do.
+- **Too perfect.** Knots, tannin streaks, water marks, one bead of condensation.
+  Imperfection is what reads as real.
+- **Wrong physics.** The steam is described the way löyly actually behaves — a
+  hard burst that climbs, folds across the ceiling and dies away — not as
+  drifting fog.
+- **The face problem.** Faces are where AI video falls apart fastest. This never
+  shows one, which is both safer and better: the viewer is the person in the
+  sauna.
+
+---
+
+## Fallback: the same film cut into six 8-second prompts
+
+If you would rather generate shot by shot than extend one take, the six-shot
+version of this same film is in the git history of this file (commit before this
+one), or split the timestamps above at 8s, 16s, 26s, 31s, 38s and 45s and give
+each piece its own copy of THE PLACE, THE LOOK and NOT THIS blocks.
