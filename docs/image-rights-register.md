@@ -606,9 +606,11 @@ catalogue material, so it stays approved and simply unreferenced.
    how the six `saunas-normalized/eda-*` copies passed the audit while the same
    originals were listed. The untraced copies are now listed explicitly, and
    any future blocked asset should be added under **every** path it exists at.
-3. **ULLA** — unchanged position: excluded from the 2026-08-11 grant, with the
-   2026-08-17 founder exception leaving `bux-ulla-hero.jpg` live. The current
-   working tree (uncommitted) deletes `src/content/saunas/bux-ulla.md` and its
-   images. Removing a catalogue model is a commercial decision, not a coding
-   one, so it needs the founder's explicit approval before launch either way.
+3. **ULLA** — position unchanged: excluded from the 2026-08-11 grant, covered
+   only by the 2026-08-17 founder exception that leaves its catalogue
+   photograph live. An earlier session had deleted the model, which the founder
+   did not approve, so it was restored byte-identically in the corrective commit
+   `dd5fe03`. Nothing here is newly licensed: no permission is claimed for ULLA
+   beyond the recorded exception, and nothing in it is cleared for paid
+   advertising. The launch decision on ULLA still belongs to the founder.
 

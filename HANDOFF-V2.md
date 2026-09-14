@@ -3,10 +3,12 @@
 **Current checkpoint — September 14, 2026:** see
 [Inquiry launch checkpoint](docs/demand-test-v2-checkpoint.md). The current
 direction is a free-inquiry demand test before committing to inventory.
-At this state the pre-launch board is **25/25 GREEN**, image integrity and image
-rights pass, and the desktop/390 px inquiry journey is verified **26/26** in a
-real browser (`npm run qa:flow`, safe mode). Nothing deployed; main/V1 untouched.
-Still open and founder-only: the ULLA catalogue decision, the paid-advertising /
+At this state the pre-launch board was **25/25 GREEN** before the ULLA
+restoration, image integrity and image rights pass, and the desktop/390 px
+inquiry journey is verified **26/26** in a real browser (`npm run qa:flow`, safe
+mode). The unapproved ULLA removal was reversed in corrective commit `dd5fe03`;
+its image-rights position is unchanged. Nothing deployed; main/V1 untouched.
+Still open and founder-only: the ULLA launch decision, the paid-advertising /
 VIRU-NORD permission gaps, live CRM + mail delivery, exact public prices, and
 approval to publish.
 

@@ -45,6 +45,10 @@ the relevant commercial decisions. V1/main remains protected.
 - This pass also checked in the inquiry-flow browser QA as
   `scripts/browser-flow-qa.mjs` (`npm run qa:flow`), so the desktop/390 px
   journey can be re-run by anyone from one command.
+- Corrective commit `dd5fe03` restores the ULLA model and its assets, after the
+  founder declined the earlier unapproved removal. It contains only those
+  previously tracked ULLA paths (byte-identical to their earlier content) and
+  reverts nothing else.
 
 ## Verified at this state
 
@@ -65,6 +69,15 @@ state committed here. The production build was local; nothing was deployed.
 | Sales funnel audit | 18/18 |
 | Inquiry API sources | 10/10 accepted in safe mode; 9 customer-ack previews, 1 enrichment skip; nothing sent |
 | Browser flow QA, desktop 1440 + mobile 390 (`npm run qa:flow`) | **26/26 passed**, exit 0 |
+
+The board counts above were measured before the ULLA restoration (100 pages,
+66 product pages). After that corrective commit only the affected pages and
+assets were re-checked, as instructed: `/saunas/bux-ulla/`, `/saunas/`,
+`/saunas/cube-saunas/`, `/saunas/outdoor-saunas/` and `/compare/` all render
+with ULLA listed again, and all twelve restored ULLA files (hero, both source
+photographs, six normalized/source optimized variants and the presentation PDF)
+serve with the correct content types. The full board was deliberately not
+re-run, so those counts are pre-restore figures.
 
 The browser pass covered the real journey end to end: homepage → catalogue →
 model page (hero is local, every image decodes, model preselected on the page's
@@ -116,11 +129,13 @@ except the single safe-mode API pass, which stores and sends nothing.
 
 ## Open decisions — founder only, not resolvable from code
 
-1. **ULLA.** This state removes the ULLA model: its content file, three source
-   images, its presentation PDF and eight optimized variants, with no code
-   references left behind. That is a catalogue/commercial decision, so approve
-   the removal or restore the model (with or without its hero) before launch.
-   It is fully reversible — the deletions are one commit.
+1. **ULLA.** An earlier session removed the ULLA model, and the founder did not
+   approve that. It has been restored byte-identically (content file, three
+   source images, its presentation PDF and eight optimized variants) in the
+   corrective commit `dd5fe03`; nothing else was reverted. Its image-rights
+   position is unchanged — excluded from the 2026-08-11 grant, covered only by
+   the 2026-08-17 founder exception for its existing catalogue photograph, and
+   not cleared for paid advertising. The launch decision on ULLA remains open.
 2. **Paid advertising.** Two NORD interior images are website-cleared but
    advertising-blocked, and VIRU/NORD website permission is still not on file.
 3. **Live delivery.** CRM rows, staff email and Telegram remain unproven from
