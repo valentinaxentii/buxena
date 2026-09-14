@@ -91,8 +91,17 @@ on this preview only.
 **Verified on the hosted preview:** homepage (V2 wording), catalogue with ULLA
 listed, ULLA page with its hero image and presentation PDF, EDA 160 with the
 verified CAPRA hero, a source PNG and a WebP variant, robots.txt, and the
-safe-mode inquiry API — **16/16 checks** before protection was switched on, then a
-**401** gate afterwards.
+safe-mode inquiry API — **16/16 checks** before protection was switched on. After
+protection, **every path tested returns 401 unauthenticated** — pages, images,
+`robots.txt`, and `/api/enquiries` for both GET and POST.
+
+One operational note: for a few minutes after protection was enabled, a cached
+public copy of one path was still served at the exact URL that had been fetched
+while the preview was public. It expired on its own, and both cache-busted and
+plain re-checks now return 401 everywhere. If a path ever looks public again,
+re-check it with a `?nocache=` query first, and read responses with `curl` or Node
+rather than Windows PowerShell — `Invoke-WebRequest` will happily return a
+locally cached body and make a protected site look open.
 
 
 ### The one sign-in step (account owner only)
