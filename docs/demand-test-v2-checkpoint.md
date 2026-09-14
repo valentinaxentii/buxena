@@ -37,6 +37,14 @@ the relevant commercial decisions. V1/main remains protected.
 - The prelaunch script owns a separate safe-mode test server, reads its logs
   directly, keeps it through the runtime route sweep, then closes it. It never
   reuses a potentially live local server.
+- This pass: the EDA 160 hero became Capra's own 1,6 m product-page file (the
+  last image blocker), product pages gained an "images may show optional
+  features — your written quote confirms what is included" note, and
+  `docs/image-sources-2026-09-14.json` now records the shipped assets and the
+  recovered bundle record with supplier pages and checksums.
+- This pass also checked in the inquiry-flow browser QA as
+  `scripts/browser-flow-qa.mjs` (`npm run qa:flow`), so the desktop/390 px
+  journey can be re-run by anyone from one command.
 
 ## Verified at this state
 
