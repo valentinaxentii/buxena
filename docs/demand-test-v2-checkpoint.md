@@ -70,14 +70,13 @@ state committed here. The production build was local; nothing was deployed.
 | Inquiry API sources | 10/10 accepted in safe mode; 9 customer-ack previews, 1 enrichment skip; nothing sent |
 | Browser flow QA, desktop 1440 + mobile 390 (`npm run qa:flow`) | **26/26 passed**, exit 0 |
 
-The board counts above were measured before the ULLA restoration (100 pages,
-66 product pages). After that corrective commit only the affected pages and
-assets were re-checked, as instructed: `/saunas/bux-ulla/`, `/saunas/`,
-`/saunas/cube-saunas/`, `/saunas/outdoor-saunas/` and `/compare/` all render
-with ULLA listed again, and all twelve restored ULLA files (hero, both source
-photographs, six normalized/source optimized variants and the presentation PDF)
-serve with the correct content types. The full board was deliberately not
-re-run, so those counts are pre-restore figures.
+The board was re-run once **after** the ULLA restoration, because the restore
+changes exactly what that board counts (page, model and reference totals): it is
+again **25/25 GREEN** at 101 pages, 67 product pages, 67 published models with no
+findings and 6,388 references checked. The rows above were measured before the
+restore. The unaffected suites (unit tests, security, sales funnel, public
+claims, electrical/compliance) and the browser flow QA were **not** re-run, as
+instructed.
 
 The browser pass covered the real journey end to end: homepage → catalogue →
 model page (hero is local, every image decodes, model preselected on the page's

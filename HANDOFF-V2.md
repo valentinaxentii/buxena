@@ -38,8 +38,18 @@ Everything below this section is historical. Current state:
   secret-sounding assignment in any tracked file. Secret-shaped values were never
   displayed.
 - **Chromebook access:** `.devcontainer/devcontainer.json` (Node 22, smallest
-  machine requested, safe-mode enquiries, official Cline extension, no prebuilds)
-  plus [`docs/chromebook-access.md`](docs/chromebook-access.md).
+  machine requested, safe-mode enquiries, official Cline extension — the
+  `saoudrizwan.claude-dev` ID was verified against the VS Code Marketplace — and
+  no prebuilds) plus [`docs/chromebook-access.md`](docs/chromebook-access.md).
+- **GitHub CI is green on the pushed revision.** Both read-only workflows
+  (`Verify` and `BUXENA V2 CI`) completed **successfully** for `5b3b193` and
+  `31fac23`: type check, unit tests, security, sales-funnel, electrical/compliance
+  and public-claims audits, production build, image-rights audit and the full
+  pre-launch board. The previously pushed `9baae79` had **both runs failing**, so
+  this pushed state is the first green one on GitHub. The board was also re-run
+  locally once after the ULLA restoration — **25/25 GREEN**, 101 pages, 67 product
+  pages, 67 published models with no findings, 6,388 references — because the
+  restore changes what that board counts.
 - **Preview:** not created. This machine has no Netlify credential at all, so the
   account plan, the included access-protection option and the linked site cannot
   even be read — and must not be guessed at. `docs/chromebook-access.md` gives the
