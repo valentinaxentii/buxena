@@ -70,20 +70,53 @@ A submission validates, shows "Local test mode", and writes/sends nothing.
 
 ## Preview on Netlify (blocked on one credential)
 
-The Windows machine has no Netlify login (`netlify` CLI not installed, no
-`NETLIFY_AUTH_TOKEN`, no `%APPDATA%\netlify\config.json`, and `.netlify/state.json`
-holds only geolocation data with no site ID). Without that credential the plan,
-the available access-protection option and the linked site cannot even be read,
-so no preview was created and none is claimed.
+This machine has no Netlify credential: the `netlify` CLI is not installed, there
+is no `NETLIFY_AUTH_TOKEN`, `%APPDATA%\netlify\Config\config.json` contains only
+`cliId` and telemetry settings, and `.netlify/state.json` holds only geolocation
+data with no site ID. Without that credential the account plan, the included
+access-protection option and the linked site cannot even be read — so no preview
+was created and none is claimed.
 
-To unblock, do **one** of these on the Windows machine (or in the Codespace):
+### The one sign-in step (account owner only)
 
-1. `npx netlify-cli login` — opens a browser to authorise the BUXENA account, or
+Either:
+
+1. `npx --yes netlify-cli login` — opens a browser to authorise the BUXENA
+   account, or
 2. create a personal access token at
    <https://app.netlify.com/user/applications#personal-access-tokens> and set it
-   for the session only: `$env:NETLIFY_AUTH_TOKEN = '<paste once>'`.
+   for the session only: `$env:NETLIFY_AUTH_TOKEN = '<paste once>'`
 
-Then the preview needs no code changes: `netlify deploy` from this repository
-creates a draft deploy, `netlify status` shows the plan and allowance, and the
-passwords/access-protection option can be checked **before** deploying. Nothing
-paid is required for a draft deploy, and no plan upgrade may be accepted.
+Never write that token into a file, a commit or this repository.
+
+### Exact sequence after signing in (all non-production)
+
+```powershell
+# 1. Confirm who is signed in and whether a site is linked.
+npx --yes netlify-cli status
+
+# 2. Read the plan/allowance and find the BUXENA site BEFORE deploying.
+npx --yes netlify-cli sites:list
+#    Confirm the plan, and check whether deploy/access protection is included.
+#    If protection is a PAID feature: stop and report it. Do not upgrade, do not
+#    accept an overage, and do not deploy an unprotected preview.
+
+# 3. Build locally, then add a preview-only robots header.
+npm run build
+node -e "require('fs').writeFileSync('dist/_headers','/*\n  X-Robots-Tag: noindex, nofollow\n')"
+
+# 4. Create a NON-PRODUCTION draft deploy with a stable alias.
+#    NEVER add --prod: that publishes production (buxena.com).
+npx --yes netlify-cli deploy --dir=dist --alias=buxena-v2-preview
+```
+
+Then, in the Netlify UI for that deploy: confirm `BUXENA_SAFE_MODE=true` applies
+to it (`netlify.toml` sets it for the deploy-preview and branch-deploy contexts)
+and switch access protection on **before** sharing the URL.
+
+### Verify the preview
+
+Open the homepage, `/saunas/`, a product image, `/saunas/bux-ulla/` and the
+inquiry flow. Confirm the form reports “Local test mode” (safe mode) instead of
+sending anything, and that no new enquiry, email or upload appeared. Confirm
+production still shows the “Coming Soon” placeholder.
