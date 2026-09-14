@@ -8,7 +8,7 @@ import type { ConfigurableModel } from '../lib/product-config';
  * Replaces a static read-only list of options. The customer now makes actual
  * selections, sees them accumulate in a summary, and carries them into the
  * enquiry — so a specialist opens a lead that already says which heater family
- * and supply format the customer wants, instead of starting from "which model
+ * and which options and accessories the customer wants, instead of starting from "which model
  * were you looking at?".
  *
  * Every group is data-driven (see lib/product-config.ts): a model with no
@@ -51,15 +51,16 @@ const productBacked = hasProductOptions(model);
               {!group.fromProductData && <span class="cfg__tag">Your preference</span>}
             </legend>
             {group.help && <p class="cfg__help">{group.help}</p>}
-            <div class="cfg__options" role="radiogroup" aria-label={group.label}>
+            <div class="cfg__options" role={group.multiSelect ? 'group' : 'radiogroup'} aria-label={group.label}>
               {group.options.map((option, i) => (
                 <label class="cfg__option">
                   <input
-                    type="radio"
+                    type={group.multiSelect ? 'checkbox' : 'radio'}
                     name={`cfg-${group.key}`}
                     value={option.value}
                     data-cfg-input={group.key}
                     data-cfg-label={option.label}
+                    data-cfg-multiselect={group.multiSelect ? 'true' : undefined}
                     data-track="product_option_selected"
                     data-track-model={model.title}
                     data-track-group={group.key}
@@ -290,13 +291,27 @@ const productBacked = hasProductOptions(model);
 
     root.querySelectorAll<HTMLInputElement>('[data-cfg-input]').forEach((input) => {
       input.addEventListener('change', () => {
-        if (!input.checked) return;
         const key = input.dataset.cfgInput!;
         const groupEl = input.closest('[data-cfg-group]');
         const groupLabel =
           groupEl?.querySelector('.cfg__legend')?.childNodes[0]?.textContent?.trim() ?? key;
-        chosen.set(key, { groupLabel, optionLabel: input.dataset.cfgLabel ?? input.value });
-        render();
+
+        if (input.dataset.cfgMultiselect === 'true') {
+          // Accessories combine: read every checked box in the group, not just
+          // the one that changed, and join them for the summary / enquiry.
+          const selected = [...groupEl!.querySelectorAll<HTMLInputElement>('[data-cfg-input]:checked')]
+            .map((el) => el.dataset.cfgLabel ?? el.value);
+          if (selected.length) {
+            chosen.set(key, { groupLabel, optionLabel: selected.join(', ') });
+          } else {
+            chosen.delete(key);
+          }
+          render();
+        } else {
+          if (!input.checked) return;
+          chosen.set(key, { groupLabel, optionLabel: input.dataset.cfgLabel ?? input.value });
+          render();
+        }
         track('product_option_selected', { model: modelTitle, group: key, value: input.value });
       });
     });

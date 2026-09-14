@@ -5,7 +5,7 @@ import { sendCustomerAckEmail, buildCustomerAckEmail } from '../../lib/send-cust
 import { sendEnquiryTelegram } from '../../lib/notify-telegram';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { decideEnquiryOutcome, wasDelivered } from '../../lib/enquiry-capture';
-import { checkOptionalZip } from '../../lib/zip';
+import { checkOptionalZip, normalizeZip } from '../../lib/zip';
 import { isLeadSafeMode, safeModeReason } from '../../lib/safe-mode';
 import { FALLBACK_SOURCE, isSourceConstraintError, withFormLine } from '../../lib/enquiry-source';
 
@@ -408,7 +408,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // `unrecorded` tells both messages to stop claiming the enquiry is "also
     // in Admin" and to say plainly that they are the only copy — a staff
     // notification that lies about where the data is, is worse than none.
-    const notify = { ...safe, source: safe.source ?? undefined };
+    // The ZIP travels on its own so a notification can label it correctly —
+    // `safe.location` holds a ZIP for most forms and a project location for
+    // trade enquiries (see lib/enquiry-location.ts). Nothing new is stored: the
+    // database row is built explicitly further up.
+    const zipValue = typeof zip === 'string' && zip.trim() ? normalizeZip(zip) : null;
+    const notify = { ...safe, zip: zipValue, source: safe.source ?? undefined };
     const staffNotify = { ...notify, unrecorded: !recorded };
 
     // The customer acknowledgment promises a human will follow up, so it may

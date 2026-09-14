@@ -24,13 +24,20 @@
  * local dev and any unconfigured environment keep working exactly as before.
  */
 
-import { getNotifySmtpConfig, createNotifyTransport, escapeHtml as esc } from './notify-smtp';
+import { getNotifySmtpConfig, createNotifyTransport, escapeHtml as esc } from './notify-smtp.ts';
+import { contactLocationRows } from './enquiry-location.ts';
 
 export interface EnquiryEmailInput {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
   location?: string | null;
+  /**
+   * The customer's ZIP, when the form sent one. Kept SEPARATE from `location`
+   * because the two mean different things and used to be printed as one row —
+   * see lib/enquiry-location.ts.
+   */
+  zip?: string | null;
   message?: string | null;
   saunaInterest?: string | null;
   source?: string | null;
@@ -42,26 +49,18 @@ export interface EnquiryEmailInput {
   unrecorded?: boolean;
 }
 
+export interface EnquiryNotificationContent {
+  subject: string;
+  text: string;
+  html: string;
+}
+
 /**
- * Returns TRUE only when the message was actually handed to Zoho. Not
- * configured, or the send failed, returns FALSE — it still never throws.
- *
- * The boolean matters: /api/enquiries treats a delivered staff notification
- * as a second capture path when the database write fails, and "resolved
- * without throwing" is not the same as "a human received this". Returning
- * void made those two indistinguishable.
+ * Pure builder — no transport, no env access — so the exact message a staff
+ * notification carries can be generated, inspected and tested without sending
+ * anything. `sendEnquiryEmail` below is the sender; this is the content.
  */
-export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolean> {
-  const config = getNotifySmtpConfig();
-
-  // Unconfigured — quietly skip. Submissions still record to Supabase.
-  if (!config) {
-    if (import.meta.env.DEV) {
-      console.info('[enquiry-email] ZOHO_SMTP_USER/ZOHO_SMTP_PASSWORD not set — skipping email.');
-    }
-    return false;
-  }
-
+export function buildEnquiryNotification(input: EnquiryEmailInput): EnquiryNotificationContent {
   const source = input.source?.trim() || 'Website';
   const name = input.name?.trim() || 'No name given';
   const message = input.message?.trim() || '';
@@ -69,16 +68,21 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolea
   // Every requested field gets its own row, and stays visible even when the
   // visitor left it blank — a missing row reads as "the form is broken", an
   // em dash reads as "they didn't fill this in".
+  //
+  // The ZIP and the placement are TWO rows, decided by lib/enquiry-location.ts:
+  // `location` carries a ZIP for most forms and a project location for trade
+  // enquiries, so labelling it "ZIP / Location" printed a placement answer
+  // ("Outdoor") as though it were the postcode.
   const rows: [string, string][] = [
     ['Name', input.name?.trim() || '—'],
     ['Email', input.email?.trim() || '—'],
     ['Phone', input.phone?.trim() || '—'],
-    ['ZIP / Location', input.location?.trim() || '—'],
+    ...contactLocationRows(input.zip, input.location).map((row) => [row.label, row.value] as [string, string]),
     ['Model / request', input.saunaInterest?.trim() || '—'],
     ['Source', source],
   ];
 
-  const textBody = [
+  const text = [
     `New enquiry from the BUXENA website (${source}).`,
     '',
     ...rows.map(([k, v]) => `${k}: ${v}`),
@@ -90,7 +94,7 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolea
       : 'This enquiry is also saved in BUXENA Admin → Website Enquiries.',
   ].join('\n');
 
-  const htmlBody = `
+  const html = `
     <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; line-height: 1.6;">
       <h2 style="margin: 0 0 4px; font-size: 18px;">New enquiry — ${esc(source)}</h2>
       ${
@@ -129,6 +133,31 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolea
     </div>
   `.trim();
 
+  return { subject: `New enquiry — ${name}`, text, html };
+}
+
+/**
+ * Returns TRUE only when the message was actually handed to Zoho. Not
+ * configured, or the send failed, returns FALSE — it still never throws.
+ *
+ * The boolean matters: /api/enquiries treats a delivered staff notification
+ * as a second capture path when the database write fails, and "resolved
+ * without throwing" is not the same as "a human received this". Returning
+ * void made those two indistinguishable.
+ */
+export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolean> {
+  const config = getNotifySmtpConfig();
+
+  // Unconfigured — quietly skip. Submissions still record to Supabase.
+  if (!config) {
+    if (import.meta.env.DEV) {
+      console.info('[enquiry-email] ZOHO_SMTP_USER/ZOHO_SMTP_PASSWORD not set — skipping email.');
+    }
+    return false;
+  }
+
+  const { subject, text, html } = buildEnquiryNotification(input);
+
   const transporter = createNotifyTransport(config);
 
   try {
@@ -139,9 +168,9 @@ export async function sendEnquiryEmail(input: EnquiryEmailInput): Promise<boolea
       // break delivery. Only the display name is fixed text.
       from: `BUXENA Website <${config.user}>`,
       to: config.to,
-      subject: `New enquiry — ${name}`,
-      text: textBody,
-      html: htmlBody,
+      subject,
+      text,
+      html,
       // Let staff reply straight to the customer from their inbox.
       ...(input.email?.trim() ? { replyTo: input.email.trim() } : {}),
     });

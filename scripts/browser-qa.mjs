@@ -45,6 +45,10 @@ const flag = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : nul
 
 const ALL_WIDTHS = [
   { name: '1440', width: 1440, height: 900, touch: false },
+  // 1366×768 is the most common laptop panel there is, and the header was
+  // measured overflowing at exactly this width (the pricing CTA 182px off
+  // screen) while the other widths were clean. It belongs in the sweep.
+  { name: '1366', width: 1366, height: 768, touch: false },
   { name: '1280', width: 1280, height: 800, touch: false },
   { name: '1024', width: 1024, height: 768, touch: false },
   { name: '430', width: 430, height: 932, touch: true },

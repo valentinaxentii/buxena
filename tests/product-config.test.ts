@@ -24,15 +24,60 @@ test('a model with no verified options exposes no groups at all', () => {
   assert.equal(shouldShowConfigurator(model), false, 'the whole configurator is hidden');
 });
 
-test('supply format appears only when the model states it', () => {
+test('options appear as a single-select variant group when the model states them', () => {
   const groups = buildConfigGroups({
     title: 'BUH-VIRU',
     options: ['Flat-pack kit', 'Factory assembled'],
   });
-  const supply = groups.find((g) => g.key === 'supply');
-  assert.ok(supply, 'supply group should exist');
-  assert.equal(supply!.fromProductData, true);
-  assert.deepEqual(supply!.options.map((o) => o.label), ['Flat-pack kit', 'Factory assembled']);
+  const variants = groups.find((g) => g.key === 'variants');
+  assert.ok(variants, 'variant group should exist');
+  assert.equal(variants!.fromProductData, true);
+  assert.equal(variants!.multiSelect, undefined, 'variants are mutually exclusive, never multi-select');
+  assert.deepEqual(variants!.options.map((o) => o.label), ['Flat-pack kit', 'Factory assembled']);
+});
+
+test('independent accessories are separated from mutually-exclusive variants', () => {
+  const groups = buildConfigGroups({
+    title: 'BUX EDA 160',
+    options: [
+      'Full glass front',
+      'Half-moon rear glass',
+      'Exterior finish: Natural / Main Parts Painted / Fully Painted',
+      'LED lighting kit (Wi-Fi switch optional)',
+    ],
+  });
+  const variants = groups.find((g) => g.key === 'variants')!;
+  const accessories = groups.find((g) => g.key === 'accessories')!;
+  assert.ok(variants, 'variant group exists');
+  assert.ok(accessories, 'accessories group exists');
+  assert.equal(accessories.multiSelect, true, 'accessories are multi-select');
+  assert.deepEqual(accessories.options.map((o) => o.label), ['LED lighting kit (Wi-Fi switch optional)']);
+  assert.deepEqual(variants.options.map((o) => o.label), [
+    'Full glass front',
+    'Half-moon rear glass',
+    'Exterior finish: Natural / Main Parts Painted / Fully Painted',
+  ]);
+  assert.ok(
+    !variants.options.some((o) => o.label === 'LED lighting kit (Wi-Fi switch optional)'),
+    'an accessory must never reach the variant group'
+  );
+});
+
+test('all four verified accessory values are recognised as accessories', () => {
+  const groups = buildConfigGroups({
+    title: 'X',
+    options: ['Ergonomic backrest', 'Backrest', 'Bench skirts', 'LED lighting kit (Wi-Fi switch optional)'],
+  });
+  const accessories = groups.find((g) => g.key === 'accessories')!;
+  assert.ok(accessories, 'accessories group exists');
+  assert.equal(accessories.multiSelect, true);
+  assert.equal(accessories.options.length, 4);
+  assert.equal(groups.find((g) => g.key === 'variants'), undefined, 'a model with only accessories has no variant group');
+});
+
+test('a model with no accessories has no accessories group', () => {
+  const groups = buildConfigGroups({ title: 'BUH-VIRU', options: ['Flat-pack kit', 'Factory assembled'] });
+  assert.equal(groups.find((g) => g.key === 'accessories'), undefined);
 });
 
 test('heater families are split from their verified brands', () => {
@@ -106,12 +151,12 @@ test('the summary lists only answered groups, in page order', () => {
     options: ['Flat-pack kit', 'Factory assembled'],
     heaterOptions: ['Electric: Harvia'],
   });
-  const lines = summariseSelections(groups, { supply: 'Factory assembled', heater: 'Electric' });
-  assert.deepEqual(lines, ['Supply format: Factory assembled', 'Heater: Electric']);
+  const lines = summariseSelections(groups, { variants: 'Factory assembled', heater: 'Electric' });
+  assert.deepEqual(lines, ['Options: Factory assembled', 'Heater: Electric']);
   // An unanswered group is omitted — a blank is not a selection, and padding
   // the note with "not selected" makes it harder for staff to read.
-  const partial = summariseSelections(groups, { supply: 'Flat-pack kit' });
-  assert.deepEqual(partial, ['Supply format: Flat-pack kit']);
+  const partial = summariseSelections(groups, { variants: 'Flat-pack kit' });
+  assert.deepEqual(partial, ['Options: Flat-pack kit']);
 });
 
 test('an unknown selection falls back to its raw value rather than vanishing', () => {

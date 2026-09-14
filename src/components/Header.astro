@@ -142,7 +142,14 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+    /* FLUID SINCE 2026-09-14. The nav gained two items (Hot Tubs, Cold
+       Plunges) and ten labels stopped fitting beside a fixed-width logo and
+       the CTA. Measured before this change: the header's inner content needed
+       123px more than it had at 1440px and 182px at 1366px, so the pricing
+       button sat off-screen and "Contact" was clipped. These gaps now shrink
+       continuously; the bands at the bottom only handle the widths where the
+       nav itself has to leave. */
+    gap: clamp(0.85rem, 0.35rem + 1.05vw, 2.5rem);
     transition: height 0.35s var(--ease);
   }
 
@@ -233,7 +240,7 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
        .hdr__cta below) — re-verified empirically across the full
        1001-1440px range afterward; see the narrow-band media query at the
        bottom of this file for how the budget was rebalanced. */
-    gap: clamp(1.2rem, 0.5rem + 1.4vw, 2rem);
+    gap: clamp(0.5rem, 0.1rem + 0.7vw, 2rem);
   }
 
   /* Quiet-luxury nav type: weight 500 at 13px, restrained 0.12em tracking
@@ -243,7 +250,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   .hdr__nav a {
     /* GROWN ~9%, 2026-08-14: 0.8125rem (13px) → 0.8875rem (14.2px) —
        "navigation = clear, substantial, premium." */
-    font-size: 0.8875rem;
+    /* 14.2px remains the desktop size; it now eases down to ~11.2px as the
+       viewport narrows, which is what keeps ten labels on one line without
+       wrapping or clipping. */
+    font-size: clamp(0.7rem, 0.56rem + 0.22vw, 0.8875rem);
     font-weight: 500;
     /* 0.12em → 0.09em — the other half of reclaiming the ~33px this row was
        short by. `white-space:nowrap` is the actual fix for the wrapping
@@ -299,10 +309,12 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      per "approximately the same... or only slightly smaller." */
   .hdr__cta {
     height: 2.35rem;
-    padding: 0 1.05rem;
+    /* Shrinks with the row instead of forcing it wider. The button must stay
+       ON SCREEN — that is the whole point of it. */
+    padding: 0 clamp(0.6rem, 0.3rem + 0.5vw, 1.05rem);
     display: inline-flex;
     align-items: center;
-    font-size: 0.75rem;
+    font-size: clamp(0.6875rem, 0.6rem + 0.1vw, 0.75rem);
     font-weight: 500;
     letter-spacing: 0.1em;
     white-space: nowrap;
@@ -395,16 +407,22 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
      because at the previous 1200px cutoff the jump back to base values
      opened a fresh 13px overflow right at that boundary; verified
      overflow-free from 1001px to 1440px afterward. */
-  @media (max-width: 1320px) and (min-width: 1001px) {
-    .hdr__nav ul { gap: 0.6rem; }
-    .hdr__nav a { font-size: 0.75rem; letter-spacing: 0.06em; }
-    .hdr__cta { padding: 0 0.8rem; font-size: 0.6875rem; height: 2.2rem; }
+  /* THE ONE BAND WHERE THE NAV ITSELF CANNOT FIT — recomputed 2026-09-14.
+     Ten uppercase labels, a deliberately non-shrinking logo and the CTA stop
+     fitting below ~1153px even at the smallest legible type, so from 1152px
+     down the nav moves into the drawer that already exists. The pricing button
+     STAYS in the header: a review of these widths found it had simply vanished
+     there, which is exactly what must not happen to the primary CTA. */
+  @media (max-width: 1152px) and (min-width: 1001px) {
+    .hdr__nav { display: none; }
+    .burger { display: flex; }
   }
 
   @media (max-width: 1000px) {
     .hdr__nav { display: none; }
     /* flex, not block — the button centres its bars in the 44px hit area */
     .burger { display: flex; }
+    /* Phones keep the bar minimal; the drawer carries Request Pricing. */
     .hdr__cta { display: none; }
   }
 
@@ -460,8 +478,8 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
     }
   });
 
-  // close the drawer if the viewport grows past the breakpoint
-  window.matchMedia('(min-width: 1001px)').addEventListener('change', (e) => {
+  // close the drawer if the viewport grows into the band where the nav returns
+  window.matchMedia('(min-width: 1153px)').addEventListener('change', (e) => {
     if (e.matches) setOpen(false);
   });
 </script>

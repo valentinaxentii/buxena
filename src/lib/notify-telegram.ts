@@ -44,6 +44,8 @@ function getTelegramConfig(): TelegramConfig | null {
   return { token, chatId };
 }
 
+import { contactLocationRows } from './enquiry-location.ts';
+
 /**
  * Escapes the four characters Telegram's HTML parse mode treats as markup.
  * Without this a visitor typing "<3" or "R&D" would break the whole message —
@@ -124,6 +126,8 @@ export interface EnquiryTelegramInput {
   email?: string | null;
   phone?: string | null;
   location?: string | null;
+  /** The customer's ZIP, when the form sent one — see lib/enquiry-location.ts. */
+  zip?: string | null;
   message?: string | null;
   saunaInterest?: string | null;
   source?: string | null;
@@ -146,7 +150,10 @@ export async function sendEnquiryTelegram(input: EnquiryTelegramInput): Promise<
     line('Name', input.name) ?? '<b>Name:</b> —',
     line('Email', input.email),
     line('Phone', input.phone),
-    line('ZIP / Location', input.location),
+    // ZIP and placement as their own lines: `location` holds a ZIP for most
+    // forms and a project location for trade enquiries, so one merged
+    // "ZIP / Location" line printed "Outdoor" as though it were a postcode.
+    ...contactLocationRows(input.zip, input.location).map((row) => line(row.label, row.value)),
     line('Model / request', input.saunaInterest),
     message ? `\n<b>Message</b>\n${esc(message)}` : null,
     '',

@@ -38,6 +38,11 @@ export interface ConfigGroup {
   options: ConfigOption[];
   /** true → derived from this model's verified data; false → a customer preference. */
   fromProductData: boolean;
+  /**
+   * true → the customer may pick MORE THAN ONE option (accessories that
+   * combine). false / absent → the options are mutually exclusive (variants).
+   */
+  multiSelect?: boolean;
 }
 
 /** The subset of a sauna's frontmatter the configurator reads. */
@@ -72,6 +77,28 @@ function toOption(raw: string): ConfigOption {
 }
 
 /**
+ * The option values that are INDEPENDENT ACCESSORIES, not mutually-exclusive
+ * variants. Verified against the supplier catalogue: these are add-on
+ * equipment that can be combined — backrests, bench skirts, the LED kit —
+ * whereas glass/glazing, exterior finish, wood species, supply format and
+ * room layout are either/or choices where selecting one excludes the others.
+ *
+ * The allowlist is exact on purpose. A value not listed here is treated as a
+ * variant, so an invented accessory can never slip through; adding a real
+ * accessory later is one line here, not a guess in the UI.
+ */
+const ACCESSORY_OPTION_VALUES = new Set([
+  'Ergonomic backrest',
+  'Backrest',
+  'Bench skirts',
+  'LED lighting kit (Wi-Fi switch optional)',
+]);
+
+function isAccessoryOption(raw: string): boolean {
+  return ACCESSORY_OPTION_VALUES.has(raw.trim());
+}
+
+/**
  * How the customer intends to install. A PREFERENCE, not a product claim.
  *
  * It lives in the quote form (components/QuoteForm.astro), not here, and is
@@ -90,14 +117,34 @@ export const INSTALLATION_PREFERENCES: ConfigOption[] = [
 export function buildConfigGroups(model: ConfigurableModel): ConfigGroup[] {
   const groups: ConfigGroup[] = [];
 
-  // Assembly / supply format — only where the model states it.
-  if (model.options?.length) {
+  // Options split into mutually-exclusive variants and independent accessories.
+  // The flat `options` array used to dump BOTH into a single radio group
+  // labelled "Supply format", which mislabelled glass/finish choices and forced
+  // a customer to choose between, say, "Bench skirts" and "Full glass front".
+  // The two kinds are different: variants exclude each other, accessories
+  // combine — so they get separate groups and the accessories are multi-select.
+  const optionValues = model.options ?? [];
+  const variants = optionValues.filter((o) => !isAccessoryOption(o));
+  const accessories = optionValues.filter((o) => isAccessoryOption(o));
+
+  if (variants.length) {
     groups.push({
-      key: 'supply',
-      label: 'Supply format',
-      help: 'Verified for this model.',
+      key: 'variants',
+      label: 'Options',
+      help: 'Verified for this model. Choose the specification that fits.',
       fromProductData: true,
-      options: model.options.map(toOption),
+      options: variants.map(toOption),
+    });
+  }
+
+  if (accessories.length) {
+    groups.push({
+      key: 'accessories',
+      label: 'Accessories',
+      help: 'Choose any that apply — these can be combined.',
+      fromProductData: true,
+      multiSelect: true,
+      options: accessories.map(toOption),
     });
   }
 
