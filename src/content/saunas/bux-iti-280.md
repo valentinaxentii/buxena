@@ -18,8 +18,9 @@ heroImage:
   # depth — it is the correct SERIES, verified against the source page, and
   # no other model's photo has been substituted. Classification: FAMILY.
   # Replace with an exact depth photo the moment Capra sends one.
-  src: "/images/saunas-normalized/bux-iti-family-transparent.png"
-  alt: "BUX ITI 280 barrel sauna exterior, glass door and shingled roof"
+  src: "/images/saunas-normalized/bux-iti-family-linen.png"
+  fit: "contain"
+  alt: "BUX ITI barrel sauna with full glass front and black shingled roof"
 dimensions:
   - { label: "Depth", value: "9.2 ft (280 cm)" }
   - { label: "Width", value: "7.8 ft (238 cm)" }

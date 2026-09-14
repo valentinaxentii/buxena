@@ -19,6 +19,7 @@ interface Slide {
   alt: string;
   note?: string;
   fit?: 'cover' | 'contain';
+  preferSource?: boolean;
 }
 interface Props {
   hero: Slide;
@@ -61,6 +62,7 @@ const hasMultiple = slides.length > 1;
           tone="dark"
           priority={i === 0}
           fit={slide.fit ?? 'contain'}
+          preferSource={slide.preferSource}
           maxHeight="520px"
         />
       </div>

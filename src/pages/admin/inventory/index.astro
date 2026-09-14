@@ -64,12 +64,6 @@ try {
   dbReady = false;
 }
 
-function landedOrCost(row: any): number {
-  return Number(row.landed_cost ?? row.products?.cost ?? 0);
-}
-function inventoryValue(row: any): number {
-  return Number(row.in_stock ?? 0) * landedOrCost(row);
-}
 function money(n: number | null | undefined): string {
   return n == null ? '—' : `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -128,15 +122,6 @@ function sortIndicator(col: string): string {
             <th><a href={sortHref('incoming')}>Incoming{sortIndicator('incoming')}</a></th>
             <th><a href={sortHref('reserved')}>Reserved{sortIndicator('reserved')}</a></th>
             <th><a href={sortHref('available')}>Available{sortIndicator('available')}</a></th>
-            <th>Container</th>
-            <th>PO</th>
-            <th><a href={sortHref('eta')}>ETA{sortIndicator('eta')}</a></th>
-            <th>Port</th>
-            <th>Warehouse</th>
-            <th>Product Cost</th>
-            <th>Landed Cost</th>
-            <th>Selling Price</th>
-            <th>Inventory Value</th>
           </tr>
         </thead>
         <tbody>
@@ -148,15 +133,6 @@ function sortIndicator(col: string): string {
               <td>{row.incoming ?? 0}</td>
               <td>{row.reserved ?? 0}</td>
               <td>{row.available ?? 0}</td>
-              <td>{row.container_number || '—'}</td>
-              <td>{row.purchase_order || '—'}</td>
-              <td>{row.eta || '—'}</td>
-              <td>{row.port || '—'}</td>
-              <td>{row.warehouse || '—'}</td>
-              <td>{money(row.products?.cost)}</td>
-              <td>{money(row.landed_cost)}</td>
-              <td>{money(row.products?.selling_price)}</td>
-              <td>{money(inventoryValue(row))}</td>
             </tr>
           ))}
         </tbody>
@@ -169,6 +145,7 @@ function sortIndicator(col: string): string {
           <div class="mobile-card__top">
             <span class="mobile-card__code">{row.products?.model_name ?? '— unknown model —'}</span>
             <span class="mobile-card__model">{row.suppliers?.name ?? '—'}</span>
+            <span class="mobile-card__price">{money(row.products?.selling_price)}</span>
           </div>
           <dl class="mobile-card__stats">
             <div><dt>In Stock</dt><dd>{row.in_stock ?? 0}</dd></div>
@@ -176,10 +153,6 @@ function sortIndicator(col: string): string {
             <div><dt>Incoming</dt><dd>{row.incoming ?? 0}</dd></div>
             <div><dt>Available</dt><dd>{row.available ?? 0}</dd></div>
           </dl>
-          <div class="mobile-card__meta mobile-card__meta--row">
-            <span>Selling Price</span>
-            <span>{money(row.products?.selling_price)}</span>
-          </div>
         </a>
       ))}
     </div>
@@ -189,9 +162,40 @@ function sortIndicator(col: string): string {
 </AdminLayout>
 
 <style>
-  .mobile-card__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0; }
-  .mobile-card__stats dt { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--admin-muted); }
-  .mobile-card__stats dd { margin: 0.1rem 0 0; font-size: 0.95rem; font-weight: 600; color: var(--admin-cream); }
+  /* Inventory cards are often used on a narrow browser window as well as a
+     phone. Make the whole card a compact, single-colour link rather than
+     letting the browser's blue/purple visited-link styles leak into it. */
+  :global(.mobile-cards) { gap: 0.4rem; }
+  :global(a.mobile-card) {
+    padding: 0.35rem 0.7rem;
+    gap: 0.15rem;
+    border-radius: 3px;
+    background: var(--admin-panel);
+    color: var(--admin-cream);
+    text-decoration: none;
+  }
+  :global(a.mobile-card:hover) { border-color: var(--admin-gold); text-decoration: none; }
+  :global(.mobile-card__top) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.55rem; }
+  :global(.mobile-card__code) { font-size: 0.8rem; color: var(--admin-cream); }
+  :global(.mobile-card__model) { font-size: 0.7rem; color: var(--admin-muted); }
+  :global(.mobile-card__price) { font-size: 0.72rem; font-weight: 600; color: var(--admin-cream); white-space: nowrap; }
+  .mobile-card__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; margin: 0; }
+  .mobile-card__stats > div { display: flex; align-items: baseline; gap: 0.18rem; min-width: 0; }
+  .mobile-card__stats dt { font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--admin-muted); white-space: nowrap; }
+  .mobile-card__stats dd { margin: 0; font-size: 0.74rem; font-weight: 600; color: var(--admin-cream); }
+  /* The summary is intentionally limited to the six operational quantities.
+     Container, port, warehouse and costs are on the model detail screen.
+     Keeping 15 columns here forced the entire admin page sideways. */
+  :global(.admin-table th:first-child), :global(.admin-table td:first-child) { width: 40%; white-space: normal; }
+
+  /* At narrow desktop widths the shared `.mobile-cards` display rule used to
+     override `.mobile-show`, so both layouts appeared at once.  Inventory
+     switches cleanly to its compact summary before the table is squeezed. */
+  :global(.mobile-cards.mobile-show) { display: none; }
+  @media (max-width: 900px) {
+    :global(.admin-table-wrap.mobile-hide) { display: none !important; }
+    :global(.mobile-cards.mobile-show) { display: flex; }
+  }
 </style>
 
 <style>

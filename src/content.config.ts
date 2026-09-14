@@ -21,6 +21,11 @@ const imageSlot = z.object({
    * them has already been normalized in the pixels themselves.
    */
   fit: z.enum(['cover', 'contain']).optional(),
+  /**
+   * Keep the supplied source rather than selecting a generated WebP variant.
+   * Used only where the derivative visibly loses essential product detail.
+   */
+  preferSource: z.boolean().optional(),
 });
 
 /**

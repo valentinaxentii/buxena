@@ -260,6 +260,7 @@ const breadcrumbSchema = {
               model={data.title}
               label={[data.series, data.productType].filter(Boolean).join(' · ')}
             />
+            <p class="prod-hero__image-note">Images may show optional features and accessories. Your written quote confirms what is included.</p>
           </div>
 
           <div class="prod-hero__info">
@@ -310,7 +311,7 @@ const breadcrumbSchema = {
               <div class="prod-hero__action-head">
                 <span class="eyebrow">Your purchase plan</span>
                 <h2 id="purchase-title">Ready to price this sauna?</h2>
-                <p>We confirm the chosen configuration, current lead time and delivery approach for your location before you order.</p>
+                <p>Free inquiry — no payment or order commitment. We confirm the chosen configuration, current lead time and delivery approach for your location before you order.</p>
               </div>
 
               <a
@@ -682,6 +683,7 @@ const breadcrumbSchema = {
   }
 
   .prod-hero__media { display: flex; flex-direction: column; gap: 0.75rem; }
+  .prod-hero__image-note { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); }
 
   .prod-hero__thumbs {
     display: grid;

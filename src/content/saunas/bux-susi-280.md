@@ -6,6 +6,9 @@ productType: "Barrel"
 series: "SUSI"
 tagline: "The SUSI bottom-cut barrel, 280cm depth"
 summary: "A Capra SUSI bottom-cut barrel sauna, 280cm depth."
+capacity: "4–5 people"
+capacityMin: 4
+capacityMax: 5
 order: 420
 placeholder: false
 materials: ["Nordic Spruce", "Thermo Pine"]
@@ -35,8 +38,7 @@ delivery: "Contact us for details"
 ------
 
 Capra's SUSI bottom-cut barrel at 280cm depth — a flat-bottomed barrel
-form, for a level floor without a raised threshold. Available in Nordic
-Spruce or Thermo Pine.
+form, for a level floor without a raised threshold. Comfortably seats four
+to five people and is available in Nordic Spruce or Thermo Pine.
 
-Exact seating capacity and heater kW are confirmed with you before ordering
-— Capra's catalogue does not state a per-model capacity for this range.
+Heater kW is confirmed with your quote.

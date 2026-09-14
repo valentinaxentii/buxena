@@ -25,6 +25,21 @@ const rounds = [
     body: 'Wait until your breathing has settled and you feel genuinely cool again. Then decide whether to go back in. Two or three rounds is typical.',
   },
 ];
+
+const infraredNotes = [
+  {
+    title: 'Radiant warmth',
+    body: 'Infrared and traditional sauna create heat differently. Infrared is often chosen for its gentler-feeling, radiant warmth; a traditional sauna centres on hot air, stones and löyly.',
+  },
+  {
+    title: 'A slower ritual',
+    body: 'Some people prefer a lower-air-temperature session and an unhurried pause. Others want the humidity and intensity of a traditional room. Neither is a medical treatment — it is a matter of the experience you enjoy.',
+  },
+  {
+    title: 'Choose for your space',
+    body: 'The right heat style depends on the room, electrical plan, preferred temperature and how you want to use it. We can help you think through those practical choices before you commit.',
+  },
+];
 ---
 
 <BaseLayout
@@ -117,6 +132,31 @@ const rounds = [
           Drink water between rounds, and leave the room whenever it stops being
           pleasant. Nothing about a sauna is improved by pushing through.
         </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band infrared-section">
+    <div class="shell">
+      <div class="infrared-head reveal">
+        <span class="eyebrow">Considering infrared?</span>
+        <h2 class="h2 measure--tight">Warmth, without the wellness promises</h2>
+        <p class="lead measure">
+          Infrared belongs in the conversation when you are choosing the kind of heat
+          you want to live with — not as a shortcut to a health claim.
+        </p>
+      </div>
+
+      <div class="infrared-notes reveal">
+        {infraredNotes.map((note) => (
+          <article class="infrared-note">
+            <span class="infrared-note__mark" aria-hidden="true"></span>
+            <div>
+              <h3 class="h3 infrared-note__title">{note.title}</h3>
+              <p>{note.body}</p>
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   </section>
@@ -220,6 +260,50 @@ const rounds = [
   .etiquette-section { padding-block: clamp(1.4rem, 0.9rem + 1.2vw, 2.1rem); }
   .split__media { max-width: 330px; }
 
+  /* Infrared is explained as a design choice, not a treatment. The three
+     rows borrow the supplied reference's calm editorial rhythm, but their
+     heat-line marks deliberately resemble a radiant element rather than a
+     medical icon or an unsubstantiated benefit scorecard. */
+  .infrared-section {
+    background:
+      linear-gradient(90deg, transparent 0 1.5rem, color-mix(in srgb, var(--bronze) 68%, transparent) 1.5rem 1px, transparent 1px) top left / 100% 1px no-repeat,
+      var(--linen-deep);
+  }
+  .infrared-head { margin-bottom: clamp(1.8rem, 1.2rem + 1.7vw, 3rem); }
+  .infrared-head .lead { margin-top: 0.9rem; }
+  .infrared-notes { max-width: 60rem; }
+  .infrared-note {
+    display: grid;
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+    gap: clamp(0.85rem, 0.5rem + 1vw, 1.4rem);
+    align-items: start;
+    padding-block: clamp(1rem, 0.7rem + 0.7vw, 1.45rem);
+    border-top: 1px solid var(--line);
+  }
+  .infrared-note:last-child { border-bottom: 1px solid var(--line); }
+  .infrared-note__mark {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: 0.36rem;
+    border: 1.5px solid var(--bronze);
+    border-radius: 50%;
+    position: relative;
+  }
+  .infrared-note__mark::before,
+  .infrared-note__mark::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    height: 0.55rem;
+    background: var(--bronze);
+    transform: translateX(-50%);
+  }
+  .infrared-note__mark::before { bottom: calc(100% + 0.23rem); }
+  .infrared-note__mark::after { top: calc(100% + 0.23rem); }
+  .infrared-note__title { margin-bottom: 0.32rem; }
+  .infrared-note p { max-width: 53rem; color: var(--muted); margin: 0; }
+
   .disclaimer {
     border-top: 2px solid var(--ink);
     padding-top: 1.27rem;
@@ -236,5 +320,6 @@ const rounds = [
        "mobile should use most of the available width" direction on this
        page's other image. */
     .split__media { max-width: none; }
+    .infrared-note { grid-template-columns: 1.8rem minmax(0, 1fr); }
   }
 </style>

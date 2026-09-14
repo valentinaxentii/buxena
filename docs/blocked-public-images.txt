@@ -25,6 +25,15 @@
 
 # EDA / AURA / ITI imagery — not covered by the recorded Capra website grant.
 # AURA and ITI are currently held/draft, but remain blocked if restored later.
+#
+# 2026-09-14 — two EDA paths were TRACED and removed from this list:
+#   /images/saunas/eda-thermowood-1-3m-hero.png
+#   /images/saunas/eda-thermowood-2-35m-hero.jpeg
+# Both were matched by content against Capra's own product-page images for the
+# exact SKUs TS130TRWD2-1000 and S235TRWD2-1000 (see the register's "Capra
+# product-page trace" section). They are Capra-supplied material and therefore
+# covered by the 2026-08-11 written grant. Removing a path here is only ever
+# done with that recorded evidence — never to make the audit pass.
 /images/saunas/aura-thermowood-1-3m-hero.jpeg
 /images/saunas/iti-thermowood-2-3m-hero.png
 /images/saunas/eda-nordic-spruce-1-6m-hero.png
@@ -35,14 +44,24 @@
 /images/saunas/eda-nordic-spruce-3-0m-hero.png
 /images/saunas/eda-nordic-spruce-3-3m-hero.png
 /images/saunas/eda-nordic-spruce-4-0m-hero.png
-/images/saunas/eda-thermowood-1-3m-hero.png
 /images/saunas/eda-thermowood-1-6m-hero.png
-/images/saunas/eda-thermowood-2-35m-hero.jpeg
 /images/saunas/eda-thermowood-2-5m-hero.png
 /images/saunas/eda-thermowood-2-8m-hero.png
 /images/saunas/eda-thermowood-3-0m-hero.png
 /images/saunas/eda-thermowood-3-3m-hero.png
 /images/saunas/eda-thermowood-4-0m-hero.png
+
+# Untraced BUXENA cutouts of the EDA 2,35 m hero, left in public/ after the
+# 2026-09-14 replacement. Their origin could not be matched to any Capra
+# product-page image, so they must not return to a page without a traced source.
+/images/saunas-normalized/eda-thermowood-2-35m-transparent.png
+
+# The normalized EDA 1,6 m hero, replaced 2026-09-14. Its origin matched Capra's
+# own EDA 1,6 m product-page image only inconclusively (identical framing,
+# different tone), so it is NOT claimed as traced. Capra's unchanged
+# product-page file now serves that model (see docs/image-sources-2026-09-14.json);
+# this copy must not return without a traced source.
+/images/saunas-normalized/eda-thermowood-1-6m-hero.png
 
 # VIRU supplier-gallery imagery — written website permission not on file.
 

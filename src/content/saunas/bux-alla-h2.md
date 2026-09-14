@@ -15,6 +15,9 @@ materials: ["Extra dried pine"]
 heroImage:
   src: "/images/saunas-normalized/alla-h2-transparent.png"
   alt: "ALLA H2 indoor sauna, rounded pine cabin with bronze-tinted glass front"
+  # The generated WebP was visibly too soft at product-hero size. Keep the
+  # exact approved PNG until Capra supplies a higher-resolution original.
+  preferSource: true
 dimensions:
   - { label: "External (D × W × H)", value: "51.2 × 106.7 × 89.8 in (1300 × 2710 × 2280 mm)" }
   - { label: "Internal (D × W × H)", value: "43.3 × 100.0 × 81.1 in (1100 × 2540 × 2060 mm)" }

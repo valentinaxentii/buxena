@@ -16,6 +16,8 @@
  */
 
 /** Every conversion-relevant event the site can emit. */
+import { inquiryAttribution } from './enquiry-attribution';
+
 export type TrackEvent =
   | 'product_view'
   | 'category_view'
@@ -118,23 +120,15 @@ declare global {
   }
 }
 
-/** First-touch campaign attribution, read from the URL and the referrer. */
+/** First landing context for this tab, shared with the submitted inquiry. */
 export function campaignContext(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-
-  const params = new URLSearchParams(window.location.search);
-  const utm: Record<string, string> = {};
-
-  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid']) {
-    const value = params.get(key);
-    if (value) utm[key] = value;
-  }
-
-  return {
-    ...utm,
-    landing_page: window.location.pathname,
-    ...(document.referrer ? { referrer: document.referrer } : {}),
+  const context = inquiryAttribution();
+  const values = {
+    landing_page: context.landingPath, referrer: context.referrerHost,
+    utm_source: context.utmSource, utm_medium: context.utmMedium,
+    utm_campaign: context.utmCampaign, utm_content: context.utmContent, utm_term: context.utmTerm,
   };
+  return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1])));
 }
 
 /**

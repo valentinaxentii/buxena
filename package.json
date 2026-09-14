@@ -23,7 +23,8 @@
     "routes:runtime": "node scripts/runtime-routes.mjs",
     "leaks:audit": "node scripts/commercial-leak-audit.mjs",
     "failures:audit": "node scripts/failure-modes.mjs",
-    "qa:browser": "node scripts/browser-qa.mjs"
+    "qa:browser": "node scripts/browser-qa.mjs",
+    "qa:flow": "node scripts/browser-flow-qa.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^8.1.2",

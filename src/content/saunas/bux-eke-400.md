@@ -8,6 +8,9 @@ tagline: "The EKE cube, 400cm depth"
 summary: "A Capra EKE outdoor cube sauna, 400cm depth."
 order: 340
 placeholder: false
+capacity: "4–6 people"
+capacityMin: 4
+capacityMax: 6
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
   # FAMILY / CONFIGURATION IMAGE — registered 2026-08-16 at the founder's

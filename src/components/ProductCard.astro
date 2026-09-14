@@ -44,6 +44,21 @@ const buckets = capacityBuckets(capacityMin, capacityMax);
 const materialSlug = (materials ?? []).map((m) => m.toLowerCase().replace(/[^a-z0-9]+/g, '-')).join(' ');
 const isVariantGroup = variants.length > 1;
 const familyFit = image?.fit ?? 'contain';
+// This lets the catalogue search match the terms a customer is likely to use,
+// including a grouped card's individual sellable sizes.
+const searchTerms = [
+  title,
+  displayTitle(title),
+  tagline,
+  category,
+  location,
+  productType,
+  series,
+  capacity,
+  ...(materials ?? []),
+  ...(dimensions?.flatMap((dimension) => [dimension.label, dimension.value]) ?? []),
+  ...variants.flatMap((variant) => [variant.slug, variant.label]),
+].filter(Boolean).join(' ').toLowerCase();
 ---
 
 <article
@@ -54,6 +69,7 @@ const familyFit = image?.fit ?? 'contain';
   data-series={series ?? ''}
   data-material={materialSlug}
   data-capacity={buckets.join(' ')}
+  data-search={searchTerms}
 >
   {isVariantGroup ? (
     <div class="pcard__link pcard__link--group">
@@ -69,7 +85,6 @@ const familyFit = image?.fit ?? 'contain';
           fixedRatio={true}
           class="pcard-family-figure"
         />
-        <span class="pcard__family-badge">{series} collection</span>
         {placeholder && showDev && <span class="pcard__flag">Placeholder listing</span>}
       </div>
       <div class="pcard__body">
@@ -112,28 +127,9 @@ const familyFit = image?.fit ?? 'contain';
     </a>
   )}
 
-  {isVariantGroup ? (
-    <div class="pcard__actions pcard__actions--family">
-      <a
-        class="pcard__quote"
-        href={`/quote/?model=${encodeURIComponent(title)}`}
-        data-track="pricing_request_started"
-        data-track-model={title}
-        data-track-category={category}
-        data-track-form-type="product_card"
-      >Request Pricing</a>
-    </div>
-  ) : (
+  {!isVariantGroup && (
     <div class="pcard__actions">
       <a class="pcard__more" href={`/saunas/${slug}/`}>View Model <span class="pcard__arrow" aria-hidden="true">→</span></a>
-      <a
-        class="pcard__quote"
-        href={`/quote/?model=${encodeURIComponent(title)}`}
-        data-track="pricing_request_started"
-        data-track-model={title}
-        data-track-category={category}
-        data-track-form-type="product_card"
-      >Request Pricing</a>
     </div>
   )}
 </article>
@@ -203,23 +199,12 @@ const familyFit = image?.fit ?? 'contain';
     transform: scale(1.06);
     filter: saturate(1.08) contrast(1.06) brightness(1.04);
   }
-  .pcard__family-badge {
-    position: absolute;
-    left: 0.8rem;
-    bottom: 0.8rem;
-    z-index: 2;
-    padding: 0.38rem 0.58rem;
-    background: rgba(17, 16, 14, 0.72);
-    border: 1px solid rgba(255,255,255,0.18);
-    color: rgba(255,255,255,0.88);
-    font-family: 'Manrope', var(--font-sans);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    backdrop-filter: blur(5px);
+  /* The EDA supplier render has almost no internal canvas, unlike the other
+     family cutouts. Keep the product visually aligned with its neighbours
+     rather than letting it dominate the shared 4:3 card stage. */
+  .pcard[data-series='EDA'] .pcard__media--family :global(img) {
+    transform: scale(0.91);
   }
-
   .pcard__flag {
     position: absolute;
     top: 0.9rem;

@@ -13,9 +13,13 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Nordic Spruce"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas/eda-nordic-spruce-2-0m-hero.png"
+  # VERIFIED supplier image — Capra's own photograph of the EDA 2,0 m Nordic
+  # Spruce barrel sauna (SKU S200WWD2-1000), taken from Capra's product page
+  # https://caprasaunas.com/product/eda-nordic-spruce-sauna2-0m-6-6ft-4-6-people/
+  # on 2026-09-14 and cut out locally. Covered by the 2026-08-11 written grant.
+  # It replaces a file whose origin could not be traced; that file stays on the
+  # rights blocklist and is no longer referenced anywhere.
+  src: "/images/saunas/eda-nordic-spruce-2-0m-hero-capra.png"
   alt: "BUX EDA 200 Nordic Spruce barrel sauna exterior"
 dimensions:
   - { label: "Depth", value: "6.6 ft (200 cm)" }

@@ -121,7 +121,10 @@ export function readHeaterFacts(heaterOptions: string[] | undefined | null): Hea
  * data for is a gap in our data, not a fact about the sauna.
  */
 export function heaterSummary(facts: HeaterFacts): string {
-  if (facts.unknown) return 'Confirmed with your quote';
+  // BUXENA does not bundle a heater with any sauna. Keep the supplier's
+  // compatibility details visible, but make the commercial inclusion status
+  // unambiguous on every model page.
+  if (facts.unknown) return 'Compatibility confirmed with your quote · Not included';
 
   const parts: string[] = [];
   if (facts.fuels.includes('electric') && facts.fuels.includes('wood')) parts.push('Electric or wood-burning');
@@ -129,10 +132,9 @@ export function heaterSummary(facts: HeaterFacts): string {
   else if (facts.fuels.includes('wood')) parts.push('Wood-burning');
 
   if (facts.kwRange) parts.push(facts.kwRange);
-  if (facts.heaterIncluded) parts.push('heater included');
   if (facts.appControl) parts.push('app control');
 
-  return parts.length ? parts.join(' · ') : 'Confirmed with your quote';
+  return parts.length ? `${parts.join(' · ')} · Not included` : 'Not included';
 }
 
 /**

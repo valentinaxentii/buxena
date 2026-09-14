@@ -3,6 +3,7 @@ export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import PortInput from '../../../components/admin/PortInput.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { getSettings } from '../../../lib/settings';
@@ -26,7 +27,7 @@ try {
   settings = await getSettings(supabase);
   const [supplierRows, productRows, supplierProductRows] = await Promise.all([
     supabase.from('suppliers').select('id, name, currency').order('name'),
-    supabase.from('products').select('id, model_name, cost').eq('is_active', true).order('model_name'),
+    supabase.from('products').select('id, model_name, cost, supplier_id').eq('is_active', true).order('model_name'),
     supabase.from('supplier_products').select('supplier_id, product_id, supplier_model_code, unit_cost, currency').eq('is_active', true),
   ]);
   suppliers = supplierRows.data ?? [];
@@ -124,13 +125,14 @@ try {
     <label class="admin-field"><span>Container Number</span><input type="text" name="container_number" /></label>
     <label class="admin-field"><span>Expected Departure (ETD)</span><input type="date" name="etd" /></label>
     <label class="admin-field"><span>Expected Arrival (ETA)</span><input type="date" name="eta" /></label>
-    <label class="admin-field"><span>Origin</span><input type="text" name="origin" /></label>
-    <label class="admin-field"><span>Destination</span><input type="text" name="destination" /></label>
+    <PortInput id="shipment-origin" name="origin" label="Origin port" />
+    <PortInput id="shipment-destination" name="destination" label="Destination port" />
     <label class="admin-field"><span>Currency</span><input type="text" name="currency" id="shipment-currency" value={settings.currency} maxlength="3" /></label>
-    <p class="ship-hint-inline">Model choices below narrow to this supplier's linked models once one is selected — models with no supplier link yet still show up, so this never blocks you.</p>
+    <p class="ship-hint-inline">All active models remain available, including models whose supplier link is still being completed.</p>
 
     <script type="application/json" id="supplier-products-data" set:html={jsonForScript(supplierProducts)} />
     <script type="application/json" id="suppliers-data" set:html={jsonForScript(suppliers)} />
+    <script type="application/json" id="products-data" set:html={jsonForScript(products)} />
 
     <div class="admin-form__full">
       <h2 class="admin-section-title" style="margin-top:1rem;">Add Models</h2>
@@ -261,10 +263,10 @@ try {
   const modelWraps = Array.from(document.querySelectorAll('[data-model-select]'));
 
   function applySupplierFilter() {
-    const supplierId = supplierSelect?.value || '';
-    const linkedIds = supplierId ? supplierProducts.filter((sp) => sp.supplier_id === supplierId).map((sp) => sp.product_id) : [];
-    // No links recorded for this supplier yet -> don't block ordering, show everything.
-    const productIds = linkedIds.length > 0 ? linkedIds : null;
+    // Supplier association sets the suggested cost and currency below, but
+    // never removes an active BUXENA model from the shipment picker. The
+    // supplier-links table is incomplete while the catalogue is expanding.
+    const productIds = null;
     modelWraps.forEach((wrap) => {
       wrap.dispatchEvent(new CustomEvent('modelselect:restrict', { detail: { productIds } }));
     });

@@ -156,6 +156,10 @@ const webSiteSchema = {
 
     <script>
       import { track, type TrackEvent, type TrackPayload } from '../lib/track';
+      import { inquiryAttribution } from '../lib/enquiry-attribution';
+
+      // Capture the entry page before internal navigation removes campaign tags.
+      inquiryAttribution();
 
       // Delegated conversion tracking. Any element carrying data-track="<event>"
       // fires that event on click, with every data-track-* attribute passed

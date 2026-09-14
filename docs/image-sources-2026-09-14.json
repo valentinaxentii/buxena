@@ -1,0 +1,98 @@
+{
+  "verifiedOn": "2026-09-14",
+  "permissionEmail": "https://mail.google.com/mail/#all/19ff019efc102165",
+  "permissionSender": "Andres Sokk, CAPRA",
+  "permissionDate": "2026-08-11",
+  "scope": "CAPRA-supplied product images, 3D renders and catalogue materials; website, social media and paid ads; US/Canada. ULLA is excluded.",
+  "howToRead": [
+    "shippedAssets lists the files this repository actually serves, the CAPRA product page each was taken from and the supplier URL behind it. Every checksum here was recomputed in this workspace.",
+    "recoveredRecord preserves the September 14 handoff bundle's own source record (commit cf1c514) so it is not lost. Those four downloads were installed in the other workspace; this tree instead ships the files in shippedAssets, taken from the same CAPRA product pages. Its checksums are kept exactly as received and were not re-verified here.",
+    "Comparison method and per-model scores: docs/capra-image-trace-2026-09-14.md."
+  ],
+  "shippedAssets": [
+    {
+      "model": "bux-eda-160",
+      "shippingPublicPath": "/images/saunas/eda-thermowood-1-6m-hero-capra.png",
+      "supplierProductPage": "https://caprasaunas.com/product/eda-thermowood-sauna1-6m-5-2ft-3-4-people/",
+      "supplierSku": "TS160TRWD2-1000",
+      "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/04/uc-1.png",
+      "transformation": "None; the supplier's bytes were copied unchanged.",
+      "bytes": 2444461,
+      "sha256": "1e5fd127b1313c94509d4b4f00a2c8e50d3e22efd8ab5a124222d32c145b1ff5"
+    },
+    {
+      "model": "bux-eda-200",
+      "shippingPublicPath": "/images/saunas/eda-nordic-spruce-2-0m-hero-capra.png",
+      "supplierProductPage": "https://caprasaunas.com/product/eda-nordic-spruce-sauna2-0m-6-6ft-4-6-people/",
+      "supplierSku": "S200WWD2-1000",
+      "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/05/uc-1.jpeg",
+      "transformation": "White studio background removed, trimmed, PNG. Subject and proportions unchanged; only the surrounding canvas was removed.",
+      "sourceBytes": 2602284,
+      "sourceSha256": "a89b607345211323c113df1d32b32a4429883960a04ed0e43bc6e8ca90014517",
+      "shippedBytes": 4280204,
+      "shippedSha256": "f3420eafa8b8a5c8cc86d4179e6641304a24051470f9dac11156dcd1c72e24e6"
+    },
+    {
+      "model": "bux-eda-235",
+      "shippingPublicPath": "/images/saunas/eda-thermowood-2-35m-hero-capra.png",
+      "supplierProductPage": "https://caprasaunas.com/product/eda-thermowood-sauna2-35m-7-7ft-4-6-people/",
+      "supplierSku": "S235TRWD2-1000",
+      "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/05/uc.png",
+      "transformation": "White studio background removed, trimmed, PNG.",
+      "sourceBytes": 2463891,
+      "sourceSha256": "1a7e656b39d64ff47c0f963ec512281f9bd1b0040457551270b1f95162a7638b",
+      "shippedBytes": 2783413,
+      "shippedSha256": "eab3b1860435b93b7e1f80976f4d600fee264b13ec9a47eb149cd8b119bd249a"
+    },
+    {
+      "model": "bux-eke-160",
+      "shippingPublicPath": "/images/saunas-normalized/bux-eke-160-exact-cutout.png",
+      "supplierProductPage": "https://caprasaunas.com/product/eke-thermowood-sauna1-6m-5-2ft-3-people/",
+      "supplierSku": "EK160TRWD2-1000",
+      "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/09/10026-3.jpg",
+      "transformation": "White studio background removed, trimmed, PNG. The full-glass front shown is an optional configuration the quote confirms.",
+      "sourceBytes": 557260,
+      "sourceSha256": "ce5eced41012ed1d44f4f952ab57c894a004d9746576776a45703e35b0f0f661",
+      "shippedBytes": 2439636,
+      "shippedSha256": "4af24b77228dd94a54776eff2312e4a7b6a2e03faa17b29d8a73b93a6eb865dc"
+    }
+  ],
+  "recoveredRecord": {
+    "source": "buxena-v2-updates.bundle, commit cf1c514f30892c34df2d6543c394197c12879d45; bundle SHA-256 fbfe2b8c29286b43bfe3ddecfa2855496dcd3380979159269646bc3b867c0c11, verified against the handoff CHECKSUMS.json.",
+    "assets": [
+      {
+        "model": "bux-eda-200",
+        "publicPathUsedThere": "/images/saunas/bux-eda-200-capra.jpeg",
+        "supplierProductPage": "https://caprasaunas.com/product/eda-nordic-spruce-sauna2-0m-6-6ft-4-6-people/",
+        "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/05/uc-1-1024x640.jpeg",
+        "sha256": "dcc745867d8ee2fd8a6de26b1f9b1d7be846553568d304c9e3591b8944bfe979",
+        "bytes": 51241
+      },
+      {
+        "model": "bux-eda-130",
+        "publicPathUsedThere": "/images/saunas/bux-eda-130-capra.jpg",
+        "supplierProductPage": "https://caprasaunas.com/product/eda-thermowood-sauna1-3m-4-3ft-2-3-people/",
+        "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/09/TS-130-d2_basic_thermo_frontRview_whiteBR-1024x819.jpg",
+        "sha256": "d45bda2bf13eaa00bc0314d116ef3c0f1677e5c4df4e465907446857e1cdc12b",
+        "bytes": 78956
+      },
+      {
+        "model": "bux-eda-235",
+        "publicPathUsedThere": "/images/saunas/bux-eda-235-capra.jpeg",
+        "supplierProductPage": "https://caprasaunas.com/product/eda-thermowood-sauna2-35m-7-7ft-4-6-people/",
+        "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/05/uc-2-1024x683.jpeg",
+        "sha256": "b8416a0fdd491dead85ec213f7683c09fa2d9d60fec1ca72a1b7416d5ab7fa56",
+        "bytes": 231761
+      },
+      {
+        "model": "bux-eke-160",
+        "publicPathUsedThere": "/images/saunas/bux-eke-160-capra.jpg",
+        "supplierProductPage": "https://caprasaunas.com/product/eke-thermowood-sauna1-6m-5-2ft-3-people/",
+        "supplierImageUrl": "https://caprasaunas.com/wp-content/uploads/2024/09/10020-4.jpg",
+        "sha256": "cd296694b6d14ca3eed36bfc2461495b8473ca9137a9ba983f9fe93673519273",
+        "bytes": 580893
+      }
+    ],
+    "agreementNote": "The two records agree where they overlap. The bundle's EKE 160 download (10020-4.jpg, cd296694...) is the same supplier file this workspace downloaded and checksummed independently. Its EDA entries come from the same product pages: the EDA 200 and EDA 235 URLs are WordPress-resized variants of page images this tree used at full size (uc-1.jpeg, uc-2.jpeg), while the shipped EDA 235 hero is the cutout built from that page's uc.png render. Neither record substitutes a family image or generated product imagery."
+  }
+}

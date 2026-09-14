@@ -132,7 +132,10 @@ const isActive = (href: string) => path === href || (href !== '/' && path.starts
   }
 
   .hdr__inner {
-    max-width: var(--shell);
+    /* The product navigation needs a wider measure than editorial page
+       content. This uses the full desktop header comfortably without
+       changing the reading width of the rest of the site. */
+    max-width: min(100%, 100rem);
     margin-inline: auto;
     padding: 0 var(--gutter);
     height: var(--hdr-h);

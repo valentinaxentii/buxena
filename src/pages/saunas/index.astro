@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import ProductFilters from '../../components/ProductFilters.astro';
 import QuoteBand from '../../components/QuoteBand.astro';
+import InquiryNotice from '../../components/InquiryNotice.astro';
 import ContinueProject from '../../components/ContinueProject.astro';
 import { getCollection } from 'astro:content';
 import { byPhotographedThenOrder, groupFamilyPhotoSeries } from '../../data/catalog';
@@ -47,10 +48,12 @@ const facets = [
   {
     key: 'material' as const,
     label: 'Material',
-    options: uniqueOptions(saunas.flatMap((s) => s.data.materials ?? [])).map((v) => ({
-      value: v.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      label: v,
-    })),
+    options: uniqueOptions(saunas.flatMap((s) => s.data.materials ?? []))
+      .filter((v) => !['nordic pinewood', 'spruce'].includes(v.toLowerCase()))
+      .map((v) => ({
+        value: v.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        label: v,
+      })),
   },
 ];
 ---
@@ -65,10 +68,10 @@ const facets = [
       <span class="eyebrow">The Range</span>
       <h1 class="display measure--tight">Every model, in one place</h1>
       <p class="lead measure">
-        Filter by location, type, series, capacity or material. Every sellable
-        size remains available; ranges that share one supplier photograph are
-        grouped so the catalogue does not repeat the same image again and again.
+        Find a sauna for your space. Filter by location, style and capacity,
+        compare your favourites, then ask us about pricing and availability.
       </p>
+      <InquiryNotice />
       <a class="plan-cta" href="/plan-your-sauna/">
         Plan Your Sauna <span class="arrow" aria-hidden="true">→</span>
       </a>
@@ -112,7 +115,7 @@ const facets = [
               tagline={card.tagline ?? s.data.tagline}
               category={s.data.category}
               placeholder={s.data.placeholder}
-              image={s.data.heroImage}
+              image={card.image ?? s.data.heroImage}
               location={s.data.location}
               productType={s.data.productType}
               series={s.data.series}

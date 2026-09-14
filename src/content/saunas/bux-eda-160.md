@@ -13,10 +13,18 @@ capacityMin: 3
 capacityMax: 4
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas-normalized/eda-thermowood-1-6m-hero.png"
-  alt: "BUX EDA 160 Thermo Pine barrel sauna exterior"
+  # VERIFIED supplier image — Capra's own photograph of the EDA 1,6 m thermowood
+  # barrel sauna (SKU TS160TRWD2-1000), taken from Capra's product page
+  # https://caprasaunas.com/product/eda-thermowood-sauna1-6m-5-2ft-3-4-people/
+  # and installed with the supplier's bytes unchanged (SHA-256
+  # 1e5fd127b1313c94509d4b4f00a2c8e50d3e22efd8ab5a124222d32c145b1ff5). Covered
+  # by the 2026-08-11 written Capra grant. It replaces a normalized copy that
+  # matched Capra's own EDA 1,6 m image only inconclusively; that copy is now on
+  # the rights blocklist and is no longer referenced anywhere.
+  # Evidence: docs/image-sources-2026-09-14.json.
+  src: "/images/saunas/eda-thermowood-1-6m-hero-capra.png"
+  alt: "BUX EDA 160 Thermo Pine barrel sauna exterior, with optional glazing and chimney"
+  fit: contain
 dimensions:
   - { label: "Depth", value: "5.2 ft (160 cm)" }
   - { label: "Width", value: "6.7 ft (205 cm)" }

@@ -1,0 +1,41 @@
+---
+/**
+ * Searchable shipping-port field used by Shipment Orders.
+ *
+ * A native datalist keeps typing available for an unusual port while offering
+ * the port names BUXENA uses most often for Baltic / European suppliers and
+ * U.S. inbound containers.
+ */
+interface Props {
+  id: string;
+  name: string;
+  label: string;
+  value?: string | null;
+}
+
+const { id, name, label, value = '' } = Astro.props;
+const ports = [
+  'Port of Tallinn, Estonia (EETLL)',
+  'Port of Riga, Latvia (LVRIX)',
+  'Port of Klaipėda, Lithuania (LTKLJ)',
+  'Port of Gdynia, Poland (PLGDY)',
+  'Port of Gdańsk, Poland (PLGDN)',
+  'Port of Hamburg, Germany (DEHAM)',
+  'Port of Rotterdam, Netherlands (NLRTM)',
+  'Port of Antwerp-Bruges, Belgium (BEANR)',
+  'Port of New York and New Jersey — Newark, NJ, USA (USNYC)',
+  'Port of Baltimore, MD, USA (USBAL)',
+  'Port of Norfolk, VA, USA (USORF)',
+  'Port of Charleston, SC, USA (USCHS)',
+  'Port of Savannah, GA, USA (USSAV)',
+  'Port of Miami, FL, USA (USMIA)',
+];
+---
+
+<label class="admin-field">
+  <span>{label}</span>
+  <input id={id} type="text" name={name} value={value} list={`${id}-options`} autocomplete="off" placeholder="Start typing a port…" />
+  <datalist id={`${id}-options`}>
+    {ports.map((port) => <option value={port} />)}
+  </datalist>
+</label>

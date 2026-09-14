@@ -3,6 +3,7 @@ import { categories } from '../data/site';
 import { displayTitle } from '../data/catalog';
 import { getCollection } from 'astro:content';
 import ProjectUpload from './ProjectUpload.astro';
+import InquiryNotice from './InquiryNotice.astro';
 import { INSTALLATION_PREFERENCES } from '../lib/product-config';
 
 interface Props {
@@ -61,6 +62,7 @@ const offeredCategories = categories.filter((c) =>
   </p>
 
   <fieldset class="qform__step" data-quote-step="capture">
+    <InquiryNotice />
     <div class="qform__grid">
       <div class="field">
         <label for="q-name">Name <span aria-hidden="true">*</span></label>
@@ -81,16 +83,6 @@ const offeredCategories = categories.filter((c) =>
         <label for="q-zip">ZIP code <span aria-hidden="true">*</span></label>
         <input id="q-zip" name="zip" type="text" inputmode="numeric" required autocomplete="postal-code" pattern="\d{5}" maxlength="5" title="Enter a valid 5-digit U.S. ZIP code." data-zip-input />
         <span class="field__hint">Delivery depends on where the sauna is going.</span>
-      </div>
-
-      <div class="field">
-        <label for="q-placement">Indoor or outdoor?</label>
-        <select id="q-placement" name="placement">
-          <option value="">No preference yet</option>
-          <option value="outdoor">Outdoor</option>
-          <option value="indoor">Indoor</option>
-          <option value="unsure">Not sure</option>
-        </select>
       </div>
 
       <div class="field">
@@ -121,17 +113,31 @@ const offeredCategories = categories.filter((c) =>
           <option value="3-6-months">3–6 months</option>
           <option value="researching">Still researching</option>
         </select>
+        <span class="field__hint">Your preference helps us check suitable options; it is not a delivery promise.</span>
+      </div>
+
+      <div class="field">
+        <label for="q-budget">Total project budget (optional)</label>
+        <select id="q-budget" name="budget" aria-describedby="q-budget-hint">
+          <option value="">Not decided / prefer not to say</option>
+          <option value="under-5k">Under $5,000</option>
+          <option value="5-10k">$5,000 – $10,000</option>
+          <option value="10-20k">$10,000 – $20,000</option>
+          <option value="20-35k">$20,000 – $35,000</option>
+          <option value="35k-plus">$35,000+</option>
+        </select>
+        <span class="field__hint" id="q-budget-hint">Your budget for the sauna, heater, delivery and site work. These ranges are not product prices.</span>
       </div>
     </div>
 
     <div class="qform__foot">
-      <button class="btn btn--bronze" type="submit">Get My Pricing</button>
+      <button class="btn btn--bronze" type="submit">Request Pricing &amp; Availability</button>
       <p class="qform__note">We use your details to answer this enquiry. Nothing else.</p>
     </div>
   </fieldset>
 
   <fieldset class="qform__step qform__detail" data-quote-step="detail" hidden>
-    <p class="qform__captured" data-quote-captured><strong>Your pricing request is in.</strong> Two more minutes of detail helps us quote the right system first time — or skip and we'll ask as we go.</p>
+    <p class="qform__captured" data-quote-captured><strong>Your inquiry is in.</strong> Add optional details to help us assess your project, or skip for now. No order has been placed.</p>
     <div class="qform__grid">
       <div class="field">
         <label for="q-capacity">People it should seat</label>
@@ -145,14 +151,24 @@ const offeredCategories = categories.filter((c) =>
       </div>
 
       <div class="field">
-        <label for="q-budget">Budget range</label>
-        <select id="q-budget" name="budget">
-          <option value="">Prefer not to say yet</option>
-          <option value="under-10k">Under $10,000</option>
-          <option value="10-20k">$10,000 – $20,000</option>
-          <option value="20-35k">$20,000 – $35,000</option>
-          <option value="35k-plus">$35,000+</option>
+        <label for="q-placement">Indoor or outdoor?</label>
+        <select id="q-placement" name="placement">
+          <option value="">No preference yet</option>
+          <option value="outdoor">Outdoor</option>
+          <option value="indoor">Indoor</option>
+          <option value="unsure">Not sure</option>
         </select>
+      </div>
+
+      <div class="field field--full">
+        <label for="q-timing-flexibility">How flexible is your timing?</label>
+        <select id="q-timing-flexibility" name="timing-flexibility">
+          <option value="">Not decided yet</option>
+          <option value="flexible">I can wait for the right sauna</option>
+          <option value="fixed-date">I have a target date — please check if it is possible</option>
+          <option value="need-guidance">I need to understand lead times first</option>
+        </select>
+        <span class="field__hint">If you have a target date, include it in the project notes below.</span>
       </div>
 
       <div class="field">
@@ -197,7 +213,7 @@ const offeredCategories = categories.filter((c) =>
     </div>
 
     <div class="qform__foot">
-      <button class="btn btn--bronze" type="button" data-quote-details-send>Add Project Details</button>
+      <button class="btn btn--bronze" type="submit" data-quote-details-send>Add Project Details</button>
       <button class="btn btn--ghost qform__skip" type="button" data-quote-skip>Skip for now →</button>
     </div>
   </fieldset>
@@ -208,8 +224,8 @@ const offeredCategories = categories.filter((c) =>
   .qform__step { border: none; margin: 0; padding: 0; }
   .qform__captured { font-size: var(--t-small); color: var(--muted); border-left: 3px solid var(--bronze); background: var(--linen-deep); padding: 0.9rem 1.2rem; margin: 0 0 1.5rem; }
   .qform__captured strong { color: var(--ink); font-weight: 600; }
-  .qform__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--form-row-gap) 1.75rem; }
-  .field { display: grid; gap: var(--form-label-gap); }.field--full { grid-column: 1 / -1; }
+  .qform__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--form-row-gap) 1.75rem; }
+  .field { display: grid; min-width: 0; gap: var(--form-label-gap); }.field--full { grid-column: 1 / -1; }
   .field label { font-size: var(--t-label); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }.field label span { color: var(--bronze-ink); font-weight: 700; }
   .field input,.field select,.field textarea { font-family: var(--font-sans); font-size: 1.0625rem; font-weight: 400; color: var(--ink); background: transparent; border: none; border-bottom: 1.5px solid var(--line); padding: 0.7rem 0; width: 100%; border-radius: 0; transition: border-color 0.4s var(--ease); }
   .field textarea { border: 1.5px solid var(--line); padding: 0.9rem 1rem; resize: vertical; line-height: 1.6; }.field select { appearance: none; cursor: pointer; }
@@ -303,16 +319,24 @@ const offeredCategories = categories.filter((c) =>
     // Step 1's enquiry id. Step 2 sends it so its answers are merged into that
     // same enquiry instead of creating a second row for the same buyer.
     let capturedEnquiryId: string | null = null;
+    let submitting = false;
+    let detailsAdded = false;
 
     form.addEventListener('focusin', () => track('quote_started', { formType: 'quote_form' }), { once: true });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (submitting || detailsAdded) return;
+      if (capturedEmail) {
+        await submitDetails();
+        return;
+      }
       if (!form.reportValidity()) return;
+      submitting = true;
       const zip = get('zip');
       const extras = [
         zip && `ZIP: ${zip}`,
-        get('placement') && `Placement: ${getLabel('placement')}`,
+        get('budget') && `Total project budget: ${getLabel('budget')}`,
         get('timeline') && `Timeline: ${getLabel('timeline')}`,
         urlPackage && `Package interest: ${urlPackage}`,
       ].filter(Boolean).join(' · ');
@@ -334,6 +358,7 @@ const offeredCategories = categories.filter((c) =>
         source: isCompare ? 'Quote Comparison' : 'Quote Form',
         botField: get('bot-field'),
       });
+      submitting = false;
 
       if (!result.ok) {
         console.error('[quote] capture failed:', result.error);
@@ -348,6 +373,7 @@ const offeredCategories = categories.filter((c) =>
         zip,
         location: get('placement'),
         timeline: get('timeline'),
+        budget: get('budget'),
         ...(urlPackage ? { package: urlPackage } : {}),
       });
       track('pricing_request_submitted', { formType: 'quote_form', model: get('model'), zip });
@@ -363,6 +389,7 @@ const offeredCategories = categories.filter((c) =>
         formType: 'quote_form',
         zip,
         timeline: get('timeline'),
+        budget: get('budget'),
       };
       if (!result.devMode) track('lead_confirmed', leadPayload);
 
@@ -376,8 +403,11 @@ const offeredCategories = categories.filter((c) =>
       form.querySelector('.form-status')?.remove();
       captureStep.hidden = true;
       detailStep.hidden = false;
+      captureBtn.type = 'button';
+      captureBtn.disabled = true;
       if (wasDevMode) showFormStatus(form, 'dev-success');
       detailStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      detailStep.querySelector<HTMLSelectElement>('select')?.focus({ preventScroll: true });
     });
 
     const finish = () => {
@@ -385,11 +415,14 @@ const offeredCategories = categories.filter((c) =>
       if (!wasDevMode) window.location.assign('/thank-you/');
     };
 
-    detailsBtn.addEventListener('click', async () => {
+    async function submitDetails() {
+      if (submitting || detailsAdded) return;
+      submitting = true;
       const details = [
         `FOLLOW-UP PROJECT DETAILS (${capturedEmail})`,
         get('capacity') && `People: ${getLabel('capacity')}`,
-        get('budget') && `Budget: ${getLabel('budget')}`,
+        get('placement') && `Placement: ${getLabel('placement')}`,
+        get('timing-flexibility') && `Timing flexibility: ${getLabel('timing-flexibility')}`,
         // Installation preference is asked here for EVERY model — including the
         // ones with no configurator — so a specialist never has to ask twice.
         get('installation') && `Installation: ${installationLabel(get('installation'))}`,
@@ -401,6 +434,7 @@ const offeredCategories = categories.filter((c) =>
 
       const originalLabel = detailsBtn.textContent ?? '';
       detailsBtn.disabled = true;
+      skipBtn.disabled = true;
       detailsBtn.textContent = 'Sending…';
 
       const result = await submitEnquiry({
@@ -419,21 +453,30 @@ const offeredCategories = categories.filter((c) =>
         appendToEnquiryId: capturedEnquiryId,
       });
 
-      detailsBtn.disabled = false;
-      detailsBtn.textContent = originalLabel || 'Add Project Details';
-
-      // Files ride along with the details step, where the upload control is.
-      await sendProjectFiles(result.enquiryId);
       if (!result.ok) {
+        submitting = false;
+        detailsBtn.disabled = false;
+        skipBtn.disabled = false;
+        detailsBtn.textContent = originalLabel || 'Add Project Details';
         showFormStatus(form, 'error');
         return;
+      }
+      // Upload only after the details were accepted. Keep the buttons locked
+      // during uploads so another click cannot append the same answers twice.
+      try {
+        await sendProjectFiles(result.enquiryId);
+      } finally {
+        submitting = false;
+        detailsAdded = true;
+        detailsBtn.textContent = 'Project details added';
+        skipBtn.disabled = false;
       }
       if (result.devMode) {
         showFormStatus(form, 'dev-success', 'Follow-up details captured too.');
         return;
       }
       finish();
-    });
+    }
 
     skipBtn.addEventListener('click', finish);
   });

@@ -38,6 +38,8 @@ export const publicEmail = site.emailConfirmed || showDev ? site.email : null;
 
 export const nav = [
   { label: 'Saunas', href: '/saunas/' },
+  { label: 'Hot Tubs', href: '/hot-tubs/' },
+  { label: 'Cold Plunges', href: '/cold-plunges/' },
   { label: 'Sauna Advisor', href: '/plan-your-sauna/' },
   { label: 'For Trade', href: '/for-trade/' },
   { label: 'Our Story', href: '/our-story/' },

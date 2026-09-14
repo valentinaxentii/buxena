@@ -1,0 +1,166 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import QuoteBand from '../../components/QuoteBand.astro';
+
+type HotTubFamily = {
+  name: string;
+  eyebrow: string;
+  image: string;
+  alt: string;
+  summary: string;
+  models: { model: string; size: string; capacity: string; detail?: string }[];
+};
+
+// Source: BUXENA Hot Tub catalogue supplied by BUXENA. Each row below is
+// transcribed from its supplier model table. Sales availability, delivered
+// configuration and final inclusions still require a project-specific quote.
+const families: HotTubFamily[] = [
+  {
+    name: 'Fiberglass Hot Tubs',
+    eyebrow: 'Fiberglass shell · Thermowood cladding',
+    image: '/images/hot-tubs/fiberglass-quattro.jpg',
+    alt: 'BUXENA fiberglass hot tub with thermowood cladding and an external stove',
+    summary: 'Eight freestanding fiberglass configurations, from a compact two-person oval to an eight-person rectangular Quattro.',
+    models: [
+      { model: 'Quattro TP217', size: '2.0 × 1.7 m', capacity: '8 people' },
+      { model: 'Octa TP24', size: '2.4 × 1.8 m', capacity: '9 people' },
+      { model: 'Octa TP82', size: '2.0 × 2.0 m', capacity: '7 people' },
+      { model: 'Octa TP8', size: '1.8 × 1.8 m', capacity: '6 people' },
+      { model: 'Round TP2V', size: 'Ø 2.0 m', capacity: '4 people', detail: 'Integrated stove' },
+      { model: 'Round TP18V', size: 'Ø 1.8 m', capacity: '3 people', detail: 'Inside stove' },
+      { model: 'Round TP18', size: 'Ø 1.8 m', capacity: '4 people', detail: 'Outside stove' },
+      { model: 'Oval TP19', size: '1.85 × 0.95 m', capacity: '2 people' },
+    ],
+  },
+  {
+    name: 'Fiberglass Liner Hot Tubs',
+    eyebrow: 'Fiberglass liner · Thermowood cladding',
+    image: '/images/hot-tubs/fiberglass-liner.jpg',
+    alt: 'BUXENA fiberglass-liner hot tub outdoors',
+    summary: 'A fiberglass-liner range with the same practical forms, specified separately from the full fiberglass shell range.',
+    models: [
+      { model: 'Liner Quattro', size: '2.0 × 1.7 m', capacity: '8 people' },
+      { model: 'Liner Octa', size: '2.4 × 1.8 m', capacity: '9 people' },
+      { model: 'Liner Octa', size: '2.0 × 2.0 m', capacity: '7 people' },
+      { model: 'Liner Octa', size: '1.8 × 1.8 m', capacity: '6 people' },
+      { model: 'Liner Round', size: 'Ø 1.8 m', capacity: '4 people' },
+      { model: 'Liner Round', size: 'Ø 1.8 m', capacity: '3 people', detail: 'Inside heater' },
+      { model: 'Liner Oval', size: '1.85 × 0.95 m', capacity: '2 people' },
+    ],
+  },
+  {
+    name: 'Wooden Hot Tubs · Outside Stove',
+    eyebrow: 'Wooden construction · External stove',
+    image: '/images/hot-tubs/wood-outside-stove.jpg',
+    alt: 'BUXENA round wooden hot tub with an external stove',
+    summary: 'Round wooden tubs offered in five diameters. The catalogue lists spruce, larch, or thermowood options.',
+    models: [
+      { model: 'LE / LL / LT16', size: 'Ø 1.6 m', capacity: '4–6 people' },
+      { model: 'LE / LL / LT18', size: 'Ø 1.8 m', capacity: '7–8 people' },
+      { model: 'LE / LL / LT20', size: 'Ø 2.0 m', capacity: '8–10 people' },
+      { model: 'LE / LL / LT22', size: 'Ø 2.2 m', capacity: '9–11 people' },
+      { model: 'LE / LL / LT24', size: 'Ø 2.4 m', capacity: '10–12 people' },
+    ],
+  },
+  {
+    name: 'Wooden Hot Tubs · Steel Liner',
+    eyebrow: 'Wooden exterior · Stainless-steel liner',
+    image: '/images/hot-tubs/wood-steel-liner.jpg',
+    alt: 'BUXENA wooden hot tub with a stainless-steel liner and an external stove',
+    summary: 'Stainless-steel-lined wooden tubs in three diameters, available with an inside or outside stove configuration.',
+    models: [
+      { model: 'LTN16', size: 'Ø 1.6 m', capacity: '3–4 people outside / 2–3 inside' },
+      { model: 'LTN18', size: 'Ø 1.8 m', capacity: '5–6 people outside / 4–5 inside' },
+      { model: 'LTN20', size: 'Ø 2.0 m', capacity: '6–8 people outside / 5–6 inside' },
+    ],
+  },
+  {
+    name: 'Wooden Hot Tubs · Inside Stove',
+    eyebrow: 'Wooden construction · Internal stove',
+    image: '/images/hot-tubs/wood-inside-stove.jpg',
+    alt: 'BUXENA round wooden hot tub with an internal stove',
+    summary: 'Five round wooden models with an internal stove. Internal stove placement reduces the usable seating capacity versus the outside-stove version.',
+    models: [
+      { model: 'LE / LL / LT16', size: 'Ø 1.6 m', capacity: '4–5 people' },
+      { model: 'LE / LL / LT18', size: 'Ø 1.8 m', capacity: '6–7 people' },
+      { model: 'LE / LL / LT20', size: 'Ø 2.0 m', capacity: '7–8 people' },
+      { model: 'LE / LL / LT22', size: 'Ø 2.2 m', capacity: '8–9 people' },
+      { model: 'LE / LL / LT24', size: 'Ø 2.4 m', capacity: '9–10 people' },
+    ],
+  },
+  {
+    name: 'Wooden Oval Hot Tubs',
+    eyebrow: 'Wooden construction · Outside stove',
+    image: '/images/hot-tubs/wood-oval.jpg',
+    alt: 'BUXENA compact oval wooden hot tub with an external stove',
+    summary: 'Compact two-person oval wooden tubs for smaller decks and patios.',
+    models: [
+      { model: 'OE / OT / OL13', size: '1.3 × 0.85 m', capacity: '2 people' },
+      { model: 'OE / OT / OL16', size: '1.6 × 1.0 m', capacity: '2 people' },
+    ],
+  },
+];
+---
+
+<BaseLayout title="Hot Tubs" description="Explore BUXENA hot tubs separately from our sauna collection — fiberglass, liner, wooden and steel-lined configurations.">
+  <section class="band band--tight intro">
+    <div class="shell">
+      <span class="eyebrow">BUXENA Hot Tubs</span>
+      <h1 class="display measure--tight">A separate hot-tub collection</h1>
+      <p class="lead measure">These are hot tubs, not saunas. Browse the supplier’s distinct fiberglass and wooden ranges, then ask us to confirm the exact configuration, stove, options and delivery for your project.</p>
+      <a class="cold-link" href="/cold-plunges/">Looking for cold plunges? <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  <section class="band band--tight catalogue">
+    <div class="shell">
+      <div class="family-grid">
+        {families.map((family) => (
+          <article class="family">
+            <img src={family.image} alt={family.alt} loading="lazy" />
+            <div class="family__body">
+              <span class="family__eyebrow">{family.eyebrow}</span>
+              <h2>{family.name}</h2>
+              <p>{family.summary}</p>
+              <div class="models" aria-label={`${family.name} available models`}>
+                {family.models.map((item) => (
+                  <div class="model">
+                    <div><strong>{item.model}</strong><span>{item.size}{item.detail ? ` · ${item.detail}` : ''}</span></div>
+                    <b>{item.capacity}</b>
+                  </div>
+                ))}
+              </div>
+              <a class="family__cta" href={`/quote/?model=${encodeURIComponent(family.name)}`} data-track="pricing_request_started" data-track-model={family.name} data-track-category="hot-tubs" data-track-form-type="hot-tub_catalogue">Request pricing <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <QuoteBand heading="Choose the right hot-tub configuration" body="Tell us the installation space, the number of bathers and whether you prefer an inside or outside stove. We will help narrow the appropriate configuration before pricing it." />
+</BaseLayout>
+
+<style>
+  .intro { padding-bottom: .9rem; }
+  .intro .lead { margin-top: .8rem; }
+  .cold-link { display: inline-block; margin-top: 1rem; color: var(--bronze-ink); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-decoration: none; text-transform: uppercase; }
+  .cold-link span { margin-left: .45rem; }
+  .catalogue { padding-top: .9rem; }
+  .family-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1rem, 2vw, 1.8rem); }
+  .family { border: 1px solid var(--line); background: var(--linen); overflow: hidden; display: flex; flex-direction: column; }
+  .family > img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+  .family__body { padding: clamp(1.25rem, 2vw, 1.8rem); display: flex; flex: 1; flex-direction: column; align-items: flex-start; }
+  .family__eyebrow { color: var(--bronze-ink); font-size: var(--t-label); font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+  h2 { font-family: var(--font-display); font-weight: 500; font-size: clamp(1.7rem, 1.3rem + 1vw, 2.25rem); line-height: 1.1; margin: .5rem 0 .7rem; }
+  .family__body > p { color: var(--muted); font-size: var(--t-small); line-height: 1.55; margin: 0 0 1rem; }
+  .models { width: 100%; border-top: 1px solid var(--line); }
+  .model { display: flex; justify-content: space-between; gap: .75rem; padding: .64rem 0; border-bottom: 1px solid var(--line); font-size: .78rem; line-height: 1.35; }
+  .model div { display: grid; gap: .12rem; }
+  .model strong { font-weight: 650; color: var(--ink); }
+  .model span { color: var(--muted); }
+  .model b { flex: 0 0 auto; text-align: right; color: var(--bronze-ink); font-weight: 650; }
+  .family__cta { margin-top: 1.15rem; color: var(--ink); font-size: .68rem; font-weight: 700; letter-spacing: .11em; text-decoration: none; text-transform: uppercase; border-bottom: 1px solid var(--bronze); padding-bottom: .38rem; }
+  .family__cta span { margin-left: .45rem; }
+  @media (max-width: 760px) { .family-grid { grid-template-columns: 1fr; } }
+</style>

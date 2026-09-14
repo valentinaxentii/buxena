@@ -3,6 +3,7 @@ export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import ModelSelect from '../../../components/admin/ModelSelect.astro';
+import { getCollection } from 'astro:content';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
@@ -21,6 +22,7 @@ let error: string | null = null;
 let notice: string | null = null;
 let actions = { supported: false, archived: false };
 let notFound = false;
+let productVisual: { src: string; alt: string } | null = null;
 
 try {
   const supabase = createSupabaseAdminClient();
@@ -90,6 +92,17 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
 }
+
+// The public catalogue is the canonical image source. Inventory contains no
+// image URL, so resolve its product name to the exact catalogue model rather
+// than assigning a similar family picture.
+if (record?.products?.model_name) {
+  const catalogModel = (await getCollection('saunas')).find(
+    (entry) => entry.data.title === record.products.model_name
+  );
+  const hero = catalogModel?.data.heroImage;
+  if (hero?.src && hero.alt) productVisual = { src: hero.src, alt: hero.alt };
+}
 // Archive state for the actions block. Resolved after the record loads and
 // kept out of the main try so a failure here can never mask the record itself.
 try {
@@ -120,7 +133,8 @@ function money(n: number | null | undefined): string {
 
   {record && (
     <>
-      <form class="admin-form" method="POST">
+      <div class="inventory-detail">
+      <form class="admin-form inventory-detail__form" method="POST">
         <label class="admin-field"><span>Sauna Model *</span>
           <ModelSelect id="inv-product-select" name="product_id" products={products} value={record.product_id} />
         </label>
@@ -165,12 +179,52 @@ function money(n: number | null | undefined): string {
         </div>
       </form>
 
+      <aside class="inventory-product-visual" aria-label="Product image">
+        {productVisual ? (
+          <img src={productVisual.src} alt={productVisual.alt} />
+        ) : (
+          <p>No approved catalogue image is available for this model.</p>
+        )}
+      </aside>
+      </div>
+
     </>
   )}
 </AdminLayout>
 
 <style>
   .notice--error { padding: 0.85rem 1rem; font-size: 0.85rem; color: #e6b7a0; background: rgba(230, 130, 90, 0.06); border: 1px solid rgba(230, 130, 90, 0.35); border-radius: 2px; }
+  .inventory-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 52rem) minmax(17rem, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+  .inventory-detail__form { max-width: none; }
+  .inventory-product-visual {
+    position: sticky;
+    top: 1.5rem;
+    display: grid;
+    place-items: center;
+    min-height: 22rem;
+    padding: 1.5rem;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 3px;
+  }
+  .inventory-product-visual img {
+    display: block;
+    width: 100%;
+    max-width: 30rem;
+    max-height: 31rem;
+    object-fit: contain;
+  }
+  .inventory-product-visual p { margin: 0; color: var(--admin-muted); font-size: 0.85rem; text-align: center; }
+  @media (max-width: 1000px) {
+    .inventory-detail { grid-template-columns: 1fr; }
+    .inventory-product-visual { position: static; min-height: 14rem; }
+    .inventory-product-visual img { max-height: 20rem; }
+  }
 </style>
 
 <script>

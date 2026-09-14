@@ -1,7 +1,8 @@
 /**
- * Report every sauna hero image that is not backed by genuine transparency,
- * plus any card still forced to cover. This complements image-integrity.mjs:
- * integrity proves paths resolve; this script proves card assets have alpha.
+ * Report every sauna hero image that has neither genuine transparency nor a
+ * verified uniform BUXENA linen studio background, plus any card still forced
+ * to cover. Both treatments are visually clear and intentional; scene photos,
+ * checkerboards and accidental white rectangles are not.
  */
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -23,6 +24,7 @@ for (const file of files) {
   const diskPath = path.join(publicDir, src.replace(/^\//, ''));
   const metadata = await sharp(diskPath).metadata();
   let transparentPercent = 0;
+  let hasUniformLinenBackground = false;
 
   if (metadata.hasAlpha) {
     const { data } = await sharp(diskPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -33,7 +35,27 @@ for (const file of files) {
     transparentPercent = (transparent / (data.length / 4)) * 100;
   }
 
-  if (transparentPercent < 0.1 || fit === 'cover') {
+  if (transparentPercent < 0.1) {
+    const { data, info } = await sharp(diskPath).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const points = [
+      [0, 0], [info.width - 1, 0], [0, info.height - 1], [info.width - 1, info.height - 1],
+      [10, 10], [info.width - 11, 10], [10, info.height - 11], [info.width - 11, info.height - 11],
+    ];
+    const samples = points.map(([x, y]) => {
+      const index = (y * info.width + x) * 3;
+      return [data[index], data[index + 1], data[index + 2]];
+    });
+    const average = [0, 1, 2].map((channel) =>
+      samples.reduce((sum, sample) => sum + sample[channel], 0) / samples.length
+    );
+    const maxDelta = Math.max(...samples.flatMap((sample) =>
+      sample.map((value, channel) => Math.abs(value - average[channel]))
+    ));
+    const isWarmLightLinen = average[0] >= 235 && average[1] >= 228 && average[2] >= 218;
+    hasUniformLinenBackground = isWarmLightLinen && maxDelta <= 8;
+  }
+
+  if ((transparentPercent < 0.1 && !hasUniformLinenBackground) || fit === 'cover') {
     findings.push({
       title,
       file,

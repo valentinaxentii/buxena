@@ -1,5 +1,17 @@
 # BUXENA V2 — Release Candidate Status
 
+**Current checkpoint — September 14, 2026:** see
+[Inquiry launch checkpoint](docs/demand-test-v2-checkpoint.md). The current
+direction is a free-inquiry demand test before committing to inventory.
+At this state the pre-launch board is **25/25 GREEN**, image integrity and image
+rights pass, and the desktop/390 px inquiry journey is verified **26/26** in a
+real browser (`npm run qa:flow`, safe mode). Nothing deployed; main/V1 untouched.
+Still open and founder-only: the ULLA catalogue decision, the paid-advertising /
+VIRU-NORD permission gaps, live CRM + mail delivery, exact public prices, and
+approval to publish.
+
+**The August 13 results below are historical, not the current launch status.**
+
 Last updated **2026-08-13**. Branch **`buxena-v2`**.
 **Nothing deployed. `main` / V1 untouched at `e3b457d`.**
 

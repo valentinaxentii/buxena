@@ -21,7 +21,7 @@ dimensions:
   - { label: "Steam room", value: "10.5 ft (321 cm)" }
   - { label: "Changing room", value: "6.4 ft (195.5 cm)" }
   - { label: "Terrace", value: "2 ft (60 cm)" }
-  - { label: "Wall thickness", value: "1.8 in (45 mm)" }
+  - { label: "Front & back wall thickness", value: "1.8 in (45 mm)" }
 specs:
   - { label: "Layout", value: "Terrace + changing room + steam room" }
   - { label: "Benches", value: "Black alder" }

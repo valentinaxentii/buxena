@@ -21,10 +21,23 @@ const { facets } = Astro.props;
 ---
 
 <div class="pfilters" data-filters>
-  <button class="pfilters__trigger" type="button" data-filter-open>
-    Filter
-    <span class="pfilters__count" data-filter-count hidden></span>
-  </button>
+  <div class="pfilters__tools" role="search" aria-label="Search the sauna range">
+    <label class="pfilters__search">
+      <span class="pfilters__search-label">Find a model</span>
+      <input
+        type="search"
+        data-filter-search
+        placeholder="Search model, series or material"
+        autocomplete="off"
+      />
+      <button class="pfilters__clear" type="button" data-filter-search-clear hidden aria-label="Clear search">Clear</button>
+    </label>
+
+    <button class="pfilters__trigger" type="button" data-filter-open>
+      Filter
+      <span class="pfilters__count" data-filter-count hidden></span>
+    </button>
+  </div>
 
   {/* Below 900px this panel becomes a full-screen overlay, so it carries
       dialog semantics. On desktop it is inline content and the role is
@@ -65,7 +78,60 @@ const { facets } = Astro.props;
   /* Tightened 2026-08-14 — shared across all 5 catalogue pages that use this
      component, so this is a genuine cross-page consistency improvement, not
      a one-off override. */
-  .pfilters { position: relative; margin-bottom: clamp(0.9rem, 0.5rem + 1vw, 1.5rem); }
+  .pfilters { position: relative; margin-bottom: clamp(0.75rem, 0.4rem + 0.8vw, 1.15rem); }
+
+  .pfilters__tools {
+    display: flex;
+    justify-content: flex-end;
+    align-items: end;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+  }
+  .pfilters__search {
+    display: grid;
+    grid-template-columns: auto minmax(10rem, 17rem) auto;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 2.65rem;
+    padding: 0 0.15rem 0 0.75rem;
+    border: 1px solid var(--line);
+    background: var(--linen);
+  }
+  .pfilters__search:focus-within { border-color: var(--ink); }
+  .pfilters__search-label {
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bronze-ink);
+    white-space: nowrap;
+  }
+  .pfilters__search input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.8125rem;
+  }
+  .pfilters__search input::placeholder { color: var(--muted); opacity: 1; }
+  .pfilters__clear {
+    min-height: 2.2rem;
+    padding: 0 0.55rem;
+    border: 0;
+    background: transparent;
+    color: var(--bronze-ink);
+    cursor: pointer;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .pfilters__clear:hover { color: var(--ink); }
 
   .pfilters__trigger {
     display: none;
@@ -93,31 +159,37 @@ const { facets } = Astro.props;
   }
 
   .pfilters__groups {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    display: grid;
+    gap: 0.55rem;
   }
 
-  .pfilters__group { display: grid; gap: 0.5rem; }
+  .pfilters__group {
+    display: grid;
+    grid-template-columns: 4.1rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.65rem;
+  }
 
   .pfilters__label {
-    font-size: var(--t-label);
+    padding-top: 0.48rem;
+    font-size: 0.64rem;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
   }
 
-  .pfilters__chips { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .pfilters__chips { display: flex; flex-wrap: wrap; gap: 0.38rem; }
 
   .chip {
     display: inline-flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: 0.35rem;
     background: none;
     border: 1px solid var(--line);
-    padding: 0.6rem 1.1rem;
-    font-size: 0.875rem;
+    min-height: 2.25rem;
+    padding: 0.42rem 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     cursor: pointer;
@@ -133,6 +205,9 @@ const { facets } = Astro.props;
   .pfilters__scrim[hidden] { display: none; }
 
   @media (max-width: 900px) {
+    .pfilters__tools { justify-content: stretch; align-items: stretch; }
+    .pfilters__search { flex: 1 1 auto; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .pfilters__search-label { display: none; }
     .pfilters__trigger { display: inline-flex; }
 
     .pfilters__panel {
@@ -146,6 +221,11 @@ const { facets } = Astro.props;
       transform: translateX(100%);
       transition: transform 0.4s var(--ease);
     }
+    .pfilters__groups { gap: 0.9rem; }
+    .pfilters__group { grid-template-columns: 1fr; gap: 0.42rem; }
+    .pfilters__label { padding-top: 0; }
+    .pfilters__chips { gap: 0.5rem; }
+    .chip { min-height: 2.6rem; padding: 0.55rem 0.9rem; font-size: 0.8125rem; }
     .pfilters.is-open .pfilters__panel { transform: translateX(0); }
 
     .pfilters__head {
@@ -194,12 +274,15 @@ const { facets } = Astro.props;
     const scrim = root.querySelector<HTMLElement>('[data-filter-scrim]');
     const countEl = root.querySelector<HTMLElement>('[data-filter-count]');
     const chips = root.querySelectorAll<HTMLButtonElement>('.chip');
+    const searchInput = root.querySelector<HTMLInputElement>('[data-filter-search]');
+    const clearSearch = root.querySelector<HTMLButtonElement>('[data-filter-search-clear]');
 
     const grid = document.querySelector<HTMLElement>('[data-product-grid]');
     const cards = grid ? Array.from(grid.querySelectorAll<HTMLElement>('.pcard')) : [];
     const emptyEl = document.querySelector<HTMLElement>('[data-empty]');
 
     const active: Record<string, string> = {};
+    let searchQuery = '';
 
     /**
      * The mobile panel is a full-screen overlay, so it needs the same
@@ -246,11 +329,13 @@ const { facets } = Astro.props;
     const applyFilters = () => {
       let shown = 0;
       cards.forEach((card) => {
-        const match = Object.entries(active).every(([facet, value]) => {
+        const facetMatch = Object.entries(active).every(([facet, value]) => {
           if (!value) return true;
           const tokens = (card.dataset[facet] ?? '').split(' ').filter(Boolean);
           return tokens.includes(value);
         });
+        const searchMatch = !searchQuery || (card.dataset.search ?? '').includes(searchQuery);
+        const match = facetMatch && searchMatch;
         card.hidden = !match;
         if (match) shown++;
       });
@@ -279,6 +364,20 @@ const { facets } = Astro.props;
       });
     });
 
+    searchInput?.addEventListener('input', () => {
+      searchQuery = searchInput.value.trim().toLowerCase();
+      if (clearSearch) clearSearch.hidden = !searchQuery;
+      applyFilters();
+    });
+    clearSearch?.addEventListener('click', () => {
+      if (!searchInput) return;
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearch.hidden = true;
+      searchInput.focus();
+      applyFilters();
+    });
+
     // "Reset Filters" (e.g. in the no-results state): every group back to
     // All, grid restored. Lives outside the component's own markup so the
     // page can place it beside its empty message.
@@ -290,6 +389,9 @@ const { facets } = Astro.props;
           c.classList.toggle('is-on', on);
           c.setAttribute('aria-pressed', String(on));
         });
+        if (searchInput) searchInput.value = '';
+        searchQuery = '';
+        if (clearSearch) clearSearch.hidden = true;
         applyFilters();
       });
     });

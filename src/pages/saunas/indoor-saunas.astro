@@ -29,10 +29,12 @@ const facets = [
   {
     key: 'material' as const,
     label: 'Material',
-    options: uniqueOptions(models.flatMap((s) => s.data.materials ?? [])).map((v) => ({
-      value: v.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      label: v,
-    })),
+    options: uniqueOptions(models.flatMap((s) => s.data.materials ?? []))
+      .filter((v) => !['nordic pinewood', 'spruce'].includes(v.toLowerCase()))
+      .map((v) => ({
+        value: v.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        label: v,
+      })),
   },
 ];
 ---

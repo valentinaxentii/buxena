@@ -6,6 +6,9 @@ productType: "Cube"
 series: "UKU"
 tagline: "The rounded cube, 130cm depth"
 summary: "A Capra UKU rounded-cube sauna, 130cm depth."
+capacity: "3–4 people"
+capacityMin: 3
+capacityMax: 4
 order: 65
 placeholder: false
 materials: ["Nordic Spruce", "Thermo Pine"]
@@ -34,9 +37,7 @@ options: ["Full glass front", "Half-moon rear glass", "Exterior finish: Natural 
 delivery: "Contact us for details"
 ------
 
-The shortest depth in Capra's UKU rounded-cube line. Available in Nordic
-Spruce or Thermo Pine.
+The shortest depth in Capra's UKU rounded-cube line, comfortably seating
+three to four people. Available in Nordic Spruce or Thermo Pine.
 
-Exact seating capacity and heater kW are confirmed with you before ordering
-— Capra has not published a per-SKU spec sheet for this depth (unlike UKU
-160 and UKU 230, which have one each).
+Heater kW is confirmed with your quote.

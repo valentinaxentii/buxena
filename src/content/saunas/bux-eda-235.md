@@ -13,11 +13,16 @@ capacityMin: 4
 capacityMax: 6
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
-  src: "/images/saunas-normalized/eda-thermowood-2-35m-transparent.png"
+  # VERIFIED supplier images for EDA 2,35 m thermowood (SKU S235TRWD2-1000),
+  # taken from Capra's product page
+  # https://caprasaunas.com/product/eda-thermowood-sauna2-35m-7-7ft-4-6-people/
+  # on 2026-09-14: the hero is Capra's render, cut out locally; the gallery
+  # photo below is Capra's own product photo, content-match verified. Both are
+  # Capra-supplied material under the 2026-08-11 written grant.
+  src: "/images/saunas/eda-thermowood-2-35m-hero-capra.png"
   alt: "BUX EDA 235 Thermo Pine barrel sauna exterior"
 gallery:
+  # Content-match verified against Capra's product-page photo, 2026-09-14.
   - src: "/images/saunas/eda-thermowood-2-35m-hero.jpeg"
     alt: "BUX EDA 235 Thermo Pine barrel sauna installed on a garden patio"
     fit: "cover"

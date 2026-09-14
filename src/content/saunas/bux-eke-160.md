@@ -8,15 +8,22 @@ tagline: "The EKE cube, 160cm depth"
 summary: "A Capra EKE outdoor cube sauna, 160cm depth."
 order: 310
 placeholder: false
+capacity: "3 people"
+capacityMin: 3
+capacityMax: 3
 materials: ["Nordic Spruce", "Thermo Pine"]
 heroImage:
-  # EXACT MODEL IMAGE — Capra's live EKE 160 product page identifies this
-  # configuration as EKE 160 (SKU EK160TRWD2-1000). The image is served from
-  # Capra's own linked Drive asset rather than reusing the generic EKE family
-  # render. Keep this mapped only to EKE 160.
-  src: "https://drive.google.com/thumbnail?id=1eE-7IM6AzESa5GFA4L0oSwF_iI4tJtsj&sz=w1200"
-  alt: "BUX EKE 160 outdoor thermowood cube sauna"
-  fit: cover
+  # EXACT MODEL — Capra's own photograph of the EKE 160 (1,6 m) thermowood cube
+  # sauna, published on Capra's product page for SKU EK160TRWD2-1000:
+  # https://caprasaunas.com/product/eke-thermowood-sauna1-6m-5-2ft-3-people/
+  # Downloaded 2026-09-14 (image 10026-3.jpg, 2048x2048) and cut out onto a
+  # transparent background locally for catalogue consistency. Permission: the
+  # 2026-08-11 written Capra grant covering all Capra-supplied product images
+  # for US/Canada marketing. The earlier shared EKE-series catalogue cutout is
+  # left on disk, unreferenced. Evidence: docs/image-rights-register.md.
+  src: "/images/saunas-normalized/bux-eke-160-exact-cutout.png"
+  alt: "BUX EKE 160 outdoor cube sauna in thermowood, 160 cm depth"
+  fit: contain
 dimensions:
   - { label: "Depth", value: "5.2 ft (160 cm)" }
   - { label: "Width", value: "6.9 ft (210 cm)" }

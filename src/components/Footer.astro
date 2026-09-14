@@ -38,9 +38,23 @@ const year = new Date().getFullYear();
         </div>
 
         <div>
+          <h2 class="ftr__h">Hot Tubs</h2>
+          <ul>
+            <li><a href="/hot-tubs/">Explore Hot Tubs</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 class="ftr__h">Cold Plunges</h2>
+          <ul>
+            <li><a href="/cold-plunges/">Explore Cold Plunges</a></li>
+          </ul>
+        </div>
+
+        <div>
           <h2 class="ftr__h">Explore</h2>
           <ul>
-            {nav.map((n) => (
+            {nav.filter((n) => n.href !== '/cold-plunges/').map((n) => (
               <li><a href={n.href}>{n.label}</a></li>
             ))}
             <li><a href="/how-buying-works/">How Buying Works</a></li>
@@ -124,7 +138,11 @@ const year = new Date().getFullYear();
 
   .ftr__top {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
+    /* Five navigation groups now live beside the logo. Give that group the
+       majority of the row so Enquiries does not wrap underneath Saunas and
+       create a large, empty second footer row. This single shared component
+       is rendered by every public page. */
+    grid-template-columns: minmax(11rem, 0.72fr) minmax(0, 2.28fr);
     gap: var(--footer-col-gap);
     margin-bottom: var(--footer-row-gap);
   }
@@ -142,8 +160,8 @@ const year = new Date().getFullYear();
 
   .ftr__cols {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: clamp(1.1rem, 0.45rem + 1.95vw, 2.25rem);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: clamp(0.8rem, 0.35rem + 1.2vw, 1.5rem);
   }
 
   .ftr__h {
@@ -248,6 +266,10 @@ const year = new Date().getFullYear();
 
   @media (max-width: 860px) {
     .ftr__top { grid-template-columns: 1fr; }
+    .ftr__cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 680px) {
+    .ftr__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 560px) {
     /* RESET 2026-08-14: original 2.25rem, now 2rem (×0.89) — was 1.6rem. */

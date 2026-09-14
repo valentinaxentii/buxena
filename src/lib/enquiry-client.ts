@@ -16,6 +16,8 @@
  * Supabase, SMTP and Telegram credentials live exclusively server-side.
  */
 
+import { inquiryAttribution } from './enquiry-attribution';
+
 export interface EnquiryResult {
   ok: boolean;
   devMode?: boolean;
@@ -25,23 +27,7 @@ export interface EnquiryResult {
 }
 
 export async function submitEnquiry(payload: Record<string, unknown>): Promise<EnquiryResult> {
-  // Captured only at submission time, not across visits. Query-string values
-  // are limited to standard campaign keys so CRM users see useful attribution
-  // without storing arbitrary URL parameters or a visitor's full referrer URL.
-  const params = new URLSearchParams(window.location.search);
-  const attribution = {
-    landingPath: `${window.location.pathname}${window.location.search}`,
-    referrerHost: (() => {
-      try { return document.referrer ? new URL(document.referrer).hostname : ''; }
-      catch { return ''; }
-    })(),
-    utmSource: params.get('utm_source') ?? '',
-    utmMedium: params.get('utm_medium') ?? '',
-    utmCampaign: params.get('utm_campaign') ?? '',
-    utmContent: params.get('utm_content') ?? '',
-    utmTerm: params.get('utm_term') ?? '',
-  };
-  const enrichedPayload = { ...payload, attribution };
+  const enrichedPayload = { ...payload, attribution: inquiryAttribution() };
 
   const emit = (event: 'form_success' | 'form_error', extra: Record<string, unknown> = {}) => {
     window.dataLayer = window.dataLayer || [];

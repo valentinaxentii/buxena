@@ -16,3 +16,15 @@ astro.qa.config.mjs
 design-qa.md
 design-qa-assets/
 output/
+
+# Local QA/probing scratch — deliberately not part of the site or its launch
+# commit. The durable records live in docs/ (image trace, source manifest,
+# checkpoint); scripts/browser-flow-qa.mjs is the checked-in flow QA.
+.codex-*.log
+.tmp-*/
+_unreadable-onedrive-files/
+deno.lock
+tmp/
+purchase-panel-*.png
+search-catalogue.png
+scripts/__pycache__/

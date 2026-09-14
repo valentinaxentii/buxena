@@ -4,6 +4,7 @@ import { publicAssets } from '../lib/product-assets';
 import type { TechnicalAssets } from '../lib/product-assets';
 import { displayTitle } from '../data/catalog';
 import { readHeaterFacts } from '../lib/heater-options';
+import { viruDetailsFor } from '../data/viru-catalog-details';
 
 /**
  * Technical specification sheet + verified resources for every sauna model.
@@ -13,20 +14,25 @@ import { readHeaterFacts } from '../lib/heater-options';
  * globally without duplicating markup across 30+ product pages.
  *
  * FACTUAL INTEGRITY: only values already present in the model's verified content
- * are rendered. Unit columns are split only when both systems are explicitly
- * present in the source string. Nothing is calculated or guessed.
+ * are rendered. Existing dual-unit values are preserved exactly. When the
+ * supplier provides metric only, the missing imperial value is calculated here
+ * with standard unit factors and labelled "Approx." so no false precision is
+ * introduced.
  */
 interface Props {
   assets?: TechnicalAssets;
   /** Internal model title, for analytics and content lookup. */
   model: string;
+  /** Content slug used to connect an exact supplier catalogue sheet. */
+  slug?: string;
 }
-const { assets, model } = Astro.props;
+const { assets, model, slug } = Astro.props;
 
 const resources = publicAssets(assets);
 const saunaEntries = await getCollection('saunas', ({ data }) => !data.draft);
 const product = saunaEntries.find((entry) => entry.data.title === model);
 const data = product?.data;
+const catalogue = slug ? viruDetailsFor(slug) : undefined;
 
 function stripOuterParens(value: string): string {
   return value.replace(/^\s*\(|\)\s*$/g, '').trim();
@@ -34,9 +40,49 @@ function stripOuterParens(value: string): string {
 
 function unitSystem(value: string): 'metric' | 'imperial' | null {
   const v = value.toLowerCase();
-  if (/\b(mm|cm|kg|m³|m2|m²|kw)\b/.test(v)) return 'metric';
+  if (/(?:\b(?:mm|cm|kg|m3|m2|m|kw)\b|m[²³])/.test(v)) return 'metric';
   if (/\b(in|inch|inches|lb|lbs|ft|sq ft|cu ft)\b/.test(v) || /\d+\s*[′']/u.test(v)) return 'imperial';
   return null;
+}
+
+function formatConverted(value: number, digits = 1): string {
+  const rounded = Number(value.toFixed(digits));
+  return Number.isInteger(rounded)
+    ? rounded.toLocaleString('en-US')
+    : rounded.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: digits });
+}
+
+/** Calculate an imperial companion only for a clearly metric source value. */
+function calculatedImperial(value: string, label: string): string {
+  const match = value.match(/^(.+?)\s*(mm|cm|kg|m3|m³|m2|m²|m)(?=\s|,|$)(.*)$/i);
+  if (!match) return '';
+
+  const [, metricNumbers, rawUnit, trailing] = match;
+  const unit = rawUnit.toLowerCase();
+  const compactCentimetres = /bench|seat|table|door|window|thickness/i.test(label);
+  const conversion = unit === 'mm'
+    ? { factor: 1 / 25.4, suffix: 'in', digits: 1 }
+    : unit === 'cm' && compactCentimetres
+      ? { factor: 1 / 2.54, suffix: 'in', digits: 1 }
+      : unit === 'cm'
+        ? { factor: 1 / 30.48, suffix: 'ft', digits: 1 }
+        : unit === 'kg'
+          ? { factor: 2.2046226218, suffix: 'lb', digits: 0 }
+          : unit === 'm3' || unit === 'm³'
+            ? { factor: 35.3146667, suffix: 'cu ft', digits: 1 }
+            : unit === 'm2' || unit === 'm²'
+              ? { factor: 10.7639104, suffix: 'sq ft', digits: 1 }
+              : { factor: 3.280839895, suffix: 'ft', digits: 1 };
+
+  let convertedAny = false;
+  const converted = metricNumbers.replace(/\d[\d,]*(?:\.\d+)?/g, (token) => {
+    const parsed = Number(token.replace(/,/g, ''));
+    if (!Number.isFinite(parsed)) return token;
+    convertedAny = true;
+    return formatConverted(parsed * conversion.factor, conversion.digits);
+  });
+  if (!convertedAny) return '';
+  return `Approx. ${converted.trim()} ${conversion.suffix}${trailing}`.replace(/\s+,/g, ',');
 }
 
 /**
@@ -47,9 +93,15 @@ function unitSystem(value: string): 'metric' | 'imperial' | null {
  * both systems, keep it intact in a neutral Value column rather than
  * manufacturing a conversion.
  */
-function splitVerifiedUnits(value: string) {
+function splitVerifiedUnits(value: string, label: string) {
   const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*(.*)$/);
-  if (!match) return { metric: '', imperial: '', value };
+  if (!match) {
+    if (unitSystem(value) === 'metric') {
+      const imperial = calculatedImperial(value, label);
+      if (imperial) return { metric: value, imperial, value: '' };
+    }
+    return { metric: '', imperial: '', value };
+  }
 
   const first = match[1].trim();
   const second = stripOuterParens(match[2]);
@@ -74,7 +126,7 @@ function splitVerifiedUnits(value: string) {
  * states something about it — electric/wood compatibility is never assumed,
  * and an unstated fuel gets no row at all rather than a guessed ✕.
  */
-const heaterFacts = readHeaterFacts(data?.heaterOptions);
+const heaterFacts = readHeaterFacts(data?.heaterOptions ?? catalogue?.heaterOptions);
 const heaterCompatRows = heaterFacts.unknown
   ? []
   : [
@@ -105,7 +157,7 @@ const technicalRows = data
         .map((row) => ({ label: row.label, raw: row.value })),
       ...(data.materials?.length ? [{ label: 'Material', raw: data.materials.join(', ') }] : []),
       ...(data.delivery ? [{ label: 'Delivery', raw: data.delivery }] : []),
-    ].map((row) => ({ ...row, ...splitVerifiedUnits(row.raw) }))
+    ].map((row) => ({ ...row, ...splitVerifiedUnits(row.raw, row.label) }))
   : [];
 
 const hasTechnicalSheet = technicalRows.length > 0 || heaterCompatRows.length > 0;
@@ -196,6 +248,51 @@ function minutes(seconds?: number): string {
                   </table>
                 </div>
               )}
+
+              {catalogue && (
+                <div class="catalogue-details">
+                  <div class="catalogue-details__head">
+                    <span class="eyebrow">Included & configurable</span>
+                    <h3>Complete model information</h3>
+                  </div>
+
+                  <div class="catalogue-details__top">
+                    <section class="catalogue-details__included">
+                      <h4>Basic set includes</h4>
+                      <ul>{catalogue.basicSet.map((item) => <li>{item}</li>)}</ul>
+                    </section>
+
+                    <dl class="catalogue-details__choices">
+                      <div>
+                        <dt>Wood</dt>
+                        <dd>{catalogue.woodOptions.join(' / ')}</dd>
+                      </div>
+                      <div>
+                        <dt>Heater choices</dt>
+                        <dd>{catalogue.heaterOptions.join(' / ')}</dd>
+                      </div>
+                      <div>
+                        <dt>Delivery choices</dt>
+                        <dd>{catalogue.deliveryOptions.join(' / ')}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  {catalogue.accessories.length > 0 && (
+                    <div class="catalogue-details__accessories">
+                      <h4>Additional equipment and accessories</h4>
+                      <div class="catalogue-details__grid">
+                        {catalogue.accessories.map((group) => (
+                          <section>
+                            <h5>{group.label}</h5>
+                            <ul>{group.items.map((item) => <li>{item}</li>)}</ul>
+                          </section>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {drawingResources.length > 0 && (
@@ -222,7 +319,7 @@ function minutes(seconds?: number): string {
             )}
           </div>
 
-          <p class="techsheet__note">Only supplier-verified information is shown. Final heater, electrical, site and delivery requirements are confirmed with your written quote.</p>
+          <p class="techsheet__note">Only supplier-verified information is shown. Imperial values labelled “Approx.” are calculated from the supplier's metric measurements. Final heater, electrical, site and delivery requirements are confirmed with your written quote.</p>
         </div>
       )}
 
@@ -376,6 +473,80 @@ function minutes(seconds?: number): string {
   .techsheet__mark.is-yes { color: var(--bronze-ink); }
   .techsheet__mark.is-no { color: var(--muted); }
   .techsheet__compatnote { color: var(--muted); }
+  .catalogue-details {
+    margin-top: clamp(1.4rem, 1rem + 1vw, 2.2rem);
+    padding-top: clamp(1.2rem, 0.9rem + 0.8vw, 1.8rem);
+    border-top: 1px solid var(--line);
+  }
+  .catalogue-details__head h3 {
+    margin: 0.2rem 0 0;
+    font-family: var(--serif);
+    font-size: clamp(1.35rem, 1.05rem + 0.8vw, 1.8rem);
+    font-weight: 400;
+  }
+  .catalogue-details h4,
+  .catalogue-details h5 {
+    margin: 0;
+    color: var(--bronze-ink);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .catalogue-details__top {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
+    gap: clamp(1rem, 2vw, 2rem);
+    margin-top: 1rem;
+  }
+  .catalogue-details__included,
+  .catalogue-details__choices,
+  .catalogue-details__grid section {
+    padding: 1rem;
+    border: 1px solid var(--line);
+    background: var(--linen-deep);
+  }
+  .catalogue-details ul {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0.7rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+  .catalogue-details li { position: relative; padding-left: 0.85rem; }
+  .catalogue-details li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--bronze-ink);
+  }
+  .catalogue-details__choices { margin: 0; }
+  .catalogue-details__choices div + div {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .catalogue-details__choices dt {
+    color: var(--bronze-ink);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .catalogue-details__choices dd {
+    margin: 0.25rem 0 0;
+    color: var(--ink);
+    font-size: 0.82rem;
+  }
+  .catalogue-details__accessories { margin-top: 1rem; }
+  .catalogue-details__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.65rem;
+  }
   .techsheet__drawings {
     display: grid;
     gap: 0.55rem;
@@ -492,6 +663,7 @@ function minutes(seconds?: number): string {
     .techsheet__head { align-items: flex-start; }
     .techsheet__table { min-width: 38rem; }
     .techsheet__panel { padding: 1rem; }
+    .catalogue-details__top { grid-template-columns: 1fr; }
   }
 </style>
 

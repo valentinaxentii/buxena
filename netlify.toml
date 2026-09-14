@@ -5,6 +5,16 @@
 [build.environment]
   NODE_VERSION = "22.12.0"
 
+# Local development must proxy the server-rendered admin and API routes.
+# Astro otherwise binds its auto-detected local server to IPv6 (::1), while
+# the founder's browser uses 127.0.0.1. Keep Astro on its internal IPv4 port
+# and let Netlify Dev own the familiar 127.0.0.1:4321 address.
+[dev]
+  command = "npm run dev -- --host 127.0.0.1 --port 4322"
+  targetPort = 4322
+  port = 4321
+  framework = "#custom"
+
 # ---------------------------------------------------------------------------
 # EVERY NON-PRODUCTION DEPLOY IS SAFE BY DEFAULT
 # ---------------------------------------------------------------------------

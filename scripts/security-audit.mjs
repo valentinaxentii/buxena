@@ -66,7 +66,7 @@ check(
       /createSignedUrl/.test(read('src/lib/document-access.ts')) &&
       /signDocumentUrls/.test(read('src/pages/admin/enquiries/[id].astro')))
 );
-check('password reset requests are locally rate limited', forgotPassword.includes('password-reset:') && forgotPassword.includes('checkRateLimit'));
+check('automatic password reset emails are disabled', !forgotPassword.includes('resetPasswordForEmail') && forgotPassword.includes('Automatic reset emails are disabled'));
 check('security-definer view hardened', hardening.includes('alter view public.orders_with_margin set (security_invoker = true)'));
 check('anon cannot execute document numbering', hardening.includes('issue_document_number(uuid) from public, anon, authenticated'));
 check('anon cannot execute inventory issuance', hardening.includes('issue_inventory_unit(uuid, uuid, uuid, numeric, text) from public, anon, authenticated'));

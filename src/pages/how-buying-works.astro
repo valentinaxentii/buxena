@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import InquiryNotice from '../components/InquiryNotice.astro';
 
 /**
  * How Buying Works — the commercial journey from shortlist to installed
@@ -20,22 +21,22 @@ const steps = [
   {
     n: '02',
     title: 'Request pricing',
-    body: 'Tell us about your project — or send us another quote you have received and we will help you compare it item by item.',
+    body: 'Send a free inquiry for your chosen model, or ask us to help you choose. Share your delivery ZIP code, budget and preferred timing. No payment is taken.',
   },
   {
     n: '03',
     title: 'We review your project',
-    body: 'A BUXENA specialist checks your space, access, power and heater fit before anything is priced.',
+    body: 'We check model availability and review your space, access, power and heater requirements. If a model or timing does not fit, we discuss alternatives.',
   },
   {
     n: '04',
     title: 'Your written quote',
-    body: 'Itemized so you can see exactly what is included — the sauna, the matched heater and components, and delivery as its own line.',
+    body: 'Once supply and configuration are confirmed, review an itemized quote covering the sauna, heater and components, delivery, exclusions and estimated timing.',
   },
   {
     n: '05',
     title: 'Order confirmation',
-    body: 'You confirm your order in writing, with payment details provided alongside your quote. Nothing is ordered until you confirm.',
+    body: 'An inquiry does not reserve stock or place an order. Any order requires your written agreement to the confirmed specification, price, estimated timing and payment and cancellation terms.',
   },
   {
     n: '06',
@@ -62,6 +63,7 @@ const steps = [
         Seven steps, in order — so you know exactly what happens from the
         first look to the first heat.
       </p>
+      <InquiryNotice />
     </div>
   </section>
 

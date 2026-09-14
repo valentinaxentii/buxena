@@ -13,8 +13,11 @@ capacityMin: 2
 capacityMax: 3
 materials: ["Thermo Pine"]
 heroImage:
-  # Exact-depth BUXENA asset restored 2026-08-16 instead of the generic
-  # EDA family image. Provenance/usage remains governed by the image-rights register.
+  # VERIFIED supplier image, traced 2026-09-14 by content match: this file is
+  # Capra's own product-page image for EDA 1,3 m thermowood (SKU TS130TRWD2-1000),
+  # https://caprasaunas.com/product/eda-thermowood-sauna1-3m-4-3ft-2-3-people/
+  # Capra-supplied material under the 2026-08-11 written grant.
+  # Evidence: docs/image-rights-register.md (Capra product-page trace).
   src: "/images/saunas/eda-thermowood-1-3m-hero.png"
   alt: "BUX EDA 130 Thermo Pine barrel sauna exterior"
 dimensions:

@@ -3,6 +3,7 @@ export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import StatusBadge from '../../../components/admin/StatusBadge.astro';
+import PortInput from '../../../components/admin/PortInput.astro';
 import '../../../styles/admin.css';
 import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import { isAdminStaff } from '../../../lib/staff-access';
@@ -323,8 +324,8 @@ const bulkReceiveItems = items.filter((i) => !i.products?.unit_tracked);
             <div class="admin-panel ship-section">
               <h2 class="admin-section-title">Logistics</h2>
               <div class="admin-form">
-                <label class="admin-field"><span>Origin</span><input type="text" name="origin" value={shipment.origin ?? ''} /></label>
-                <label class="admin-field"><span>Destination</span><input type="text" name="destination" value={shipment.destination ?? ''} /></label>
+                <PortInput id="shipment-origin" name="origin" label="Origin port" value={shipment.origin} />
+                <PortInput id="shipment-destination" name="destination" label="Destination port" value={shipment.destination} />
               </div>
             </div>
 

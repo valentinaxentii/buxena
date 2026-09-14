@@ -1,0 +1,106 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import QuoteBand from '../../components/QuoteBand.astro';
+
+const models = [
+  {
+    name: 'Fiberglass Oval',
+    label: 'Two-person cold plunge',
+    material: 'Fiberglass bath · Thermowood exterior',
+    capacity: '2 people',
+    dimensions: '1.85 × 0.95 m',
+    volume: '800 L',
+    detail: '1.1 m high · 0.96 m water depth · 18 mm thermowood cladding',
+    notes: 'Two headrests and drain are listed in the base set. External electric chiller is optional.',
+  },
+  {
+    name: 'Fiberglass Round',
+    label: 'One-person cold plunge',
+    material: 'Fiberglass bath · Thermowood exterior',
+    capacity: '1 person',
+    dimensions: 'Ø 1.06 m',
+    volume: '400 L',
+    detail: '0.935 m high · 18 mm thermowood cladding',
+    notes: 'Compact single-user design. An external electric chiller is recommended for temperature control.',
+  },
+  {
+    name: 'Stainless Steel Round',
+    label: 'One-person cold plunge',
+    material: 'Stainless-steel tank · Thermowood exterior',
+    capacity: '1 person',
+    dimensions: 'Ø 0.86 m',
+    volume: '400 L',
+    detail: '1.05 m high · 0.96 m water depth · 120 kg',
+    notes: 'External electric chiller, cover and steps are optional. The supplied product information lists a 41 mm thermowood exterior.',
+  },
+];
+---
+
+<BaseLayout title="Cold Plunges" description="Explore BUXENA cold plunges from BUXENA — compact fiberglass and stainless-steel cold-water immersion tubs, separate from our sauna and hot-tub ranges.">
+  <section class="band band--tight intro">
+    <div class="shell">
+      <span class="eyebrow">BUXENA Cold Plunges</span>
+      <h1 class="display measure--tight">Cold water, clearly specified</h1>
+      <p class="lead measure">A dedicated cold-plunge range, separate from hot tubs and saunas. Every model below is a compact BUXENA immersion tub; cooling equipment is optional and confirmed in your quote.</p>
+      <a class="back-link" href="/hot-tubs/">← Explore Hot Tubs</a>
+    </div>
+  </section>
+
+  <section class="band band--tight catalogue">
+    <div class="shell">
+      <div class="grid">
+        {models.map((model) => (
+          <article class="model">
+            <div class="model__stage" aria-hidden="true">
+              <span>Cold Plunge</span>
+              <i></i>
+            </div>
+            <div class="model__body">
+              <span class="model__eyebrow">{model.label}</span>
+              <h2>{model.name}</h2>
+              <p class="model__material">{model.material}</p>
+              <dl>
+                <div><dt>Capacity</dt><dd>{model.capacity}</dd></div>
+                <div><dt>Dimensions</dt><dd>{model.dimensions}</dd></div>
+                <div><dt>Water volume</dt><dd>{model.volume}</dd></div>
+              </dl>
+              <p class="model__detail">{model.detail}</p>
+              <p class="model__note">{model.notes}</p>
+              <a class="model__cta" href={`/quote/?model=${encodeURIComponent(`BUXENA Cold Plunge — ${model.name}`)}`} data-track="pricing_request_started" data-track-model={`BUXENA Cold Plunge — ${model.name}`} data-track-category="cold-plunges" data-track-form-type="cold-plunge_catalogue">Request pricing <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p class="source-note">Model details are taken from current BUXENA cold-plunge product information. U.S. delivery, chiller selection, electrical requirements and final lead time are confirmed individually before order.</p>
+    </div>
+  </section>
+
+  <QuoteBand heading="Build a complete heat-and-cold ritual" body="Tell us your sauna model, available space and whether you need cooling only or a heater-chiller unit. We will recommend the right plunge configuration." />
+</BaseLayout>
+
+<style>
+  .intro { padding-bottom: 1rem; }
+  .intro .lead { margin-top: .8rem; }
+  .back-link { display: inline-block; margin-top: 1rem; color: var(--bronze-ink); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-decoration: none; text-transform: uppercase; }
+  .catalogue { padding-top: .8rem; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1rem, 2vw, 1.7rem); }
+  .model { border: 1px solid var(--line); background: var(--linen); }
+  .model__stage { position: relative; height: 180px; overflow: hidden; background: linear-gradient(155deg, #dce8ea, #a9c6cb 48%, #76969a); display: grid; place-items: center; }
+  .model__stage::before { content: ''; position: absolute; width: 72%; aspect-ratio: 1.55; border: 11px solid rgba(248, 246, 239, .88); border-radius: 42% 42% 48% 48%; box-shadow: inset 0 20px 0 rgba(52, 90, 98, .18), 0 18px 28px rgba(35, 55, 57, .22); transform: translateY(12px); }
+  .model__stage i { position: absolute; width: 55%; height: 28%; border-radius: 50%; background: rgba(54, 106, 118, .52); transform: translateY(10px); }
+  .model__stage span { position: relative; z-index: 1; align-self: end; margin-bottom: 1rem; color: #f7f5ee; font-size: .62rem; font-weight: 750; letter-spacing: .18em; text-transform: uppercase; }
+  .model__body { padding: clamp(1.25rem, 2vw, 1.75rem); }
+  .model__eyebrow { color: var(--bronze-ink); font-size: var(--t-label); font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+  h2 { margin: .5rem 0; color: var(--ink); font-family: var(--font-display); font-size: clamp(1.75rem, 1.4rem + .7vw, 2.1rem); font-weight: 500; line-height: 1.08; }
+  .model__material, .model__detail, .model__note { font-size: var(--t-small); line-height: 1.55; }
+  .model__material { margin: 0 0 1rem; color: var(--bronze-ink); }
+  dl { margin: 0; border-top: 1px solid var(--line); }
+  dl div { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-bottom: 1px solid var(--line); font-size: .8rem; }
+  dt { color: var(--muted); } dd { margin: 0; color: var(--ink); font-weight: 650; text-align: right; }
+  .model__detail { margin: 1rem 0 .45rem; color: var(--ink); }
+  .model__note { color: var(--muted); margin: 0; }
+  .model__cta { display: inline-block; margin-top: 1.15rem; border-bottom: 1px solid var(--bronze); color: var(--ink); font-size: .68rem; font-weight: 700; letter-spacing: .11em; padding-bottom: .38rem; text-decoration: none; text-transform: uppercase; }
+  .model__cta span { margin-left: .45rem; }
+  .source-note { max-width: 760px; margin: 1.2rem 0 0; color: var(--muted); font-size: var(--t-small); line-height: 1.55; }
+  @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } .model__stage { height: 210px; } }
+</style>

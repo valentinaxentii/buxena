@@ -14,7 +14,7 @@
  *
  * This set exists because "BUH-" is BUXENA's own generic internal SKU
  * prefix, used by EVERY model regardless of supplier — including NORD (Wood
- * Architects) and VIRU (Baltresto), which are NOT Capra and must never show
+ * Architects) and VIRU (supplier-managed), which are NOT Capra and must never show
  * a Capra-implying "BUX" brand. A blanket "strip BUH-, add BUX" regex would
  * silently mislabel those too, so the BUX substitution is only ever applied
  * to a title in this exact list, verified against model-identity.json's own
@@ -58,7 +58,24 @@ export function capacityBuckets(min?: number, max?: number): CapacityBucket[] {
 }
 
 /**
- * Catalogue order: photographed models first, then the curated `order`.
+ * Capra is the primary outdoor sauna range. Keep its verified series ahead of
+ * other suppliers in every catalogue view; ProductFilters only hides cards,
+ * so this ordering remains true after a customer narrows a result set.
+ */
+const CAPRA_SERIES = new Set([
+  'AAPO', 'ALLA', 'EDA', 'EKE', 'ELLA', 'ILLI', 'ITI', 'KLAABU', 'KLAAR',
+  'RUUDI', 'SUSI', 'UKU',
+]);
+
+/** Founder-selected lead row for the public catalogue. */
+const FEATURED_SERIES_ORDER = new Map([
+  ['EKE', 0],
+  ['AAPO', 1],
+]);
+
+/**
+ * Catalogue order: founder-selected lead series, then Capra models, then
+ * photographed models, then the curated `order`.
  *
  * Sixteen of the thirty-two models lost their photography to the image-rights
  * audit — their only picture had no identifiable owner, so it could not be
@@ -73,48 +90,60 @@ export function capacityBuckets(min?: number, max?: number): CapacityBucket[] {
  * sequence returns with the last one. Nothing to remember to revert.
  */
 export function byPhotographedThenOrder(
-  a: { data: { order: number; heroImage?: { src?: string } } },
-  b: { data: { order: number; heroImage?: { src?: string } } }
+  a: { data: { order: number; series?: string; heroImage?: { src?: string } } },
+  b: { data: { order: number; series?: string; heroImage?: { src?: string } } }
 ): number {
+  const featuredA = FEATURED_SERIES_ORDER.get(a.data.series ?? '') ?? Number.MAX_SAFE_INTEGER;
+  const featuredB = FEATURED_SERIES_ORDER.get(b.data.series ?? '') ?? Number.MAX_SAFE_INTEGER;
+  if (featuredA !== featuredB) return featuredA - featuredB;
+  const capra = Number(CAPRA_SERIES.has(b.data.series ?? '')) - Number(CAPRA_SERIES.has(a.data.series ?? ''));
+  if (capra !== 0) return capra;
   const pictured = Number(Boolean(b.data.heroImage?.src)) - Number(Boolean(a.data.heroImage?.src));
   return pictured !== 0 ? pictured : a.data.order - b.data.order;
 }
-
-/** Capra publishes one family photograph for every depth in these ranges.
- * Rendering that same photograph as 4–5 separate neighbouring cards makes the
- * catalogue look broken and implies unique model photography that does not
- * exist. Keep every SKU/page, but present these ranges once with direct size
- * links to every individual model. Used by every listing page (the main
- * catalogue and each location/type page), not just one — a family series
- * shows up wherever its models are listed. */
-const FAMILY_PHOTO_SERIES = new Set(['EKE', 'SUSI', 'ITI']);
 
 export interface FamilyGroupedCard<T> {
   representative: T;
   title?: string;
   tagline?: string;
   variants?: { slug: string; label: string }[];
+  image?: { src?: string; alt: string; note?: string; fit?: 'cover' | 'contain' };
 }
 
-/** Collapse repeated-family-photo series into one card each, with the rest
- * of `items` passed through unchanged. Preserves `items`' existing order. */
-export function groupFamilyPhotoSeries<T extends { id: string; data: { series?: string; title: string } }>(
+/** One card per sauna family. Individual sellable sizes remain directly
+ * available inside the card, which lets customers compare the actual model
+ * choices without scrolling past the same sauna presentation repeatedly. */
+export function groupFamilyPhotoSeries<T extends { id: string; data: { series?: string; title: string; productType?: string; heroImage?: { src?: string } } }>(
   items: T[]
 ): FamilyGroupedCard<T>[] {
+  // VIRU spans four distinct supplier constructions. Grouping the entire
+  // manufacturer line into one card made Cube, Oval and Vertical models
+  // disappear when customers filtered by type. Other series remain grouped
+  // exactly as before because each represents one construction family.
+  const familyKey = (item: T) => {
+    const series = item.data.series?.trim() ?? '';
+    return series === 'VIRU' ? `${series}::${item.data.productType ?? 'Other'}` : series;
+  };
+  const seriesCounts = new Map<string, number>();
+  for (const item of items) {
+    const key = familyKey(item);
+    if (key) seriesCounts.set(key, (seriesCounts.get(key) ?? 0) + 1);
+  }
   const seenSeries = new Set<string>();
   const cards: FamilyGroupedCard<T>[] = [];
 
   for (const item of items) {
-    const series = item.data.series ?? '';
-    if (!FAMILY_PHOTO_SERIES.has(series)) {
+    const series = item.data.series?.trim() ?? '';
+    const key = familyKey(item);
+    if (!series || (seriesCounts.get(key) ?? 0) < 2) {
       cards.push({ representative: item });
       continue;
     }
-    if (seenSeries.has(series)) continue;
-    seenSeries.add(series);
+    if (seenSeries.has(key)) continue;
+    seenSeries.add(key);
 
     const members = items
-      .filter((candidate) => candidate.data.series === series)
+      .filter((candidate) => familyKey(candidate) === key)
       .sort((a, b) => {
         const an = Number(a.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
         const bn = Number(b.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? 0);
@@ -122,18 +151,44 @@ export function groupFamilyPhotoSeries<T extends { id: string; data: { series?: 
       });
     // EKE 160 has a verified exact-model image from Capra's live product page;
     // prefer it for the grouped EKE card instead of the generic family render.
+    const viruPreferredSlug = series === 'VIRU'
+      ? {
+          Barrel: 'viru-s16-1-6m',
+          Cube: 'viru-sqr4pv-4-0m',
+          Oval: 'viru-s242-oval',
+        }[members[0]?.data.productType ?? '']
+      : undefined;
+    const viruPreferredRepresentative = viruPreferredSlug
+      ? members.find((member) => member.id === viruPreferredSlug)
+      : undefined;
     const representative = series === 'EKE'
       ? (members.find((member) => member.data.title === 'BUX EKE 160') ?? members[0] ?? item)
-      : (members[0] ?? item);
+      : series === 'RUUDI'
+        ? (members.find((member) => member.data.title === 'BUX RUUDI M') ?? members[0] ?? item)
+      : series === 'VIRU'
+        ? (viruPreferredRepresentative ?? members.find((member) => Boolean(member.data.heroImage?.src)) ?? members[0] ?? item)
+        : (members[0] ?? item);
     const variants = members.map((member) => ({
       slug: member.id,
-      label: `${member.data.title.match(/(\d+)(?!.*\d)/)?.[1] ?? member.data.title} cm`,
+      label: displayTitle(member.data.title),
     }));
 
     cards.push({
       representative,
-      title: `BUX ${series}`,
-      tagline: `${members.length} available depths. Choose the size that fits your space.`,
+      image: series === 'RUUDI'
+        ? {
+            src: '/images/saunas-normalized/bux-ruudi-family-linen.png',
+            alt: 'BUX RUUDI sauna family with full glass front',
+            note: 'RUUDI family image from the Capra catalogue, prepared for BUXENA presentation',
+            fit: 'contain',
+          }
+        : undefined,
+      title: CAPRA_SERIES.has(series)
+        ? `BUX ${series}`
+        : series === 'VIRU'
+          ? `VIRU ${representative.data.productType ?? ''}`.trim()
+          : series,
+      tagline: `${members.length} models available. Choose the size and configuration that fit your space.`,
       variants,
     });
   }

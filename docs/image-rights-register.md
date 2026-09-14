@@ -1,5 +1,18 @@
 # BUXENA — Image Rights Register
 
+**Update — September 14, 2026:** verified CAPRA assets now serve EKE 160, the
+EDA 130/200/235 group and the exact-model EDA 160 hero. The files this site
+actually serves, the CAPRA product page behind each one and every checksum are
+in [`docs/image-sources-2026-09-14.json`](image-sources-2026-09-14.json); the
+per-model comparison scores are in
+[`docs/capra-image-trace-2026-09-14.md`](capra-image-trace-2026-09-14.md). That
+JSON also preserves the source list recovered from the September 14 handoff
+bundle. The 2026-08-11 written grant from Andres Sokk covers CAPRA-supplied
+product images for the website, social media and paid ads in the US/Canada;
+ULLA remains excluded, and this update does not clear any other supplier's
+assets or the older undocumented EDA files still listed in
+`docs/blocked-public-images.txt`.
+
 Audit of every customer-facing image asset in `public/`, against the
 copyright/licensing risk called out in the V2 build brief.
 
@@ -530,3 +543,72 @@ exact-depth photo. Both conditions are enforced in each affected file's
 | Exact-match status | FAMILY — each file's own comment records the source page and that it is not an exact-depth photo |
 | Commercial use | Same NEEDS CONFIRMATION tier as the row above |
 | Notes | ITI D4's previous hero (`iti-thermowood-2-3m-hero.png`) was not reused for this — it was already listed BLOCKED above for undocumented origin, independent of this ruling |
+
+---
+
+## Capra product-page trace — EDA group and EKE 160 (2026-09-14)
+
+**Scope.** This closes the EDA half of the §2a gap. The rule applied here is the
+register's own: "an undocumented file doesn't retroactively become
+Capra-supplied because Capra later granted broad permission" — so every asset
+was traced rather than assumed. Full evidence (source URLs, sizes, dimensions,
+SHA-256 of the fetched bytes and the comparison scores) is recorded in
+[`docs/capra-image-trace-2026-09-14.md`](capra-image-trace-2026-09-14.md).
+
+**Method.** Each image is compared against the images Capra itself publishes on
+the product page *for that exact SKU* (all 76 of Capra's product pages are
+public). Local asset and candidate are auto-cropped to the subject's bounding
+box, then compared at 64×64 greyscale after z-score normalisation. A score near
+zero means the local file **is** the supplier's own published image, not merely
+a similar-looking one.
+
+**Traced — removed from `docs/blocked-public-images.txt` on this evidence:**
+
+| Path | Capra SKU | Score |
+|---|---|---|
+| `/images/saunas/eda-thermowood-1-3m-hero.png` | EDA 1,3 m thermowood `TS130TRWD2-1000` | 0.05 |
+| `/images/saunas/eda-thermowood-2-35m-hero.jpeg` | EDA 2,35 m thermowood `S235TRWD2-1000` | 0.02 |
+
+**Traced, left unchanged:** the sibling cutouts
+`/images/saunas-normalized/eda-nordic-spruce-2-5m-hero.png` (0.02),
+`eda-thermowood-2-8m-hero.png` (0.01), `eda-nordic-spruce-3-0m-hero.png` (0.03),
+`eda-thermowood-3-3m-hero.png` (0.02) and `eda-nordic-spruce-4-0m-hero.png`
+(0.02) all match their own SKU's product-page image.
+
+**Replaced with verified supplier material** (the old file stays on disk,
+unreferenced, and blocklisted where it is untraced):
+
+| Model | New file | Built from |
+|---|---|---|
+| EKE 160 | `/images/saunas-normalized/bux-eke-160-exact-cutout.png` | `10026-3.jpg` — EKE 160 page, SKU `EK160TRWD2-1000` |
+| EDA 200 | `/images/saunas/eda-nordic-spruce-2-0m-hero-capra.png` | `uc-1.jpeg` — EDA 2,0 m Nordic Spruce page, SKU `S200WWD2-1000` |
+| EDA 235 hero | `/images/saunas/eda-thermowood-2-35m-hero-capra.png` | `uc.png` — EDA 2,35 m thermowood page, SKU `S235TRWD2-1000` |
+
+EKE 160 is now an **exact-model** photograph instead of the shared EKE-series
+catalogue render. That is the outcome the 2026-08-16 family ruling asked for
+("Replace with an exact depth photo the moment Capra sends one") — Capra's own
+product page already publishes one, so the family render is no longer needed
+there. The previous shared cutout
+(`/images/saunas-normalized/bux-eke-160-official-cutout.png`) is Capra-sourced
+catalogue material, so it stays approved and simply unreferenced.
+
+**Still open — flagged, not assumed:**
+
+1. **Resolved 2026-09-14.** The EDA 160 hero now ships as Capra's own EDA 1,6 m
+   product-page file (`/images/saunas/eda-thermowood-1-6m-hero-capra.png`, SKU
+   `TS160TRWD2-1000`, supplier bytes unchanged — the first option this entry
+   offered). The previous normalized copy
+   (`/images/saunas-normalized/eda-thermowood-1-6m-hero.png`) matched only
+   inconclusively, is not claimed as traced, and is now on the blocklist and
+   referenced nowhere. Checksums: `docs/image-sources-2026-09-14.json`.
+2. **Sibling-directory gap.** The blocklist matches exact path strings, so a
+   copy of a blocked asset under a different directory is not caught. That is
+   how the six `saunas-normalized/eda-*` copies passed the audit while the same
+   originals were listed. The untraced copies are now listed explicitly, and
+   any future blocked asset should be added under **every** path it exists at.
+3. **ULLA** — unchanged position: excluded from the 2026-08-11 grant, with the
+   2026-08-17 founder exception leaving `bux-ulla-hero.jpg` live. The current
+   working tree (uncommitted) deletes `src/content/saunas/bux-ulla.md` and its
+   images. Removing a catalogue model is a commercial decision, not a coding
+   one, so it needs the founder's explicit approval before launch either way.
+

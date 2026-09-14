@@ -33,6 +33,11 @@ const catalog = models.map((m) => ({
   capacityMax: m.data.capacityMax,
   materials: m.data.materials,
   dimensions: m.data.dimensions,
+  heaterOptions: m.data.heaterOptions,
+  features: m.data.features,
+  specs: m.data.specs,
+  options: m.data.options,
+  availability: m.data.availability,
   heroImage: m.data.heroImage,
   order: m.data.order,
 }));
@@ -74,10 +79,10 @@ const TOTAL_STEPS = 5;
               we'll ask for them by email when we review your project.
               You can also skip this step.
             </p>
-            <label class="space__upload">
+            <label class="space__upload" data-space-drop>
               <input type="file" accept="image/*,.pdf" multiple capture="environment" data-space-files />
               <span class="space__upload-cta">Add photos or plans</span>
-              <span class="space__upload-hint">Camera, photo library or files</span>
+              <span class="space__upload-hint">Drag images or PDF plans here, or click to browse</span>
             </label>
             <ul class="space__thumbs" data-space-thumbs></ul>
           </fieldset>
@@ -256,6 +261,7 @@ const TOTAL_STEPS = 5;
     transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease);
   }
   .space__upload:hover { border-color: var(--bronze); background: var(--linen-deep); }
+  .space__upload.is-dragging { border-color: var(--bronze); background: var(--linen-deep); }
   .space__upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   .space__upload-cta {
     font-size: 0.8125rem;
@@ -398,6 +404,9 @@ const TOTAL_STEPS = 5;
     location?: string; productType?: string;
     capacity?: string; capacityMin?: number; capacityMax?: number;
     materials?: string[]; dimensions?: { label: string; value: string }[];
+    heaterOptions?: string[]; features?: string[];
+    specs?: { label: string; value: string }[]; options?: string[];
+    availability?: 'in-stock' | 'in-transit' | 'preorder';
     heroImage?: { src?: string; alt: string }; order: number;
   }
 
@@ -421,6 +430,7 @@ const TOTAL_STEPS = 5;
     const progressLabel = root.querySelector<HTMLElement>('[data-space-progress-label]')!;
     const progressFill = root.querySelector<HTMLElement>('[data-space-progress-fill]')!;
     const filesInput = root.querySelector<HTMLInputElement>('[data-space-files]')!;
+    const dropZone = root.querySelector<HTMLElement>('[data-space-drop]')!;
     const thumbs = root.querySelector<HTMLElement>('[data-space-thumbs]')!;
     const results = root.querySelector<HTMLElement>('[data-space-results]')!;
     const resultsGrid = root.querySelector<HTMLElement>('[data-space-results-grid]')!;
@@ -465,7 +475,7 @@ const TOTAL_STEPS = 5;
     };
 
     // Photo selection — local previews only, nothing transmitted.
-    filesInput.addEventListener('change', () => {
+    const renderSelectedFiles = () => {
       startOnce();
       thumbs.innerHTML = '';
       const files = Array.from(filesInput.files ?? []);
@@ -485,6 +495,33 @@ const TOTAL_STEPS = 5;
       if (photoCount > 0) {
         track('space_photo_uploaded', { formType: 'see_it_in_my_space', photoCount });
       }
+    };
+    filesInput.addEventListener('change', renderSelectedFiles);
+
+    // Real drag-and-drop support. The label still opens the normal Windows
+    // picker when clicked, while dropping files no longer navigates away or
+    // leaves the visitor wondering whether anything was selected.
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add('is-dragging');
+      });
+    });
+    ['dragleave', 'drop'].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.remove('is-dragging');
+      });
+    });
+    dropZone.addEventListener('drop', (event) => {
+      const dropped = Array.from(event.dataTransfer?.files ?? []).filter((file) =>
+        file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      );
+      if (!dropped.length) return;
+      const transfer = new DataTransfer();
+      dropped.slice(0, 12).forEach((file) => transfer.items.add(file));
+      filesInput.files = transfer.files;
+      renderSelectedFiles();
     });
 
     // Single-select groups
@@ -672,17 +709,27 @@ const TOTAL_STEPS = 5;
       const [a, b] = matches.map((m) => m.model);
       if (!a || !b) return;
       const dimText = (m: SpaceModel) => (m.dimensions ?? []).map((d) => `${d.label}: ${d.value}`).join('; ');
-      const rows = [
+      const baseRows: [string, string, string][] = [
         ['Placement', a.location ?? '', b.location ?? ''],
         ['Type', a.productType ?? '', b.productType ?? ''],
         ['Capacity', a.capacity ?? '', b.capacity ?? ''],
         ['Dimensions', dimText(a), dimText(b)],
         ['Material', (a.materials ?? []).join(', '), (b.materials ?? []).join(', ')],
-      ].filter(([, va, vb]) => va || vb);
+        ['Heater compatibility', (a.heaterOptions ?? []).join(', '), (b.heaterOptions ?? []).join(', ')],
+        ['Features', (a.features ?? []).join(', '), (b.features ?? []).join(', ')],
+        ['Available options', (a.options ?? []).join(', '), (b.options ?? []).join(', ')],
+        ['Availability', a.availability ?? '', b.availability ?? ''],
+      ];
+      const specLabels = [...new Set([...(a.specs ?? []), ...(b.specs ?? [])].map((spec) => spec.label))];
+      const specValue = (m: SpaceModel, label: string) =>
+        (m.specs ?? []).find((spec) => spec.label.toLowerCase() === label.toLowerCase())?.value ?? '';
+      const rows = [...baseRows, ...specLabels.map((label) => [label, specValue(a, label), specValue(b, label)] as [string, string, string])]
+        .filter(([, va, vb]) => va || vb)
+        .filter(([label], index, all) => all.findIndex(([candidate]) => candidate.toLowerCase() === label.toLowerCase()) === index);
       comparePanel.innerHTML = `
         <table>
           <thead><tr><th></th><th>${shownName(a.title)}</th><th>${shownName(b.title)}</th></tr></thead>
-          <tbody>${rows.map(([l, va, vb]) => `<tr><th scope="row">${l}</th><td>${va || '—'}</td><td>${vb || '—'}</td></tr>`).join('')}</tbody>
+          <tbody>${rows.map(([l, va, vb]) => `<tr><th scope="row">${l}</th><td>${va || 'Not specified'}</td><td>${vb || 'Not specified'}</td></tr>`).join('')}</tbody>
         </table>`;
       comparePanel.hidden = false;
     });

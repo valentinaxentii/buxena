@@ -23,7 +23,8 @@
  * tests are SKIPPED entirely rather than risk writing a real row.
  * Exit code: 0 = launch-green, 1 = at least one failure.
  */
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
+import { startQaServer } from './qa-server.mjs';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -176,10 +177,11 @@ try {
 // internal imports); it is verified END-TO-END below instead — the dev
 // server's ack preview lines prove the real send/skip decisions.
 
-// Whether THIS script started the dev server, and so owes it a shutdown.
-// Module scope on purpose: the runtime route sweep near the end of this file
-// needs the same server, so the stop cannot live inside the forms block.
-let devServerStartedHere = false;
+// A dedicated safe-mode test server is kept alive for the form tests AND for
+// the runtime route sweep near the end of this file, then closed. Module scope
+// on purpose: the sweep needs the same server, so the stop cannot live inside
+// the forms block.
+let qaServer = null;
 
 // Live dev-server form tests — guarded against any live configuration.
 const envFile = path.join(ROOT, '.env');
@@ -187,25 +189,18 @@ const devLive = existsSync(envFile) && /^\s*ENQUIRIES_DEV_LIVE\s*=\s*true\s*$/m.
 if (devLive) {
   record('forms', 'SKIPPED — .env has ENQUIRIES_DEV_LIVE=true (live mode); refusing to submit test forms', false, 'unset it and re-run');
 } else {
-  const base = 'http://localhost:4321';
-  const up = async () => { try { return (await fetch(`${base}/`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; } };
-  // MUST be --background: the customer-ack assertion below reads the server's
-  // own log lines through `astro dev logs`, which only speaks to a background
-  // server. Starting it in the foreground (as this did) made that read return
-  // nothing, so the ack check reported "0 send / 0 skip" and the board said
-  // NOT LAUNCH-READY for a reason that had nothing to do with the emails.
-  if (!(await up())) {
-    spawn('npx', ['astro', 'dev', '--background'], { shell: true, detached: true, stdio: 'ignore' }).unref();
-    devServerStartedHere = true;
-    for (let i = 0; i < 20 && !(await up()); i++) await new Promise((r) => setTimeout(r, 1500));
-  }
-  if (!(await up())) {
-    record('forms', 'dev server reachable', false, 'could not start astro dev');
-  } else {
+  // Own the server instead of reusing whatever answers on 4321: a developer's
+  // own `npm run dev` may be live-configured, and a --background CLI server's
+  // log is only readable while that CLI believes it still owns the process.
+  // startQaServer forces BUXENA_SAFE_MODE=true and ENQUIRIES_DEV_LIVE=false and
+  // hands back the log lines it captured itself.
+  try { qaServer = await startQaServer(); }
+  catch (error) { record('forms', 'dev server reachable', false, String(error).slice(0, 1800)); }
+  if (qaServer) {
+    const base = qaServer.base;
     const post = (payload) =>
-      fetch(`${base}/api/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
-    const devLogs = () => { try { return execSync('npx astro dev logs', { encoding: 'utf8', stdio: 'pipe' }); } catch { return ''; } };
-    const logsBefore = devLogs().length;
+      fetch(`${base}/api/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(10_000) }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
+    const logsBefore = qaServer.logs().length;
 
     // One submission per source; enrichment ("— details") must NOT trigger a
     // customer acknowledgment, everything else with an email must.
@@ -218,17 +213,17 @@ if (devLive) {
     }
     record('forms', `all ${SOURCES.length} form sources accepted in dev test mode (nothing sent/stored)`, allOk, bad.join(', '));
 
-    // Customer-ack decisions, verified end-to-end from the dev server's own
-    // preview log lines produced by the submissions above.
-    const newLogs = devLogs().slice(logsBefore);
+    // Customer-ack decisions, read from the test server's own preview log
+    // lines produced by the submissions above.
+    const newLogs = qaServer.logs().slice(logsBefore);
     const sends = (newLogs.match(/customer ack would send/g) ?? []).length;
     const skips = (newLogs.match(/customer ack would NOT send/g) ?? []).length;
     // An unreadable log is NOT a failing acknowledgment. Saying so plainly
     // matters more than the colour of the line: a board that reports a
     // tooling problem as a broken customer email teaches you to ignore it.
-    const unreadable = /not started with/.test(newLogs) || newLogs.trim() === '';
+    const unreadable = newLogs.trim() === '';
     if (unreadable) {
-      record('email', 'customer ack decisions could not be read (dev server not started with --background — stop any running `npm run dev` and re-run)', false);
+      record('email', 'customer ack decisions could not be read (the dedicated test server produced no preview log lines)', false);
     } else {
       record('email', `customer ack sends for ${SOURCES.length - 1} sources, skips enrichment (saw ${sends} send / ${skips} skip)`, sends === SOURCES.length - 1 && skips === 1);
     }
@@ -407,7 +402,10 @@ if (devLive) {
   let out = '';
   let ok = false;
   try {
-    out = execSync('node scripts/runtime-routes.mjs', { encoding: 'utf8', timeout: 300_000 });
+    // The sweep must talk to the server this script owns, not to 4321: a
+    // developer's own dev server may be running there.
+    if (!qaServer) throw new Error('Dedicated safe-mode test server unavailable');
+    out = execFileSync(process.execPath, ['scripts/runtime-routes.mjs', qaServer.base], { encoding: 'utf8', timeout: 300_000 });
     ok = /all routes rendered successfully/.test(out);
   } catch (e) {
     out = String(e.stdout ?? e);
@@ -417,13 +415,6 @@ if (devLive) {
     ? ''
     : (out.split('RUNTIME FAILURES:')[1] ?? out).replace(/\s+/g, ' ').trim().slice(0, 260);
   record('runtime', `all ${count} public routes render on a live server`, ok, detail);
-}
-
-// Every check that needs a live server has now run. Stopping it earlier left
-// the route sweep talking to a closed port, which only looked fine while a
-// developer happened to have their own `npm run dev` open.
-if (devServerStartedHere) {
-  try { execSync('npx astro dev stop', { stdio: 'pipe' }); } catch { /* leave it running */ }
 }
 
 // ------------------------------------------- 8. model presentation system
@@ -442,6 +433,10 @@ console.log('\n■ 8/8 Model presentations');
   const detail = out.includes('PROBLEMS') ? out.split('PROBLEMS')[1].replace(/\s+/g, ' ').slice(0, 220) : '';
   record('pdf', `presentations mapped correctly (identity ${idLine}, linked ${linkLine})`, ok, detail);
 }
+
+// Every check that needs a live server has now run — the 8/8 presentation
+// check above needs none — so the dedicated test server can be closed.
+if (qaServer) await qaServer.stop();
 
 // ------------------------------------------------------------------- summary
 const fails = results.filter((r) => !r.ok);
