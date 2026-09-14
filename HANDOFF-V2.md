@@ -1,20 +1,67 @@
 # BUXENA V2 — Release Candidate Status
 
-**Current checkpoint — September 14, 2026:** see
+**Current checkpoint — September 14, 2026 (end of day):** see
 [Inquiry launch checkpoint](docs/demand-test-v2-checkpoint.md). The current
 direction is a free-inquiry demand test before committing to inventory.
-At this state the pre-launch board was **25/25 GREEN** before the ULLA
-restoration, image integrity and image rights pass, and the desktop/390 px
-inquiry journey is verified **26/26** in a real browser (`npm run qa:flow`, safe
-mode). The unapproved ULLA removal was reversed in corrective commit `dd5fe03`;
-its image-rights position is unchanged. Nothing deployed; main/V1 untouched.
-Still open and founder-only: the ULLA launch decision, the paid-advertising /
-VIRU-NORD permission gaps, live CRM + mail delivery, exact public prices, and
-approval to publish.
+The three remaining fixes are now done and saved in commit `9643902` (pushed to
+`origin/buxena-v2`): the header keeps **Contact** and **Request Pricing** on
+screen at laptop widths (the CTA was ~182 px off-screen at 1366×768), the staff
+notification prints the delivery **ZIP** separately from the **Indoor/Outdoor**
+placement answer, and the product configurator carries its ZIP and selections
+into the inquiry while splitting independent **accessories** (multi-select) from
+mutually-exclusive **variants** (single-select). Unit tests **214 passed, 0
+failed**; Astro check **0 errors, 0 warnings**; production build passed. The
+protected preview was redeployed in safe mode. Nothing deployed to production;
+main/V1 untouched at `e3b457d`. Still open and founder-only: the ULLA launch
+decision, the paid-advertising / VIRU-NORD permission gaps, live CRM + mail
+delivery, exact public prices, and approval to publish.
 
 ---
 
-## Admin inquiry workflow — September 14, 2026 (latest update)
+## Final three fixes — September 14, 2026
+
+Commit `9643902` closes the three items that were still open at the previous
+handoff. Each is code-only where possible, test-backed, and driven by verified
+product data (no invented options, no guessed prices).
+
+1. **Header at laptop widths.** At 1366×768 the nav labels plus the pricing CTA
+   measured ~182 px past the container, and the pricing button had simply
+   disappeared at the narrow end of the desktop band. The nav now collapses into
+   the existing drawer from 1152 px while the **Request Pricing** button stays in
+   the header; nav type and the CTA scale down with the viewport instead of
+   overflowing. `scripts/browser-qa.mjs` now includes 1366×768 in its width sweep.
+
+2. **ZIP vs placement in notifications.** `enquiries.location` held a ZIP for
+   most forms and a project location for trade enquiries, so one merged
+   "ZIP / Location" line printed the placement ("Outdoor") as though it were the
+   postcode. New pure `src/lib/enquiry-location.ts` (`contactLocationRows`) makes
+   the one decision both channels share: a ZIP is labelled "ZIP / Postal Code",
+   anything else "Placement / Location", and a legacy ZIP stored in `location` is
+   recognised by shape. `send-enquiry-email.ts` gained a pure
+   `buildEnquiryNotification` so the exact text is asserted with no transport.
+
+3. **Configurator carries ZIP + options, and separates accessories from
+   variants.** The flat `options` list was dumped into one radio group labelled
+   "Supply format", forcing a customer to choose between, say, "Bench skirts"
+   and "Full glass front". `lib/product-config.ts` now splits `options` into a
+   single-select **variants** group and a multi-select **accessories** group,
+   driven by a verified allowlist (Ergonomic backrest, Backrest, Bench skirts,
+   LED lighting kit). The configurator renders accessories as checkboxes and
+   carries the ZIP (leading zeros and customer edits preserved) plus every
+   selection into the quote form's message.
+
+**Verified at this revision**
+
+| Check | Result |
+| --- | --- |
+| Astro check | 0 errors, 0 warnings (182 hints, 322 files) |
+| Unit tests | **214 passed, 0 failed** |
+| Production build (`npm run build`) | Passed locally |
+| Preview | Live and protected (`sso_login=true`), safe mode on; unauthenticated requests return 401 |
+
+---
+
+## Admin inquiry workflow — September 14, 2026
 
 The founder-facing CRM was lying in four specific ways. All four are fixed, with
 tests that fail if they come back.

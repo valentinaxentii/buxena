@@ -1,11 +1,15 @@
 # BUXENA V2 — inquiry launch checkpoint
 
-Updated September 14, 2026 — second pass, same day. Work is on `buxena-v2`:
-the inquiry changes are saved in `1077925`, and the supplier-image follow-up
-recovered from the handoff bundle (`cf1c514`) was integrated selectively, only
-where this workspace did not already have equal or better work.
-This checkpoint supersedes older launch-readiness summaries. No deployment,
-production change, advertising, customer email or inventory purchase was made.
+Updated September 14, 2026 — third pass (end of day). Work is on `buxena-v2`.
+The three remaining fixes are saved in commit `9643902` (pushed to
+`origin/buxena-v2`): the header at laptop widths, the ZIP/placement split in
+staff notifications, and the configurator's ZIP + option carry with accessories
+separated from variants. The inquiry changes are in `1077925`, and the
+supplier-image follow-up recovered from the handoff bundle (`cf1c514`) was
+integrated selectively, only where this workspace did not already have equal or
+better work. This checkpoint supersedes older launch-readiness summaries. No
+production deployment, advertising, customer email or inventory purchase was
+made; the protected preview was redeployed in safe mode only.
 
 ## Commercial direction
 
@@ -49,6 +53,13 @@ the relevant commercial decisions. V1/main remains protected.
   founder declined the earlier unapproved removal. It contains only those
   previously tracked ULLA paths (byte-identical to their earlier content) and
   reverts nothing else.
+- Final pass (commit `9643902`): the header keeps Contact and Request Pricing
+  on screen at laptop widths (the pricing CTA was ~182 px off-screen at
+  1366×768); staff notifications now print the delivery ZIP separately from the
+  Indoor/Outdoor placement answer; and the product configurator carries its ZIP
+  and selections into the inquiry while splitting independent accessories
+  (multi-select checkboxes) from mutually-exclusive variants (single-select
+  radios), driven by a verified accessory allowlist.
 
 ## Verified at this state
 
@@ -153,11 +164,22 @@ collection setup. Do not count budget selection or a free inquiry as a sale.
 
 ## Continue from here
 
+The final state is saved in commit `9643902` on `origin/buxena-v2` (HEAD equals
+remote). Unit tests **214 passed, 0 failed**; Astro check 0 errors, 0 warnings;
+production build passed. The protected non-production preview is live at
+<https://v2--buxena-v2-preview.netlify.app> in safe mode with `sso_login=true`
+(sign-in and deploy/undo commands in
+[`docs/chromebook-access.md`](chromebook-access.md)); the Codespaces
+configuration (`.devcontainer/devcontainer.json`) is saved in the same branch.
+Production (`buxena.com`, branch `main` at `e3b457d`) was verified untouched.
+
 Preserve this branch and every catalogue entry. Do not publish invented prices,
-and never deploy to production. The branch is now saved to GitHub on the founder's
-instruction, and a separate **protected** non-production preview exists (URL and
-access method in [`docs/chromebook-access.md`](chromebook-access.md)); production
-(`buxena.com`, branch `main` at `e3b457d`) was verified untouched. The next real
-step is the launch review with the founder: settle the ULLA decision, confirm who
-answers inquiries during travel, then verify live inquiry delivery deliberately
-and only with explicit approval.
+and never deploy to production.
+
+**Next action (founder, on the Chromebook):** open the Codespace for
+`buxena-v2` (link and notes in
+[`docs/chromebook-access.md`](chromebook-access.md)) and run the launch review —
+settle the ULLA decision, confirm who answers inquiries during travel, then
+verify live inquiry delivery deliberately and only with explicit approval and
+live credentials. Do not publish prices, deploy production, or send customer
+email/Telegram before that approval.
