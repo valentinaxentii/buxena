@@ -34,7 +34,10 @@ async function logEnquiryActivity(supabase: SupabaseClient, enquiryId: string, d
     description,
     staff_id: staffId ?? null,
   });
-  if (error) console.error('[enquiry-conversion] activity log failed:', error);
+  // A code, never the error text: PostgREST messages name tables, columns and
+  // constraints, which is free schema reconnaissance in a log anyone with
+  // access to the hosting dashboard can read.
+  if (error) console.error('[enquiry-conversion] activity log failed:', { code: error.code ?? 'unknown' });
 }
 
 function enquiryOrigin(enquiry: any): string {

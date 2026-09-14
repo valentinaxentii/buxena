@@ -105,7 +105,9 @@ export async function handleRecordAction(
 
   const { error } = await ctx.supabase.from(ctx.table).delete().eq('id', ctx.id);
   if (error) {
-    console.error(`[record-actions] deleting ${ctx.table}/${ctx.id} failed:`, error.message);
+    // Table + code only. The row id and the database's own message stay out of
+    // the log: one is customer-identifying, the other names schema internals.
+    console.error('[record-actions] delete failed:', { table: ctx.table, code: error.code ?? 'unknown' });
     return { kind: 'error', message: 'Could not delete this record. Please try again.' };
   }
 

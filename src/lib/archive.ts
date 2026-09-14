@@ -79,11 +79,13 @@ export function archiveSupported(supabase: SupabaseClient): Promise<boolean> {
         // safe answer: it degrades to the previous behaviour instead of
         // breaking the page.
         if (error.code !== '42703') {
-          console.error('[archive] support probe failed, assuming unsupported:', error.message);
+          console.error('[archive] support probe failed, assuming unsupported:', { code: error.code ?? 'unknown' });
         }
         return false;
       } catch (e) {
-        console.error('[archive] support probe threw:', e instanceof Error ? e.message : e);
+        console.error('[archive] support probe threw:', {
+          name: e instanceof Error ? e.name : 'unknown',
+        });
         return false;
       }
     })();

@@ -14,7 +14,74 @@ approval to publish.
 
 ---
 
-## Chromebook / remote access — September 14, 2026 (latest update)
+## Admin inquiry workflow — September 14, 2026 (latest update)
+
+The founder-facing CRM was lying in four specific ways. All four are fixed, with
+tests that fail if they come back.
+
+**What was wrong.** The enquiries list read only `data` and dropped its `error`,
+so a failed query rendered as *“No enquiries yet.”* The detail page treated ANY
+query error as *“Enquiry not found.”* Optional panels (linked Lead, linked Quote,
+Activity Timeline, files, other enquiries from the same contact) rendered empty
+when their own query failed. And the pre-delete check that asks whether an
+enquiry is linked to a Lead or Quote ignored its error — so an unreadable enquiry
+looked unlinked, the one direction where being wrong cannot be undone.
+
+**What changed.**
+
+- New `src/lib/admin-enquiry-state.ts`: one pure decision table — `ok`,
+  `missing`, `configuration`, `unavailable` — used by both pages, so a list and a
+  detail page can never describe the same failure two different ways. Only
+  PostgREST's no-rows answer to `.single()` is ever allowed to mean "missing".
+- The list now renders its own error state (*“This is a loading error, not an
+  empty inbox”*) with a **Try again** link, and only says the list is empty when
+  the query actually succeeded. A filtered empty result says so, distinctly.
+- The detail page keeps an available enquiry on screen when an optional panel
+  fails, and names each unavailable section. Only a genuine no-rows answer says
+  "not found".
+- Permanent deletion is now **blocked, not guessed**, when the Lead/Quote linkage
+  cannot be verified, with its own wording.
+- Status changes, "mark contacted" and Lead/Quote conversions are confirmed
+  against the row **re-read from the database**, not against the write call
+  returning: a change that did not take effect cannot display as success, and an
+  action whose reload failed says exactly that. Duplicate conversions still
+  report "no second Lead/Quote was created".
+- Raw database text, row ids and exception messages no longer reach the UI or the
+  diagnostic logs (`lib/record-actions.ts`, `lib/archive.ts`,
+  `lib/enquiry-conversion.ts` now log codes).
+- Two display gaps fixed: the customer panel's *"ZIP / Postal Code"* row was
+  showing `location`, which the quote form fills with the **placement** answer
+  ("outdoor") — it is now *"Location / Placement"* plus a real ZIP row taken from
+  the customer's own `ZIP:` answer, showing "—" when none was given. Campaign
+  attribution (already captured into the arrival timeline entry) is now readable
+  at a glance in its own panel, allow-listed to the seven permitted fields and
+  honest when nothing was recorded.
+
+**Verified at this revision**
+
+| Check | Result |
+| --- | --- |
+| Astro check | 0 errors, 0 warnings (182 hints, 316 files) |
+| Unit tests | **198 passed, 0 failed** — 28 new in `tests/admin-enquiry-resilience.test.ts` |
+| Pre-launch board | **25/25 GREEN** (101 pages, 67 models, 6,388 refs, all routes served) |
+| Security audit | 20/20 |
+| Sales funnel audit | 18/18 |
+| Electrical/compliance guard | Passed (211 source files) |
+| Image rights / public claims | Passed |
+
+**Deliberately NOT verified here:** a browser pass over the admin pages against
+live data. The local `.env` holds real production Supabase credentials, so
+rendering the admin locally would read real customer records — the opposite of
+what this task asked for. The pages are covered by the type check, the 28
+decision/structural tests and the build; the founder can confirm the rendering in
+a browser where the CRM is connected.
+
+**Remaining blocker for this workflow:** the live inquiry-delivery test (a real
+submission proving CRM row + staff notification + one acknowledgment + admin
+readability, then status change and one Lead/Quote conversion). It is planned
+but NOT executed, and its two proposed emails are awaiting the founder's
+approval — see the plan below.
+
 
 Everything below this section is historical. Current state:
 

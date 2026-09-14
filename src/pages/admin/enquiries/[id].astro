@@ -14,6 +14,26 @@ import { buildEnquiryReply, buildMailtoHref } from '../../../lib/enquiry-reply-t
 import { buildFollowUpEmail, type FollowUpTrigger } from '../../../lib/follow-up-email-templates';
 import { parseEnquiryDetails } from '../../../lib/enquiry-details';
 import { effectiveSource } from '../../../lib/enquiry-source';
+import {
+  ALREADY_CONVERTED_MESSAGES,
+  campaignFacts,
+  classifyList,
+  classifyRow,
+  CONFIGURATION_BODY,
+  CONFIGURATION_HEADLINE,
+  contactedConfirmation,
+  conversionConfirmation,
+  conversionFailureMessage,
+  decideEnquiryDeletion,
+  DELETION_MESSAGES,
+  findAnswer,
+  RECORD_FAILED_BODY,
+  RECORD_FAILED_HEADLINE,
+  RETRY_LABEL,
+  sectionUnavailable,
+  statusChangeConfirmation,
+  UNCONFIRMED_ACTION_MESSAGE,
+} from '../../../lib/admin-enquiry-state';
 import { site } from '../../../data/site';
 
 // Permanent deletion is admin-only; enforced server-side in the handler below.
@@ -26,8 +46,27 @@ let enquiry: any = null;
 let lead: any = null;
 let quote: any = null;
 let timeline: any[] = [];
-let notFound = false;
+/**
+ * What the record read actually did. This used to be a `notFound` boolean set
+ * by ANY query error, so a timeout or a revoked key told the founder the
+ * enquiry "did not exist" — while the record it could not read may well have
+ * been an unanswered enquiry. Only PostgREST's "no rows" answer to `.single()`
+ * proves absence. See lib/admin-enquiry-state.ts.
+ */
+let recordKind: 'ok' | 'missing' | 'configuration' | 'unavailable' = 'ok';
 let error: string | null = null;
+/** Optional panels that failed. Each is named on screen rather than rendering
+ *  as an empty panel that reads like "there is nothing here". */
+let failedSections: string[] = [];
+/** What the founder asked for, confirmed against the row re-read further down. */
+let requestedStatus: string | null = null;
+let requestedContact = false;
+let requestedConversion: 'lead' | 'quote' | null = null;
+/** Where "Try again" goes: this same enquiry. */
+const retryHref = Astro.url.pathname;
+/** Whether the service-role client could be constructed at all — the one
+ *  failure that has no error object to classify. */
+let clientReady = false;
 // Files the customer attached to this enquiry. Read with the service-role
 // client behind the admin middleware, then each one is given a short-lived
 // signed URL — the private object path never reaches the browser.
@@ -39,6 +78,7 @@ let alsoFromContact: any[] = [];
 
 try {
   const supabase = createSupabaseAdminClient();
+  clientReady = true;
   const staffId = Astro.locals.staffUser?.id ?? null;
 
   if (Astro.request.method === 'POST') {
@@ -46,31 +86,63 @@ try {
     const intent = String(form.get('_intent') ?? '');
 
     if (intent === 'mark_contacted') {
-      await markEnquiryContacted(supabase, id!, staffId);
+      // Recorded here, then CONFIRMED against the row re-read further down: a
+      // write that silently did nothing must not be reported as a change.
+      try {
+        await markEnquiryContacted(supabase, id!, staffId);
+        requestedContact = true;
+      } catch {
+        error = 'Could not mark this enquiry as contacted — nothing was changed. Please try again.';
+      }
     } else if (intent === 'change_status') {
       const status = String(form.get('status') ?? '');
-      if (STATUSES.includes(status)) await changeEnquiryStatus(supabase, id!, status, staffId);
-    } else if (intent === 'convert_to_lead') {
-      const result = await convertEnquiryToLead(supabase, id!, staffId);
-      if (!result.ok && result.reason === 'ALREADY_CONVERTED') notice = 'This enquiry was already converted to a Lead.';
-      else if (!result.ok) error = 'Could not convert to Lead: ' + result.reason;
-    } else if (intent === 'create_quote') {
-      const result = await createQuoteFromEnquiry(supabase, id!, staffId);
-      if (!result.ok && result.reason === 'ALREADY_CONVERTED') notice = 'A Quote already exists for this enquiry.';
-      else if (!result.ok) error = 'Could not create Quote: ' + result.reason;
+      if (!STATUSES.includes(status)) {
+        error = 'That is not a status this enquiry can be set to, so nothing was changed.';
+      } else {
+        try {
+          await changeEnquiryStatus(supabase, id!, status, staffId);
+          requestedStatus = status;
+        } catch {
+          error = 'Could not update the status — nothing was changed. Please try again.';
+        }
+      }
+    } else if (intent === 'convert_to_lead' || intent === 'create_quote') {
+      const kind = intent === 'convert_to_lead' ? ('lead' as const) : ('quote' as const);
+      try {
+        const result = kind === 'lead'
+          ? await convertEnquiryToLead(supabase, id!, staffId)
+          : await createQuoteFromEnquiry(supabase, id!, staffId);
+        if (result.ok) requestedConversion = kind;
+        else if (result.reason === 'ALREADY_CONVERTED') notice = ALREADY_CONVERTED_MESSAGES[kind];
+        else error = conversionFailureMessage(kind, result.reason);
+      } catch {
+        // The conversion helpers throw on a real failure (a customer row that
+        // could not be created, say). The wording stays ours; a database
+        // message never reaches the screen.
+        error = `Could not create the ${kind} — nothing was changed. Please try again.`;
+      }
     } else {
       // Archive / restore / permanent delete. A converted enquiry keeps an
       // extra rule of its own on top of the shared checks: it is the source
       // record behind a Lead or Quote and must survive them, so it can be
       // archived out of the way but never permanently deleted.
-      const linked = await (async () => {
-        if (String(form.get('_intent') ?? '') !== 'delete') return false;
-        const { data: current } = await supabase.from('enquiries').select('lead_id, quote_id').eq('id', id).single();
-        return Boolean(current?.lead_id || current?.quote_id);
-      })();
+      // A converted enquiry is the source record behind a Lead or Quote and must
+      // survive it, so the linkage is re-read immediately before the delete.
+      // A FAILED read blocks the delete rather than assuming "unlinked": the
+      // one outcome that must never happen is deleting a source record because
+      // we could not tell whether it was one.
+      let deletion: 'allowed' | 'blocked-linked' | 'blocked-unverified' = 'allowed';
+      if (intent === 'delete') {
+        const { data: linkRow, error: linkError } = await supabase
+          .from('enquiries')
+          .select('lead_id, quote_id')
+          .eq('id', id)
+          .single();
+        deletion = decideEnquiryDeletion({ data: linkRow ?? null, error: linkError });
+      }
 
-      if (linked) {
-        error = 'This enquiry is linked to a Lead or Quote and cannot be deleted — it must remain as the source record. Archive it, or set its status to Lost, to close it instead.';
+      if (deletion !== 'allowed') {
+        error = DELETION_MESSAGES[deletion];
       } else {
         const outcome = await handleRecordAction(Astro, form, {
           supabase,
@@ -87,18 +159,34 @@ try {
   }
 
   const { data: enquiryRow, error: enquiryError } = await supabase.from('enquiries').select('*').eq('id', id).single();
-  if (enquiryError || !enquiryRow) {
-    notFound = true;
-  } else {
-    enquiry = enquiryRow;
+  const record = classifyRow<any>({ data: enquiryRow ?? null, error: enquiryError });
+  recordKind = record.kind;
+
+  if (record.kind === 'ok') {
+    enquiry = record.data;
+
     const [leadRow, quoteRow, activityRows] = await Promise.all([
-      enquiry.lead_id ? supabase.from('leads').select('id, name, status').eq('id', enquiry.lead_id).maybeSingle() : Promise.resolve({ data: null }),
-      enquiry.quote_id ? supabase.from('quotes').select('id, quote_number, status, total, share_token, viewed_at').eq('id', enquiry.quote_id).maybeSingle() : Promise.resolve({ data: null }),
+      enquiry.lead_id ? supabase.from('leads').select('id, name, status').eq('id', enquiry.lead_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      enquiry.quote_id ? supabase.from('quotes').select('id, quote_number, status, total, share_token, viewed_at').eq('id', enquiry.quote_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
       supabase.from('activities').select('id, description, created_at').eq('entity_type', 'enquiry').eq('entity_id', id).order('created_at', { ascending: false }),
     ]);
-    lead = leadRow.data;
-    quote = quoteRow.data;
-    timeline = activityRows.data ?? [];
+
+    // Each optional panel is judged ON ITS OWN. One failing query must not blank
+    // the others, and must never hide the enquiry itself — an empty "Linked
+    // Records" panel is indistinguishable from one whose query failed.
+    if (enquiry.lead_id) {
+      const linkedLead = classifyRow<any>(leadRow);
+      if (linkedLead.kind === 'ok') lead = linkedLead.data;
+      else if (linkedLead.kind !== 'missing') failedSections.push('Linked Lead');
+    }
+    if (enquiry.quote_id) {
+      const linkedQuote = classifyRow<any>(quoteRow);
+      if (linkedQuote.kind === 'ok') quote = linkedQuote.data;
+      else if (linkedQuote.kind !== 'missing') failedSections.push('Linked Quote');
+    }
+    const activity = classifyList<any>(activityRows);
+    if (activity.kind === 'ok') timeline = activity.rows;
+    else failedSections.push('Activity Timeline');
   }
 
   // OTHER ENQUIRIES FROM THE SAME PERSON.
@@ -113,33 +201,68 @@ try {
   // Matched on email because that is the field every form requires. One
   // indexed query on a table already open; no new table, no new column.
   if (enquiry?.email) {
-    const { data: siblingRows } = await supabase
+    const siblings = classifyList<any>(await supabase
       .from('enquiries')
       .select('id, source, status, sauna_interest, created_at')
       .eq('email', enquiry.email)
       .neq('id', id)
       .order('created_at', { ascending: false })
-      .limit(10);
-    alsoFromContact = siblingRows ?? [];
+      .limit(10));
+    if (siblings.kind === 'ok') alsoFromContact = siblings.rows;
+    else failedSections.push('Also From This Contact');
   }
 
   // Customer project files, newest first.
   if (enquiry) {
-    const { data: fileRows } = await supabase
+    const files = classifyList<any>(await supabase
       .from('documents')
       .select('file_url, file_name, created_at')
       .eq('enquiry_id', id)
-      .order('created_at', { ascending: false });
-    const rows = fileRows ?? [];
-    const signed = await signDocumentUrls(supabase, rows.map((r: any) => r.file_url));
-    projectFiles = rows.map((r: any) => ({
-      name: r.file_name || 'Attachment',
-      url: signed.get(String(r.file_url ?? '').trim()) ?? null,
-      created: r.created_at ?? null,
-    }));
+      .order('created_at', { ascending: false }));
+    if (files.kind !== 'ok') {
+      failedSections.push('Customer project files');
+    } else {
+      try {
+        const signed = await signDocumentUrls(supabase, files.rows.map((r: any) => r.file_url));
+        projectFiles = files.rows.map((r: any) => ({
+          name: r.file_name || 'Attachment',
+          url: signed.get(String(r.file_url ?? '').trim()) ?? null,
+          created: r.created_at ?? null,
+        }));
+      } catch {
+        // Signing is a second call against storage. A failure hides the file
+        // links, never the enquiry, and is named as its own unavailable part.
+        failedSections.push('Customer project files');
+      }
+    }
   }
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Supabase is not configured yet.';
+} catch {
+  // A throw here is either the client failing to construct (missing credentials
+  // — a configuration problem) or a read that failed outright. Neither is
+  // "not found", and neither gets to speak: database messages name tables,
+  // columns and constraints. The panel below carries our own wording instead.
+  if (recordKind === 'ok') recordKind = clientReady ? 'unavailable' : 'configuration';
+}
+
+// Confirmations — from the row RE-READ above, never from the fact that a write
+// call returned. An action is only reported as a change when the reloaded
+// record proves it; if the reload itself failed, say exactly that instead of
+// guessing in either direction.
+if (requestedStatus || requestedContact || requestedConversion) {
+  if (recordKind !== 'ok' || !enquiry) {
+    error = UNCONFIRMED_ACTION_MESSAGE;
+  } else {
+    const confirmation = requestedStatus
+      ? statusChangeConfirmation(enquiry.status, requestedStatus)
+      : requestedContact
+        ? contactedConfirmation(enquiry.contacted_at)
+        : conversionConfirmation(
+            requestedConversion!,
+            requestedConversion === 'lead' ? enquiry.lead_id : enquiry.quote_id
+          );
+    if (confirmation.tone === 'notice') notice = confirmation.message;
+    else error = confirmation.message;
+  }
 }
 // Archive state for the actions block. Resolved after the record loads and
 // kept out of the main try so a failure here can never mask the record itself.
@@ -196,13 +319,54 @@ const followUpMailto = enquiry?.email && followUp ? buildMailtoHref(enquiry.emai
 // The customer's own answers, lifted out of the message blob so the reply can
 // be written from them without reading a paragraph first. Read-only.
 const details = parseEnquiryDetails(enquiry?.message);
+/**
+ * The ZIP the customer actually typed, taken from the answers block — NOT from
+ * enquiries.location, which two forms fill with the placement answer
+ * ("outdoor", "poolside"). Null when no ZIP was given, so the row can say so
+ * rather than borrowing another field's value and inventing a fact.
+ */
+const zipAnswer = findAnswer(details.fields, /^(zip|postal)/i);
+/** Permitted campaign facts, recovered from the arrival entry the capture
+ *  already writes into the activity timeline. Empty when none were recorded. */
+const campaign = campaignFacts((timeline ?? []).map((entry: any) => entry?.description));
 ---
 
 <AdminLayout title="Enquiry" subtitle={enquiry ? `Received ${new Date(enquiry.created_at).toLocaleString()}` : undefined} parentLabel="Website Enquiries" parentHref="/admin/enquiries">
   {enquiry && <Fragment slot="title-badge"><StatusBadge status={enquiry.status} /></Fragment>}
 
-  {notFound && <p class="admin-empty">Enquiry not found.</p>}
+  {recordKind === 'missing' && (
+    <p class="admin-empty">
+      Enquiry not found. It may have been permanently deleted — check the
+      {' '}<a href="/admin/enquiries">enquiries list</a>.
+    </p>
+  )}
+
+  {recordKind === 'configuration' && (
+    <div class="admin-placeholder" style="margin-bottom:1.5rem;">
+      <h2>{CONFIGURATION_HEADLINE}</h2>
+      <p>{CONFIGURATION_BODY}</p>
+    </div>
+  )}
+
+  {/* A failed read is NOT a missing record: the whole point of this panel is
+      that "Enquiry not found" must never describe a query that did not run. */}
+  {recordKind === 'unavailable' && (
+    <div class="admin-placeholder" style="margin-bottom:1.5rem; border-color: rgba(230,130,90,0.35);">
+      <h2>{RECORD_FAILED_HEADLINE}</h2>
+      <p>{RECORD_FAILED_BODY}</p>
+      <a class="admin-btn" href={retryHref}>{RETRY_LABEL}</a>
+    </div>
+  )}
+
   {error && <p class="notice notice--error" style="margin-bottom:1.25rem;">{error}</p>}
+
+  {/* One named line per optional panel that failed, so an incomplete page is
+      never mistaken for a complete one — the enquiry itself stays visible. */}
+  {failedSections.length > 0 && (
+    <div class="notice notice--error" style="margin-bottom:1.25rem;">
+      {failedSections.map((section) => <p style="margin:0 0 0.4rem;">{sectionUnavailable(section)}</p>)}
+    </div>
+  )}
 
   {enquiry && (
     <RecordActions
@@ -261,7 +425,12 @@ const details = parseEnquiryDetails(enquiry?.message);
               <div><dt>Name</dt><dd>{enquiry.name || '—'}</dd></div>
               <div><dt>Email</dt><dd>{enquiry.email || '—'}</dd></div>
               <div><dt>Phone</dt><dd>{enquiry.phone || '—'}</dd></div>
-              <div><dt>ZIP / Postal Code</dt><dd>{enquiry.location || '—'}</dd></div>
+              {/* `location` is NOT reliably a ZIP: two forms send the placement
+                  answer in it ("outdoor", "poolside") while the ZIP arrives in
+                  the message. Showing it under "ZIP / Postal Code" invented a
+                  fact the customer never gave. */}
+              <div><dt>Location / Placement</dt><dd>{enquiry.location || '—'}</dd></div>
+              <div><dt>ZIP / Postal Code</dt><dd>{zipAnswer || '—'}</dd></div>
             </dl>
 
             {projectFiles.length > 0 && (
@@ -404,6 +573,25 @@ const details = parseEnquiryDetails(enquiry?.message);
               <div><dt>Status</dt><dd><StatusBadge status={enquiry.status} /></dd></div>
               {enquiry.contacted_at && <div><dt>Contacted</dt><dd>{new Date(enquiry.contacted_at).toLocaleString()}</dd></div>}
             </dl>
+          </section>
+
+          {/* Permitted campaign attribution, read back from the arrival entry the
+              capture already writes into the timeline. Only allow-listed fields;
+              when none were captured it says so rather than showing an empty panel. */}
+          <section class="admin-panel enq-sec">
+            <h2 class="enq-sec__h">Campaign Attribution</h2>
+            {campaign.length > 0 ? (
+              <dl class="enq-kv enq-kv--1col">
+                {campaign.map((fact) => (
+                  <div><dt>{fact.label}</dt><dd>{fact.value}</dd></div>
+                ))}
+              </dl>
+            ) : (
+              <p class="enq-files__note" style="margin:0;">
+                Not recorded for this enquiry — no campaign details were captured, or this
+                enquiry predates campaign attribution.
+              </p>
+            )}
           </section>
 
           {alsoFromContact.length > 0 && (

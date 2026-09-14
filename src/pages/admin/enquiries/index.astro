@@ -8,9 +8,19 @@ import { createSupabaseAdminClient } from '../../../lib/supabase-admin';
 import ArchiveToggle from '../../../components/admin/ArchiveToggle.astro';
 import { archiveSupported, withArchiveFilter } from '../../../lib/archive';
 import { effectiveSource } from '../../../lib/enquiry-source';
+import {
+  classifyList,
+  CONFIGURATION_BODY,
+  CONFIGURATION_HEADLINE,
+  LOAD_FAILED_BODY,
+  LOAD_FAILED_HEADLINE,
+  RETRY_LABEL,
+} from '../../../lib/admin-enquiry-state';
 
 const search = Astro.url.searchParams.get('q') ?? '';
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
+/** Where "Try again" goes: this same view, filters intact. */
+const retryHref = Astro.url.pathname + Astro.url.search;
 
 const STATUSES = ['New', 'Contacted', 'Qualified', 'Quoted', 'Won', 'Lost'];
 
@@ -61,7 +71,13 @@ function nextAction(e: { status: string; created_at: string }): string {
 }
 
 let enquiries: any[] = [];
-let dbReady = true;
+/**
+ * What the list query actually did. The old code kept a single boolean and
+ * discarded the query's error, so a failed read rendered as "No enquiries yet"
+ * — a claim about the business made on the strength of a request that never
+ * returned. See lib/admin-enquiry-state.ts.
+ */
+let listKind: 'ok' | 'configuration' | 'unavailable' = 'ok';
 // Archived records are hidden from the active list; ?archived=1 shows only them.
 const showArchived = Astro.url.searchParams.get('archived') === '1';
 let archiveOk = false;
@@ -80,18 +96,31 @@ try {
   // is applied, so this cannot break the page in the meantime.
   archiveOk = await archiveSupported(supabase);
   query = withArchiveFilter(query, archiveOk, showArchived);
-  const { data } = await query.limit(200);
-  enquiries = data ?? [];
+  const list = classifyList(await query.limit(200));
+  listKind = list.kind;
+  enquiries = list.rows;
 } catch {
-  dbReady = false;
+  // createSupabaseAdminClient() throws only when the project is unconfigured,
+  // which is a configuration problem rather than a temporary one.
+  listKind = 'configuration';
 }
 ---
 
 <AdminLayout title="Website Enquiries" parentLabel="Dashboard" parentHref="/admin">
-  {!dbReady && (
+  {listKind === 'configuration' && (
     <div class="admin-placeholder" style="margin-bottom: 1.5rem;">
-      <h2>Not connected to Supabase yet</h2>
-      <p>See <code>README-ADMIN.md</code> to connect a project and run the schema.</p>
+      <h2>{CONFIGURATION_HEADLINE}</h2>
+      <p>{CONFIGURATION_BODY}</p>
+    </div>
+  )}
+
+  {/* A failed read is NOT an empty inbox. Reporting "No enquiries yet" here
+      would tell the founder the funnel is quiet while the CRM is unreachable. */}
+  {listKind === 'unavailable' && (
+    <div class="admin-placeholder" style="margin-bottom: 1.5rem; border-color: rgba(230,130,90,0.35);">
+      <h2>{LOAD_FAILED_HEADLINE}</h2>
+      <p>{LOAD_FAILED_BODY}</p>
+      <a class="admin-btn" href={retryHref}>{RETRY_LABEL}</a>
     </div>
   )}
 
@@ -112,6 +141,7 @@ try {
   </div>
 
   <div class="admin-panel">
+    {listKind === 'ok' && (
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
@@ -146,7 +176,16 @@ try {
         </tbody>
       </table>
     </div>
-    {dbReady && enquiries.length === 0 && <p class="admin-empty">No enquiries yet — they'll appear here as visitors submit Request a Quote, use the Sauna Advisor, or reach out through the contact form.</p>}
+    )}
+    {/* Only a query that actually SUCCEEDED may say the list is empty, and an
+        empty filtered list is not the same statement as an empty database. */}
+    {listKind === 'ok' && enquiries.length === 0 && (
+      <p class="admin-empty">
+        {search || statusFilter
+          ? 'No enquiries match this filter. Clear the search or the status filter to see the whole list.'
+          : "No enquiries yet — they'll appear here as visitors submit Request a Quote, use the Sauna Advisor, or reach out through the contact form."}
+      </p>
+    )}
   </div>
 </AdminLayout>
 
