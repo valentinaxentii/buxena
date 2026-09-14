@@ -68,14 +68,32 @@ A submission validates, shows "Local test mode", and writes/sends nothing.
 - No public prices, stock claims or delivery promises may be invented; the public
   pricing register stays empty until the founder approves exact figures.
 
-## Preview on Netlify (blocked on one credential)
+## Preview — live and protected
 
-This machine has no Netlify credential: the `netlify` CLI is not installed, there
-is no `NETLIFY_AUTH_TOKEN`, `%APPDATA%\netlify\Config\config.json` contains only
-`cliId` and telemetry settings, and `.netlify/state.json` holds only geolocation
-data with no site ID. Without that credential the account plan, the included
-access-protection option and the linked site cannot even be read — so no preview
-was created and none is claimed.
+**URL:** <https://v2--buxena-v2-preview.netlify.app>
+
+It is a draft deploy (with a stable alias) of the built `buxena-v2` revision on a
+**separate Netlify project** called `buxena-v2-preview`, not on the project that
+serves buxena.com. Nothing done there can affect production.
+
+**Access:** the project is **private**, enforced by Netlify login — the included
+protection on credit-based plans (site passwords are Pro-only). Sign in to Netlify
+as `valentin.axentii@gmail.com` in the same browser. An unauthenticated request
+currently gets **HTTP 401**, which was verified after protection was enabled.
+
+**Safety on that project:** `BUXENA_SAFE_MODE=true` is set on the project *and*
+passed per deploy, so the inquiry API answers `{"ok":true,"devMode":true}` and
+writes and sends nothing. No Supabase, Zoho or Telegram credential exists on that
+project, so the enquiry API could not reach live services even if the flag were
+wrong. `X-Robots-Tag: noindex, nofollow` and a `Disallow: /` robots.txt are served
+on this preview only.
+
+**Verified on the hosted preview:** homepage (V2 wording), catalogue with ULLA
+listed, ULLA page with its hero image and presentation PDF, EDA 160 with the
+verified CAPRA hero, a source PNG and a WebP variant, robots.txt, and the
+safe-mode inquiry API — **16/16 checks** before protection was switched on, then a
+**401** gate afterwards.
+
 
 ### The one sign-in step (account owner only)
 
@@ -89,34 +107,39 @@ Either:
 
 Never write that token into a file, a commit or this repository.
 
-### Exact sequence after signing in (all non-production)
+### Updating the preview (exact commands that were used)
 
 ```powershell
-# 1. Confirm who is signed in and whether a site is linked.
-npx --yes netlify-cli status
-
-# 2. Read the plan/allowance and find the BUXENA site BEFORE deploying.
-npx --yes netlify-cli sites:list
-#    Confirm the plan, and check whether deploy/access protection is included.
-#    If protection is a PAID feature: stop and report it. Do not upgrade, do not
-#    accept an overage, and do not deploy an unprotected preview.
-
-# 3. Build locally, then add a preview-only robots header.
 npm run build
-node -e "require('fs').writeFileSync('dist/_headers','/*\n  X-Robots-Tag: noindex, nofollow\n')"
 
-# 4. Create a NON-PRODUCTION draft deploy with a stable alias.
-#    NEVER add --prod: that publishes production (buxena.com).
-npx --yes netlify-cli deploy --dir=dist --alias=buxena-v2-preview
+# A normal `netlify deploy` runs the build itself, which deletes these two files,
+# so patch them and deploy with --no-build.
+node -e "require('fs').writeFileSync('dist/_headers','/*\n  X-Robots-Tag: noindex, nofollow\n')"
+node -e "require('fs').writeFileSync('dist/robots.txt','# BUXENA V2 non-production preview. Not for indexing.\nUser-agent: *\nDisallow: /\n')"
+
+npx --yes netlify-cli@latest deploy --dir=dist --no-build --site 1c41d814-c514-4236-a98d-826b49dea4a3 --alias v2 --env BUXENA_SAFE_MODE=true --message "V2 preview"
 ```
 
-Then, in the Netlify UI for that deploy: confirm `BUXENA_SAFE_MODE=true` applies
-to it (`netlify.toml` sets it for the deploy-preview and branch-deploy contexts)
-and switch access protection on **before** sharing the URL.
+Never add `--prod`: on the production project that publishes buxena.com. The site
+id above is the separate `buxena-v2-preview` project.
 
-### Verify the preview
+### How the protection was set (and how to undo it)
 
-Open the homepage, `/saunas/`, a product image, `/saunas/bux-ulla/` and the
-inquiry flow. Confirm the form reports “Local test mode” (safe mode) instead of
-sending anything, and that no new enquiry, email or upload appeared. Confirm
-production still shows the “Coming Soon” placeholder.
+Team login (private project) is applied to the preview project only:
+
+```powershell
+# on  — unauthenticated visitors get 401; the owner signs in to Netlify
+npx --yes netlify-cli@latest api updateSite --data '{\"site_id\":\"1c41d814-c514-4236-a98d-826b49dea4a3\",\"sso_login\":true,\"sso_login_context\":\"all\"}'
+# off — make the preview public again
+npx --yes netlify-cli@latest api updateSite --data '{\"site_id\":\"1c41d814-c514-4236-a98d-826b49dea4a3\",\"sso_login\":false}'
+```
+
+### Removing the preview entirely
+
+```powershell
+npx --yes netlify-cli@latest api deleteSite --data '{\"site_id\":\"1c41d814-c514-4236-a98d-826b49dea4a3\"}'
+```
+
+Production was verified unchanged throughout: `buxena.com` still serves the
+"Coming Soon" page, and the production project still publishes `main` at
+`e3b457d` with protection off.

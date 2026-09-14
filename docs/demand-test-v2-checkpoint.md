@@ -154,8 +154,10 @@ collection setup. Do not count budget selection or a free inquiry as a sale.
 ## Continue from here
 
 Preserve this branch and every catalogue entry. Do not publish invented prices,
-modify main/V1, or deploy. Changes are committed locally; no push is included
-because the hosting branch-deploy configuration has not been verified. The next
-real step is the launch review with the founder: settle the ULLA decision,
-confirm who answers inquiries during travel, then verify live inquiry delivery
-deliberately and only with explicit approval.
+and never deploy to production. The branch is now saved to GitHub on the founder's
+instruction, and a separate **protected** non-production preview exists (URL and
+access method in [`docs/chromebook-access.md`](chromebook-access.md)); production
+(`buxena.com`, branch `main` at `e3b457d`) was verified untouched. The next real
+step is the launch review with the founder: settle the ULLA decision, confirm who
+answers inquiries during travel, then verify live inquiry delivery deliberately
+and only with explicit approval.

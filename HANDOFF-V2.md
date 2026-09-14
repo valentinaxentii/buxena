@@ -50,10 +50,15 @@ Everything below this section is historical. Current state:
   locally once after the ULLA restoration — **25/25 GREEN**, 101 pages, 67 product
   pages, 67 published models with no findings, 6,388 references — because the
   restore changes what that board counts.
-- **Preview:** not created. This machine has no Netlify credential at all, so the
-  account plan, the included access-protection option and the linked site cannot
-  even be read — and must not be guessed at. `docs/chromebook-access.md` gives the
-  single sign-in step that unblocks it. No preview URL is claimed here.
+- **Preview:** **live and protected** at <https://v2--buxena-v2-preview.netlify.app>
+  — a draft deploy on a separate Netlify project (`buxena-v2-preview`), not the
+  one serving buxena.com. Access requires Netlify login (the included protection
+  on credit-based plans; passwords are Pro-only) and unauthenticated requests get
+  **401**. On that project `BUXENA_SAFE_MODE=true` is set (project and deploy), no
+  production credentials exist, and `X-Robots-Tag: noindex, nofollow` plus a
+  `Disallow: /` robots.txt are served. 16/16 hosted checks passed before the
+  protection was enabled. Commands to update or remove it are in
+  [`docs/chromebook-access.md`](docs/chromebook-access.md).
 
 **The August 13 results below are historical, not the current launch status.**
 
