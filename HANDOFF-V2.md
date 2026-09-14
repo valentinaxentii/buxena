@@ -12,6 +12,39 @@ Still open and founder-only: the ULLA launch decision, the paid-advertising /
 VIRU-NORD permission gaps, live CRM + mail delivery, exact public prices, and
 approval to publish.
 
+---
+
+## Chromebook / remote access — September 14, 2026 (latest update)
+
+Everything below this section is historical. Current state:
+
+- **Saved to GitHub:** branch `buxena-v2`, including the handoff, the preview
+  documentation and the Codespaces configuration. Nothing was merged into `main`,
+  force-pushed, or deployed to production.
+- **Production is untouched, and verified so:** the live `buxena.com` HTML is the
+  BUXENA "Coming Soon" placeholder, and `origin/main:src/pages/index.astro` is
+  exactly that placeholder (`WEBSITE UNDER CONSTRUCTION` / "SOMETHING
+  EXTRAORDINARY IS COMING SOON"). Production therefore serves `main`, still at
+  `e3b457d`. `buxena-v2` is a non-production branch, so a push to it cannot
+  replace V1 or change buxena.com.
+- **ULLA:** the removal you did not approve was reversed in corrective commit
+  `dd5fe03` — content file, three source images, its presentation PDF and eight
+  optimized variants, restored byte-identically. Its image-rights position is
+  unchanged (excluded from the 2026-08-11 CAPRA grant; covered only by the
+  2026-08-17 founder exception for its existing catalogue photograph; not cleared
+  for paid advertising). The launch decision remains yours.
+- **Outgoing commits were audited before saving:** 541 changed paths, no `.env`,
+  credential, cache, log, archive or temporary file, and no non-empty
+  secret-sounding assignment in any tracked file. Secret-shaped values were never
+  displayed.
+- **Chromebook access:** `.devcontainer/devcontainer.json` (Node 22, smallest
+  machine requested, safe-mode enquiries, official Cline extension, no prebuilds)
+  plus [`docs/chromebook-access.md`](docs/chromebook-access.md).
+- **Preview:** not created. This machine has no Netlify credential at all, so the
+  account plan, the included access-protection option and the linked site cannot
+  even be read — and must not be guessed at. `docs/chromebook-access.md` gives the
+  single sign-in step that unblocks it. No preview URL is claimed here.
+
 **The August 13 results below are historical, not the current launch status.**
 
 Last updated **2026-08-13**. Branch **`buxena-v2`**.

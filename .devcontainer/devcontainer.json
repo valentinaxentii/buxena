@@ -1,0 +1,30 @@
+{
+  // BUXENA V2 — browser-based development from any machine (e.g. the Chromebook).
+  //
+  // Chosen deliberately, per the founder's constraints:
+  //   * Node 22 matches .github/workflows and package.json's engines.
+  //   * The smallest suitable machine is requested, so a Codespace cannot
+  //     silently pick a larger (expensive) one.
+  //   * Enquiry handling is forced into SAFE MODE for interactive development:
+  //     validate and acknowledge, write nothing, send nothing. Local `astro dev`
+  //     is already safe unless ENQUIRIES_DEV_LIVE=true; this makes it explicit.
+  //   * No secrets are baked in. .env stays local and is never committed, and no
+  //     production credential belongs in this file.
+  //   * No prebuilds are configured anywhere: the container installs
+  //     dependencies once, on creation.
+  "name": "BUXENA V2 (safe mode)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "hostRequirements": { "cpus": 2, "memory": "8gb", "storage": "32gb" },
+  "remoteEnv": {
+    "BUXENA_SAFE_MODE": "true",
+    "ENQUIRIES_DEV_LIVE": "false",
+    "ASTRO_TELEMETRY_DISABLED": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["saoudrizwan.claude-dev"]
+    }
+  },
+  "postCreateCommand": "npm ci",
+  "waitFor": "postCreateCommand"
+}
